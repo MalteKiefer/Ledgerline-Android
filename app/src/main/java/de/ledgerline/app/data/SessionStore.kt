@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.domain.model.Session
+import javax.crypto.Cipher
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -17,21 +18,32 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 
 @Serializable private data class SealedSession(val baseUrl: String, val token: String, val spkiPin: String, val userName: String?)
 
-/** Persists the session as a single AES-GCM sealed blob (keystore-gated). */
+/**
+ * Persists the session as a single AES-GCM sealed blob (keystore-gated with per-use
+ * auth). [save]/[load] build the keystore cipher and hand it to [authorize], which
+ * runs exactly ONE CryptoObject-bound biometric prompt and returns the authorised
+ * cipher — that single prompt authorizes the keystore operation.
+ */
 class SessionStore(private val context: Context, private val sealer: KeystoreSealer) {
     private val key = byteArrayPreferencesKey("session_blob")
     private val json = Json
 
-    suspend fun save(session: Session) {
+    /** @return true on success, false if the auth was cancelled/failed. */
+    suspend fun save(session: Session, authorize: suspend (Cipher) -> Cipher?): Boolean {
         val plain = json.encodeToString(SealedSession(session.baseUrl, session.token, session.spkiPin, session.userName))
-        val blob = sealer.seal(plain.toByteArray())
+        val cipher = sealer.encryptCipher()
+        val authed = authorize(cipher) ?: return false // ONE biometric happens here
+        val blob = sealer.finishSeal(authed, plain.toByteArray())
         context.dataStore.edit { it[key] = blob }
+        return true
     }
 
-    /** Requires the keystore key to be unlocked (BiometricPrompt) beforehand. */
-    suspend fun load(): Session? {
+    /** Runs one CryptoObject-bound biometric (via [authorize]) to decrypt the blob. */
+    suspend fun load(authorize: suspend (Cipher) -> Cipher?): Session? {
         val blob = context.dataStore.data.first()[key] ?: return null
-        val plain = String(sealer.open(blob))
+        val cipher = sealer.decryptCipher(blob)
+        val authed = authorize(cipher) ?: return null // ONE biometric happens here
+        val plain = String(sealer.finishOpen(authed, blob))
         val s = json.decodeFromString<SealedSession>(plain)
         return Session(s.baseUrl, s.token, s.spkiPin, s.userName)
     }

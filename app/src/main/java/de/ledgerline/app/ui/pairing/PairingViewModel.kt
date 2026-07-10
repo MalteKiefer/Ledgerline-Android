@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import javax.crypto.Cipher
 import javax.inject.Inject
 
 @HiltViewModel
@@ -31,8 +32,10 @@ class PairingViewModel @Inject constructor(
     }
 
     /**
-     * Persist the paired session as a keystore-sealed blob. Called only AFTER a
-     * successful app-lock auth, so the auth-gated keystore key can be used to seal.
+     * Persist the paired session as a keystore-sealed blob. [authorize] runs the
+     * single CryptoObject-bound biometric that authorizes the keystore seal.
+     * @return true on success, false if the auth was cancelled/failed.
      */
-    suspend fun persist(session: Session) = sessionStore.save(session)
+    suspend fun persist(session: Session, authorize: suspend (Cipher) -> Cipher?): Boolean =
+        sessionStore.save(session, authorize)
 }

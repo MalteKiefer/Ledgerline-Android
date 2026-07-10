@@ -37,14 +37,14 @@ import de.ledgerline.app.R
 import kotlinx.coroutines.launch
 
 /**
- * Vault unlock screen. Tapping Unlock first runs the app-lock auth ([authGate]) —
- * this opens the keystore auth window so the sealed session can be read — then
- * derives the Vault Key from the passphrase.
+ * Vault unlock screen. Tapping Unlock reads the sealed session, which triggers
+ * exactly one CryptoObject-bound app-lock biometric ([authorize]) to authorize the
+ * keystore decrypt, then derives the Vault Key from the passphrase.
  */
 @Composable
 fun UnlockScreen(
     vm: UnlockViewModel = hiltViewModel(),
-    authGate: suspend () -> Boolean,
+    authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
     onUnlocked: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -100,7 +100,8 @@ fun UnlockScreen(
                     onClick = {
                         val entered = passphrase.toCharArray()
                         passphrase = ""
-                        scope.launch { if (authGate()) vm.unlock(entered) else entered.fill(' ') }
+                        // Exactly one biometric, triggered inside load() via authorize.
+                        scope.launch { vm.unlock(entered, authorize) }
                     },
                     enabled = state != UnlockUiState.Working,
                     modifier = Modifier.fillMaxWidth().height(52.dp),

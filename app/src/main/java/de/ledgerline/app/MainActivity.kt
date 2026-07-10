@@ -14,10 +14,11 @@ import androidx.lifecycle.LifecycleOwner
 import dagger.hilt.android.AndroidEntryPoint
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.WorkspaceCache
+import androidx.biometric.BiometricPrompt
 import de.ledgerline.app.core.security.AppLock
+import de.ledgerline.app.core.security.CryptoAuth
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.LockGuard
-import de.ledgerline.app.core.security.LockResult
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.ui.nav.AppNav
@@ -87,11 +88,22 @@ class MainActivity : FragmentActivity() {
                 val lockTitle = stringResource(R.string.lock_title)
                 val lockSubtitle = stringResource(R.string.lock_subtitle)
                 val link by pairLink.collectAsState()
+                // Runs ONE CryptoObject-bound biometric on the keystore cipher and
+                // returns the authorised cipher (or null on cancel/failure). Threaded
+                // into SessionStore.save/load via the screens.
+                val authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher? = { cipher ->
+                    idleLocker.touch()
+                    when (
+                        val r = appLock.authenticate(
+                            this@MainActivity, lockTitle, lockSubtitle, BiometricPrompt.CryptoObject(cipher),
+                        )
+                    ) {
+                        is CryptoAuth.Success -> r.cipher
+                        else -> null
+                    }
+                }
                 AppNav(
-                    authGate = {
-                        idleLocker.touch()
-                        appLock.authenticate(this@MainActivity, lockTitle, lockSubtitle) is LockResult.Success
-                    },
+                    authorize = authorize,
                     initialPairLink = link,
                 )
             }
