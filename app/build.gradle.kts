@@ -19,6 +19,8 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += listOf("en", "de")
+        // 64-bit only; also drops the stale 4 KB-aligned prebuilt ABIs from lazysodium.
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
     buildTypes {
@@ -35,7 +37,14 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
-    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    packaging {
+        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        jniLibs {
+            useLegacyPackaging = false // uncompressed + page-aligned .so in the APK
+            // Prefer our own 16 KB-aligned libsodium.so over lazysodium's 4 KB one.
+            pickFirsts += "**/libsodium.so"
+        }
+    }
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
