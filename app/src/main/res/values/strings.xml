@@ -110,4 +110,5 @@
     <string name="photo_original">View original</string>
     <string name="photo_video_soon">Video playback comes later.</string>
     <string name="menu_bookmarks">Bookmarks</string>
+    <string name="menu_more">More</string>
 </resources>

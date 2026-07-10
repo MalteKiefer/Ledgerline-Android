@@ -18,6 +18,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.produceState
@@ -32,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import de.ledgerline.app.R
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.domain.model.GalleryPhoto
+import de.ledgerline.app.ui.workspace.LocalFullscreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +44,8 @@ fun PhotoViewerScreen(
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
+    val fs = LocalFullscreen.current
+    DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
 
     var scale by remember { mutableFloatStateOf(1f) }
     var ox by remember { mutableFloatStateOf(0f) }

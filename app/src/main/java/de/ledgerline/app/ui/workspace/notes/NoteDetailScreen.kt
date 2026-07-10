@@ -18,14 +18,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.ledgerline.app.domain.model.Note
+import de.ledgerline.app.ui.workspace.LocalFullscreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteDetailScreen(note: Note, onBack: () -> Unit, modifier: Modifier = Modifier) {
     BackHandler(onBack = onBack)
+    val fs = LocalFullscreen.current
+    DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
     Scaffold(
         modifier = modifier,
         topBar = {
