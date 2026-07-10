@@ -194,4 +194,10 @@
     <string name="person_hide">Ausblenden</string>
     <string name="person_name_hint">Name</string>
     <string name="person_photos_count">%1$d Fotos</string>
+
+    <!-- Share target -->
+    <string name="share_title">Zu Ledgerline importieren</string>
+    <string name="share_none">Nichts zu importieren</string>
+    <string name="share_summary_photos">%1$d Fotos/Videos → Galerie</string>
+    <string name="share_summary_files">%1$d Dateien → Dateien</string>
 </resources>
