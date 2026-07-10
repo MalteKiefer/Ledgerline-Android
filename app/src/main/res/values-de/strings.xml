@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">Ledgerline</string>
+
+    <!-- Onboarding / Willkommen -->
+    <string name="welcome_tagline">Deine private Zero-Knowledge-Cloud</string>
+    <string name="welcome_get_started">Los geht\'s</string>
+    <string name="welcome_step_connect">Dieses Gerät verbinden</string>
+    <string name="welcome_step_unlock">Tresor entsperren</string>
+
+    <!-- Kopplung -->
+    <string name="pairing_title">Gerät verbinden</string>
+    <string name="pairing_rationale_heading">Kopplungscode scannen</string>
+    <string name="pairing_rationale_body">Öffne dein Ledgerline-Webprofil → Gerät verbinden und richte die Kamera auf den QR-Code. Die Kamera wird nur zum Lesen des Kopplungscodes verwendet — nichts wird aufgezeichnet oder hochgeladen.</string>
+    <string name="pairing_allow_camera">Kamerazugriff erlauben</string>
+    <string name="pairing_settings_hint">Kamerazugriff ist deaktiviert. Aktiviere ihn für Ledgerline in den Geräteeinstellungen, um den Code zu scannen.</string>
+    <string name="pairing_point_at_code">Auf den QR-Code richten</string>
+    <string name="pairing_waiting">Warte auf Bestätigung in der Web-App…</string>
+    <string name="pairing_no_camera">Kameraberechtigung wird zum Scannen des Kopplungscodes benötigt.</string>
+    <string name="pairing_failed">Kopplung fehlgeschlagen: %1$s</string>
+    <string name="unlock_title">Tresor entsperren</string>
+    <string name="unlock_subtitle">Gib deine Passphrase ein, um den Tresor dieses Geräts zu entsperren.</string>
+    <string name="unlock_passphrase">Passphrase</string>
+    <string name="unlock_button">Entsperren</string>
+    <string name="unlock_not_configured">Noch kein Tresor. Bitte zuerst in der Web-App einrichten.</string>
+    <string name="unlock_error">Falsche Passphrase oder Entsperren nicht möglich.</string>
+    <string name="lock_title">Ledgerline entsperren</string>
+    <string name="lock_subtitle">Zum Fortfahren authentifizieren</string>
+    <string name="lock_locked">Gesperrt. Zum Fortfahren authentifizieren.</string>
+</resources>
