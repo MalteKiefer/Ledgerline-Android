@@ -1,8 +1,13 @@
 package de.ledgerline.app.ui.settings
 
+import android.Manifest
 import android.app.LocaleManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.LocaleList
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +25,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,8 +61,14 @@ fun SettingsContent(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val timeout by vm.timeoutMinutes.collectAsStateWithLifecycle()
+    val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
     var showDisconnectConfirm by remember { mutableStateOf(false) }
+
+    // Result is ignored: if the user denies notifications the op still runs; the
+    // platform simply suppresses the foreground-service notification.
+    val notificationsLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
     Column(
         modifier
@@ -95,6 +107,24 @@ fun SettingsContent(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) { Text(stringResource(R.string.settings_lock_now)) }
+
+        SwitchRow(
+            title = stringResource(R.string.settings_background_ops_title),
+            subtitle = stringResource(R.string.settings_background_ops_subtitle),
+            checked = backgroundOps,
+            onCheckedChange = { enabled ->
+                vm.setBackgroundOpsEnabled(enabled)
+                // Ask for POST_NOTIFICATIONS on enable (Android 13+) so the ongoing
+                // foreground-service notification is visible while ops run.
+                if (enabled &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    notificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+            },
+        )
 
         // Account
         SectionHeader(stringResource(R.string.settings_account))
@@ -156,6 +186,32 @@ private fun SectionHeader(text: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.fillMaxWidth().padding(16.dp, 16.dp, 16.dp, 4.dp),
     )
+}
+
+@Composable
+private fun SwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
 }
 
 @Composable
