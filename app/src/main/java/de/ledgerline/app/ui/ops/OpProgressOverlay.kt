@@ -63,4 +63,5 @@ private fun kindLabel(kind: OpKind): Int = when (kind) {
     OpKind.DUPLICATE_SCAN -> R.string.ops_kind_duplicate_scan
     OpKind.UPLOAD -> R.string.ops_kind_upload
     OpKind.BLOB_CLEANUP -> R.string.ops_kind_blob_cleanup
+    OpKind.PREFETCH -> R.string.ops_kind_prefetch
 }

@@ -4,6 +4,8 @@ import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.offline.StoreDiskCache
+import de.ledgerline.app.data.offline.FileBlobPolicy
+import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
@@ -21,15 +23,24 @@ import java.io.File
 
 /** JVM test helpers for the offline-cache seam. */
 
-/** A trivial [OfflineFlags] with per-flag values; defaults to everything on. */
+/**
+ * A trivial [OfflineFlags] with per-value fields; defaults keep caching on with an
+ * unlimited size limit so existing tests read clearly.
+ */
 class FakeOfflineFlags(
     private val enabled: Boolean = true,
-    private val filesBlobs: Boolean = true,
-    private val photosBlobs: Boolean = true,
+    private val filesPolicy: FileBlobPolicy = FileBlobPolicy.ON_DEMAND,
+    private val photosPolicy: PhotoBlobPolicy = PhotoBlobPolicy.ON_DEMAND,
+    private val maxBytes: Long = 0L,
+    private val wifiOnly: Boolean = false,
+    private val chargingOnly: Boolean = false,
 ) : OfflineFlags {
     override fun enabled() = enabled
-    override fun filesBlobs() = filesBlobs
-    override fun photosBlobs() = photosBlobs
+    override fun filesPolicy() = filesPolicy
+    override fun photosPolicy() = photosPolicy
+    override fun maxBytes() = maxBytes
+    override fun wifiOnly() = wifiOnly
+    override fun chargingOnly() = chargingOnly
 }
 
 /** A [StoreDiskCache] rooted at a fresh temp dir (auto-unique per call). */

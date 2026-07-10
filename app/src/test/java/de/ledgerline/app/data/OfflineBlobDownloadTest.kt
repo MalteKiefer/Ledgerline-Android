@@ -63,7 +63,7 @@ class OfflineBlobDownloadTest {
 
     @Test fun files_module_flag_off_does_not_cache() = runBlocking {
         val blobCache = tmpBlobCache()
-        val repo = filesRepo(FilesApi(cipher, fail = false), blobCache, FakeOfflineFlags(filesBlobs = false))
+        val repo = filesRepo(FilesApi(cipher, fail = false), blobCache, FakeOfflineFlags(filesPolicy = de.ledgerline.app.data.offline.FileBlobPolicy.OFF))
         assertTrue(repo.downloadToBytes("blob-x", "encKey") is Outcome.Ok)
         assertTrue(blobCache.get("blob-x") == null) // flag off → nothing cached
     }
