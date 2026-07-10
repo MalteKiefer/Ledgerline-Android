@@ -12,12 +12,15 @@ import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.data.offline.FileBlobPolicy
+import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.NetworkFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,20 +64,30 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setOfflineEnabled(enabled) }
     }
 
-    /** Whether file-content blobs are cached on disk for offline read. */
-    val filesBlobsOffline: StateFlow<Boolean> = settingsStore.filesBlobsOffline
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    // Temporary C1 mapping of the two 5a on/off switches onto the new enum policies:
+    // a switch is "on" iff the policy is not OFF; toggling writes ON_DEMAND / OFF.
+    // C4 replaces these with proper Off / On-demand / All (+ Thumbnails) selectors.
+
+    /** Whether file-content blobs are cached on disk (policy != OFF). */
+    val filesBlobsOffline: StateFlow<Boolean> = settingsStore.filesPolicy
+        .map { it != FileBlobPolicy.OFF }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     fun setFilesBlobsOffline(enabled: Boolean) {
-        viewModelScope.launch { settingsStore.setFilesBlobsOffline(enabled) }
+        viewModelScope.launch {
+            settingsStore.setFilesPolicy(if (enabled) FileBlobPolicy.ON_DEMAND else FileBlobPolicy.OFF)
+        }
     }
 
-    /** Whether photo blobs (originals/thumbs/renditions) are cached on disk. */
-    val photosBlobsOffline: StateFlow<Boolean> = settingsStore.photosBlobsOffline
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    /** Whether photo blobs (originals/thumbs/renditions) are cached on disk (policy != OFF). */
+    val photosBlobsOffline: StateFlow<Boolean> = settingsStore.photosPolicy
+        .map { it != PhotoBlobPolicy.OFF }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     fun setPhotosBlobsOffline(enabled: Boolean) {
-        viewModelScope.launch { settingsStore.setPhotosBlobsOffline(enabled) }
+        viewModelScope.launch {
+            settingsStore.setPhotosPolicy(if (enabled) PhotoBlobPolicy.ON_DEMAND else PhotoBlobPolicy.OFF)
+        }
     }
 
     /** Total on-disk size of both offline caches, refreshed on demand + after a clear. */

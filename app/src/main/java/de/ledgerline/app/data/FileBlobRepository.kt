@@ -7,6 +7,7 @@ import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.domain.model.Session
@@ -40,6 +41,10 @@ class FileBlobRepository(
     private val offlineFlags: OfflineFlags,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) : FileBlobs {
+    /** File-content ciphertext is cached on access unless the master switch or the policy is off. */
+    private fun cachingEnabled(): Boolean =
+        offlineFlags.enabled() && offlineFlags.filesPolicy() != FileBlobPolicy.OFF
+
     /** Production constructor used by Hilt (Hilt can't inject the default lambda). */
     @Inject constructor(
         sessionHolder: SessionHolder,
@@ -120,7 +125,7 @@ class FileBlobRepository(
                 }
             }
             val bytes = res.body()!!.bytes()
-            if (offlineFlags.filesBlobs()) blobCache.put(blob, bytes)
+            if (cachingEnabled()) blobCache.put(blob, bytes)
             val plain = BlobDownloader.decrypt(bytes, encFileKey, vk, crypto)
             consume(plain)
             Outcome.Ok(Unit)
@@ -141,7 +146,7 @@ class FileBlobRepository(
         err: Outcome<Unit>,
         consume: (ByteArray) -> Unit,
     ): Outcome<Unit> {
-        if (!offlineFlags.filesBlobs()) return err
+        if (!cachingEnabled()) return err
         val bytes = blobCache.get(blob) ?: return err
         return try {
             consume(BlobDownloader.decrypt(bytes, encFileKey, vk, crypto))
@@ -193,8 +198,11 @@ class FileBlobRepository(
         /** Offline flags stub used where caching must stay inert (all toggles off). */
         private val NoOfflineFlags = object : OfflineFlags {
             override fun enabled() = false
-            override fun filesBlobs() = false
-            override fun photosBlobs() = false
+            override fun filesPolicy() = FileBlobPolicy.OFF
+            override fun photosPolicy() = de.ledgerline.app.data.offline.PhotoBlobPolicy.OFF
+            override fun maxBytes() = 0L
+            override fun wifiOnly() = false
+            override fun chargingOnly() = false
         }
 
         /** A [Crypto] that throws on every call; only used where crypto is never invoked. */

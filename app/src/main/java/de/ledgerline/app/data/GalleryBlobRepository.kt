@@ -7,6 +7,7 @@ import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.data.remote.dto.ProcessResponse
@@ -38,6 +39,10 @@ class GalleryBlobRepository private constructor(
         offlineFlags: OfflineFlags,
     ) : this(sessionHolder, vaultKeyHolder, crypto, blobCache, offlineFlags, { s -> NetworkFactory.create(s.baseUrl, { s.token }, s.spkiPin) })
 
+    /** Photo ciphertext is cached on access unless the master switch or the policy is off. */
+    private fun cachingEnabled(): Boolean =
+        offlineFlags.enabled() && offlineFlags.photosPolicy() != PhotoBlobPolicy.OFF
+
     override suspend fun download(ref: String, key: String): Outcome<ByteArray> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
@@ -52,7 +57,7 @@ class GalleryBlobRepository private constructor(
                 }
             }
             val bytes = res.body()!!.bytes()
-            if (offlineFlags.photosBlobs()) blobCache.put(ref, bytes)
+            if (cachingEnabled()) blobCache.put(ref, bytes)
             Outcome.Ok(BlobDownloader.decrypt(bytes, key, vk, crypto))
         } catch (e: Exception) { cachedOr(ref, key, vk, Outcome.Err(ErrorKind.DECRYPT, e)) }
     }
@@ -63,7 +68,7 @@ class GalleryBlobRepository private constructor(
      * Returns [err] if disabled, absent, or decryption fails.
      */
     private fun cachedOr(ref: String, key: String, vk: ByteArray, err: Outcome<ByteArray>): Outcome<ByteArray> {
-        if (!offlineFlags.photosBlobs()) return err
+        if (!cachingEnabled()) return err
         val bytes = blobCache.get(ref) ?: return err
         return try {
             Outcome.Ok(BlobDownloader.decrypt(bytes, key, vk, crypto))
