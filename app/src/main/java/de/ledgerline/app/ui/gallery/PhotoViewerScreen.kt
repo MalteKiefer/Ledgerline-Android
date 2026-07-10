@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Info
@@ -156,7 +158,7 @@ private fun PhotoInfoSheet(
     }
 
     val context = LocalContext.current
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -228,15 +230,22 @@ private fun PhotoInfoSheet(
                     value = locationValue,
                     onClick = { openInMaps(context, lat, lng, mapLabel) },
                 )
-                OsmMap(
-                    lat = lat,
-                    lng = lng,
-                    modifier = Modifier
+                // Wrap the native MapView in a clipped Box so it can't overdraw the
+                // info rows above it while the sheet scrolls.
+                Box(
+                    Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    onTap = { openInMaps(context, lat, lng, mapLabel) },
-                )
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .height(160.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                ) {
+                    OsmMap(
+                        lat = lat,
+                        lng = lng,
+                        modifier = Modifier.fillMaxSize(),
+                        onTap = { openInMaps(context, lat, lng, mapLabel) },
+                    )
+                }
                 Text(
                     text = stringResource(R.string.map_open_hint),
                     style = MaterialTheme.typography.labelSmall,
