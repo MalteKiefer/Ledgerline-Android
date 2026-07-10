@@ -16,6 +16,7 @@ import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.core.security.AppLock
 import de.ledgerline.app.core.security.IdleLocker
+import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.core.security.LockResult
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.SettingsStore
@@ -39,6 +40,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var sessionHolder: SessionHolder
     @Inject lateinit var workspaceCache: WorkspaceCache
     @Inject lateinit var settingsStore: SettingsStore
+    @Inject lateinit var lockGuard: LockGuard
     private val appLock = AppLock()
 
     // Emits the latest validated pairing deep link. singleTask means a link
@@ -49,7 +51,12 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         // MASVS-STORAGE: block screenshots, screen recording, recents preview.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
-        enableEdgeToEdge()
+        // The app is always dark; force light (dark-style) system bar icons so the
+        // clock/notification icons stay visible on the transparent dark bars.
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
 
         // Apply the persisted idle-lock timeout before any unlock can happen.
         idleLocker.timeoutMs = runBlocking { settingsStore.timeoutMinutes.first() } * 60_000L
@@ -59,11 +66,19 @@ class MainActivity : FragmentActivity() {
 
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
-                vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
+                // Skip exactly one auto-lock when WE launched a system picker (SAF)
+                // or credential prompt, which briefly backgrounds us. A real
+                // background (home button) has no armed skip → wipe normally.
+                if (!lockGuard.consumeSkip()) {
+                    vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
+                }
             }
 
             override fun onResume(owner: LifecycleOwner) {
                 if (idleLocker.isExpired()) { vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear() } else idleLocker.touch()
+                // Defensive: if a picker returned via a dialog path without onStop,
+                // don't leave a stale skip armed for the next real background.
+                lockGuard.clear()
             }
         })
 
@@ -81,6 +96,10 @@ class MainActivity : FragmentActivity() {
                 )
             }
         }
+
+        // Belt-and-suspenders: force light status bar icons for the dark UI.
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            .isAppearanceLightStatusBars = false
     }
 
     // singleTask: a pairing link delivered while the activity is alive comes here.

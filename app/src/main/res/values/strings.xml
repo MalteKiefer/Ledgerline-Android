@@ -72,6 +72,7 @@
     <string name="pdf_render_failed">Couldn\'t render this page.</string>
     <string name="pdf_open_failed">Couldn\'t open this PDF.</string>
     <string name="file_usage">%1$s of %2$s used</string>
+    <string name="file_usage_unlimited">%1$s used</string>
     <string name="file_name">Name</string>
     <string name="folder_name">Folder name</string>
     <string name="action_create">Create</string>

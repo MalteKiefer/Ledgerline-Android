@@ -78,7 +78,7 @@ class FilesViewModelTest {
         override suspend fun invoke(): Pair<Long, Long> = 1024L to 10240L
     }
 
-    private fun vm() = FilesViewModel(load, cache, mutate, blobs, usage)
+    private fun vm() = FilesViewModel(load, cache, mutate, blobs, usage, de.ledgerline.app.core.security.LockGuard())
 
     @Test fun root_shows_folders_then_files_excluding_trashed() = runTest {
         val vm = vm()

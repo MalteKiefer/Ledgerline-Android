@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -119,7 +120,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
             file = ready.file,
             bytes = ready.bytes,
             onBack = { vm.closeViewer() },
-            onSave = { exportLauncher.launch(ready.file.name) },
+            onSave = { vm.armLockSuppression(); exportLauncher.launch(ready.file.name) },
             modifier = modifier,
         )
         return
@@ -134,11 +135,16 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
 
     Scaffold(
         modifier = modifier,
+        // This inner Scaffold is nested inside WorkspaceScaffold, which already
+        // applied the top-bar/window insets via the passed [modifier]. Zero the
+        // inner content insets so the top inset isn't added twice (a wide gap
+        // between the app bar and the first list row).
+        contentWindowInsets = WindowInsets(0),
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             if (!ui.loading && !ui.error) {
                 FilesFab(
-                    onUpload = { uploadLauncher.launch(arrayOf("*/*")) },
+                    onUpload = { vm.armLockSuppression(); uploadLauncher.launch(arrayOf("*/*")) },
                     onNewFolder = { showNewFolder = true },
                 )
             }
@@ -155,8 +161,13 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                         LazyColumn(Modifier.fillMaxSize()) {
                             usage?.let { u ->
                                 item {
+                                    val usageText = if (u.quota <= 0) {
+                                        stringResource(R.string.file_usage_unlimited, humanSize(u.used))
+                                    } else {
+                                        stringResource(R.string.file_usage, humanSize(u.used), humanSize(u.quota))
+                                    }
                                     Text(
-                                        stringResource(R.string.file_usage, humanSize(u.used), humanSize(u.quota)),
+                                        usageText,
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.WorkspaceCache
+import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.domain.model.FileEntry
 import de.ledgerline.app.domain.model.NamedFolder
 import de.ledgerline.app.domain.model.WorkspaceManifest
@@ -54,6 +55,7 @@ class FilesViewModel @Inject constructor(
     private val mutate: MutateWorkspace,
     private val blobRepo: FileBlobs,
     private val filesUsage: FilesUsage,
+    private val lockGuard: LockGuard,
 ) : ViewModel() {
     private val stack = ArrayDeque<String?>().apply { addLast(null) }   // current folder = last
     private val _state = MutableStateFlow(FilesUi(loading = true))
@@ -93,6 +95,12 @@ class FilesViewModel @Inject constructor(
         }
         loadUsage()
     }
+
+    /**
+     * Suppress exactly one auto-lock before launching a SAF picker (upload/export),
+     * which briefly backgrounds the app and would otherwise wipe the Vault Key.
+     */
+    fun armLockSuppression() = lockGuard.armSkipOnce()
 
     fun open(folderId: String) { stack.addLast(folderId); recompute() }
     fun back() { if (stack.size > 1) { stack.removeLast(); recompute() } }
