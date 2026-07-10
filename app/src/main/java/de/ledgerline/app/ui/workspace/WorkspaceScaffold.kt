@@ -8,6 +8,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import de.ledgerline.app.R
+import de.ledgerline.app.ui.gallery.GalleryScreen
 import de.ledgerline.app.ui.settings.SettingsContent
 import de.ledgerline.app.ui.workspace.bookmarks.BookmarksScreen
 import de.ledgerline.app.ui.workspace.files.FilesScreen
@@ -50,39 +52,59 @@ fun WorkspaceScaffold(
     val loader: WorkspaceViewModel = hiltViewModel()
     LaunchedEffect(Unit) { loader.ensureLoaded() }
 
-    // Four primary content tabs; secondary destinations (Settings) live in the
-    // top-bar overflow menu so the bottom bar never exceeds four items.
+    // Four primary content tabs; secondary destinations (Settings, Bookmarks) live
+    // in the top-bar overflow menu so the bottom bar never exceeds four items.
     val tabs = listOf(
         Tab(R.string.tab_files, Icons.Outlined.Folder),
-        Tab(R.string.tab_notes, Icons.Outlined.Description),
-        Tab(R.string.tab_bookmarks, Icons.Outlined.Bookmarks),
+        Tab(R.string.tab_gallery, Icons.Outlined.PhotoLibrary),
         Tab(R.string.tab_todos, Icons.Outlined.CheckCircle),
+        Tab(R.string.tab_notes, Icons.Outlined.Description),
     )
     var selected by remember { mutableIntStateOf(0) }
     var showSettings by remember { mutableStateOf(false) }
+    var showBookmarks by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
 
-    // Settings is a secondary screen; back exits it to the current tab.
+    // Settings and Bookmarks are secondary screens; back exits them to the current tab.
     BackHandler(enabled = showSettings) { showSettings = false }
+    BackHandler(enabled = showBookmarks && !showSettings) { showBookmarks = false }
+
+    // Determine the active overlay screen (Settings takes priority if both set somehow)
+    val inOverlay = showSettings || showBookmarks
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(if (showSettings) R.string.settings_title else tabs[selected].labelRes)) },
+                title = {
+                    Text(
+                        stringResource(
+                            when {
+                                showSettings -> R.string.settings_title
+                                showBookmarks -> R.string.menu_bookmarks
+                                else -> tabs[selected].labelRes
+                            }
+                        )
+                    )
+                },
                 colors = TopAppBarDefaults.topAppBarColors(),
                 navigationIcon = {
-                    if (showSettings) {
-                        IconButton(onClick = { showSettings = false }) {
+                    if (inOverlay) {
+                        IconButton(onClick = { showSettings = false; showBookmarks = false }) {
                             Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
                         }
                     }
                 },
                 actions = {
-                    if (!showSettings) {
+                    if (!inOverlay) {
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more))
                         }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_bookmarks)) },
+                                leadingIcon = { Icon(Icons.Outlined.Bookmarks, contentDescription = null) },
+                                onClick = { menuOpen = false; showBookmarks = true },
+                            )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.settings_title)) },
                                 leadingIcon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
@@ -97,8 +119,8 @@ fun WorkspaceScaffold(
             NavigationBar {
                 tabs.forEachIndexed { i, tab ->
                     NavigationBarItem(
-                        selected = !showSettings && selected == i,
-                        onClick = { selected = i; showSettings = false },
+                        selected = !inOverlay && selected == i,
+                        onClick = { selected = i; showSettings = false; showBookmarks = false },
                         icon = { Icon(tab.icon, contentDescription = null) },
                         label = { Text(stringResource(tab.labelRes)) },
                     )
@@ -107,14 +129,14 @@ fun WorkspaceScaffold(
         },
     ) { padding ->
         val m = Modifier.padding(padding)
-        if (showSettings) {
-            SettingsContent(modifier = m, onLockNow = onLockNow, onDisconnected = onDisconnected)
-        } else {
-            when (selected) {
+        when {
+            showSettings -> SettingsContent(modifier = m, onLockNow = onLockNow, onDisconnected = onDisconnected)
+            showBookmarks -> BookmarksScreen(modifier = m)
+            else -> when (selected) {
                 0 -> FilesScreen(m)
-                1 -> NotesScreen(m)
-                2 -> BookmarksScreen(m)
-                else -> TodosScreen(m)
+                1 -> GalleryScreen(m)
+                2 -> TodosScreen(m)
+                else -> NotesScreen(m)
             }
         }
     }

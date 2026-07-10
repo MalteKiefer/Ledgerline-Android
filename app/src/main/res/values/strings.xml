@@ -27,6 +27,7 @@
     <string name="lock_subtitle">Authenticate to continue</string>
     <string name="lock_locked">Locked. Authenticate to continue.</string>
     <string name="tab_files">Files</string>
+    <string name="tab_gallery">Gallery</string>
     <string name="tab_notes">Notes</string>
     <string name="tab_bookmarks">Bookmarks</string>
     <string name="tab_todos">Todos</string>
@@ -100,4 +101,12 @@
     <string name="action_back">Back</string>
     <string name="action_settings">Settings</string>
     <string name="action_more">More</string>
+
+    <!-- Gallery -->
+    <string name="gallery_empty">No photos yet.</string>
+    <string name="gallery_error">Couldn\'t load the gallery.</string>
+    <string name="gallery_usage">%1$s used</string>
+    <string name="photo_original">View original</string>
+    <string name="photo_video_soon">Video playback comes later.</string>
+    <string name="menu_bookmarks">Bookmarks</string>
 </resources>
