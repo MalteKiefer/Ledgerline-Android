@@ -24,9 +24,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
-import de.ledgerline.app.ui.workspace.common.CenteredMessage
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
+import de.ledgerline.app.ui.workspace.common.RefreshableMessage
 import de.ledgerline.app.ui.workspace.common.humanSize
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,7 +38,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
         ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() }, modifier)
         else -> PullToRefreshBox(isRefreshing = ui.loading, onRefresh = { vm.refresh() }, modifier = modifier) {
             if (ui.folders.isEmpty() && ui.files.isEmpty() && !ui.canGoBack) {
-                CenteredMessage(stringResource(R.string.ws_empty_files))
+                RefreshableMessage(stringResource(R.string.ws_empty_files))
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
                     if (ui.canGoBack) item {

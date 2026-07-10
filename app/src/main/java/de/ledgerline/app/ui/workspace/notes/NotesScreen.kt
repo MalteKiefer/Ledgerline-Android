@@ -23,9 +23,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
-import de.ledgerline.app.ui.workspace.common.CenteredMessage
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
+import de.ledgerline.app.ui.workspace.common.RefreshableMessage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +41,7 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
     when {
         ui.loading -> LoadingBox(modifier)
         ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() }, modifier)
-        ui.notes.isEmpty() -> PullToRefreshBox(ui.loading, { vm.refresh() }, modifier) { CenteredMessage(stringResource(R.string.ws_empty_notes)) }
+        ui.notes.isEmpty() -> PullToRefreshBox(ui.loading, { vm.refresh() }, modifier) { RefreshableMessage(stringResource(R.string.ws_empty_notes)) }
         else -> PullToRefreshBox(ui.loading, { vm.refresh() }, modifier) {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(ui.notes, key = { it.id }) { note ->

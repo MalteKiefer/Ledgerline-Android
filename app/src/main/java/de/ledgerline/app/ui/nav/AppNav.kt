@@ -34,6 +34,8 @@ class RootViewModel @Inject constructor(
     private val _dest = MutableStateFlow(Destination.LOADING)
     val dest: StateFlow<Destination> = _dest
 
+    val unlocked: StateFlow<Boolean> = vaultKeyHolder.unlocked
+
     /**
      * Decide the start destination. If a session already exists, go straight to
      * unlock. Otherwise show onboarding — unless a pairing deep link launched the
@@ -91,6 +93,9 @@ fun AppNav(
         Destination.WELCOME -> WelcomeScreen(onGetStarted = { vm.toPairing() })
         Destination.PAIRING -> PairingScreen(authGate = authGate, initialPairLink = initialPairLink, onPaired = { vm.toUnlock() })
         Destination.UNLOCK -> UnlockScreen(authGate = authGate, onUnlocked = { vm.toHome() })
-        Destination.HOME -> WorkspaceScaffold()
+        Destination.HOME -> {
+            val unlocked by vm.unlocked.collectAsStateWithLifecycle()
+            if (unlocked) WorkspaceScaffold() else UnlockScreen(authGate = authGate, onUnlocked = { vm.toHome() })
+        }
     }
 }
