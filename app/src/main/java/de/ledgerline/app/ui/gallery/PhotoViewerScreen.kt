@@ -222,13 +222,11 @@ private fun PhotoInfoSheet(
             }
             val lat = photo.lat
             val lng = photo.lng
-            val mapLabel = place?.display?.takeIf { it.isNotBlank() }
-                ?: listOfNotNull(place?.city, place?.country).filter { it.isNotBlank() }.joinToString(", ").ifBlank { "Photo" }
             if (lat != null && lng != null) {
                 InfoRow(
                     label = stringResource(R.string.info_location),
                     value = locationValue,
-                    onClick = { openInMaps(context, lat, lng, mapLabel) },
+                    onClick = { openInMaps(context, lat, lng) },
                 )
                 // Wrap the native MapView in a clipped Box so it can't overdraw the
                 // info rows above it while the sheet scrolls.
@@ -243,7 +241,7 @@ private fun PhotoInfoSheet(
                         lat = lat,
                         lng = lng,
                         modifier = Modifier.fillMaxSize(),
-                        onTap = { openInMaps(context, lat, lng, mapLabel) },
+                        onTap = { openInMaps(context, lat, lng) },
                     )
                 }
                 Text(
@@ -259,9 +257,9 @@ private fun PhotoInfoSheet(
     }
 }
 
-private fun openInMaps(context: Context, lat: Double, lng: Double, label: String) {
-    val enc = Uri.encode(label)
-    val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($enc)")
+private fun openInMaps(context: Context, lat: Double, lng: Double) {
+    // Coordinates only — no address label appended.
+    val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng")
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
 }
 
