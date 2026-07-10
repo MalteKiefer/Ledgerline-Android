@@ -11,6 +11,7 @@ import de.ledgerline.app.data.GalleryBlobRepository
 import de.ledgerline.app.data.GalleryUsageImpl
 import de.ledgerline.app.data.LoadGalleryImpl
 import de.ledgerline.app.data.LoadWorkspaceImpl
+import de.ledgerline.app.data.MutateGalleryImpl
 import de.ledgerline.app.data.MutateWorkspaceImpl
 import de.ledgerline.app.data.UploadFileImpl
 import de.ledgerline.app.domain.usecase.DownloadFile
@@ -20,6 +21,7 @@ import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUsage
 import de.ledgerline.app.domain.usecase.LoadGallery
 import de.ledgerline.app.domain.usecase.LoadWorkspace
+import de.ledgerline.app.domain.usecase.MutateGallery
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.usecase.UploadFile
 
@@ -28,6 +30,7 @@ import de.ledgerline.app.domain.usecase.UploadFile
 abstract class WorkspaceModule {
     @Binds abstract fun bindLoadWorkspace(impl: LoadWorkspaceImpl): LoadWorkspace
     @Binds abstract fun bindMutateWorkspace(impl: MutateWorkspaceImpl): MutateWorkspace
+    @Binds abstract fun bindMutateGallery(impl: MutateGalleryImpl): MutateGallery
     @Binds abstract fun bindUploadFile(impl: UploadFileImpl): UploadFile
     @Binds abstract fun bindDownloadFile(impl: DownloadFileImpl): DownloadFile
     @Binds abstract fun bindFileBlobs(impl: FileBlobRepository): FileBlobs
