@@ -26,4 +26,7 @@ interface Crypto {
      * JSON parser ignores it), or null if decryption fails.
      */
     fun openManifest(ciphertext: String, vk: ByteArray): String?
+
+    /** Inverse of openManifest: pad to a 4-KiB bucket and secretbox-seal to `{"c","n"}`. */
+    fun sealManifest(json: String, vk: ByteArray): String
 }

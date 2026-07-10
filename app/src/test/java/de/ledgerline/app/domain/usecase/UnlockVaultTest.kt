@@ -20,6 +20,7 @@ class UnlockVaultTest {
         override fun b64encode(b: ByteArray) = String(b)
         override fun fromHex(s: String) = s.toByteArray()
         override fun openManifest(ciphertext: String, vk: ByteArray): String? = null
+        override fun sealManifest(json: String, vk: ByteArray): String = "SEALED:$json"
     }
 
     private fun gateway(configured: Boolean = true) = object : VaultGateway {

@@ -74,6 +74,22 @@ class SodiumCrypto @Inject constructor() : Crypto {
         }
     }
 
+    override fun sealManifest(json: String, vk: ByteArray): String {
+        val bucket = 4096
+        val target = ((json.length + 1 + bucket - 1) / bucket) * bucket   // ceil((len+1)/4096)*4096
+        val padded = json + " ".repeat(target - json.length)
+        val plain = padded.toByteArray(Charsets.UTF_8)
+        val nonce = ByteArray(SecretBox.NONCEBYTES)                       // 24
+        randomBytes(nonce)
+        val cipher = ByteArray(plain.size + SecretBox.MACBYTES)
+        check(ls.cryptoSecretBoxEasy(cipher, plain, plain.size.toLong(), nonce, vk)) { "seal failed" }
+        return """{"c":"${b64encode(cipher)}","n":"${b64encode(nonce)}"}"""
+    }
+
+    private fun randomBytes(out: ByteArray) {
+        java.security.SecureRandom().nextBytes(out)
+    }
+
     /** Test-only helper to build a secretbox ciphertext fixture. */
     internal fun secretBoxSealForTest(message: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray {
         val out = ByteArray(message.size + SecretBox.MACBYTES)
