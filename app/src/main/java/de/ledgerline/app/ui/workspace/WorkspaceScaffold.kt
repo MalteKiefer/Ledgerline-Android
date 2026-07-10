@@ -12,6 +12,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -19,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
 import de.ledgerline.app.R
 import de.ledgerline.app.ui.workspace.bookmarks.BookmarksScreen
 import de.ledgerline.app.ui.workspace.files.FilesScreen
@@ -29,6 +31,8 @@ private data class Tab(val labelRes: Int, val icon: ImageVector)
 
 @Composable
 fun WorkspaceScaffold() {
+    val loader: WorkspaceViewModel = hiltViewModel()
+    LaunchedEffect(Unit) { loader.ensureLoaded() }
     val tabs = listOf(
         Tab(R.string.tab_files, Icons.Outlined.Folder),
         Tab(R.string.tab_notes, Icons.Outlined.Description),

@@ -23,13 +23,18 @@ class BookmarksViewModel @Inject constructor(
     private val _state = MutableStateFlow(BookmarksUi(loading = true))
     val state: StateFlow<BookmarksUi> = _state
 
-    init { if (cache.value.value == null) refresh() else recompute() }
+    init {
+        viewModelScope.launch {
+            cache.value.collect { ws ->
+                if (ws != null) recompute() else _state.value = BookmarksUi(loading = true)
+            }
+        }
+    }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = false)
-        when (load.invoke()) {
-            is Outcome.Ok -> recompute()
-            is Outcome.Err -> _state.value = BookmarksUi(loading = false, error = true)
+        if (load.invoke() is Outcome.Err) {
+            _state.value = _state.value.copy(loading = false, error = true)
         }
     }
 

@@ -30,13 +30,18 @@ class FilesViewModel @Inject constructor(
     private val _state = MutableStateFlow(FilesUi(loading = true))
     val state: StateFlow<FilesUi> = _state
 
-    init { recompute(); if (cache.value.value == null) refresh() else recompute() }
+    init {
+        viewModelScope.launch {
+            cache.value.collect { ws ->
+                if (ws != null) recompute() else _state.value = FilesUi(loading = true)
+            }
+        }
+    }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = false)
-        when (load.invoke()) {
-            is Outcome.Ok -> recompute()
-            is Outcome.Err -> _state.value = _state.value.copy(loading = false, error = true)
+        if (load.invoke() is Outcome.Err) {
+            _state.value = _state.value.copy(loading = false, error = true)
         }
     }
 
