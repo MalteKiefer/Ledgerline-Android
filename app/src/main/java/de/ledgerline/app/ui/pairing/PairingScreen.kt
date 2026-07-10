@@ -37,8 +37,21 @@ import de.ledgerline.app.domain.model.PairingState
 import de.ledgerline.app.ui.scan.QrCodeAnalyzer
 import de.ledgerline.app.ui.scan.parsePairLink
 
+/**
+ * Pairing screen. On approval it requires an app-lock auth (biometric / device
+ * credential) via [authGate] before the session is sealed to disk — this both
+ * establishes the user and opens the auth window the keystore key needs to seal.
+ *
+ * @param authGate runs the app-lock prompt; returns true on success.
+ * @param initialPairLink an optional `ledgerline://pair` deep link to auto-start.
+ */
 @Composable
-fun PairingScreen(vm: PairingViewModel = hiltViewModel(), onPaired: () -> Unit) {
+fun PairingScreen(
+    vm: PairingViewModel = hiltViewModel(),
+    authGate: suspend () -> Boolean,
+    initialPairLink: String? = null,
+    onPaired: () -> Unit,
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var hasCamera by remember {
@@ -46,10 +59,28 @@ fun PairingScreen(vm: PairingViewModel = hiltViewModel(), onPaired: () -> Unit) 
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         )
     }
+    var authFailed by remember { mutableStateOf(false) }
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { hasCamera = it }
 
+    // A deep link that launched the app takes precedence over scanning.
+    LaunchedEffect(initialPairLink) {
+        initialPairLink?.let { link -> parsePairLink(link)?.let { (url, code) -> vm.startPairing(url, code, Build.MODEL) } }
+    }
     LaunchedEffect(Unit) { if (!hasCamera) permLauncher.launch(Manifest.permission.CAMERA) }
-    LaunchedEffect(state) { if (state is PairingState.Approved) onPaired() }
+
+    // On approval: gate on app-lock auth, then seal the session, then advance.
+    LaunchedEffect(state) {
+        val s = state
+        if (s is PairingState.Approved) {
+            authFailed = false
+            if (authGate()) {
+                vm.persist(s.session)
+                onPaired()
+            } else {
+                authFailed = true
+            }
+        }
+    }
 
     Column(Modifier.fillMaxSize().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(stringResource(R.string.pairing_title), style = MaterialTheme.typography.headlineSmall)
@@ -67,6 +98,12 @@ fun PairingScreen(vm: PairingViewModel = hiltViewModel(), onPaired: () -> Unit) 
                 CircularProgressIndicator()
                 Text(stringResource(R.string.pairing_waiting))
             }
+            is PairingState.Approved ->
+                if (authFailed) {
+                    Text(stringResource(R.string.lock_locked), color = MaterialTheme.colorScheme.error)
+                } else {
+                    CircularProgressIndicator()
+                }
             is PairingState.Failed -> Text(stringResource(R.string.pairing_failed, s.reason.name), color = MaterialTheme.colorScheme.error)
             else -> {}
         }

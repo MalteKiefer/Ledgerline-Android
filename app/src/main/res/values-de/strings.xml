@@ -9,4 +9,7 @@
     <string name="unlock_button">Entsperren</string>
     <string name="unlock_not_configured">Noch kein Tresor. Bitte zuerst in der Web-App einrichten.</string>
     <string name="unlock_error">Falsche Passphrase oder Entsperren nicht möglich.</string>
+    <string name="lock_title">Ledgerline entsperren</string>
+    <string name="lock_subtitle">Zum Fortfahren authentifizieren</string>
+    <string name="lock_locked">Gesperrt. Zum Fortfahren authentifizieren.</string>
 </resources>

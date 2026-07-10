@@ -9,4 +9,7 @@
     <string name="unlock_button">Unlock</string>
     <string name="unlock_not_configured">No vault yet. Set it up in the web app first.</string>
     <string name="unlock_error">Wrong passphrase or unable to unlock.</string>
+    <string name="lock_title">Unlock Ledgerline</string>
+    <string name="lock_subtitle">Authenticate to continue</string>
+    <string name="lock_locked">Locked. Authenticate to continue.</string>
 </resources>

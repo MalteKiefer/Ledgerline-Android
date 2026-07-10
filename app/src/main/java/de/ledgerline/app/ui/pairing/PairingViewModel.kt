@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.data.PairingRepository
 import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.domain.model.PairingState
+import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.usecase.ClaimAndPollPairing
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +26,13 @@ class PairingViewModel @Inject constructor(
         viewModelScope.launch {
             ClaimAndPollPairing(repository).run(baseUrl, code, deviceName).collect { s ->
                 _state.value = s
-                if (s is PairingState.Approved) sessionStore.save(s.session)
             }
         }
     }
+
+    /**
+     * Persist the paired session as a keystore-sealed blob. Called only AFTER a
+     * successful app-lock auth, so the auth-gated keystore key can be used to seal.
+     */
+    suspend fun persist(session: Session) = sessionStore.save(session)
 }

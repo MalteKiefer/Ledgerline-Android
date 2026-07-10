@@ -22,6 +22,11 @@ class KeystoreSealer(
     private val alias: String = "ledgerline_token_key",
     private val requireAuth: Boolean = true,
 ) {
+    private companion object {
+        // Window (seconds) a single auth authorizes key use for.
+        const val AUTH_VALIDITY_SECONDS = 30
+    }
+
     private val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
     private fun buildSpec(strongBox: Boolean): KeyGenParameterSpec =
@@ -36,8 +41,13 @@ class KeystoreSealer(
                 if (strongBox) setIsStrongBoxBacked(true)
                 if (requireAuth) {
                     setUserAuthenticationRequired(true)
+                    // Time-bound auth: a successful biometric/device-credential prompt
+                    // authorizes key use for a short window, so the app can seal/unseal
+                    // the session right after the app-lock prompt without binding a
+                    // CryptoObject to each operation. A future hardening could switch to
+                    // per-use auth (validity 0) with a CryptoObject-bound prompt.
                     setUserAuthenticationParameters(
-                        0,
+                        AUTH_VALIDITY_SECONDS,
                         KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
                     )
                     setInvalidatedByBiometricEnrollment(true)

@@ -16,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,11 +26,22 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
+import kotlinx.coroutines.launch
 
+/**
+ * Vault unlock screen. Tapping Unlock first runs the app-lock auth ([authGate]) —
+ * this opens the keystore auth window so the sealed session can be read — then
+ * derives the Vault Key from the passphrase.
+ */
 @Composable
-fun UnlockScreen(vm: UnlockViewModel = hiltViewModel(), onUnlocked: () -> Unit) {
+fun UnlockScreen(
+    vm: UnlockViewModel = hiltViewModel(),
+    authGate: suspend () -> Boolean,
+    onUnlocked: () -> Unit,
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     var passphrase by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(state) { if (state is UnlockUiState.Unlocked) onUnlocked() }
 
@@ -48,7 +60,14 @@ fun UnlockScreen(vm: UnlockViewModel = hiltViewModel(), onUnlocked: () -> Unit) 
             singleLine = true,
         )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = { vm.unlock(passphrase.toCharArray()); passphrase = "" }, enabled = state != UnlockUiState.Working) {
+        Button(
+            onClick = {
+                val entered = passphrase.toCharArray()
+                passphrase = ""
+                scope.launch { if (authGate()) vm.unlock(entered) else entered.fill(' ') }
+            },
+            enabled = state != UnlockUiState.Working,
+        ) {
             Text(stringResource(R.string.unlock_button))
         }
         when (state) {
