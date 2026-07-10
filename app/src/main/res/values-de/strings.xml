@@ -116,6 +116,7 @@
     <string name="info_resolution">Auflösung</string>
     <string name="info_location">Ort</string>
     <string name="info_unknown">—</string>
+    <string name="map_open_hint">Auf die Karte tippen zum Navigieren</string>
     <string name="menu_bookmarks">Lesezeichen</string>
     <string name="menu_more">Mehr</string>
 </resources>

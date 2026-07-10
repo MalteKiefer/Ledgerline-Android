@@ -116,6 +116,7 @@
     <string name="info_resolution">Resolution</string>
     <string name="info_location">Location</string>
     <string name="info_unknown">—</string>
+    <string name="map_open_hint">Tap the map to navigate</string>
     <string name="menu_bookmarks">Bookmarks</string>
     <string name="menu_more">More</string>
 </resources>
