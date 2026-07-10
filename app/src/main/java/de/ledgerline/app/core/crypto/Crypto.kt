@@ -19,4 +19,11 @@ interface Crypto {
     fun b64decode(s: String): ByteArray
     fun b64encode(b: ByteArray): String
     fun fromHex(s: String): ByteArray
+
+    /**
+     * Decrypt a sealed manifest string `{"c":...,"n":...}` with the vault key.
+     * Returns the plaintext JSON (trailing 4-KiB whitespace padding intact; the
+     * JSON parser ignores it), or null if decryption fails.
+     */
+    fun openManifest(ciphertext: String, vk: ByteArray): String?
 }
