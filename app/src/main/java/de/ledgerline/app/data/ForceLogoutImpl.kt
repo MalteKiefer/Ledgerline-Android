@@ -1,6 +1,7 @@
 package de.ledgerline.app.data
 
 import de.ledgerline.app.core.GalleryCache
+import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.WorkspaceCache
@@ -25,6 +26,7 @@ class ForceLogoutImpl @Inject constructor(
     private val workspaceCache: WorkspaceCache,
     private val galleryCache: GalleryCache,
     private val thumbCache: ThumbCache,
+    private val metaCache: MetaCache,
 ) : ForceLogout {
     override suspend fun invoke() {
         // In-memory first (secrets + decrypted caches).
@@ -33,6 +35,7 @@ class ForceLogoutImpl @Inject constructor(
         workspaceCache.clear()
         galleryCache.clear()
         thumbCache.clear()
+        metaCache.clear()
         // Persisted last: drop the sealed session and delete the keystore key so a
         // re-pair is required.
         sessionStore.clear()
