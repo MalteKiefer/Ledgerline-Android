@@ -88,9 +88,14 @@ class FileBlobRepository(
                                 if (r < 0) break
                                 read += r
                             }
-                            val last = remaining - read <= 0
+                            // If the source delivered fewer bytes than declared (truncation /
+                            // shrank between query and read), treat EOF as the final chunk so the
+                            // last frame is TAG_FINAL and the loop can't spin forever.
+                            val eof = read < want
+                            val last = eof || remaining - read <= 0
                             sink.write(enc.encryptChunk(buf.copyOf(read), last))
                             remaining -= read
+                            if (eof) break
                         }
                     }
                 }

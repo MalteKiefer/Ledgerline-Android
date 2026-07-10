@@ -151,7 +151,7 @@ class FilesViewModel @Inject constructor(
                     mutate.invoke { m ->
                         m.copy(
                             files = m.files + FileEntry(
-                                id = up.value.id,
+                                id = newId(),          // entry id distinct from the blob id (matches the web contract)
                                 blob = up.value.id,
                                 encFileKey = up.value.encFileKey,
                                 name = name,
