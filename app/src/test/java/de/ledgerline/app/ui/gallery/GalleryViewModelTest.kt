@@ -108,6 +108,7 @@ class GalleryViewModelTest {
         uploader = uploader,
         mutate = mutate,
         lockGuard = LockGuard(),
+        vaultKeyHolder = de.ledgerline.app.core.security.VaultKeyHolder(),
     )
 
     @Test fun newest_first_trashed_hidden() = runTest {

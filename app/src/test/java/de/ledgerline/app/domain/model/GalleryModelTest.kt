@@ -2,6 +2,7 @@ package de.ledgerline.app.domain.model
 
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -10,10 +11,10 @@ class GalleryModelTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun meta_blob_parses_embedding_faces_place_and_ignores_unknown_and_phash() {
+    fun meta_blob_parses_embedding_faces_place_and_phash_and_ignores_unknown() {
         val src = """{"place":{"city":"X"},"embedding":[0.1,0.2],""" +
             """"faces":[{"embedding":[0.3],"cropRef":"r","cropKey":"k"}],""" +
-            """"phash":123,"unknown":true}"""
+            """"phash":123456789,"unknown":true}"""
 
         val meta = json.decodeFromString(PhotoMetaBlob.serializer(), src)
 
@@ -23,6 +24,17 @@ class GalleryModelTest {
         assertEquals(listOf(0.3), meta.faces[0].embedding)
         assertEquals("r", meta.faces[0].cropRef)
         assertEquals("k", meta.faces[0].cropKey)
+        assertEquals(123456789L, meta.phash)
+    }
+
+    @Test
+    fun meta_blob_phash_defaults_to_null_when_absent() {
+        val meta = json.decodeFromString(
+            PhotoMetaBlob.serializer(),
+            """{"embedding":[0.1]}""",
+        )
+
+        assertNull(meta.phash)
     }
 
     @Test

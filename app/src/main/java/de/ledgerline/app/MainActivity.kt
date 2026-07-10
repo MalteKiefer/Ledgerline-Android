@@ -12,17 +12,12 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dagger.hilt.android.AndroidEntryPoint
-import de.ledgerline.app.core.GalleryCache
-import de.ledgerline.app.core.MetaCache
-import de.ledgerline.app.core.SessionHolder
-import de.ledgerline.app.core.ThumbCache
-import de.ledgerline.app.core.WorkspaceCache
 import androidx.biometric.BiometricPrompt
 import de.ledgerline.app.core.security.AppLock
 import de.ledgerline.app.core.security.CryptoAuth
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.LockGuard
-import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.core.security.VaultLocker
 import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.ui.nav.AppNav
 import de.ledgerline.app.ui.theme.LedgerlineTheme
@@ -39,13 +34,8 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
-    @Inject lateinit var vaultKeyHolder: VaultKeyHolder
     @Inject lateinit var idleLocker: IdleLocker
-    @Inject lateinit var sessionHolder: SessionHolder
-    @Inject lateinit var workspaceCache: WorkspaceCache
-    @Inject lateinit var galleryCache: GalleryCache
-    @Inject lateinit var thumbCache: ThumbCache
-    @Inject lateinit var metaCache: MetaCache
+    @Inject lateinit var locker: VaultLocker
     @Inject lateinit var settingsStore: SettingsStore
     @Inject lateinit var lockGuard: LockGuard
     private val appLock = AppLock()
@@ -77,15 +67,13 @@ class MainActivity : FragmentActivity() {
                 // or credential prompt, which briefly backgrounds us. A real
                 // background (home button) has no armed skip → wipe normally.
                 if (!lockGuard.consumeSkip()) {
-                    vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
-                    galleryCache.clear(); thumbCache.clear(); metaCache.clear()
+                    locker.lock()
                 }
             }
 
             override fun onResume(owner: LifecycleOwner) {
                 if (idleLocker.isExpired()) {
-                    vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
-                    galleryCache.clear(); thumbCache.clear(); metaCache.clear()
+                    locker.lock()
                 } else idleLocker.touch()
                 // Defensive: if a picker returned via a dialog path without onStop,
                 // don't leave a stale skip armed for the next real background.
