@@ -17,6 +17,7 @@ data class GalleryPhoto(
     val width: Int? = null, val height: Int? = null, val duration: Double? = null,
     val created: String? = null, val trashed: Boolean = false,
     val name: String? = null,
+    val mime: String? = null, val size: Long? = null,
     val camera: String? = null,
     val taken_at: String? = null,
     val content_id: String? = null,

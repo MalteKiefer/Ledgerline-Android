@@ -1,12 +1,14 @@
 package de.ledgerline.app.data
 
 import de.ledgerline.app.core.ErrorKind
+import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
+import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.domain.model.Gallery
 import de.ledgerline.app.domain.model.GalleryManifest
 import de.ledgerline.app.domain.model.Session
@@ -16,16 +18,28 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class GalleryRepository private constructor(
+class GalleryRepository(
     private val sessionHolder: SessionHolder,
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
+    private val cache: GalleryCache,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
-    @Inject constructor(sessionHolder: SessionHolder, vaultKeyHolder: VaultKeyHolder, crypto: Crypto) :
-        this(sessionHolder, vaultKeyHolder, crypto, { s -> NetworkFactory.create(s.baseUrl, { s.token }, s.spkiPin) })
+    @Inject constructor(
+        sessionHolder: SessionHolder,
+        vaultKeyHolder: VaultKeyHolder,
+        crypto: Crypto,
+        cache: GalleryCache,
+    ) : this(
+        sessionHolder,
+        vaultKeyHolder,
+        crypto,
+        cache,
+        apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
+    )
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val jsonEncoder = Json { encodeDefaults = true }
 
     /** Gallery blob storage usage: (used bytes, quota bytes). Null on any failure. */
     suspend fun galleryUsage(): Pair<Long, Long>? {
@@ -58,5 +72,67 @@ class GalleryRepository private constructor(
                 }
             }
         } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
+    }
+
+    /**
+     * Optimistic write: apply [mutate] to the current manifest, PUT it; on 409 reload
+     * the server manifest, re-apply [mutate], and retry (bounded to 4 attempts).
+     * Updates the cache on success.
+     */
+    suspend fun save(mutate: (GalleryManifest) -> GalleryManifest): Outcome<Gallery> {
+        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+        val api = apiProvider(session)
+
+        var base: GalleryManifest? = cache.value.value?.manifest
+        var version: Int? = cache.value.value?.version
+
+        repeat(4) {
+            if (base == null || version == null) {
+                val res = api.galleryStore()
+                if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
+                val body = res.body()!!
+                base = body.ciphertext?.let {
+                    json.decodeFromString<GalleryManifest>(
+                        crypto.openManifest(it, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
+                    )
+                } ?: GalleryManifest()
+                version = body.version
+            }
+
+            val next = mutate(base!!)
+            val ciphertext = crypto.sealManifest(
+                jsonEncoder.encodeToString(GalleryManifest.serializer(), next),
+                vk,
+            )
+            val put = try {
+                api.galleryStorePut(StorePutRequest(ciphertext, version!!))
+            } catch (e: Exception) {
+                return Outcome.Err(ErrorKind.NETWORK, e)
+            }
+
+            when {
+                put.isSuccessful -> {
+                    val newVersion = put.body()?.version ?: (version!! + 1)
+                    val g = Gallery(next, newVersion)
+                    cache.set(g)
+                    return Outcome.Ok(g)
+                }
+                put.code() == 409 -> {
+                    // Reload fresh server state, then loop to re-apply mutate.
+                    val res = api.galleryStore()
+                    if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
+                    val body = res.body()!!
+                    base = body.ciphertext?.let {
+                        json.decodeFromString<GalleryManifest>(
+                            crypto.openManifest(it, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
+                        )
+                    } ?: GalleryManifest()
+                    version = body.version
+                }
+                else -> return Outcome.Err(ErrorKind.HTTP)
+            }
+        }
+        return Outcome.Err(ErrorKind.HTTP) // gave up after retries
     }
 }

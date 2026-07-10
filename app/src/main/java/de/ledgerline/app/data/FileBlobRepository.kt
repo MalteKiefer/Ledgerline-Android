@@ -4,7 +4,6 @@ import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
-import de.ledgerline.app.core.crypto.padByteCount
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
@@ -13,12 +12,8 @@ import de.ledgerline.app.domain.usecase.FileBlobs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
-import okhttp3.RequestBody
-import okio.BufferedSink
 import java.io.InputStream
-import java.security.SecureRandom
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -66,52 +61,7 @@ class FileBlobRepository(
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val enc = crypto.newContentEncryptor(vk)
-        // Framed ciphertext size = header + total + chunks*(ABYTES+4); pad to the Padmé bucket.
-        val chunks = if (size == 0L) 1L else (size + crypto.contentChunkSize - 1) / crypto.contentChunkSize
-        val framed = 24L + size + chunks * (17L + 4L)
-        val pad = padByteCount(framed)
-        val body = object : RequestBody() {
-            override fun contentType() = "application/octet-stream".toMediaType()
-            override fun writeTo(sink: BufferedSink) {
-                sink.write(enc.header)
-                openInput().use { ins ->
-                    val buf = ByteArray(crypto.contentChunkSize)
-                    if (size == 0L) {
-                        sink.write(enc.encryptChunk(ByteArray(0), true))
-                    } else {
-                        var remaining = size
-                        while (remaining > 0) {
-                            val want = minOf(buf.size.toLong(), remaining).toInt()
-                            var read = 0
-                            while (read < want) {
-                                val r = ins.read(buf, read, want - read)
-                                if (r < 0) break
-                                read += r
-                            }
-                            // If the source delivered fewer bytes than declared (truncation /
-                            // shrank between query and read), treat EOF as the final chunk so the
-                            // last frame is TAG_FINAL and the loop can't spin forever.
-                            val eof = read < want
-                            val last = eof || remaining - read <= 0
-                            sink.write(enc.encryptChunk(buf.copyOf(read), last))
-                            remaining -= read
-                            if (eof) break
-                        }
-                    }
-                }
-                if (pad > 0) {
-                    val rnd = SecureRandom()
-                    val block = ByteArray(64 * 1024)
-                    var left = pad
-                    while (left > 0) {
-                        val n = minOf(block.size.toLong(), left).toInt()
-                        rnd.nextBytes(block)
-                        sink.write(block, 0, n)
-                        left -= n
-                    }
-                }
-            }
-        }
+        val body = EncryptedUpload.body(enc, crypto.contentChunkSize, size, openInput)
         try {
             val part = MultipartBody.Part.createFormData("file", name, body)
             val res = apiProvider(session).uploadFile(part)
