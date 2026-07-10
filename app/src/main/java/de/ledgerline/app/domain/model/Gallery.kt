@@ -16,6 +16,25 @@ data class GalleryPhoto(
     val lat: Double? = null, val lng: Double? = null,
     val width: Int? = null, val height: Int? = null, val duration: Double? = null,
     val created: String? = null, val trashed: Boolean = false,
+    val name: String? = null,
+    val camera: String? = null,
+    val taken_at: String? = null,
+    val content_id: String? = null,
+    val hasFaces: Int? = null,
+)
+
+@Serializable
+data class PhotoPlace(
+    val name: String? = null,
+    val display: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    val country: String? = null,
+)
+
+@Serializable
+data class PhotoMetaBlob(
+    val place: PhotoPlace? = null,
 )
 
 @Serializable

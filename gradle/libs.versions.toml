@@ -23,6 +23,7 @@ androidxTestJunit = "1.2.1"
 androidxTestRunner = "1.6.2"
 robolectric = "4.14"
 pdfbox = "2.0.27.0"
+osmdroid = "6.1.20"
 
 [libraries]
 androidx-core = { module = "androidx.core:core-ktx", version = "1.15.0" }
@@ -63,6 +64,7 @@ androidx-test-junit = { module = "androidx.test.ext:junit", version.ref = "andro
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfbox" }
+osmdroid = { module = "org.osmdroid:osmdroid-android", version.ref = "osmdroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -87,6 +87,9 @@ dependencies {
     // Pure-Java/Kotlin PDF rendering (Apache-2, no native .so).
     implementation(libs.pdfbox.android)
 
+    // Pure-Java OSM map tiles (Apache-2, no native .so).
+    implementation(libs.osmdroid)
+
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.coroutines.test)
