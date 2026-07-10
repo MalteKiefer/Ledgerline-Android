@@ -3,9 +3,11 @@ package de.ledgerline.app.data.remote
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
+import de.ledgerline.app.data.remote.dto.StoreResponse
 import de.ledgerline.app.data.remote.dto.VaultResponse
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
@@ -19,4 +21,10 @@ interface LedgerlineApi {
 
     @GET("api/v1/vault")
     suspend fun vault(): Response<VaultResponse>
+
+    @GET("api/v1/store")
+    suspend fun store(): Response<StoreResponse>
+
+    @DELETE("api/v1/auth/session")
+    suspend fun deleteSession(): Response<Unit>
 }
