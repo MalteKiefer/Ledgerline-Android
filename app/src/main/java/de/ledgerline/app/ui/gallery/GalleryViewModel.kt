@@ -53,6 +53,7 @@ class GalleryViewModel @Inject constructor(
     private val uploader: GalleryUploader,
     private val mutate: MutateGallery,
     private val lockGuard: LockGuard,
+    private val vaultKeyHolder: de.ledgerline.app.core.security.VaultKeyHolder,
 ) : ViewModel() {
     data class Progress(val current: Int, val total: Int)
 
@@ -75,7 +76,15 @@ class GalleryViewModel @Inject constructor(
         viewModelScope.launch {
             cache.value.collect { g -> if (g != null) recompute() else _state.value = GalleryUi(loading = true) }
         }
-        if (cache.value.value == null) refresh()
+        // This ViewModel is activity-scoped and survives a lock (which wipes the
+        // gallery cache). Re-fetch whenever the vault is unlocked and the cache is
+        // empty — covers both first open and returning from the lock screen, where
+        // init() no longer re-runs. Emits immediately with the current unlock state.
+        viewModelScope.launch {
+            vaultKeyHolder.unlocked.collect { unlocked ->
+                if (unlocked && cache.value.value == null) refresh()
+            }
+        }
         loadUsage()
     }
 
