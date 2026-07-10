@@ -8,18 +8,24 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
+import de.ledgerline.app.core.security.LockGuard
+import de.ledgerline.app.data.GalleryUploader
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.model.PhotoMetaBlob
 import de.ledgerline.app.domain.model.PhotoPlace
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUsage
 import de.ledgerline.app.domain.usecase.LoadGallery
+import de.ledgerline.app.domain.usecase.MutateGallery
 import de.ledgerline.app.ui.workspace.files.UsageInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
+
+/** A content source for [GalleryViewModel.uploadAll]: name + mime + lazy byte reader. */
+data class PhotoSource(val name: String, val mime: String, val read: () -> ByteArray)
 
 data class GalleryUi(
     val loading: Boolean = false,
@@ -34,13 +40,26 @@ class GalleryViewModel @Inject constructor(
     private val blobs: GalleryBlobs,
     private val thumbs: ThumbCache,
     private val galleryUsage: GalleryUsage,
+    private val uploader: GalleryUploader,
+    private val mutate: MutateGallery,
+    private val lockGuard: LockGuard,
 ) : ViewModel() {
+    data class Progress(val current: Int, val total: Int)
+
     private val placeCache = mutableMapOf<String, PhotoPlace?>()
     private val _state = MutableStateFlow(GalleryUi(loading = true))
     val state: StateFlow<GalleryUi> = _state
 
     private val _usage = MutableStateFlow<UsageInfo?>(null)
     val usage: StateFlow<UsageInfo?> = _usage
+
+    private val _uploadProgress = MutableStateFlow<Progress?>(null)
+    val uploadProgress: StateFlow<Progress?> = _uploadProgress
+
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message
+
+    fun clearMessage() { _message.value = null }
 
     init {
         viewModelScope.launch {
@@ -59,6 +78,59 @@ class GalleryViewModel @Inject constructor(
         _state.value = _state.value.copy(loading = true, error = false)
         if (load.invoke() is Outcome.Err) _state.value = _state.value.copy(loading = false, error = true)
         loadUsage()
+    }
+
+    /** Arm the lock guard so the system picker launch does not trigger idle-lock. */
+    fun armLockSuppression() = lockGuard.armSkipOnce()
+
+    /**
+     * Upload each source serially: read bytes, compute sha-256 sig, dedup against
+     * already-known sigs, upload, and append the new entry to the gallery index.
+     * Progress is published via [uploadProgress]; failures are counted and surfaced
+     * as `"upload_failed:N"` in [message]. [loadUsage] is called when the queue drains.
+     */
+    fun uploadAll(sources: List<PhotoSource>) = viewModelScope.launch {
+        val existing = cache.value.value?.manifest?.photos
+            ?.mapNotNull { it.sig }
+            ?.toMutableSet()
+            ?: mutableSetOf()
+
+        _uploadProgress.value = Progress(0, sources.size)
+        var done = 0
+        var failed = 0
+
+        for (src in sources) {
+            val bytes = try {
+                src.read()
+            } catch (_: Exception) {
+                failed++
+                done++
+                _uploadProgress.value = Progress(done, sources.size)
+                continue
+            }
+
+            val sig = sha256Hex(bytes)
+            if (sig in existing) {
+                // Dedup: already present in the gallery index.
+                done++
+                _uploadProgress.value = Progress(done, sources.size)
+                continue
+            }
+
+            when (val up = uploader.upload(src.name, src.mime, sig, bytes, nowIso())) {
+                is Outcome.Ok -> {
+                    mutate.invoke { it.copy(photos = it.photos + up.value) }
+                    existing += sig
+                }
+                is Outcome.Err -> failed++
+            }
+            done++
+            _uploadProgress.value = Progress(done, sources.size)
+        }
+
+        _uploadProgress.value = null
+        loadUsage()
+        if (failed > 0) _message.value = "upload_failed:$failed"
     }
 
     /** Returns a cached thumbnail bitmap or downloads+decodes it (cached). Null on failure. */
@@ -102,4 +174,12 @@ class GalleryViewModel @Inject constructor(
             .sortedByDescending { it.created ?: "" }
         _state.value = GalleryUi(false, false, photos)
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        java.security.MessageDigest.getInstance("SHA-256")
+            .digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+
+    private fun nowIso(): String =
+        java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).toString()
 }
