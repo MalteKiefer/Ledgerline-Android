@@ -1,10 +1,24 @@
 <resources>
     <string name="app_name">Ledgerline</string>
+
+    <!-- Onboarding / welcome -->
+    <string name="welcome_tagline">Your private, zero-knowledge cloud</string>
+    <string name="welcome_get_started">Get started</string>
+    <string name="welcome_step_connect">Connect this device</string>
+    <string name="welcome_step_unlock">Unlock your vault</string>
+
+    <!-- Pairing -->
     <string name="pairing_title">Connect device</string>
+    <string name="pairing_rationale_heading">Scan the pairing code</string>
+    <string name="pairing_rationale_body">Open your Ledgerline web profile → Connect device, and point your camera at the QR code. The camera is used only to read the pairing code — nothing is recorded or uploaded.</string>
+    <string name="pairing_allow_camera">Allow camera access</string>
+    <string name="pairing_settings_hint">Camera access is off. Enable it for Ledgerline in your device Settings to scan the code.</string>
+    <string name="pairing_point_at_code">Point at the QR code</string>
     <string name="pairing_waiting">Waiting for approval in the web app…</string>
     <string name="pairing_no_camera">Camera permission is required to scan the pairing code.</string>
     <string name="pairing_failed">Pairing failed: %1$s</string>
     <string name="unlock_title">Unlock vault</string>
+    <string name="unlock_subtitle">Enter your passphrase to unlock this device\'s vault.</string>
     <string name="unlock_passphrase">Passphrase</string>
     <string name="unlock_button">Unlock</string>
     <string name="unlock_not_configured">No vault yet. Set it up in the web app first.</string>

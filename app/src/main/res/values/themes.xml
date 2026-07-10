@@ -1,3 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Ledgerline" parent="android:Theme.Material.NoActionBar" />
+    <!-- Dark window theme so there is no white flash before Compose draws. -->
+    <style name="Theme.Ledgerline" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/ledgerline_background</item>
+        <item name="android:statusBarColor">@color/ledgerline_background</item>
+        <item name="android:navigationBarColor">@color/ledgerline_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
 </resources>
