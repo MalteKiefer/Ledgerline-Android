@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Ledgerline</string>
+    <string name="pairing_title">Gerät verbinden</string>
+    <string name="pairing_waiting">Warte auf Bestätigung in der Web-App…</string>
+    <string name="pairing_no_camera">Kameraberechtigung wird zum Scannen des Kopplungscodes benötigt.</string>
+    <string name="pairing_failed">Kopplung fehlgeschlagen: %1$s</string>
+</resources>

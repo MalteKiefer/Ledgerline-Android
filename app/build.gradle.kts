@@ -36,6 +36,7 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
 dependencies {
@@ -68,6 +69,7 @@ dependencies {
     implementation(libs.camera.view)
     implementation(libs.zxing.core)
     implementation(libs.biometric)
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
     implementation(libs.lazysodium.android) { exclude(group = "net.java.dev.jna", module = "jna") }
     implementation(libs.jna) { artifact { type = "aar" } }
@@ -77,6 +79,7 @@ dependencies {
     testImplementation(libs.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.okhttp.tls)
+    testImplementation(libs.robolectric)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
 }
