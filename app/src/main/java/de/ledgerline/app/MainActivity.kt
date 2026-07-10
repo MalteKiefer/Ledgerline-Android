@@ -14,9 +14,11 @@ import androidx.lifecycle.LifecycleOwner
 import dagger.hilt.android.AndroidEntryPoint
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.WorkspaceCache
+import androidx.biometric.BiometricPrompt
 import de.ledgerline.app.core.security.AppLock
+import de.ledgerline.app.core.security.CryptoAuth
 import de.ledgerline.app.core.security.IdleLocker
-import de.ledgerline.app.core.security.LockResult
+import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.ui.nav.AppNav
@@ -39,6 +41,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var sessionHolder: SessionHolder
     @Inject lateinit var workspaceCache: WorkspaceCache
     @Inject lateinit var settingsStore: SettingsStore
+    @Inject lateinit var lockGuard: LockGuard
     private val appLock = AppLock()
 
     // Emits the latest validated pairing deep link. singleTask means a link
@@ -49,7 +52,12 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         // MASVS-STORAGE: block screenshots, screen recording, recents preview.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
-        enableEdgeToEdge()
+        // The app is always dark; force light (dark-style) system bar icons so the
+        // clock/notification icons stay visible on the transparent dark bars.
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
 
         // Apply the persisted idle-lock timeout before any unlock can happen.
         idleLocker.timeoutMs = runBlocking { settingsStore.timeoutMinutes.first() } * 60_000L
@@ -59,11 +67,19 @@ class MainActivity : FragmentActivity() {
 
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
-                vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
+                // Skip exactly one auto-lock when WE launched a system picker (SAF)
+                // or credential prompt, which briefly backgrounds us. A real
+                // background (home button) has no armed skip → wipe normally.
+                if (!lockGuard.consumeSkip()) {
+                    vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
+                }
             }
 
             override fun onResume(owner: LifecycleOwner) {
                 if (idleLocker.isExpired()) { vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear() } else idleLocker.touch()
+                // Defensive: if a picker returned via a dialog path without onStop,
+                // don't leave a stale skip armed for the next real background.
+                lockGuard.clear()
             }
         })
 
@@ -72,15 +88,30 @@ class MainActivity : FragmentActivity() {
                 val lockTitle = stringResource(R.string.lock_title)
                 val lockSubtitle = stringResource(R.string.lock_subtitle)
                 val link by pairLink.collectAsState()
+                // Runs ONE CryptoObject-bound biometric on the keystore cipher and
+                // returns the authorised cipher (or null on cancel/failure). Threaded
+                // into SessionStore.save/load via the screens.
+                val authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher? = { cipher ->
+                    idleLocker.touch()
+                    when (
+                        val r = appLock.authenticate(
+                            this@MainActivity, lockTitle, lockSubtitle, BiometricPrompt.CryptoObject(cipher),
+                        )
+                    ) {
+                        is CryptoAuth.Success -> r.cipher
+                        else -> null
+                    }
+                }
                 AppNav(
-                    authGate = {
-                        idleLocker.touch()
-                        appLock.authenticate(this@MainActivity, lockTitle, lockSubtitle) is LockResult.Success
-                    },
+                    authorize = authorize,
                     initialPairLink = link,
                 )
             }
         }
+
+        // Belt-and-suspenders: force light status bar icons for the dark UI.
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            .isAppearanceLightStatusBars = false
     }
 
     // singleTask: a pairing link delivered while the activity is alive comes here.

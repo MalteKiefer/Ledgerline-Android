@@ -10,3 +10,10 @@
 -keep class * extends com.sun.jna.** { *; }
 -keep class com.goterl.lazysodium.** { *; }
 -dontwarn java.awt.**
+
+# PdfBox-Android (pure Java) pulls fontbox and references optional java.awt/beans/imageio APIs.
+-keep class com.tom_roush.** { *; }
+-dontwarn com.tom_roush.**
+-dontwarn org.apache.pdfbox.**
+-dontwarn org.apache.fontbox.**
+-dontwarn javax.imageio.**
