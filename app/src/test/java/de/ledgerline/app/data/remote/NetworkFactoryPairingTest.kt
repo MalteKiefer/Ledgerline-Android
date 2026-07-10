@@ -20,7 +20,7 @@ class NetworkFactoryPairingTest {
                 .setBody("""{"status":"approved","token":"tok123","user":{"id":1,"name":"Malte"}}""")
                 .addHeader("Content-Type", "application/json")
         )
-        val api = NetworkFactory.create(server.url("/").toString(), tokenProvider = { null }, pin = null)
+        val api = NetworkFactory.create(server.url("/").toString(), tokenProvider = { null }, pin = null, allowCleartext = true)
         val res = api.pollPair("abc")
         assertEquals(200, res.code())
         assertEquals("approved", res.body()!!.status)

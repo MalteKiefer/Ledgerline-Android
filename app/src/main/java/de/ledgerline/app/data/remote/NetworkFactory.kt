@@ -16,17 +16,32 @@ import java.util.concurrent.TimeUnit
  * initial pairing claim/poll (TOFU: pin not yet known); once known, all sessions
  * use a pinned client.
  *
- * Note: CLEARTEXT is included alongside RESTRICTED_TLS so JVM unit tests using
- * MockWebServer over plain HTTP pass. Production traffic is HTTPS-only, enforced
- * app-wide by network_security_config.xml.
+ * Production traffic is HTTPS-only: the client is restricted to RESTRICTED_TLS
+ * (TLS 1.2+/strong ciphers) and cleartext is never permitted here — the platform
+ * network_security_config additionally blocks it app-wide (defense in depth).
+ * The `internal` overload allows CLEARTEXT solely for JVM unit tests hitting a
+ * plain-HTTP MockWebServer; the public API can never enable it.
  */
 object NetworkFactory {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun create(baseUrl: String, tokenProvider: () -> String?, pin: String?): LedgerlineApi {
+    fun create(baseUrl: String, tokenProvider: () -> String?, pin: String?): LedgerlineApi =
+        create(baseUrl, tokenProvider, pin, allowCleartext = false)
+
+    internal fun create(
+        baseUrl: String,
+        tokenProvider: () -> String?,
+        pin: String?,
+        allowCleartext: Boolean,
+    ): LedgerlineApi {
         val host = baseUrl.toHttpUrl().host
+        val specs = if (allowCleartext) {
+            listOf(ConnectionSpec.RESTRICTED_TLS, ConnectionSpec.CLEARTEXT)
+        } else {
+            listOf(ConnectionSpec.RESTRICTED_TLS)
+        }
         val builder = OkHttpClient.Builder()
-            .connectionSpecs(listOf(ConnectionSpec.RESTRICTED_TLS, ConnectionSpec.CLEARTEXT))
+            .connectionSpecs(specs)
             .callTimeout(60, TimeUnit.SECONDS)
             .addInterceptor(AuthInterceptor(tokenProvider))
             .addInterceptor(BackoffInterceptor())
