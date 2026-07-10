@@ -68,6 +68,9 @@
     <string name="file_saved">Gespeichert</string>
     <string name="file_save_failed">Speichern fehlgeschlagen</string>
     <string name="file_preview_unavailable">Für diesen Dateityp ist keine Vorschau verfügbar.</string>
+    <string name="pdf_page">Seite %1$d</string>
+    <string name="pdf_render_failed">Seite konnte nicht dargestellt werden.</string>
+    <string name="pdf_open_failed">PDF konnte nicht geöffnet werden.</string>
     <string name="file_usage">%1$s von %2$s belegt</string>
     <string name="file_name">Name</string>
     <string name="folder_name">Ordnername</string>

@@ -68,6 +68,9 @@
     <string name="file_saved">Saved</string>
     <string name="file_save_failed">Save failed</string>
     <string name="file_preview_unavailable">Preview not available for this file type.</string>
+    <string name="pdf_page">Page %1$d</string>
+    <string name="pdf_render_failed">Couldn\'t render this page.</string>
+    <string name="pdf_open_failed">Couldn\'t open this PDF.</string>
     <string name="file_usage">%1$s of %2$s used</string>
     <string name="file_name">Name</string>
     <string name="folder_name">Folder name</string>
