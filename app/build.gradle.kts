@@ -20,7 +20,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += listOf("en", "de")
         // 64-bit only; also drops the stale 4 KB-aligned prebuilt ABIs from lazysodium.
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     buildTypes {
