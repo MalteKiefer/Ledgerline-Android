@@ -27,6 +27,19 @@ class GalleryRepository private constructor(
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Gallery blob storage usage: (used bytes, quota bytes). Null on any failure. */
+    suspend fun galleryUsage(): Pair<Long, Long>? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val res = apiProvider(session).galleryUsage()
+            if (!res.isSuccessful) return null
+            val body = res.body() ?: return null
+            body.used to body.quota
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     suspend fun load(): Outcome<Gallery> {
         val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)

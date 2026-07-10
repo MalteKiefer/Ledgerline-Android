@@ -8,6 +8,7 @@ import de.ledgerline.app.domain.model.Gallery
 import de.ledgerline.app.domain.model.GalleryManifest
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.usecase.GalleryBlobs
+import de.ledgerline.app.domain.usecase.GalleryUsage
 import de.ledgerline.app.domain.usecase.LoadGallery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -23,6 +24,10 @@ import org.junit.Test
 private class FakeBlobs : GalleryBlobs {
     override suspend fun download(ref: String, key: String): Outcome<ByteArray> =
         Outcome.Err(ErrorKind.NETWORK)
+}
+
+private class FakeGalleryUsage : GalleryUsage {
+    override suspend fun invoke(): Pair<Long, Long>? = null
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -44,7 +49,7 @@ class GalleryViewModelTest {
                 return Outcome.Ok(gallery())
             }
         }
-        val vm = GalleryViewModel(load, cache, blobs = FakeBlobs(), thumbs = ThumbCache())
+        val vm = GalleryViewModel(load, cache, blobs = FakeBlobs(), thumbs = ThumbCache(), galleryUsage = FakeGalleryUsage())
         vm.refresh()
         assertEquals(listOf("b", "a"), vm.state.value.photos.map { it.id })
     }

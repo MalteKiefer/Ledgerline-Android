@@ -106,6 +106,7 @@
     <string name="gallery_empty">No photos yet.</string>
     <string name="gallery_error">Couldn\'t load the gallery.</string>
     <string name="gallery_usage">%1$s used</string>
+    <string name="gallery_usage_full">%1$s of %2$s used</string>
     <string name="photo_original">View original</string>
     <string name="photo_video_soon">Video playback comes later.</string>
     <string name="menu_bookmarks">Bookmarks</string>

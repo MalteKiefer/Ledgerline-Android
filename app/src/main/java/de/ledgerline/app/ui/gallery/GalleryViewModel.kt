@@ -10,7 +10,9 @@ import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.usecase.GalleryBlobs
+import de.ledgerline.app.domain.usecase.GalleryUsage
 import de.ledgerline.app.domain.usecase.LoadGallery
+import de.ledgerline.app.ui.workspace.files.UsageInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -28,20 +30,31 @@ class GalleryViewModel @Inject constructor(
     private val cache: GalleryCache,
     private val blobs: GalleryBlobs,
     private val thumbs: ThumbCache,
+    private val galleryUsage: GalleryUsage,
 ) : ViewModel() {
     private val _state = MutableStateFlow(GalleryUi(loading = true))
     val state: StateFlow<GalleryUi> = _state
+
+    private val _usage = MutableStateFlow<UsageInfo?>(null)
+    val usage: StateFlow<UsageInfo?> = _usage
 
     init {
         viewModelScope.launch {
             cache.value.collect { g -> if (g != null) recompute() else _state.value = GalleryUi(loading = true) }
         }
         if (cache.value.value == null) refresh()
+        loadUsage()
+    }
+
+    /** Fetch gallery blob usage (used/quota) and publish it; silently ignores failure. */
+    fun loadUsage() = viewModelScope.launch {
+        galleryUsage.invoke()?.let { (used, quota) -> _usage.value = UsageInfo(used, quota) }
     }
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = false)
         if (load.invoke() is Outcome.Err) _state.value = _state.value.copy(loading = false, error = true)
+        loadUsage()
     }
 
     /** Returns a cached thumbnail bitmap or downloads+decodes it (cached). Null on failure. */

@@ -6,9 +6,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,11 +37,13 @@ import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.ui.workspace.common.CenteredMessage
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
+import de.ledgerline.app.ui.workspace.common.humanSize
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltViewModel()) {
     val ui by vm.state.collectAsStateWithLifecycle()
+    val usage by vm.usage.collectAsStateWithLifecycle()
     var openId by remember { mutableStateOf<String?>(null) }
 
     val current = openId
@@ -70,6 +74,21 @@ fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltView
                 columns = GridCells.Adaptive(minSize = 116.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
+                usage?.let { u ->
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        val usageText = if (u.quota <= 0) {
+                            stringResource(R.string.gallery_usage, humanSize(u.used))
+                        } else {
+                            stringResource(R.string.gallery_usage_full, humanSize(u.used), humanSize(u.quota))
+                        }
+                        Text(
+                            usageText,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    }
+                }
                 items(ui.photos, key = { it.id }) { photo ->
                     ThumbCell(photo, vm) { openId = photo.id }
                 }

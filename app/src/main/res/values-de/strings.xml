@@ -106,6 +106,7 @@
     <string name="gallery_empty">Noch keine Fotos.</string>
     <string name="gallery_error">Galerie konnte nicht geladen werden.</string>
     <string name="gallery_usage">%1$s belegt</string>
+    <string name="gallery_usage_full">%1$s von %2$s belegt</string>
     <string name="photo_original">Original anzeigen</string>
     <string name="photo_video_soon">Videowiedergabe kommt später.</string>
     <string name="menu_bookmarks">Lesezeichen</string>
