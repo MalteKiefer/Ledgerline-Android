@@ -27,6 +27,7 @@
     <string name="lock_subtitle">Zum Fortfahren authentifizieren</string>
     <string name="lock_locked">Gesperrt. Zum Fortfahren authentifizieren.</string>
     <string name="tab_files">Dateien</string>
+    <string name="tab_gallery">Galerie</string>
     <string name="tab_notes">Notizen</string>
     <string name="tab_bookmarks">Lesezeichen</string>
     <string name="tab_todos">Todos</string>
@@ -100,4 +101,14 @@
     <string name="action_back">Zurück</string>
     <string name="action_settings">Einstellungen</string>
     <string name="action_more">Mehr</string>
+
+    <!-- Galerie -->
+    <string name="gallery_empty">Noch keine Fotos.</string>
+    <string name="gallery_error">Galerie konnte nicht geladen werden.</string>
+    <string name="gallery_usage">%1$s belegt</string>
+    <string name="gallery_usage_full">%1$s von %2$s belegt</string>
+    <string name="photo_original">Original anzeigen</string>
+    <string name="photo_video_soon">Videowiedergabe kommt später.</string>
+    <string name="menu_bookmarks">Lesezeichen</string>
+    <string name="menu_more">Mehr</string>
 </resources>

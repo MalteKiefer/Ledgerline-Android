@@ -48,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.FileEntry
+import de.ledgerline.app.ui.workspace.LocalFullscreen
 import kotlinx.coroutines.launch
 
 /**
@@ -65,6 +66,8 @@ fun FileViewerScreen(
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
+    val fs = LocalFullscreen.current
+    DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
     Scaffold(
         modifier = modifier,
         topBar = {
