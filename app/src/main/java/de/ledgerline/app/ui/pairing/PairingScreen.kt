@@ -56,17 +56,18 @@ import de.ledgerline.app.ui.scan.QrCodeAnalyzer
 import de.ledgerline.app.ui.scan.parsePairLink
 
 /**
- * Pairing screen. On approval it requires an app-lock auth (biometric / device
- * credential) via [authGate] before the session is sealed to disk — this both
- * establishes the user and opens the auth window the keystore key needs to seal.
+ * Pairing screen. On approval it seals the session to disk, which triggers exactly
+ * one CryptoObject-bound app-lock biometric ([authorize]) to authorize the keystore
+ * seal — this both establishes the user and authorizes the keystore key.
  *
- * @param authGate runs the app-lock prompt; returns true on success.
+ * @param authorize runs the CryptoObject-bound app-lock prompt on the keystore
+ *   cipher; returns the authorised cipher, or null on cancel/failure.
  * @param initialPairLink an optional `ledgerline://pair` deep link to auto-start.
  */
 @Composable
 fun PairingScreen(
     vm: PairingViewModel = hiltViewModel(),
-    authGate: suspend () -> Boolean,
+    authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
     initialPairLink: String? = null,
     onPaired: () -> Unit,
 ) {
@@ -91,17 +92,13 @@ fun PairingScreen(
         initialPairLink?.let { link -> parsePairLink(link)?.let { (url, code) -> vm.startPairing(url, code, Build.MODEL) } }
     }
 
-    // On approval: gate on app-lock auth, then seal the session, then advance.
+    // On approval: seal the session (one CryptoObject-bound biometric inside
+    // persist), then advance. authFailed on cancel/failure.
     LaunchedEffect(state) {
         val s = state
         if (s is PairingState.Approved) {
             authFailed = false
-            if (authGate()) {
-                vm.persist(s.session)
-                onPaired()
-            } else {
-                authFailed = true
-            }
+            if (vm.persist(s.session, authorize)) onPaired() else authFailed = true
         }
     }
 

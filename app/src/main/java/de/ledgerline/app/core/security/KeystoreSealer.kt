@@ -13,20 +13,27 @@ import javax.crypto.spec.GCMParameterSpec
  * Seals small secrets (bearer token, base URL, SPKI pin) with a hardware-backed
  * AES-256-GCM key in the AndroidKeystore. StrongBox is requested on real hardware
  * and transparently skipped where unavailable (e.g. the emulator). When
- * requireAuth=true the key can only be used after a successful BiometricPrompt and
- * is invalidated if the user enrolls a new biometric.
+ * requireAuth=true the key requires per-use authentication: every seal/unseal
+ * operation must be authorized by a CryptoObject-bound BiometricPrompt (validity 0),
+ * and the key is invalidated if the user enrolls a new biometric.
+ *
+ * Per-use auth means callers cannot use the inline [seal]/[open] helpers with an
+ * auth-gated key — the cipher init only succeeds after the CryptoObject-bound
+ * prompt. Instead they build a cipher via [encryptCipher]/[decryptCipher], run the
+ * biometric prompt on it (see AppLock), then finish with [finishSeal]/[finishOpen].
+ * This guarantees exactly ONE biometric prompt per session read/write.
+ *
+ * The alias was bumped to `_v2` when the auth params changed from time-bound to
+ * per-use: an existing key created with the old params cannot be reused with the
+ * new ones, so a fresh key is generated under the new alias. Any session sealed
+ * with the old key becomes undecryptable → the user re-pairs once (documented).
  *
  * Blob layout: [1-byte IV length][IV][GCM ciphertext+tag].
  */
 class KeystoreSealer(
-    private val alias: String = "ledgerline_token_key",
+    private val alias: String = "ledgerline_token_key_v2",
     private val requireAuth: Boolean = true,
 ) {
-    private companion object {
-        // Window (seconds) a single auth authorizes key use for.
-        const val AUTH_VALIDITY_SECONDS = 30
-    }
-
     private val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
     private fun buildSpec(strongBox: Boolean): KeyGenParameterSpec =
@@ -41,13 +48,13 @@ class KeystoreSealer(
                 if (strongBox) setIsStrongBoxBacked(true)
                 if (requireAuth) {
                     setUserAuthenticationRequired(true)
-                    // Time-bound auth: a successful biometric/device-credential prompt
-                    // authorizes key use for a short window, so the app can seal/unseal
-                    // the session right after the app-lock prompt without binding a
-                    // CryptoObject to each operation. A future hardening could switch to
-                    // per-use auth (validity 0) with a CryptoObject-bound prompt.
+                    // Per-use auth (validity 0): every cipher operation must be
+                    // authorized by a CryptoObject-bound BiometricPrompt. This is the
+                    // correct two-factor design — exactly one biometric authorizes the
+                    // keystore decrypt of the sealed session, and the passphrase derives
+                    // the Vault Key. DEVICE_CREDENTIAL works with a CryptoObject on API 30+.
                     setUserAuthenticationParameters(
-                        AUTH_VALIDITY_SECONDS,
+                        0,
                         KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
                     )
                     setInvalidatedByBiometricEnrollment(true)
@@ -68,11 +75,20 @@ class KeystoreSealer(
         }
     }
 
-    fun seal(plaintext: ByteArray): ByteArray {
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
-        val iv = cipher.iv
+    // --- Per-use (CryptoObject-bound) path: the caller runs the biometric on the
+    // cipher between the *Cipher and finish* calls (see AppLock / SessionStore). ---
+
+    /** Cipher initialised for encryption; wrap in a CryptoObject and prompt, then [finishSeal]. */
+    fun encryptCipher(): Cipher {
+        val c = Cipher.getInstance("AES/GCM/NoPadding")
+        c.init(Cipher.ENCRYPT_MODE, getOrCreateKey())
+        return c
+    }
+
+    /** Complete a seal with the authorised [cipher] from [encryptCipher]. */
+    fun finishSeal(cipher: Cipher, plaintext: ByteArray): ByteArray {
         val ct = cipher.doFinal(plaintext)
+        val iv = cipher.iv
         return ByteArray(1 + iv.size + ct.size).apply {
             this[0] = iv.size.toByte()
             System.arraycopy(iv, 0, this, 1, iv.size)
@@ -80,14 +96,27 @@ class KeystoreSealer(
         }
     }
 
-    fun open(blob: ByteArray): ByteArray {
+    /** Cipher initialised for decryption of [blob]; wrap in a CryptoObject and prompt, then [finishOpen]. */
+    fun decryptCipher(blob: ByteArray): Cipher {
         val ivLen = blob[0].toInt() and 0xFF
         val iv = blob.copyOfRange(1, 1 + ivLen)
-        val ct = blob.copyOfRange(1 + ivLen, blob.size)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
-        return cipher.doFinal(ct)
+        val c = Cipher.getInstance("AES/GCM/NoPadding")
+        c.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
+        return c
     }
+
+    /** Complete an open with the authorised [cipher] from [decryptCipher]. */
+    fun finishOpen(cipher: Cipher, blob: ByteArray): ByteArray {
+        val ivLen = blob[0].toInt() and 0xFF
+        return cipher.doFinal(blob.copyOfRange(1 + ivLen, blob.size))
+    }
+
+    // --- Inline path: only valid with requireAuth=false (no per-use auth needed).
+    // Used by KeystoreSealerTest. ---
+
+    fun seal(plaintext: ByteArray): ByteArray = finishSeal(encryptCipher(), plaintext)
+
+    fun open(blob: ByteArray): ByteArray = finishOpen(decryptCipher(blob), blob)
 
     fun clear() {
         if (store.containsAlias(alias)) store.deleteEntry(alias)

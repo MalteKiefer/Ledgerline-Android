@@ -3,14 +3,24 @@ package de.ledgerline.app.data.remote
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
+import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
+import de.ledgerline.app.data.remote.dto.UploadResponse
+import de.ledgerline.app.data.remote.dto.UsageResponse
 import de.ledgerline.app.data.remote.dto.VaultResponse
+import okhttp3.MultipartBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Part
+import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 interface LedgerlineApi {
     @POST("api/v1/auth/pair")
@@ -27,4 +37,21 @@ interface LedgerlineApi {
 
     @DELETE("api/v1/auth/session")
     suspend fun deleteSession(): Response<Unit>
+
+    @GET("api/v1/files/raw/{blob}")
+    @Streaming
+    suspend fun rawFile(@Path("blob") blob: String): Response<ResponseBody>
+
+    @Multipart
+    @POST("api/v1/files/upload")
+    suspend fun uploadFile(@Part file: MultipartBody.Part): Response<UploadResponse>
+
+    @DELETE("api/v1/files/blob/{blob}")
+    suspend fun deleteBlob(@Path("blob") blob: String): Response<Unit>
+
+    @PUT("api/v1/store")
+    suspend fun putStore(@Body body: StorePutRequest): Response<StoreResponse>
+
+    @GET("api/v1/files/usage")
+    suspend fun filesUsage(): Response<UsageResponse>
 }

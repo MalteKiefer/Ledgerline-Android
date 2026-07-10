@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.nio.CharBuffer
+import javax.crypto.Cipher
 import javax.inject.Inject
 
 sealed interface UnlockUiState {
@@ -37,10 +38,15 @@ class UnlockViewModel @Inject constructor(
     private val _state = MutableStateFlow<UnlockUiState>(UnlockUiState.Idle)
     val state: StateFlow<UnlockUiState> = _state
 
-    fun unlock(passphrase: CharArray) {
+    /**
+     * Unlock. [authorize] runs the single CryptoObject-bound biometric that
+     * authorizes reading the sealed session; the passphrase then derives the VK.
+     */
+    fun unlock(passphrase: CharArray, authorize: suspend (Cipher) -> Cipher?) {
         viewModelScope.launch {
             _state.value = UnlockUiState.Working
-            val session = sessionStore.load() ?: run { _state.value = UnlockUiState.Error("no session"); return@launch }
+            val session = sessionStore.load(authorize)
+                ?: run { _state.value = UnlockUiState.Error("no session or auth cancelled"); return@launch }
             sessionHolder.set(session)
             val bytes = charsToUtf8(passphrase)
             val result = withContext(Dispatchers.Default) { // Argon2id is CPU-heavy

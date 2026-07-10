@@ -68,13 +68,14 @@ class RootViewModel @Inject constructor(
 }
 
 /**
- * Root flow gate: pairing vs unlock vs home. [authGate] runs the app-lock
- * biometric/device-credential prompt (needs the Activity), threaded into the
- * screens that touch the auth-gated keystore key.
+ * Root flow gate: pairing vs unlock vs home. [authorize] runs the app-lock
+ * CryptoObject-bound biometric/device-credential prompt on a keystore cipher (needs
+ * the Activity) and returns the authorised cipher, threaded into the screens that
+ * touch the auth-gated keystore key. Exactly one prompt per session read/write.
  */
 @Composable
 fun AppNav(
-    authGate: suspend () -> Boolean,
+    authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
     initialPairLink: String? = null,
     vm: RootViewModel = hiltViewModel(),
 ) {
@@ -92,8 +93,8 @@ fun AppNav(
     when (dest) {
         Destination.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         Destination.WELCOME -> WelcomeScreen(onGetStarted = { vm.toPairing() })
-        Destination.PAIRING -> PairingScreen(authGate = authGate, initialPairLink = initialPairLink, onPaired = { vm.toUnlock() })
-        Destination.UNLOCK -> UnlockScreen(authGate = authGate, onUnlocked = { vm.toHome() })
+        Destination.PAIRING -> PairingScreen(authorize = authorize, initialPairLink = initialPairLink, onPaired = { vm.toUnlock() })
+        Destination.UNLOCK -> UnlockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
         Destination.HOME -> {
             val unlocked by vm.unlocked.collectAsStateWithLifecycle()
             if (unlocked) {
@@ -102,7 +103,7 @@ fun AppNav(
                     onDisconnected = { vm.toWelcome() },
                 )
             } else {
-                UnlockScreen(authGate = authGate, onUnlocked = { vm.toHome() })
+                UnlockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
             }
         }
     }

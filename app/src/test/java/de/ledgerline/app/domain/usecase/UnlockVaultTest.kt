@@ -20,6 +20,12 @@ class UnlockVaultTest {
         override fun b64encode(b: ByteArray) = String(b)
         override fun fromHex(s: String) = s.toByteArray()
         override fun openManifest(ciphertext: String, vk: ByteArray): String? = null
+        override fun sealManifest(json: String, vk: ByteArray): String = "SEALED:$json"
+        override val contentChunkSize: Int = 1
+        override fun u32le(n: Int) = ByteArray(4)
+        override fun readU32le(bytes: ByteArray, off: Int) = 0
+        override fun newContentEncryptor(vk: ByteArray): Crypto.ContentEncryptor = throw NotImplementedError()
+        override fun contentDecryptor(encFileKey: String, vk: ByteArray): Crypto.ContentDecryptor = throw NotImplementedError()
     }
 
     private fun gateway(configured: Boolean = true) = object : VaultGateway {

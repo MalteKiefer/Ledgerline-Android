@@ -84,6 +84,9 @@ dependencies {
     implementation(libs.lazysodium.android) { exclude(group = "net.java.dev.jna", module = "jna") }
     implementation(libs.jna) { artifact { type = "aar" } }
 
+    // Pure-Java/Kotlin PDF rendering (Apache-2, no native .so).
+    implementation(libs.pdfbox.android)
+
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.coroutines.test)
