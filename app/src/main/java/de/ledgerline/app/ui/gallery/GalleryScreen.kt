@@ -21,7 +21,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -64,6 +67,8 @@ fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltView
     val uploadProgress by vm.uploadProgress.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     var openId by remember { mutableStateOf<String?>(null) }
+    var showCamera by remember { mutableStateOf(false) }
+    var fabExpanded by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -97,6 +102,19 @@ fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltView
             }
             vm.clearMessage()
         }
+    }
+
+    // Camera capture screen — full-screen, like the photo viewer.
+    if (showCamera) {
+        CameraCaptureScreen(
+            onCaptured = { bytes ->
+                showCamera = false
+                val ts = System.currentTimeMillis()
+                vm.uploadAll(listOf(PhotoSource("IMG_$ts.jpg", "image/jpeg") { bytes }))
+            },
+            onBack = { showCamera = false },
+        )
+        return
     }
 
     val current = openId
@@ -154,22 +172,46 @@ fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltView
             }
         }
 
-        // FAB — always visible (bottom-end), above any content.
-        FloatingActionButton(
-            onClick = {
-                vm.armLockSuppression()
-                picker.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                )
-            },
+        // FAB with chooser menu (upload from picker or take a photo).
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(16.dp),
         ) {
-            Icon(
-                imageVector = Icons.Outlined.AddPhotoAlternate,
-                contentDescription = stringResource(R.string.gallery_add),
-            )
+            FloatingActionButton(onClick = { fabExpanded = true }) {
+                Icon(
+                    imageVector = Icons.Outlined.AddPhotoAlternate,
+                    contentDescription = stringResource(R.string.gallery_add),
+                )
+            }
+            DropdownMenu(
+                expanded = fabExpanded,
+                onDismissRequest = { fabExpanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.gallery_upload_photos)) },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null)
+                    },
+                    onClick = {
+                        fabExpanded = false
+                        vm.armLockSuppression()
+                        picker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                        )
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.gallery_take_photo)) },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.PhotoCamera, contentDescription = null)
+                    },
+                    onClick = {
+                        fabExpanded = false
+                        showCamera = true
+                    },
+                )
+            }
         }
 
         // Upload progress overlay.
