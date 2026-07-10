@@ -95,6 +95,18 @@
     <string name="settings_offline_subtitle">Hält angesehene Daten ohne Verbindung verfügbar — verschlüsselt gespeichert.</string>
     <string name="settings_offline_files">Datei-Inhalte offline</string>
     <string name="settings_offline_photos">Fotos offline</string>
+    <string name="settings_files_policy">Datei-Inhalte offline</string>
+    <string name="settings_photos_policy">Fotos offline</string>
+    <string name="settings_cache_limit">Cache-Limit</string>
+    <string name="settings_cache_unlimited">Unbegrenzt</string>
+    <string name="settings_prefetch_wifi">Nur über WLAN</string>
+    <string name="settings_prefetch_charging">Nur beim Laden</string>
+    <string name="settings_prefetch_now">Jetzt vorladen</string>
+    <string name="settings_prefetch_constraints">Vorladen übersprungen: WLAN/Laden nicht verfügbar</string>
+    <string name="policy_off">Aus</string>
+    <string name="policy_on_demand">Bei Bedarf</string>
+    <string name="policy_all">Alle</string>
+    <string name="policy_thumbs">Thumbnails</string>
     <string name="settings_offline_size">Cache-Größe: %1$s</string>
     <string name="settings_offline_clear">Cache leeren</string>
     <string name="settings_offline_clear_confirm">Offline-Cache leeren? Angesehene Daten müssen erneut geladen werden.</string>
@@ -105,6 +117,7 @@
     <string name="ops_kind_duplicate_scan">Duplikat-Scan</string>
     <string name="ops_kind_upload">Upload</string>
     <string name="ops_kind_blob_cleanup">Aufräumen</string>
+    <string name="ops_kind_prefetch">Vorladen</string>
     <string name="settings_disconnect">Dieses Gerät trennen</string>
     <string name="settings_disconnect_confirm">Dieses Gerät trennen? Du musst dich erneut koppeln, indem du einen neuen QR-Code scannst.</string>
     <string name="settings_about">Über</string>

@@ -14,6 +14,9 @@ import javax.inject.Singleton
  */
 interface Connectivity {
     fun isOnline(): Boolean
+
+    /** True if the active network is unmetered (Wi-Fi / Ethernet). False when offline. */
+    fun isUnmetered(): Boolean
 }
 
 @Singleton
@@ -27,5 +30,13 @@ class AndroidConnectivity @Inject constructor(
         val caps = cm.getNetworkCapabilities(network) ?: return false
         return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
             caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
+    override fun isUnmetered(): Boolean {
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return false
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
     }
 }

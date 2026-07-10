@@ -78,6 +78,106 @@ class BlobDiskCacheTest {
         assertArrayEquals(byteArrayOf(9), c.get(id))
     }
 
+    // A fake with a tunable limit so tests can drive put()'s auto-enforcement.
+    private class LimitFlags(private val max: Long) : OfflineFlags {
+        override fun enabled() = true
+        override fun filesPolicy() = de.ledgerline.app.data.offline.FileBlobPolicy.ON_DEMAND
+        override fun photosPolicy() = de.ledgerline.app.data.offline.PhotoBlobPolicy.ON_DEMAND
+        override fun maxBytes() = max
+        override fun wifiOnly() = false
+        override fun chargingOnly() = false
+    }
+
+    private fun ids(n: Int): List<String> =
+        (0 until n).map { "0000000%d-0000-0000-0000-000000000000".format(it) }
+
+    @Test
+    fun enforceLimit_evicts_oldest_first_until_under_limit() {
+        val c = cache()
+        val root = File(tmp.root, "blobcache")
+        val list = ids(4)
+        // Each blob is 10 bytes → 40 total. Give distinct, ascending lastModified so
+        // list[0] is oldest and list[3] newest.
+        val base = 1_000_000_000L
+        list.forEachIndexed { i, id ->
+            c.put(id, ByteArray(10))
+            File(root, id).setLastModified(base + i * 1000L)
+        }
+        assertEquals(40L, c.sizeBytes())
+
+        // Limit fits ~2 blobs (25 bytes) → must evict the two oldest.
+        c.enforceLimit(25L)
+
+        assertEquals(20L, c.sizeBytes())
+        assertFalse(c.has(list[0]))
+        assertFalse(c.has(list[1]))
+        assertTrue(c.has(list[2]))
+        assertTrue(c.has(list[3]))
+    }
+
+    @Test
+    fun enforceLimit_unlimited_never_evicts() {
+        val c = cache()
+        val list = ids(3)
+        list.forEach { c.put(it, ByteArray(10)) }
+        assertEquals(30L, c.sizeBytes())
+
+        c.enforceLimit(0L)
+
+        assertEquals(30L, c.sizeBytes())
+        list.forEach { assertTrue(c.has(it)) }
+    }
+
+    @Test
+    fun touch_on_get_protects_recently_read_blob_from_eviction() {
+        val c = cache()
+        val root = File(tmp.root, "blobcache")
+        val list = ids(3)
+        val base = 1_000_000_000L
+        list.forEachIndexed { i, id ->
+            c.put(id, ByteArray(10))
+            File(root, id).setLastModified(base + i * 1000L)
+        }
+        // list[0] is the oldest. Read it → get() touches it to now, so it's newest.
+        c.get(list[0])
+
+        // Add a fourth blob; enforce a limit fitting 3 (35 bytes) → evict one.
+        val fourth = "0000000f-0000-0000-0000-000000000000"
+        c.put(fourth, ByteArray(10))
+        File(root, fourth).setLastModified(base + 5000L)
+        c.enforceLimit(35L)
+
+        // The touched blob survives; the now-oldest (list[1]) is evicted instead.
+        assertTrue(c.has(list[0]))
+        assertFalse(c.has(list[1]))
+    }
+
+    @Test
+    fun put_auto_enforces_limit_keeping_size_under_max() {
+        val root = File(tmp.root, "blobcache")
+        val c = BlobDiskCache(root, LimitFlags(25L))
+        val list = ids(4)
+        // Each put auto-enforces the 25-byte limit; distinct lastModified so eviction
+        // is deterministic (older writes evicted first).
+        val base = 1_000_000_000L
+        list.forEachIndexed { i, id ->
+            c.put(id, ByteArray(10))
+            File(root, id).setLastModified(base + i * 1000L)
+        }
+        // After all puts, cache stays under the limit.
+        assertTrue("sizeBytes=${c.sizeBytes()}", c.sizeBytes() <= 25L)
+    }
+
+    @Test
+    fun put_never_evicts_the_just_written_blob_even_below_one_blob_limit() {
+        val root = File(tmp.root, "blobcache")
+        // Limit smaller than a single blob (10 bytes) — the just-written blob must survive.
+        val c = BlobDiskCache(root, LimitFlags(5L))
+        c.put(id, ByteArray(10))
+        assertTrue(c.has(id))
+        assertArrayEquals(ByteArray(10), c.get(id))
+    }
+
     @Test
     fun ids_with_slash_or_dotdot_are_rejected_safely() {
         val c = cache()

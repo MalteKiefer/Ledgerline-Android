@@ -9,6 +9,7 @@ import android.os.LocaleList
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +26,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +49,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.BuildConfig
 import de.ledgerline.app.R
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.data.offline.FileBlobPolicy
+import de.ledgerline.app.data.offline.PhotoBlobPolicy
+import de.ledgerline.app.ui.ops.OpProgressOverlay
 import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
@@ -65,23 +71,38 @@ fun SettingsContent(
     val timeout by vm.timeoutMinutes.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
     val offlineEnabled by vm.offlineEnabled.collectAsStateWithLifecycle()
-    val filesBlobsOffline by vm.filesBlobsOffline.collectAsStateWithLifecycle()
-    val photosBlobsOffline by vm.photosBlobsOffline.collectAsStateWithLifecycle()
+    val filesPolicy by vm.filesPolicy.collectAsStateWithLifecycle()
+    val photosPolicy by vm.photosPolicy.collectAsStateWithLifecycle()
+    val cacheMaxMb by vm.cacheMaxMb.collectAsStateWithLifecycle()
+    val prefetchWifiOnly by vm.prefetchWifiOnly.collectAsStateWithLifecycle()
+    val prefetchChargingOnly by vm.prefetchChargingOnly.collectAsStateWithLifecycle()
+    val prefetchMessage by vm.prefetchMessage.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSizeBytes.collectAsStateWithLifecycle()
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
     var showDisconnectConfirm by remember { mutableStateOf(false) }
     var showClearCacheConfirm by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val constraintsMsg = stringResource(R.string.settings_prefetch_constraints)
 
     // Compute the cache-size line once when the Settings tab is shown.
     LaunchedEffect(Unit) { vm.refreshCacheSize() }
+
+    // Surface the manual-prefetch "constraints not met" reason as a snackbar, once.
+    LaunchedEffect(prefetchMessage) {
+        if (prefetchMessage == "constraints") {
+            snackbarHostState.showSnackbar(constraintsMsg)
+            vm.clearPrefetchMessage()
+        }
+    }
 
     // Result is ignored: if the user denies notifications the op still runs; the
     // platform simply suppresses the foreground-service notification.
     val notificationsLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    Box(modifier.fillMaxSize()) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
@@ -144,20 +165,73 @@ fun SettingsContent(
             checked = offlineEnabled,
             onCheckedChange = { vm.setOfflineEnabled(it) },
         )
-        SwitchRow(
-            title = stringResource(R.string.settings_offline_files),
-            subtitle = "",
-            checked = filesBlobsOffline,
+        // Files policy: Off / On demand / All.
+        SelectorGroup(
+            title = stringResource(R.string.settings_files_policy),
             enabled = offlineEnabled,
-            onCheckedChange = { vm.setFilesBlobsOffline(it) },
+        ) {
+            RadioRow(stringResource(R.string.policy_off), filesPolicy == FileBlobPolicy.OFF, offlineEnabled) {
+                vm.setFilesPolicy(FileBlobPolicy.OFF)
+            }
+            RadioRow(stringResource(R.string.policy_on_demand), filesPolicy == FileBlobPolicy.ON_DEMAND, offlineEnabled) {
+                vm.setFilesPolicy(FileBlobPolicy.ON_DEMAND)
+            }
+            RadioRow(stringResource(R.string.policy_all), filesPolicy == FileBlobPolicy.ALL, offlineEnabled) {
+                vm.setFilesPolicy(FileBlobPolicy.ALL)
+            }
+        }
+
+        // Photos policy: Off / Thumbnails / On demand / All.
+        SelectorGroup(
+            title = stringResource(R.string.settings_photos_policy),
+            enabled = offlineEnabled,
+        ) {
+            RadioRow(stringResource(R.string.policy_off), photosPolicy == PhotoBlobPolicy.OFF, offlineEnabled) {
+                vm.setPhotosPolicy(PhotoBlobPolicy.OFF)
+            }
+            RadioRow(stringResource(R.string.policy_thumbs), photosPolicy == PhotoBlobPolicy.THUMBS, offlineEnabled) {
+                vm.setPhotosPolicy(PhotoBlobPolicy.THUMBS)
+            }
+            RadioRow(stringResource(R.string.policy_on_demand), photosPolicy == PhotoBlobPolicy.ON_DEMAND, offlineEnabled) {
+                vm.setPhotosPolicy(PhotoBlobPolicy.ON_DEMAND)
+            }
+            RadioRow(stringResource(R.string.policy_all), photosPolicy == PhotoBlobPolicy.ALL, offlineEnabled) {
+                vm.setPhotosPolicy(PhotoBlobPolicy.ALL)
+            }
+        }
+
+        // Cache size limit: 512 MB / 1 GB / 2 GB / Unlimited.
+        SelectorGroup(
+            title = stringResource(R.string.settings_cache_limit),
+            enabled = offlineEnabled,
+        ) {
+            SettingsStore.CACHE_MAX_MB_OPTIONS.forEach { mb ->
+                RadioRow(cacheLimitLabel(mb), cacheMaxMb == mb, offlineEnabled) { vm.setCacheMaxMb(mb) }
+            }
+        }
+
+        SwitchRow(
+            title = stringResource(R.string.settings_prefetch_wifi),
+            subtitle = "",
+            checked = prefetchWifiOnly,
+            enabled = offlineEnabled,
+            onCheckedChange = { vm.setPrefetchWifiOnly(it) },
         )
         SwitchRow(
-            title = stringResource(R.string.settings_offline_photos),
+            title = stringResource(R.string.settings_prefetch_charging),
             subtitle = "",
-            checked = photosBlobsOffline,
+            checked = prefetchChargingOnly,
             enabled = offlineEnabled,
-            onCheckedChange = { vm.setPhotosBlobsOffline(it) },
+            onCheckedChange = { vm.setPrefetchChargingOnly(it) },
         )
+        OutlinedButton(
+            onClick = { vm.prefetchNow() },
+            enabled = offlineEnabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) { Text(stringResource(R.string.settings_prefetch_now)) }
+
         Text(
             stringResource(R.string.settings_offline_size, humanSize(cacheSize)),
             style = MaterialTheme.typography.bodyMedium,
@@ -198,6 +272,13 @@ fun SettingsContent(
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
+    }
+        // Shared op overlay: a manual "Prefetch now" (OpKind.PREFETCH) shows here.
+        OpProgressOverlay()
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 
     if (showDisconnectConfirm) {
@@ -280,18 +361,42 @@ private fun SwitchRow(
 }
 
 @Composable
-private fun RadioRow(label: String, selected: Boolean, onSelect: () -> Unit) {
+private fun RadioRow(label: String, selected: Boolean, enabled: Boolean = true, onSelect: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
-            .selectable(selected = selected, onClick = onSelect, role = Role.RadioButton)
+            .selectable(selected = selected, enabled = enabled, onClick = onSelect, role = Role.RadioButton)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        RadioButton(selected = selected, onClick = null)
+        RadioButton(selected = selected, onClick = null, enabled = enabled)
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
+}
+
+/**
+ * A labelled radio-button group — mirrors the idle-timeout selector idiom (a label
+ * [Text] above a [selectableGroup] of [RadioRow]s), used for the offline policy /
+ * cache-limit selectors.
+ */
+@Composable
+private fun SelectorGroup(title: String, enabled: Boolean, content: @Composable () -> Unit) {
+    Text(
+        title,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
+    Column(Modifier.selectableGroup()) { content() }
+}
+
+@Composable
+private fun cacheLimitLabel(mb: Int): String = when (mb) {
+    0 -> stringResource(R.string.settings_cache_unlimited)
+    1024 -> "1 GB"
+    2048 -> "2 GB"
+    else -> "$mb MB"
 }
 
 @Composable
