@@ -83,7 +83,7 @@ class WorkspaceSaveTest {
         val cache = WorkspaceCache()
         val fakeApi = FakeApi("""{"v":1,"fileFolders":[{"id":"d1","name":"Docs"}]}""")
 
-        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, apiProvider = { fakeApi })
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), apiProvider = { fakeApi })
 
         val result = repo.save { m ->
             m.copy(fileFolders = m.fileFolders + NamedFolder("d2", "New", null))

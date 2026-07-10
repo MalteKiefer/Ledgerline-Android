@@ -29,6 +29,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.BuildConfig
 import de.ledgerline.app.R
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
 /**
@@ -62,8 +64,16 @@ fun SettingsContent(
     val scope = rememberCoroutineScope()
     val timeout by vm.timeoutMinutes.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
+    val offlineEnabled by vm.offlineEnabled.collectAsStateWithLifecycle()
+    val filesBlobsOffline by vm.filesBlobsOffline.collectAsStateWithLifecycle()
+    val photosBlobsOffline by vm.photosBlobsOffline.collectAsStateWithLifecycle()
+    val cacheSize by vm.cacheSizeBytes.collectAsStateWithLifecycle()
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
     var showDisconnectConfirm by remember { mutableStateOf(false) }
+    var showClearCacheConfirm by remember { mutableStateOf(false) }
+
+    // Compute the cache-size line once when the Settings tab is shown.
+    LaunchedEffect(Unit) { vm.refreshCacheSize() }
 
     // Result is ignored: if the user denies notifications the op still runs; the
     // platform simply suppresses the foreground-service notification.
@@ -126,6 +136,39 @@ fun SettingsContent(
             },
         )
 
+        // Offline
+        SectionHeader(stringResource(R.string.settings_offline_section))
+        SwitchRow(
+            title = stringResource(R.string.settings_offline_title),
+            subtitle = stringResource(R.string.settings_offline_subtitle),
+            checked = offlineEnabled,
+            onCheckedChange = { vm.setOfflineEnabled(it) },
+        )
+        SwitchRow(
+            title = stringResource(R.string.settings_offline_files),
+            subtitle = "",
+            checked = filesBlobsOffline,
+            enabled = offlineEnabled,
+            onCheckedChange = { vm.setFilesBlobsOffline(it) },
+        )
+        SwitchRow(
+            title = stringResource(R.string.settings_offline_photos),
+            subtitle = "",
+            checked = photosBlobsOffline,
+            enabled = offlineEnabled,
+            onCheckedChange = { vm.setPhotosBlobsOffline(it) },
+        )
+        Text(
+            stringResource(R.string.settings_offline_size, humanSize(cacheSize)),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        TextButton(
+            onClick = { showClearCacheConfirm = true },
+            modifier = Modifier.padding(horizontal = 8.dp),
+        ) { Text(stringResource(R.string.settings_offline_clear)) }
+
         // Account
         SectionHeader(stringResource(R.string.settings_account))
         Button(
@@ -175,6 +218,25 @@ fun SettingsContent(
             },
         )
     }
+
+    if (showClearCacheConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearCacheConfirm = false },
+            title = { Text(stringResource(R.string.settings_offline_clear)) },
+            text = { Text(stringResource(R.string.settings_offline_clear_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showClearCacheConfirm = false
+                    vm.clearCache()
+                }) { Text(stringResource(R.string.settings_offline_clear)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearCacheConfirm = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -194,6 +256,7 @@ private fun SwitchRow(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
     Row(
         Modifier
@@ -204,13 +267,15 @@ private fun SwitchRow(
     ) {
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (subtitle.isNotEmpty()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 

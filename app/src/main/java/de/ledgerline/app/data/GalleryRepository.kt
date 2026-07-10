@@ -5,6 +5,9 @@ import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
+import de.ledgerline.app.core.offline.OfflineFlags
+import de.ledgerline.app.core.offline.StoreEnvelope
+import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
@@ -23,6 +26,8 @@ class GalleryRepository(
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
     private val cache: GalleryCache,
+    private val storeCache: StoreDiskCache,
+    private val offlineFlags: OfflineFlags,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
     @Inject constructor(
@@ -30,13 +35,21 @@ class GalleryRepository(
         vaultKeyHolder: VaultKeyHolder,
         crypto: Crypto,
         cache: GalleryCache,
+        storeCache: StoreDiskCache,
+        offlineFlags: OfflineFlags,
     ) : this(
         sessionHolder,
         vaultKeyHolder,
         crypto,
         cache,
+        storeCache,
+        offlineFlags,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
+
+    private companion object {
+        const val KEY = "gallery"
+    }
 
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonEncoder = Json { encodeDefaults = true }
@@ -60,18 +73,41 @@ class GalleryRepository(
         return try {
             val res = apiProvider(session).galleryStore()
             when {
+                // 401 stays an auth failure → forced-logout path; never fall back to cache.
                 res.code() == HttpURLConnection.HTTP_UNAUTHORIZED -> Outcome.Err(ErrorKind.HTTP)
-                !res.isSuccessful -> Outcome.Err(ErrorKind.NETWORK)
+                !res.isSuccessful -> cachedOr(Outcome.Err(ErrorKind.NETWORK), vk)
                 else -> {
                     val body = res.body()!!
                     val manifest = body.ciphertext?.let { ct ->
                         val plain = crypto.openManifest(ct, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
                         json.decodeFromString<GalleryManifest>(plain)
                     } ?: GalleryManifest()
+                    if (offlineFlags.enabled()) {
+                        storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
+                    }
                     Outcome.Ok(Gallery(manifest, body.version))
                 }
             }
-        } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
+        } catch (e: Exception) { cachedOr(Outcome.Err(ErrorKind.NETWORK, e), vk) }
+    }
+
+    /**
+     * Network-first cache fallback: when a fetch fails with a non-auth error, try the
+     * on-disk sealed envelope and decrypt it in-memory with [vk]. Returns [err]
+     * unchanged if offline caching is off, no entry exists, or decryption fails.
+     */
+    private fun cachedOr(err: Outcome<Gallery>, vk: ByteArray): Outcome<Gallery> {
+        if (!offlineFlags.enabled()) return err
+        val env = storeCache.get(KEY) ?: return err
+        return try {
+            val manifest = env.ciphertext?.let { ct ->
+                val plain = crypto.openManifest(ct, vk) ?: return err
+                json.decodeFromString<GalleryManifest>(plain)
+            } ?: GalleryManifest()
+            Outcome.Ok(Gallery(manifest, env.version))
+        } catch (_: Exception) {
+            err
+        }
     }
 
     /**
@@ -116,6 +152,9 @@ class GalleryRepository(
                     val newVersion = put.body()?.version ?: (version!! + 1)
                     val g = Gallery(next, newVersion)
                     cache.set(g)
+                    if (offlineFlags.enabled()) {
+                        storeCache.put(KEY, StoreEnvelope(ciphertext, newVersion))
+                    }
                     return Outcome.Ok(g)
                 }
                 put.code() == 409 -> {
