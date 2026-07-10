@@ -76,6 +76,7 @@ dependencies {
     testImplementation(libs.mockk)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.okhttp.tls)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
 }
