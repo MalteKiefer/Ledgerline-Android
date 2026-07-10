@@ -144,6 +144,13 @@
     <string name="gallery_tab_photos">Photos</string>
     <string name="gallery_tab_albums">Albums</string>
     <string name="gallery_tab_people">People</string>
+    <string name="duplicates_action">Find duplicates</string>
+    <string name="duplicates_title">Duplicates</string>
+    <string name="duplicates_rescan">Rescan</string>
+    <string name="duplicates_mark_rest">Mark rest</string>
+    <string name="duplicates_trash_marked">Delete marked (%1$d)</string>
+    <string name="duplicates_none">No duplicates found.</string>
+    <string name="duplicates_copies">%1$d copies</string>
     <string name="album_new">New album</string>
     <string name="album_add_to">Add to album</string>
     <string name="selection_count">%1$d selected</string>
