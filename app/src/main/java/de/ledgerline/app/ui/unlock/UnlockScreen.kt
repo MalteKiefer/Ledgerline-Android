@@ -52,6 +52,9 @@ fun UnlockScreen(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(state) { if (state is UnlockUiState.Unlocked) onUnlocked() }
+    // Drop any stale error/not-configured message left from a previous attempt or a
+    // forced logout when this screen is (re-)entered.
+    LaunchedEffect(Unit) { vm.reset() }
 
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -89,7 +92,7 @@ fun UnlockScreen(
             ) {
                 OutlinedTextField(
                     value = passphrase,
-                    onValueChange = { passphrase = it },
+                    onValueChange = { passphrase = it; vm.reset() },
                     label = { Text(stringResource(R.string.unlock_passphrase)) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
