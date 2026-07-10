@@ -17,3 +17,7 @@
 -dontwarn org.apache.pdfbox.**
 -dontwarn org.apache.fontbox.**
 -dontwarn javax.imageio.**
+
+# osmdroid (pure Java OSM map tiles, Apache-2, no native .so).
+-keep class org.osmdroid.** { *; }
+-dontwarn org.osmdroid.**

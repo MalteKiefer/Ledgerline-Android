@@ -1,14 +1,19 @@
 package de.ledgerline.app.ui.gallery
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.ledgerline.app.R
@@ -149,6 +155,7 @@ private fun PhotoInfoSheet(
         place = vm.loadPlace(photo)
     }
 
+    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -211,18 +218,51 @@ private fun PhotoInfoSheet(
                     "%.5f, %.5f".format(photo.lat, photo.lng)
                 else -> unknown
             }
-            InfoRow(label = stringResource(R.string.info_location), value = locationValue)
+            val lat = photo.lat
+            val lng = photo.lng
+            val mapLabel = place?.display?.takeIf { it.isNotBlank() }
+                ?: listOfNotNull(place?.city, place?.country).filter { it.isNotBlank() }.joinToString(", ").ifBlank { "Photo" }
+            if (lat != null && lng != null) {
+                InfoRow(
+                    label = stringResource(R.string.info_location),
+                    value = locationValue,
+                    onClick = { openInMaps(context, lat, lng, mapLabel) },
+                )
+                OsmMap(
+                    lat = lat,
+                    lng = lng,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    onTap = { openInMaps(context, lat, lng, mapLabel) },
+                )
+                Text(
+                    text = stringResource(R.string.map_open_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                )
+            } else {
+                InfoRow(label = stringResource(R.string.info_location), value = locationValue)
+            }
         }
     }
 }
 
+private fun openInMaps(context: Context, lat: Double, lng: Double, label: String) {
+    val enc = Uri.encode(label)
+    val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng($enc)")
+    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, uri)) }
+}
+
 @Composable
-private fun InfoRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
+private fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null) {
+    val rowModifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 8.dp)
+        .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+    Row(modifier = rowModifier) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
