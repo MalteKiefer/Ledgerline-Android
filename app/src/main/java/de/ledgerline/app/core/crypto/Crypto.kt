@@ -29,4 +29,39 @@ interface Crypto {
 
     /** Inverse of openManifest: pad to a 4-KiB bucket and secretbox-seal to `{"c","n"}`. */
     fun sealManifest(json: String, vk: ByteArray): String
+
+    /** Plaintext slice size a caller must feed the streaming content cipher (4 MiB). */
+    val contentChunkSize: Int
+
+    /** Streaming content encryptor with a fresh per-file key (secretstream). */
+    fun newContentEncryptor(vk: ByteArray): ContentEncryptor
+
+    /** Streaming content decryptor; unwraps the per-file key with vk. */
+    fun contentDecryptor(encFileKey: String, vk: ByteArray): ContentDecryptor
+
+    /** Little-endian u32 helpers for the frame length prefix. */
+    fun u32le(n: Int): ByteArray
+    fun readU32le(bytes: ByteArray, off: Int): Int
+
+    interface ContentEncryptor {
+        /** Secretstream header, 24 bytes, written first to the blob. */
+        val header: ByteArray
+
+        /** Encrypt one plaintext chunk → framed `u32le(cipherLen) ++ cipher`. */
+        fun encryptChunk(chunk: ByteArray, isLast: Boolean): ByteArray
+
+        /** The wrapped per-file key as a JSON `{"c","n"}` string. */
+        fun sealKey(): String
+    }
+
+    interface ContentDecryptor {
+        /** Secretstream header size (24 bytes). */
+        val headerBytes: Int
+
+        /** Start the pull side from the blob's leading header bytes. */
+        fun start(header: ByteArray)
+
+        /** Decrypt one raw ciphertext frame → (message, isFinal). */
+        fun decryptFrame(frame: ByteArray): Pair<ByteArray, Boolean>
+    }
 }

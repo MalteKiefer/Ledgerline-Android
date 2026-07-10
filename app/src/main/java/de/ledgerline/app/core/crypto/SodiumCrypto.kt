@@ -5,6 +5,7 @@ import com.goterl.lazysodium.LazySodiumAndroid
 import com.goterl.lazysodium.SodiumAndroid
 import com.goterl.lazysodium.interfaces.PwHash
 import com.goterl.lazysodium.interfaces.SecretBox
+import com.goterl.lazysodium.interfaces.SecretStream
 import com.sun.jna.NativeLong
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -88,6 +89,75 @@ class SodiumCrypto @Inject constructor() : Crypto {
 
     private fun randomBytes(out: ByteArray) {
         java.security.SecureRandom().nextBytes(out)
+    }
+
+    override val contentChunkSize: Int = 4 * 1024 * 1024
+
+    override fun u32le(n: Int): ByteArray = byteArrayOf(
+        (n and 0xff).toByte(),
+        ((n ushr 8) and 0xff).toByte(),
+        ((n ushr 16) and 0xff).toByte(),
+        ((n ushr 24) and 0xff).toByte(),
+    )
+
+    override fun readU32le(bytes: ByteArray, off: Int): Int =
+        (bytes[off].toInt() and 0xff) or
+            ((bytes[off + 1].toInt() and 0xff) shl 8) or
+            ((bytes[off + 2].toInt() and 0xff) shl 16) or
+            ((bytes[off + 3].toInt() and 0xff) shl 24)
+
+    override fun newContentEncryptor(vk: ByteArray): Crypto.ContentEncryptor {
+        val fk = ByteArray(SecretStream.KEYBYTES) // 32
+        ls.cryptoSecretStreamKeygen(fk)
+        val state = SecretStream.State.ByReference()
+        val header = ByteArray(SecretStream.HEADERBYTES) // 24
+        check(ls.cryptoSecretStreamInitPush(state, header, fk)) { "secretstream init_push failed" }
+        return object : Crypto.ContentEncryptor {
+            override val header: ByteArray = header
+
+            override fun encryptChunk(chunk: ByteArray, isLast: Boolean): ByteArray {
+                val cipher = ByteArray(chunk.size + SecretStream.ABYTES) // +17
+                val tag = if (isLast) SecretStream.TAG_FINAL else SecretStream.TAG_MESSAGE
+                check(
+                    ls.cryptoSecretStreamPush(state, cipher, chunk, chunk.size.toLong(), tag),
+                ) { "secretstream push failed" }
+                return u32le(cipher.size) + cipher
+            }
+
+            override fun sealKey(): String {
+                val nonce = ByteArray(SecretBox.NONCEBYTES) // 24
+                randomBytes(nonce)
+                val wrapped = ByteArray(fk.size + SecretBox.MACBYTES)
+                check(
+                    ls.cryptoSecretBoxEasy(wrapped, fk, fk.size.toLong(), nonce, vk),
+                ) { "file key wrap failed" }
+                return """{"c":"${b64encode(wrapped)}","n":"${b64encode(nonce)}"}"""
+            }
+        }
+    }
+
+    override fun contentDecryptor(encFileKey: String, vk: ByteArray): Crypto.ContentDecryptor {
+        val env = lenientJson.parseToJsonElement(encFileKey) as JsonObject
+        val c = env["c"]!!.jsonPrimitive.content
+        val n = env["n"]!!.jsonPrimitive.content
+        val fk = secretBoxOpen(b64decode(c), b64decode(n), vk) ?: error("file key unwrap failed")
+        val state = SecretStream.State.ByReference()
+        return object : Crypto.ContentDecryptor {
+            override val headerBytes: Int = SecretStream.HEADERBYTES // 24
+
+            override fun start(header: ByteArray) {
+                check(ls.cryptoSecretStreamInitPull(state, header, fk)) { "secretstream init_pull failed" }
+            }
+
+            override fun decryptFrame(frame: ByteArray): Pair<ByteArray, Boolean> {
+                val message = ByteArray(frame.size - SecretStream.ABYTES)
+                val tag = ByteArray(1)
+                check(
+                    ls.cryptoSecretStreamPull(state, message, tag, frame, frame.size.toLong()),
+                ) { "secretstream pull failed" }
+                return message to (tag[0] == SecretStream.TAG_FINAL)
+            }
+        }
     }
 
     /** Test-only helper to build a secretbox ciphertext fixture. */
