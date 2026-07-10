@@ -6,6 +6,8 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import de.ledgerline.app.core.offline.AndroidConnectivity
 import de.ledgerline.app.core.offline.Connectivity
+import de.ledgerline.app.core.offline.ConstraintChecker
+import de.ledgerline.app.core.offline.Constraints
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.offline.OfflinePrefs
 import javax.inject.Singleton
@@ -25,4 +27,8 @@ abstract class OfflineModule {
     @Binds
     @Singleton
     abstract fun offlineFlags(impl: OfflinePrefs): OfflineFlags
+
+    @Binds
+    @Singleton
+    abstract fun constraints(impl: ConstraintChecker): Constraints
 }

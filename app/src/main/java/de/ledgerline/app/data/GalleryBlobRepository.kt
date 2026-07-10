@@ -77,6 +77,23 @@ class GalleryBlobRepository private constructor(
         }
     }
 
+    /**
+     * Fetch a blob's ciphertext and cache it. No decryption, no VK. Skips if already
+     * cached. Returns true on cache-hit or stored, false on failure. Used by the
+     * prefetch engine; the caller decides *what* to prefetch, so this always caches
+     * when asked (the policy flag does not gate it).
+     */
+    suspend fun prefetch(ref: String): Boolean = withContext(Dispatchers.IO) {
+        if (blobCache.has(ref)) return@withContext true
+        val session = sessionHolder.get() ?: return@withContext false
+        try {
+            val res = apiProvider(session).galleryRaw(ref)
+            if (!res.isSuccessful) return@withContext false
+            blobCache.put(ref, res.body()!!.bytes())
+            true
+        } catch (_: Exception) { false }
+    }
+
     override suspend fun uploadBytes(bytes: ByteArray, name: String): Outcome<UploadedBlob> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)

@@ -107,6 +107,7 @@
     <string name="ops_kind_duplicate_scan">Duplicate scan</string>
     <string name="ops_kind_upload">Upload</string>
     <string name="ops_kind_blob_cleanup">Cleanup</string>
+    <string name="ops_kind_prefetch">Prefetching</string>
     <string name="settings_disconnect">Disconnect this device</string>
     <string name="settings_disconnect_confirm">Disconnect this device? You will need to pair again by scanning a new QR code.</string>
     <string name="settings_about">About</string>

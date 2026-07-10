@@ -15,7 +15,7 @@ import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class OpKind { FACE_SCAN, DUPLICATE_SCAN, UPLOAD, BLOB_CLEANUP }
+enum class OpKind { FACE_SCAN, DUPLICATE_SCAN, UPLOAD, BLOB_CLEANUP, PREFETCH }
 
 data class OpProgress(val id: Long, val kind: OpKind, val current: Int, val total: Int)
 
