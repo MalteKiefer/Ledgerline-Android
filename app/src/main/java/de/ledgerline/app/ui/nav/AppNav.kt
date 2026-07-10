@@ -13,8 +13,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.ledgerline.app.core.AuthEventBus
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.SessionStore
+import de.ledgerline.app.domain.usecase.ForceLogout
 import de.ledgerline.app.ui.onboarding.WelcomeScreen
 import de.ledgerline.app.ui.pairing.PairingScreen
 import de.ledgerline.app.ui.unlock.UnlockScreen
@@ -30,6 +32,8 @@ enum class Destination { LOADING, WELCOME, PAIRING, UNLOCK, HOME }
 class RootViewModel @Inject constructor(
     private val sessionStore: SessionStore,
     private val vaultKeyHolder: VaultKeyHolder,
+    private val authEventBus: AuthEventBus,
+    private val forceLogout: ForceLogout,
 ) : ViewModel() {
     private val _dest = MutableStateFlow(Destination.LOADING)
     val dest: StateFlow<Destination> = _dest
@@ -57,6 +61,13 @@ class RootViewModel @Inject constructor(
         viewModelScope.launch {
             vaultKeyHolder.unlocked.collect { unlocked ->
                 if (!unlocked && _dest.value == Destination.HOME) _dest.value = Destination.UNLOCK
+            }
+        }
+        // Any authenticated 401 (revoked token) → wipe everything and re-pair.
+        viewModelScope.launch {
+            authEventBus.unauthorized.collect {
+                forceLogout.invoke()
+                _dest.value = Destination.WELCOME
             }
         }
     }
