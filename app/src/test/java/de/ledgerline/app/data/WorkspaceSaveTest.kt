@@ -9,6 +9,7 @@ import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
+import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
 import de.ledgerline.app.data.remote.dto.UploadResponse
@@ -70,6 +71,9 @@ class WorkspaceSaveTest {
         override suspend fun galleryStore(): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun galleryRaw(blob: String): Response<okhttp3.ResponseBody> = throw NotImplementedError()
         override suspend fun galleryUsage(): Response<UsageResponse> = throw NotImplementedError()
+        override suspend fun galleryUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
+        override suspend fun galleryProcess(file: MultipartBody.Part): Response<ProcessResponse> = throw NotImplementedError()
+        override suspend fun galleryStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     }
 
     @Test fun save_merges_on_409_and_retries() = runBlocking {

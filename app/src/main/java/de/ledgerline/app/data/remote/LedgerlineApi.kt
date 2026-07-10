@@ -3,6 +3,7 @@ package de.ledgerline.app.data.remote
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
+import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
 import de.ledgerline.app.data.remote.dto.UploadResponse
@@ -64,4 +65,15 @@ interface LedgerlineApi {
 
     @GET("api/v1/gallery/usage")
     suspend fun galleryUsage(): Response<UsageResponse>
+
+    @Multipart
+    @POST("api/v1/gallery/upload")
+    suspend fun galleryUpload(@Part file: MultipartBody.Part): Response<UploadResponse>
+
+    @Multipart
+    @POST("api/v1/gallery/process")
+    suspend fun galleryProcess(@Part file: MultipartBody.Part): Response<ProcessResponse>
+
+    @PUT("api/v1/gallery/store")
+    suspend fun galleryStorePut(@Body body: StorePutRequest): Response<StoreResponse>
 }
