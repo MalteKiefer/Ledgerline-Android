@@ -7,12 +7,14 @@ import dagger.hilt.components.SingletonComponent
 import de.ledgerline.app.data.DownloadFileImpl
 import de.ledgerline.app.data.FileBlobRepository
 import de.ledgerline.app.data.FilesUsageImpl
+import de.ledgerline.app.data.LoadGalleryImpl
 import de.ledgerline.app.data.LoadWorkspaceImpl
 import de.ledgerline.app.data.MutateWorkspaceImpl
 import de.ledgerline.app.data.UploadFileImpl
 import de.ledgerline.app.domain.usecase.DownloadFile
 import de.ledgerline.app.domain.usecase.FileBlobs
 import de.ledgerline.app.domain.usecase.FilesUsage
+import de.ledgerline.app.domain.usecase.LoadGallery
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.usecase.UploadFile
@@ -26,4 +28,5 @@ abstract class WorkspaceModule {
     @Binds abstract fun bindDownloadFile(impl: DownloadFileImpl): DownloadFile
     @Binds abstract fun bindFileBlobs(impl: FileBlobRepository): FileBlobs
     @Binds abstract fun bindFilesUsage(impl: FilesUsageImpl): FilesUsage
+    @Binds abstract fun bindLoadGallery(impl: LoadGalleryImpl): LoadGallery
 }
