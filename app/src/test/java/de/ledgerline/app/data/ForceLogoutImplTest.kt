@@ -1,6 +1,7 @@
 package de.ledgerline.app.data
 
 import de.ledgerline.app.core.GalleryCache
+import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.WorkspaceCache
@@ -32,6 +33,7 @@ class ForceLogoutImplTest {
         }
         val galleryCache = GalleryCache()
         val thumbCache = ThumbCache()
+        val metaCache = MetaCache().apply { put("p1", null) }
 
         // The two Android-touching deps (DataStore / AndroidKeystore) are mocked; we
         // assert their clear() is invoked as part of the wipe.
@@ -48,6 +50,7 @@ class ForceLogoutImplTest {
             workspaceCache = workspaceCache,
             galleryCache = galleryCache,
             thumbCache = thumbCache,
+            metaCache = metaCache,
         )
 
         forceLogout.invoke()
@@ -58,6 +61,7 @@ class ForceLogoutImplTest {
         assertNull(sessionHolder.get())
         assertNull(workspaceCache.value.value)
         assertNull(galleryCache.value.value)
+        assertFalse(metaCache.has("p1"))
 
         // Persisted session + auth-gated keystore key deleted (re-pair required).
         coVerify(exactly = 1) { sessionStore.clear() }

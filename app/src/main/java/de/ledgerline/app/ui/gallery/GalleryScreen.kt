@@ -7,20 +7,28 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -28,9 +36,14 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
@@ -40,6 +53,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,9 +74,94 @@ import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
+/** The three top-level gallery views. */
+enum class GalleryTab { PHOTOS, ALBUMS, PEOPLE }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltViewModel()) {
+fun GalleryScreen(
+    modifier: Modifier = Modifier,
+    vm: GalleryViewModel = hiltViewModel(),
+    albumsVm: AlbumsViewModel = hiltViewModel(),
+) {
+    var tab by rememberSaveable { mutableStateOf(GalleryTab.PHOTOS) }
+    var openAlbumId by remember { mutableStateOf<String?>(null) }
+    var openPersonId by remember { mutableStateOf<String?>(null) }
+
+    // Album detail — full-screen, hides the tabs.
+    openAlbumId?.let { id ->
+        AlbumDetailScreen(
+            albumId = id,
+            modifier = modifier,
+            galleryVm = vm,
+            albumsVm = albumsVm,
+            onBack = { openAlbumId = null },
+        )
+        return
+    }
+
+    // Person detail — full-screen, hides the tabs.
+    openPersonId?.let { id ->
+        PersonDetailScreen(
+            personId = id,
+            modifier = modifier,
+            galleryVm = vm,
+            onBack = { openPersonId = null },
+        )
+        return
+    }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            SegmentedButton(
+                selected = tab == GalleryTab.PHOTOS,
+                onClick = { tab = GalleryTab.PHOTOS },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+            ) { Text(stringResource(R.string.gallery_tab_photos)) }
+            SegmentedButton(
+                selected = tab == GalleryTab.ALBUMS,
+                onClick = { tab = GalleryTab.ALBUMS },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+            ) { Text(stringResource(R.string.gallery_tab_albums)) }
+            SegmentedButton(
+                selected = tab == GalleryTab.PEOPLE,
+                onClick = { tab = GalleryTab.PEOPLE },
+                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+            ) { Text(stringResource(R.string.gallery_tab_people)) }
+        }
+
+        when (tab) {
+            GalleryTab.PHOTOS -> PhotosTab(
+                vm = vm,
+                albumsVm = albumsVm,
+                modifier = Modifier.fillMaxSize(),
+            )
+            GalleryTab.ALBUMS -> AlbumsScreen(
+                modifier = Modifier.fillMaxSize(),
+                galleryVm = vm,
+                albumsVm = albumsVm,
+                onOpenAlbum = { openAlbumId = it },
+            )
+            GalleryTab.PEOPLE -> PeopleScreen(
+                modifier = Modifier.fillMaxSize(),
+                galleryVm = vm,
+                onOpenPerson = { openPersonId = it },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PhotosTab(
+    vm: GalleryViewModel,
+    albumsVm: AlbumsViewModel,
+    modifier: Modifier = Modifier,
+) {
     val ui by vm.state.collectAsStateWithLifecycle()
     val usage by vm.usage.collectAsStateWithLifecycle()
     val uploadProgress by vm.uploadProgress.collectAsStateWithLifecycle()
@@ -69,6 +169,17 @@ fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltView
     var openId by remember { mutableStateOf<String?>(null) }
     var showCamera by remember { mutableStateOf(false) }
     var fabExpanded by remember { mutableStateOf(false) }
+
+    // Selection mode.
+    var selectionMode by remember { mutableStateOf(false) }
+    val selected = remember { mutableStateListOf<String>() }
+    var showNewAlbum by remember { mutableStateOf(false) }
+    var showAddToAlbum by remember { mutableStateOf(false) }
+
+    fun exitSelection() {
+        selectionMode = false
+        selected.clear()
+    }
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
@@ -176,52 +287,84 @@ fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltView
                         }
                     }
                     items(ui.photos, key = { it.id }) { photo ->
-                        ThumbCell(photo, vm) { openId = photo.id }
+                        SelectableThumbCell(
+                            photo = photo,
+                            vm = vm,
+                            selectionMode = selectionMode,
+                            selected = photo.id in selected,
+                            onClick = {
+                                if (selectionMode) {
+                                    if (photo.id in selected) selected.remove(photo.id)
+                                    else selected.add(photo.id)
+                                } else {
+                                    openId = photo.id
+                                }
+                            },
+                            onLongClick = {
+                                if (!selectionMode) {
+                                    selectionMode = true
+                                    if (photo.id !in selected) selected.add(photo.id)
+                                }
+                            },
+                        )
                     }
                 }
             }
         }
 
-        // FAB with chooser menu (upload from picker or take a photo).
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp),
-        ) {
-            FloatingActionButton(onClick = { fabExpanded = true }) {
-                Icon(
-                    imageVector = Icons.Outlined.AddPhotoAlternate,
-                    contentDescription = stringResource(R.string.gallery_add),
-                )
-            }
-            DropdownMenu(
-                expanded = fabExpanded,
-                onDismissRequest = { fabExpanded = false },
+        // FAB with chooser menu (upload from picker or take a photo). Hidden while selecting.
+        if (!selectionMode) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
             ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.gallery_upload_photos)) },
-                    leadingIcon = {
-                        Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null)
-                    },
-                    onClick = {
-                        fabExpanded = false
-                        vm.armLockSuppression()
-                        picker.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                        )
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.gallery_take_photo)) },
-                    leadingIcon = {
-                        Icon(Icons.Outlined.PhotoCamera, contentDescription = null)
-                    },
-                    onClick = {
-                        fabExpanded = false
-                        showCamera = true
-                    },
-                )
+                FloatingActionButton(onClick = { fabExpanded = true }) {
+                    Icon(
+                        imageVector = Icons.Outlined.AddPhotoAlternate,
+                        contentDescription = stringResource(R.string.gallery_add),
+                    )
+                }
+                DropdownMenu(
+                    expanded = fabExpanded,
+                    onDismissRequest = { fabExpanded = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.gallery_upload_photos)) },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null)
+                        },
+                        onClick = {
+                            fabExpanded = false
+                            vm.armLockSuppression()
+                            picker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+                            )
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.gallery_take_photo)) },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.PhotoCamera, contentDescription = null)
+                        },
+                        onClick = {
+                            fabExpanded = false
+                            showCamera = true
+                        },
+                    )
+                }
             }
+        }
+
+        // Selection action bar overlays the top while selecting.
+        if (selectionMode) {
+            SelectionBar(
+                count = selected.size,
+                onClose = { exitSelection() },
+                onNewAlbum = { showNewAlbum = true },
+                onAddToAlbum = { showAddToAlbum = true },
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
         }
 
         // Upload progress overlay.
@@ -233,7 +376,7 @@ fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltView
                     .background(Color.Black.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center,
             ) {
-                androidx.compose.foundation.layout.Column(
+                Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
                 ) {
@@ -253,6 +396,110 @@ fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltView
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+
+    // New album from selection.
+    if (showNewAlbum) {
+        TextInputDialog(
+            title = stringResource(R.string.album_new),
+            confirmLabel = stringResource(R.string.album_create),
+            initial = "",
+            onConfirm = { name ->
+                albumsVm.create(name, selected.toList())
+                showNewAlbum = false
+                scope.launch { snackbarHostState.showSnackbar(name) }
+                exitSelection()
+            },
+            onDismiss = { showNewAlbum = false },
+        )
+    }
+
+    // Add selection to an existing album.
+    if (showAddToAlbum) {
+        AddToAlbumDialog(
+            albumsVm = albumsVm,
+            onPick = { albumId ->
+                albumsVm.addPhotos(albumId, selected.toList())
+                showAddToAlbum = false
+                exitSelection()
+            },
+            onDismiss = { showAddToAlbum = false },
+        )
+    }
+}
+
+@Composable
+private fun SelectionBar(
+    count: Int,
+    onClose: () -> Unit,
+    onNewAlbum: () -> Unit,
+    onAddToAlbum: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        tonalElevation = 3.dp,
+    ) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_cancel))
+            }
+            Text(
+                text = stringResource(R.string.selection_count, count),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f).padding(start = 8.dp),
+            )
+            IconButton(onClick = onNewAlbum) {
+                Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = stringResource(R.string.album_new))
+            }
+            IconButton(onClick = onAddToAlbum) {
+                Icon(Icons.AutoMirrored.Outlined.PlaylistAdd, contentDescription = stringResource(R.string.album_add_to))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddToAlbumDialog(
+    albumsVm: AlbumsViewModel,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val albums by albumsVm.albums.collectAsStateWithLifecycle()
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.album_add_to)) },
+        text = {
+            if (albums.isEmpty()) {
+                Text(stringResource(R.string.albums_empty))
+            } else {
+                LazyColumn {
+                    items(albums, key = { it.id }) { album ->
+                        Text(
+                            text = album.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onPick(album.id) }
+                                .padding(vertical = 12.dp, horizontal = 4.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
 }
 
 /** Resolve DISPLAY_NAME from a content URI; falls back to "photo.jpg". */
@@ -264,8 +511,29 @@ private fun queryPhotoName(context: Context, uri: Uri): String {
     return "photo.jpg"
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onClick: () -> Unit) {
+internal fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onClick: () -> Unit) {
+    SelectableThumbCell(
+        photo = photo,
+        vm = vm,
+        selectionMode = false,
+        selected = false,
+        onClick = onClick,
+        onLongClick = {},
+    )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun SelectableThumbCell(
+    photo: GalleryPhoto,
+    vm: GalleryViewModel,
+    selectionMode: Boolean,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     val bmp by produceState<android.graphics.Bitmap?>(initialValue = null, photo.id) {
         value = vm.thumb(photo)
     }
@@ -274,7 +542,7 @@ private fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onClick: () -> 
             .padding(1.dp)
             .aspectRatio(1f)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable { onClick() },
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
     ) {
         val b = bmp
         if (b != null) {
@@ -294,6 +562,19 @@ private fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onClick: () -> 
                 "▶",
                 modifier = Modifier.align(Alignment.Center),
                 color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        if (selectionMode && selected) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f)),
+            )
+            Icon(
+                Icons.Outlined.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
             )
         }
     }

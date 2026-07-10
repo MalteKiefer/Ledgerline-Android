@@ -34,8 +34,17 @@ data class PhotoPlace(
 )
 
 @Serializable
+data class MetaFace(
+    val embedding: List<Double> = emptyList(),
+    val cropRef: String? = null,
+    val cropKey: String? = null,
+)
+
+@Serializable
 data class PhotoMetaBlob(
     val place: PhotoPlace? = null,
+    val embedding: List<Double> = emptyList(),
+    val faces: List<MetaFace> = emptyList(),
 )
 
 @Serializable
@@ -45,9 +54,18 @@ data class GalleryAlbum(
 )
 
 @Serializable
+data class PersonFace(
+    val photoId: String = "",
+    val idx: Int = 0,
+    val cropRef: String? = null,
+    val cropKey: String? = null,
+)
+
+@Serializable
 data class GalleryPerson(
     val id: String = "", val name: String = "", val hidden: Boolean = false,
     val centroid: List<Double> = emptyList(),
+    val faces: List<PersonFace> = emptyList(),
 )
 
 @Serializable

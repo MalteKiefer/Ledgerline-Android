@@ -13,6 +13,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dagger.hilt.android.AndroidEntryPoint
 import de.ledgerline.app.core.GalleryCache
+import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.WorkspaceCache
@@ -44,6 +45,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var workspaceCache: WorkspaceCache
     @Inject lateinit var galleryCache: GalleryCache
     @Inject lateinit var thumbCache: ThumbCache
+    @Inject lateinit var metaCache: MetaCache
     @Inject lateinit var settingsStore: SettingsStore
     @Inject lateinit var lockGuard: LockGuard
     private val appLock = AppLock()
@@ -76,14 +78,14 @@ class MainActivity : FragmentActivity() {
                 // background (home button) has no armed skip → wipe normally.
                 if (!lockGuard.consumeSkip()) {
                     vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
-                    galleryCache.clear(); thumbCache.clear()
+                    galleryCache.clear(); thumbCache.clear(); metaCache.clear()
                 }
             }
 
             override fun onResume(owner: LifecycleOwner) {
                 if (idleLocker.isExpired()) {
                     vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
-                    galleryCache.clear(); thumbCache.clear()
+                    galleryCache.clear(); thumbCache.clear(); metaCache.clear()
                 } else idleLocker.touch()
                 // Defensive: if a picker returned via a dialog path without onStop,
                 // don't leave a stale skip armed for the next real background.
