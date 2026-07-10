@@ -118,6 +118,7 @@
     <string name="gallery_take_photo">Foto aufnehmen</string>
     <string name="camera_permission_needed">Kameraberechtigung wird zum Aufnehmen benötigt.</string>
     <string name="camera_location_hint">Zu aufgenommenen Fotos wird der Standort hinzugefügt.</string>
+    <string name="camera_switch">Kamera wechseln</string>
     <string name="gallery_uploading">Lade hoch %1$d/%2$d</string>
     <string name="gallery_upload_failed">%1$d Upload(s) fehlgeschlagen</string>
     <string name="gallery_empty">Noch keine Fotos.</string>
