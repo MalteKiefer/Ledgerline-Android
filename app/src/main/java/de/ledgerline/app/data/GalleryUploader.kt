@@ -70,7 +70,7 @@ open class GalleryUploader @Inject constructor(private val blobs: GalleryUploadA
             d.exif?.let { put("exif", it) }
             d.place?.let { put("place", it) }
             d.embedding?.let { put("embedding", it) }
-            d.phash?.let { put("phash", JsonPrimitive(it)) }
+            d.phash?.let { put("phash", it) }   // opaque JsonElement, preserved verbatim
             put("faces", metaFaces)
             d.width?.let { put("width", JsonPrimitive(it)) }
             d.height?.let { put("height", JsonPrimitive(it)) }

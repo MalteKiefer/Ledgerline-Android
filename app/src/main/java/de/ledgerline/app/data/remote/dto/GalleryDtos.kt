@@ -11,7 +11,7 @@ data class ProcessResponse(
     val exif: JsonElement? = null,
     val place: JsonElement? = null,
     val embedding: JsonElement? = null,
-    val phash: String? = null,
+    val phash: JsonElement? = null,   // server sends a signed 64-bit number, not a string
     val faces: List<ProcessFace> = emptyList(),
     val width: Int? = null,
     val height: Int? = null,
