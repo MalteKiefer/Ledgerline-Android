@@ -19,6 +19,7 @@ class UnlockVaultTest {
         override fun b64decode(s: String) = s.toByteArray()
         override fun b64encode(b: ByteArray) = String(b)
         override fun fromHex(s: String) = s.toByteArray()
+        override fun openManifest(ciphertext: String, vk: ByteArray): String? = null
     }
 
     private fun gateway(configured: Boolean = true) = object : VaultGateway {

@@ -6,6 +6,9 @@ import com.goterl.lazysodium.SodiumAndroid
 import com.goterl.lazysodium.interfaces.PwHash
 import com.goterl.lazysodium.interfaces.SecretBox
 import com.sun.jna.NativeLong
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -54,6 +57,20 @@ class SodiumCrypto @Inject constructor() : Crypto {
         val clean = s.filter { !it.isWhitespace() }
         return ByteArray(clean.length / 2) {
             ((clean[it * 2].digitToInt(16) shl 4) or clean[it * 2 + 1].digitToInt(16)).toByte()
+        }
+    }
+
+    private val lenientJson = Json { isLenient = true; ignoreUnknownKeys = true }
+
+    override fun openManifest(ciphertext: String, vk: ByteArray): String? {
+        return try {
+            val env = lenientJson.parseToJsonElement(ciphertext) as JsonObject
+            val c = env["c"]!!.jsonPrimitive.content
+            val n = env["n"]!!.jsonPrimitive.content
+            val plain = secretBoxOpen(b64decode(c), b64decode(n), vk) ?: return null
+            String(plain, Charsets.UTF_8)
+        } catch (_: Exception) {
+            null
         }
     }
 
