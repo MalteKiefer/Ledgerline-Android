@@ -71,7 +71,7 @@ class KeystoreSealer(
     }
 
     fun open(blob: ByteArray): ByteArray {
-        val ivLen = blob[0].toInt()
+        val ivLen = blob[0].toInt() and 0xFF
         val iv = blob.copyOfRange(1, 1 + ivLen)
         val ct = blob.copyOfRange(1 + ivLen, blob.size)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
