@@ -109,6 +109,13 @@
     <string name="gallery_usage_full">%1$s of %2$s used</string>
     <string name="photo_original">View original</string>
     <string name="photo_video_soon">Video playback comes later.</string>
+    <string name="info_title">Photo info</string>
+    <string name="info_file">File</string>
+    <string name="info_taken">Taken</string>
+    <string name="info_camera">Camera</string>
+    <string name="info_resolution">Resolution</string>
+    <string name="info_location">Location</string>
+    <string name="info_unknown">—</string>
     <string name="menu_bookmarks">Bookmarks</string>
     <string name="menu_more">More</string>
 </resources>
