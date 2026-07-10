@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.Outcome
+import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.SessionStore
@@ -31,6 +32,7 @@ class UnlockViewModel @Inject constructor(
     private val crypto: Crypto,
     private val holder: VaultKeyHolder,
     private val sessionStore: SessionStore,
+    private val sessionHolder: SessionHolder,
 ) : ViewModel() {
     private val _state = MutableStateFlow<UnlockUiState>(UnlockUiState.Idle)
     val state: StateFlow<UnlockUiState> = _state
@@ -39,6 +41,7 @@ class UnlockViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = UnlockUiState.Working
             val session = sessionStore.load() ?: run { _state.value = UnlockUiState.Error("no session"); return@launch }
+            sessionHolder.set(session)
             val bytes = charsToUtf8(passphrase)
             val result = withContext(Dispatchers.Default) { // Argon2id is CPU-heavy
                 UnlockVault(crypto, holder).withPassphrase(VaultRepository(session), bytes)

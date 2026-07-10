@@ -12,6 +12,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dagger.hilt.android.AndroidEntryPoint
+import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.security.AppLock
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.LockResult
@@ -31,6 +32,7 @@ class MainActivity : FragmentActivity() {
 
     @Inject lateinit var vaultKeyHolder: VaultKeyHolder
     @Inject lateinit var idleLocker: IdleLocker
+    @Inject lateinit var sessionHolder: SessionHolder
     private val appLock = AppLock()
 
     // Emits the latest validated pairing deep link. singleTask means a link
@@ -49,10 +51,11 @@ class MainActivity : FragmentActivity() {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
                 vaultKeyHolder.wipe() // background → drop the Vault Key
+                sessionHolder.clear()
             }
 
             override fun onResume(owner: LifecycleOwner) {
-                if (idleLocker.isExpired()) vaultKeyHolder.wipe() else idleLocker.touch()
+                if (idleLocker.isExpired()) { vaultKeyHolder.wipe(); sessionHolder.clear() } else idleLocker.touch()
             }
         })
 
