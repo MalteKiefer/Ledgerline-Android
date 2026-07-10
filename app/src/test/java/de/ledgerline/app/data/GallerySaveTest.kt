@@ -88,7 +88,7 @@ class GallerySaveTest {
         val existingPhotoJson = """{"v":1,"photos":[{"id":"existing"}],"albums":[],"people":[]}"""
         val fakeApi = FakeApi(existingPhotoJson)
 
-        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, apiProvider = { fakeApi })
+        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), apiProvider = { fakeApi })
 
         val result = repo.save { manifest ->
             manifest.copy(photos = manifest.photos + GalleryPhoto(id = "new"))

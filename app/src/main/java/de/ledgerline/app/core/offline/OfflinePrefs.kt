@@ -11,6 +11,22 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * Synchronous, always-current view of the offline toggles. Kept as a narrow interface
+ * so repositories depend on the seam (not the Hilt-wired [OfflinePrefs]); JVM unit
+ * tests supply a trivial fake without needing a [SettingsStore] + [Context].
+ */
+interface OfflineFlags {
+    /** Latest value of the master offline-cache switch. */
+    fun enabled(): Boolean
+
+    /** Latest value of the file-contents-offline toggle. */
+    fun filesBlobs(): Boolean
+
+    /** Latest value of the photos-offline toggle. */
+    fun photosBlobs(): Boolean
+}
+
+/**
  * Synchronous, always-current view of the offline toggles so repositories can read
  * the flags without suspending on every request. Seeds each value synchronously at
  * construction (`runBlocking { first() }`) then keeps them live via collectors on an
@@ -18,7 +34,7 @@ import javax.inject.Singleton
  * its background-ops flag.
  */
 @Singleton
-class OfflinePrefs @Inject constructor(settings: SettingsStore) {
+class OfflinePrefs @Inject constructor(settings: SettingsStore) : OfflineFlags {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -37,12 +53,9 @@ class OfflinePrefs @Inject constructor(settings: SettingsStore) {
         scope.launch { settings.photosBlobsOffline.collect { photosBlobs = it } }
     }
 
-    /** Latest value of the master offline-cache switch. */
-    fun enabled(): Boolean = enabled
+    override fun enabled(): Boolean = enabled
 
-    /** Latest value of the file-contents-offline toggle. */
-    fun filesBlobs(): Boolean = filesBlobs
+    override fun filesBlobs(): Boolean = filesBlobs
 
-    /** Latest value of the photos-offline toggle. */
-    fun photosBlobs(): Boolean = photosBlobs
+    override fun photosBlobs(): Boolean = photosBlobs
 }
