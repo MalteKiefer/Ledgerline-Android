@@ -2,10 +2,10 @@ package de.ledgerline.app.ui.workspace
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Create
-import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -30,9 +30,9 @@ private data class Tab(val labelRes: Int, val icon: ImageVector)
 @Composable
 fun WorkspaceScaffold() {
     val tabs = listOf(
-        Tab(R.string.tab_files, Icons.AutoMirrored.Outlined.List),
-        Tab(R.string.tab_notes, Icons.Outlined.Create),
-        Tab(R.string.tab_bookmarks, Icons.Outlined.Star),
+        Tab(R.string.tab_files, Icons.Outlined.Folder),
+        Tab(R.string.tab_notes, Icons.Outlined.Description),
+        Tab(R.string.tab_bookmarks, Icons.Outlined.Bookmarks),
         Tab(R.string.tab_todos, Icons.Outlined.CheckCircle),
     )
     var selected by remember { mutableIntStateOf(0) }
