@@ -37,6 +37,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setTimeoutMinutes(minutes) }
     }
 
+    /** Whether background operations may keep running after the app is backgrounded. */
+    val backgroundOpsEnabled: StateFlow<Boolean> = settingsStore.backgroundOpsEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setBackgroundOpsEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setBackgroundOpsEnabled(enabled) }
+    }
+
     /** Wipe the in-memory session/vault so the app falls back to the unlock screen. */
     fun lockNow() {
         vaultKeyHolder.wipe()

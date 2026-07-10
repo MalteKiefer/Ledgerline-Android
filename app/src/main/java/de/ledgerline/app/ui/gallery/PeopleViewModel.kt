@@ -9,6 +9,8 @@ import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
+import de.ledgerline.app.core.ops.OpKind
+import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.domain.gallery.FaceClusterer
 import de.ledgerline.app.domain.gallery.FaceInput
 import de.ledgerline.app.domain.gallery.PrevPerson
@@ -41,18 +43,13 @@ class PeopleViewModel @Inject constructor(
     private val thumbs: ThumbCache,
     private val blobs: GalleryBlobs,
     private val mutate: MutateGallery,
+    private val operationManager: OperationManager,
 ) : ViewModel() {
 
     private val json = Json { ignoreUnknownKeys = true }
 
     private val _people = MutableStateFlow<List<GalleryPerson>>(emptyList())
     val people: StateFlow<List<GalleryPerson>> = _people
-
-    private val _scanning = MutableStateFlow(false)
-    val scanning: StateFlow<Boolean> = _scanning
-
-    private val _progress = MutableStateFlow<Pair<Int, Int>?>(null)
-    val progress: StateFlow<Pair<Int, Int>?> = _progress
 
     init {
         viewModelScope.launch {
@@ -106,10 +103,9 @@ class PeopleViewModel @Inject constructor(
      * [scanLimit] most-recent photos (seeds existing people, appends unmatched);
      * 0 = full re-scan of the whole library (matches new clusters back to prior names).
      */
-    fun scanFaces(scanLimit: Int) = viewModelScope.launch {
-        _scanning.value = true
-        try {
-            val manifest = cache.value.value?.manifest ?: return@launch
+    fun scanFaces(scanLimit: Int) {
+        operationManager.run(OpKind.FACE_SCAN) { report ->
+            val manifest = cache.value.value?.manifest ?: return@run
             val incremental = scanLimit > 0
 
             val nonTrashed = manifest.photos.filter { !it.trashed }
@@ -124,7 +120,7 @@ class PeopleViewModel @Inject constructor(
                 val toFetch = targets.filter { it.metaRef != null && !metaCache.has(it.id) }
                 val total = toFetch.size
                 var done = 0
-                _progress.value = done to total
+                report(done, total)
                 for (p in toFetch) {
                     val ref = p.metaRef ?: continue
                     when (val r = blobs.download(ref, p.metaKey ?: "")) {
@@ -139,7 +135,7 @@ class PeopleViewModel @Inject constructor(
                         is Outcome.Err -> metaCache.put(p.id, null)
                     }
                     done++
-                    _progress.value = done to total
+                    report(done, total)
                 }
             }
 
@@ -196,9 +192,6 @@ class PeopleViewModel @Inject constructor(
             }
 
             mutate.invoke { m -> m.copy(people = builtPeople) }
-        } finally {
-            _scanning.value = false
-            _progress.value = null
         }
     }
 }

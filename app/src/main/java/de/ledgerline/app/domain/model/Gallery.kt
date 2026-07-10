@@ -45,6 +45,7 @@ data class PhotoMetaBlob(
     val place: PhotoPlace? = null,
     val embedding: List<Double> = emptyList(),
     val faces: List<MetaFace> = emptyList(),
+    val phash: Long? = null,
 )
 
 @Serializable

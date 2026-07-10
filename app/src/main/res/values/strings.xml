@@ -87,7 +87,17 @@
     <string name="settings_security">Security</string>
     <string name="settings_idle_timeout">Auto-lock after</string>
     <string name="settings_lock_now">Lock now</string>
+    <string name="settings_background_ops_title">Background processing</string>
+    <string name="settings_background_ops_subtitle">Operations (scans, uploads) keep running when you leave the app; a notification shows while they run. Turn off to lock immediately on background.</string>
     <string name="settings_account">Account</string>
+    <!-- Background operation foreground-service notification (counts only, never names/paths). -->
+    <string name="ops_channel_name">Background operations</string>
+    <string name="ops_channel_desc">Shown while scans or uploads run in the background.</string>
+    <string name="ops_notification_idle">Working…</string>
+    <string name="ops_kind_face_scan">Face scan</string>
+    <string name="ops_kind_duplicate_scan">Duplicate scan</string>
+    <string name="ops_kind_upload">Upload</string>
+    <string name="ops_kind_blob_cleanup">Cleanup</string>
     <string name="settings_disconnect">Disconnect this device</string>
     <string name="settings_disconnect_confirm">Disconnect this device? You will need to pair again by scanning a new QR code.</string>
     <string name="settings_about">About</string>
@@ -109,6 +119,7 @@
     <string name="gallery_take_photo">Take photo</string>
     <string name="camera_permission_needed">Camera permission is required to take a photo.</string>
     <string name="camera_location_hint">Location is added to photos you take.</string>
+    <string name="camera_switch">Switch camera</string>
     <string name="gallery_uploading">Uploading %1$d/%2$d</string>
     <string name="gallery_upload_failed">%1$d upload(s) failed</string>
     <string name="gallery_empty">No photos yet.</string>
@@ -134,6 +145,13 @@
     <string name="gallery_tab_photos">Photos</string>
     <string name="gallery_tab_albums">Albums</string>
     <string name="gallery_tab_people">People</string>
+    <string name="duplicates_action">Find duplicates</string>
+    <string name="duplicates_title">Duplicates</string>
+    <string name="duplicates_rescan">Rescan</string>
+    <string name="duplicates_mark_rest">Mark rest</string>
+    <string name="duplicates_trash_marked">Delete marked (%1$d)</string>
+    <string name="duplicates_none">No duplicates found.</string>
+    <string name="duplicates_copies">%1$d copies</string>
     <string name="album_new">New album</string>
     <string name="album_add_to">Add to album</string>
     <string name="selection_count">%1$d selected</string>

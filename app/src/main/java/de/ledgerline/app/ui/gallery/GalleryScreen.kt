@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -68,6 +70,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.GalleryPhoto
+import de.ledgerline.app.ui.ops.OpProgressOverlay
 import de.ledgerline.app.ui.workspace.common.CenteredMessage
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
@@ -87,6 +90,17 @@ fun GalleryScreen(
     var tab by rememberSaveable { mutableStateOf(GalleryTab.PHOTOS) }
     var openAlbumId by remember { mutableStateOf<String?>(null) }
     var openPersonId by remember { mutableStateOf<String?>(null) }
+    var showDuplicates by remember { mutableStateOf(false) }
+
+    // Duplicate scan — full-screen, hides the tabs.
+    if (showDuplicates) {
+        DuplicatesScreen(
+            modifier = modifier,
+            galleryVm = vm,
+            onBack = { showDuplicates = false },
+        )
+        return
+    }
 
     // Album detail — full-screen, hides the tabs.
     openAlbumId?.let { id ->
@@ -112,26 +126,50 @@ fun GalleryScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
-        SingleChoiceSegmentedButtonRow(
+        var overflowOpen by remember { mutableStateOf(false) }
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            SegmentedButton(
-                selected = tab == GalleryTab.PHOTOS,
-                onClick = { tab = GalleryTab.PHOTOS },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-            ) { Text(stringResource(R.string.gallery_tab_photos)) }
-            SegmentedButton(
-                selected = tab == GalleryTab.ALBUMS,
-                onClick = { tab = GalleryTab.ALBUMS },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-            ) { Text(stringResource(R.string.gallery_tab_albums)) }
-            SegmentedButton(
-                selected = tab == GalleryTab.PEOPLE,
-                onClick = { tab = GalleryTab.PEOPLE },
-                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-            ) { Text(stringResource(R.string.gallery_tab_people)) }
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
+                SegmentedButton(
+                    selected = tab == GalleryTab.PHOTOS,
+                    onClick = { tab = GalleryTab.PHOTOS },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
+                ) { Text(stringResource(R.string.gallery_tab_photos)) }
+                SegmentedButton(
+                    selected = tab == GalleryTab.ALBUMS,
+                    onClick = { tab = GalleryTab.ALBUMS },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
+                ) { Text(stringResource(R.string.gallery_tab_albums)) }
+                SegmentedButton(
+                    selected = tab == GalleryTab.PEOPLE,
+                    onClick = { tab = GalleryTab.PEOPLE },
+                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
+                ) { Text(stringResource(R.string.gallery_tab_people)) }
+            }
+            Box {
+                IconButton(onClick = { overflowOpen = true }) {
+                    Icon(
+                        Icons.Outlined.MoreVert,
+                        contentDescription = stringResource(R.string.action_more),
+                    )
+                }
+                DropdownMenu(
+                    expanded = overflowOpen,
+                    onDismissRequest = { overflowOpen = false },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.duplicates_action)) },
+                        onClick = {
+                            overflowOpen = false
+                            showDuplicates = true
+                        },
+                    )
+                }
+            }
         }
 
         when (tab) {
@@ -164,7 +202,6 @@ private fun PhotosTab(
 ) {
     val ui by vm.state.collectAsStateWithLifecycle()
     val usage by vm.usage.collectAsStateWithLifecycle()
-    val uploadProgress by vm.uploadProgress.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     var openId by remember { mutableStateOf<String?>(null) }
     var showCamera by remember { mutableStateOf(false) }
@@ -367,28 +404,8 @@ private fun PhotosTab(
             )
         }
 
-        // Upload progress overlay.
-        val p = uploadProgress
-        if (p != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator(color = Color.White)
-                    Text(
-                        text = stringResource(R.string.gallery_uploading, p.current, p.total),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-        }
+        // Shared progress overlay (uploads / scans).
+        OpProgressOverlay()
 
         // Snackbar host at bottom.
         SnackbarHost(
