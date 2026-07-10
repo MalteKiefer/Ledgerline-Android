@@ -5,10 +5,13 @@ import de.ledgerline.app.data.remote.PinnedTrust
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.domain.usecase.PairingGateway
 import de.ledgerline.app.domain.usecase.PollResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.ConnectionSpec
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.security.cert.X509Certificate
 
@@ -48,14 +51,15 @@ class PairingRepository : PairingGateway {
     }
 
     /** Opens one TLS connection and hashes the leaf cert's SPKI (TOFU). */
-    private fun capturePin(baseUrl: String): String {
+    private suspend fun capturePin(baseUrl: String): String = withContext(Dispatchers.IO) {
         val url = baseUrl.toHttpUrl()
         val client = OkHttpClient.Builder()
             .connectionSpecs(listOf(ConnectionSpec.RESTRICTED_TLS))
             .build()
         client.newCall(Request.Builder().url(url).head().build()).execute().use { resp ->
-            val leaf = resp.handshake!!.peerCertificates.first() as X509Certificate
-            return PinnedTrust.spkiSha256Base64(leaf)
+            val handshake = resp.handshake ?: throw IOException("no TLS handshake")
+            val leaf = handshake.peerCertificates.first() as X509Certificate
+            PinnedTrust.spkiSha256Base64(leaf)
         }
     }
 }
