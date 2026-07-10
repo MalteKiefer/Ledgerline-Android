@@ -31,7 +31,7 @@ open class GalleryUploader @Inject constructor(private val blobs: GalleryUploadA
      *  with [Base64.DEFAULT] decodes the server's standard (padded) base64. Marked
      *  internal + open so JVM tests can swap in `java.util.Base64` (the Android stub
      *  throws off-device). */
-    internal open fun decodeBase64(s: String): ByteArray = Base64.decode(s, Base64.DEFAULT)
+    internal open fun decodeBase64(s: String): ByteArray = Base64.decode(s, Base64.NO_WRAP)
 
     suspend fun upload(
         name: String,
@@ -104,6 +104,9 @@ open class GalleryUploader @Inject constructor(private val blobs: GalleryUploadA
             hasFaces = d.faces.size,
             created = createdIso,
             content_id = d.content_id,
+            name = name,
+            mime = mime,          // web needs this for video playback + original download
+            size = bytes.size.toLong(),
         )
         return Outcome.Ok(entry)
     }

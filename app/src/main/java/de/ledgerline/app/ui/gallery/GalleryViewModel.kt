@@ -109,7 +109,7 @@ class GalleryViewModel @Inject constructor(
                 continue
             }
 
-            val sig = sha256Hex(bytes)
+            val sig = fileSig(bytes)
             if (sig in existing) {
                 // Dedup: already present in the gallery index.
                 done++
@@ -175,10 +175,17 @@ class GalleryViewModel @Inject constructor(
         _state.value = GalleryUi(false, false, photos)
     }
 
-    private fun sha256Hex(bytes: ByteArray): String =
-        java.security.MessageDigest.getInstance("SHA-256")
-            .digest(bytes)
-            .joinToString("") { "%02x".format(it) }
+    /** Duplicate signature, byte-compatible with the web `_fileSig`:
+     *  "${size}:${hex(sha256(first1MiB ++ last1MiB))}" (tail empty when size <= 1 MiB). */
+    private fun fileSig(bytes: ByteArray): String {
+        val cap = 1024 * 1024
+        val size = bytes.size
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        md.update(bytes, 0, minOf(cap, size))
+        if (size > cap) md.update(bytes, size - cap, cap)
+        val hex = md.digest().joinToString("") { "%02x".format(it) }
+        return "$size:$hex"
+    }
 
     private fun nowIso(): String =
         java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).toString()
