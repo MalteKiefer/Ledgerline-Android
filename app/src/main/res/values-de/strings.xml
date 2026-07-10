@@ -98,6 +98,7 @@
     <string name="minutes_10">10 Minuten</string>
     <string name="minutes_30">30 Minuten</string>
     <string name="action_cancel">Abbrechen</string>
+    <string name="action_save">Speichern</string>
     <string name="action_back">Zurück</string>
     <string name="action_settings">Einstellungen</string>
     <string name="action_more">Mehr</string>
@@ -137,4 +138,16 @@
     <string name="album_remove_photo">Aus Album entfernen</string>
     <string name="album_set_cover">Als Cover</string>
     <string name="album_create">Erstellen</string>
+
+    <!-- Personen -->
+    <string name="people_empty">Noch keine Personen. Scanne nach Gesichtern.</string>
+    <string name="people_scan">Gesichter scannen</string>
+    <string name="people_scan_all">Ganze Bibliothek</string>
+    <string name="people_scan_recent">Nur neue (letzte 200)</string>
+    <string name="people_scanning">Scanne Gesichter… %1$d/%2$d</string>
+    <string name="person_unnamed">Unbenannt</string>
+    <string name="person_rename">Umbenennen</string>
+    <string name="person_hide">Ausblenden</string>
+    <string name="person_name_hint">Name</string>
+    <string name="person_photos_count">%1$d Fotos</string>
 </resources>
