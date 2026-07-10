@@ -126,4 +126,8 @@
     <string name="map_open_hint">Tap the map to navigate</string>
     <string name="menu_bookmarks">Bookmarks</string>
     <string name="menu_more">More</string>
+    <string name="welcome_location_title">Location for photos</string>
+    <string name="welcome_location_body">Optional: tag photos you take in the app with where they were taken. Uses your device location only — no Google, no tracking.</string>
+    <string name="welcome_location_allow">Allow location</string>
+    <string name="welcome_location_granted">Location enabled</string>
 </resources>

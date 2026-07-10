@@ -126,4 +126,8 @@
     <string name="map_open_hint">Auf die Karte tippen zum Navigieren</string>
     <string name="menu_bookmarks">Lesezeichen</string>
     <string name="menu_more">Mehr</string>
+    <string name="welcome_location_title">Standort für Fotos</string>
+    <string name="welcome_location_body">Optional: versieh in der App aufgenommene Fotos mit dem Aufnahmeort. Nutzt nur den Geräte-Standort — kein Google, kein Tracking.</string>
+    <string name="welcome_location_allow">Standort erlauben</string>
+    <string name="welcome_location_granted">Standort aktiviert</string>
 </resources>
