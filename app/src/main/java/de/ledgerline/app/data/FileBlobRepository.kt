@@ -140,8 +140,8 @@ class FileBlobRepository(
      * Fetch a blob and frame-decrypt it, feeding each plaintext chunk to [consume].
      *
      * NOTE: kept simple for Phase 3 — the full ciphertext is buffered, then
-     * frame-decrypted. Typical viewed/exported files fit comfortably; a fully
-     * streamed okio `Source` refinement is a later optimization.
+     * frame-decrypted via [BlobDownloader.decrypt]. Typical viewed/exported files
+     * fit comfortably; a fully streamed okio `Source` refinement is a later optimization.
      */
     private suspend fun streamDecrypted(
         blob: String,
@@ -154,17 +154,8 @@ class FileBlobRepository(
             val res = apiProvider(session).rawFile(blob)
             if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
             val bytes = res.body()!!.bytes()
-            val dec = crypto.contentDecryptor(encFileKey, vk)
-            dec.start(bytes.copyOfRange(0, dec.headerBytes))
-            var off = dec.headerBytes
-            while (off < bytes.size) {
-                if (off + 4 > bytes.size) break
-                val len = crypto.readU32le(bytes, off); off += 4
-                if (len <= 0 || off + len > bytes.size) break // reached the Padmé tail
-                val (msg, final) = dec.decryptFrame(bytes.copyOfRange(off, off + len)); off += len
-                consume(msg)
-                if (final) break
-            }
+            val plain = BlobDownloader.decrypt(bytes, encFileKey, vk, crypto)
+            consume(plain)
             Outcome.Ok(Unit)
         } catch (e: Exception) {
             Outcome.Err(ErrorKind.DECRYPT, e)

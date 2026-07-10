@@ -67,6 +67,9 @@ class WorkspaceSaveTest {
         override suspend fun deleteBlob(blob: String): Response<Unit> = throw NotImplementedError()
         override suspend fun filesUsage(): Response<UsageResponse> = throw NotImplementedError()
         override suspend fun deleteSession(): Response<Unit> = throw NotImplementedError()
+        override suspend fun galleryStore(): Response<StoreResponse> = throw NotImplementedError()
+        override suspend fun galleryRaw(blob: String): Response<okhttp3.ResponseBody> = throw NotImplementedError()
+        override suspend fun galleryUsage(): Response<UsageResponse> = throw NotImplementedError()
     }
 
     @Test fun save_merges_on_409_and_retries() = runBlocking {

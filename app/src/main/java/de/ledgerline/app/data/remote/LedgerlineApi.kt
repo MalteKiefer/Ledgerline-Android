@@ -54,4 +54,14 @@ interface LedgerlineApi {
 
     @GET("api/v1/files/usage")
     suspend fun filesUsage(): Response<UsageResponse>
+
+    @GET("api/v1/gallery/store")
+    suspend fun galleryStore(): Response<StoreResponse>
+
+    @GET("api/v1/gallery/raw/{blob}")
+    @Streaming
+    suspend fun galleryRaw(@Path("blob") blob: String): Response<ResponseBody>
+
+    @GET("api/v1/gallery/usage")
+    suspend fun galleryUsage(): Response<UsageResponse>
 }
