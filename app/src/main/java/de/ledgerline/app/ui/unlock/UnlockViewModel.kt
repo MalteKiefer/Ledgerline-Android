@@ -39,6 +39,18 @@ class UnlockViewModel @Inject constructor(
     val state: StateFlow<UnlockUiState> = _state
 
     /**
+     * Clear a stale error/not-configured message. Called when the unlock screen is
+     * (re-)entered and while the user edits the passphrase, so a message left over
+     * from a previous attempt (or a forced logout) does not persist. Never clobbers
+     * an in-flight [UnlockUiState.Working] or a terminal [UnlockUiState.Unlocked].
+     */
+    fun reset() {
+        if (_state.value is UnlockUiState.Error || _state.value is UnlockUiState.NotConfigured) {
+            _state.value = UnlockUiState.Idle
+        }
+    }
+
+    /**
      * Unlock. [authorize] runs the single CryptoObject-bound biometric that
      * authorizes reading the sealed session; the passphrase then derives the VK.
      */

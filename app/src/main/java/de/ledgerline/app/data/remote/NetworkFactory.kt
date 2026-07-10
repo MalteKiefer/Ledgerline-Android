@@ -1,5 +1,6 @@
 package de.ledgerline.app.data.remote
 
+import de.ledgerline.app.core.AuthNotifier
 import de.ledgerline.app.data.remote.interceptors.AuthInterceptor
 import de.ledgerline.app.data.remote.interceptors.BackoffInterceptor
 import com.jakewharton.retrofit2.converter.kotlinx.serialization.asConverterFactory
@@ -44,6 +45,17 @@ object NetworkFactory {
             .connectionSpecs(specs)
             .callTimeout(60, TimeUnit.SECONDS)
             .addInterceptor(AuthInterceptor(tokenProvider))
+            // Detect an authenticated 401 (revoked token) and signal a forced
+            // logout. Placed after AuthInterceptor so the request it inspects already
+            // carries the Bearer header; pairing/poll calls have no Authorization
+            // header, so their 401s never fire this.
+            .addInterceptor { chain ->
+                val r = chain.proceed(chain.request())
+                if (r.code == 401 && chain.request().header("Authorization") != null) {
+                    AuthNotifier.onUnauthorized?.invoke()
+                }
+                r
+            }
             .addInterceptor(BackoffInterceptor())
         if (pin != null) builder.certificatePinner(PinnedTrust.pinnerFor(host, pin))
         val retrofit = Retrofit.Builder()

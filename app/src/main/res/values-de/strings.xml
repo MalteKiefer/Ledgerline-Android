@@ -103,6 +103,13 @@
     <string name="action_more">Mehr</string>
 
     <!-- Galerie -->
+    <string name="gallery_add">Fotos hinzufügen</string>
+    <string name="gallery_upload_photos">Fotos hochladen</string>
+    <string name="gallery_take_photo">Foto aufnehmen</string>
+    <string name="camera_permission_needed">Kameraberechtigung wird zum Aufnehmen benötigt.</string>
+    <string name="camera_location_hint">Zu aufgenommenen Fotos wird der Standort hinzugefügt.</string>
+    <string name="gallery_uploading">Lade hoch %1$d/%2$d</string>
+    <string name="gallery_upload_failed">%1$d Upload(s) fehlgeschlagen</string>
     <string name="gallery_empty">Noch keine Fotos.</string>
     <string name="gallery_error">Galerie konnte nicht geladen werden.</string>
     <string name="gallery_usage">%1$s belegt</string>
@@ -119,4 +126,8 @@
     <string name="map_open_hint">Auf die Karte tippen zum Navigieren</string>
     <string name="menu_bookmarks">Lesezeichen</string>
     <string name="menu_more">Mehr</string>
+    <string name="welcome_location_title">Standort für Fotos</string>
+    <string name="welcome_location_body">Optional: versieh in der App aufgenommene Fotos mit dem Aufnahmeort. Nutzt nur den Geräte-Standort — kein Google, kein Tracking.</string>
+    <string name="welcome_location_allow">Standort erlauben</string>
+    <string name="welcome_location_granted">Standort aktiviert</string>
 </resources>

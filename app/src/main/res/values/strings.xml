@@ -103,6 +103,13 @@
     <string name="action_more">More</string>
 
     <!-- Gallery -->
+    <string name="gallery_add">Add photos</string>
+    <string name="gallery_upload_photos">Upload photos</string>
+    <string name="gallery_take_photo">Take photo</string>
+    <string name="camera_permission_needed">Camera permission is required to take a photo.</string>
+    <string name="camera_location_hint">Location is added to photos you take.</string>
+    <string name="gallery_uploading">Uploading %1$d/%2$d</string>
+    <string name="gallery_upload_failed">%1$d upload(s) failed</string>
     <string name="gallery_empty">No photos yet.</string>
     <string name="gallery_error">Couldn\'t load the gallery.</string>
     <string name="gallery_usage">%1$s used</string>
@@ -119,4 +126,8 @@
     <string name="map_open_hint">Tap the map to navigate</string>
     <string name="menu_bookmarks">Bookmarks</string>
     <string name="menu_more">More</string>
+    <string name="welcome_location_title">Location for photos</string>
+    <string name="welcome_location_body">Optional: tag photos you take in the app with where they were taken. Uses your device location only — no Google, no tracking.</string>
+    <string name="welcome_location_allow">Allow location</string>
+    <string name="welcome_location_granted">Location enabled</string>
 </resources>
