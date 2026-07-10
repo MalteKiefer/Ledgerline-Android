@@ -131,6 +131,12 @@
     <string name="welcome_location_body">Optional: versieh in der App aufgenommene Fotos mit dem Aufnahmeort. Nutzt nur den Geräte-Standort — kein Google, kein Tracking.</string>
     <string name="welcome_location_allow">Standort erlauben</string>
     <string name="welcome_location_granted">Standort aktiviert</string>
+    <string name="gallery_tab_photos">Fotos</string>
+    <string name="gallery_tab_albums">Alben</string>
+    <string name="gallery_tab_people">People</string>
+    <string name="album_new">Neues Album</string>
+    <string name="album_add_to">Zu Album hinzufügen</string>
+    <string name="selection_count">%1$d ausgewählt</string>
     <string name="albums_empty">Noch keine Alben.</string>
     <string name="album_rename">Umbenennen</string>
     <string name="album_delete">Löschen</string>
