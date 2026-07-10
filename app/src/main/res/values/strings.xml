@@ -98,6 +98,7 @@
     <string name="minutes_10">10 minutes</string>
     <string name="minutes_30">30 minutes</string>
     <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
     <string name="action_back">Back</string>
     <string name="action_settings">Settings</string>
     <string name="action_more">More</string>
@@ -130,4 +131,29 @@
     <string name="welcome_location_body">Optional: tag photos you take in the app with where they were taken. Uses your device location only — no Google, no tracking.</string>
     <string name="welcome_location_allow">Allow location</string>
     <string name="welcome_location_granted">Location enabled</string>
+    <string name="gallery_tab_photos">Photos</string>
+    <string name="gallery_tab_albums">Albums</string>
+    <string name="gallery_tab_people">People</string>
+    <string name="album_new">New album</string>
+    <string name="album_add_to">Add to album</string>
+    <string name="selection_count">%1$d selected</string>
+    <string name="albums_empty">No albums yet.</string>
+    <string name="album_rename">Rename</string>
+    <string name="album_delete">Delete</string>
+    <string name="album_name_hint">Album name</string>
+    <string name="album_remove_photo">Remove from album</string>
+    <string name="album_set_cover">Set as cover</string>
+    <string name="album_create">Create</string>
+
+    <!-- People -->
+    <string name="people_empty">No people yet. Scan for faces.</string>
+    <string name="people_scan">Scan faces</string>
+    <string name="people_scan_all">Whole library</string>
+    <string name="people_scan_recent">Only new (last 200)</string>
+    <string name="people_scanning">Scanning faces… %1$d/%2$d</string>
+    <string name="person_unnamed">Unnamed</string>
+    <string name="person_rename">Rename</string>
+    <string name="person_hide">Hide</string>
+    <string name="person_name_hint">Name</string>
+    <string name="person_photos_count">%1$d photos</string>
 </resources>
