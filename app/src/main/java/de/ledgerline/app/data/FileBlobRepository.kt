@@ -9,6 +9,7 @@ import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.domain.model.Session
+import de.ledgerline.app.domain.usecase.FileBlobs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -38,7 +39,7 @@ class FileBlobRepository(
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
     private val apiProvider: (Session) -> LedgerlineApi,
-) {
+) : FileBlobs {
     /** Production constructor used by Hilt (Hilt can't inject the default lambda). */
     @Inject constructor(
         sessionHolder: SessionHolder,
@@ -56,7 +57,7 @@ class FileBlobRepository(
      * append Padmé random padding, and upload. Returns the blob ref + wrapped key.
      * Runs with constant memory: chunks are framed and written straight to the sink.
      */
-    suspend fun upload(
+    override suspend fun upload(
         name: String,
         mime: String,
         size: Long,
@@ -117,7 +118,7 @@ class FileBlobRepository(
     }
 
     /** Download + decrypt a blob fully into memory (for in-app viewing / small files). */
-    suspend fun downloadToBytes(blob: String, encFileKey: String): Outcome<ByteArray> =
+    override suspend fun downloadToBytes(blob: String, encFileKey: String): Outcome<ByteArray> =
         withContext(Dispatchers.IO) {
             val out = java.io.ByteArrayOutputStream()
             when (val r = streamDecrypted(blob, encFileKey) { chunk -> out.write(chunk) }) {
@@ -127,7 +128,7 @@ class FileBlobRepository(
         }
 
     /** Stream-decrypt a blob, invoking [write] per plaintext chunk (for SAF export). */
-    suspend fun downloadTo(blob: String, encFileKey: String, write: (ByteArray) -> Unit): Outcome<Unit> =
+    override suspend fun downloadTo(blob: String, encFileKey: String, write: (ByteArray) -> Unit): Outcome<Unit> =
         withContext(Dispatchers.IO) { streamDecrypted(blob, encFileKey, write) }
 
     /**
@@ -169,7 +170,7 @@ class FileBlobRepository(
      * Delete freed blobs, honoring `Retry-After` on 429 (backoff capped at 30 s,
      * max 3 attempts per blob). Sequential is fine for Phase 3.
      */
-    suspend fun deleteBlobs(blobs: List<String>) = withContext(Dispatchers.IO) {
+    override suspend fun deleteBlobs(blobs: List<String>) = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext
         val api = apiProvider(session)
         for (id in blobs) {
