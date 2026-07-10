@@ -48,6 +48,8 @@ class FilesViewModel @Inject constructor(
     fun open(folderId: String) { stack.addLast(folderId); recompute() }
     fun back() { if (stack.size > 1) { stack.removeLast(); recompute() } }
 
+    fun fileById(id: String): FileEntry? = cache.value.value?.manifest?.files?.firstOrNull { it.id == id }
+
     private fun recompute() {
         val m = cache.value.value?.manifest
         val cwd = stack.last()

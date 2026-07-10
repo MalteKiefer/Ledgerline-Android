@@ -9,6 +9,7 @@ import dagger.hilt.components.SingletonComponent
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.data.PairingRepository
 import de.ledgerline.app.data.SessionStore
+import de.ledgerline.app.data.SettingsStore
 import javax.inject.Singleton
 
 @Module
@@ -25,4 +26,8 @@ object AppModule {
     @Provides
     @Singleton
     fun pairingRepository() = PairingRepository()
+
+    @Provides
+    @Singleton
+    fun settingsStore(@ApplicationContext ctx: Context) = SettingsStore(ctx)
 }

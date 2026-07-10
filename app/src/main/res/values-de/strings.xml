@@ -38,4 +38,45 @@
     <string name="ws_retry">Erneut versuchen</string>
     <string name="ws_reauth">Sitzung abgelaufen — Gerät neu koppeln.</string>
     <string name="ws_file_phase3">Dateien öffnen kommt in einer späteren Version.</string>
+
+    <!-- Prioritätsstufen -->
+    <string name="priority_low">Niedrig</string>
+    <string name="priority_normal">Normal</string>
+    <string name="priority_high">Hoch</string>
+    <string name="priority_urgent">Dringend</string>
+
+    <!-- Todo-Detail -->
+    <string name="todo_done">Erledigt</string>
+    <string name="todo_not_done">Offen</string>
+    <string name="todo_open_link">Link öffnen</string>
+    <string name="todo_priority">Priorität</string>
+    <string name="todo_due">Fällig</string>
+
+    <!-- Datei-Detail -->
+    <string name="file_type">Typ</string>
+    <string name="file_size">Größe</string>
+    <string name="file_created">Erstellt</string>
+
+    <!-- Einstellungen -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_language">Sprache</string>
+    <string name="settings_language_system">Systemstandard</string>
+    <string name="settings_language_de">Deutsch</string>
+    <string name="settings_language_en">English</string>
+    <string name="settings_security">Sicherheit</string>
+    <string name="settings_idle_timeout">Automatisch sperren nach</string>
+    <string name="settings_lock_now">Jetzt sperren</string>
+    <string name="settings_account">Konto</string>
+    <string name="settings_disconnect">Dieses Gerät trennen</string>
+    <string name="settings_disconnect_confirm">Dieses Gerät trennen? Du musst dich erneut koppeln, indem du einen neuen QR-Code scannst.</string>
+    <string name="settings_about">Über</string>
+    <string name="settings_zero_knowledge">Zero-Knowledge: Alles wird auf diesem Gerät verschlüsselt. Der Server sieht deine Daten nie.</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="minutes_1">1 Minute</string>
+    <string name="minutes_5">5 Minuten</string>
+    <string name="minutes_10">10 Minuten</string>
+    <string name="minutes_30">30 Minuten</string>
+    <string name="action_cancel">Abbrechen</string>
+    <string name="action_back">Zurück</string>
+    <string name="action_settings">Einstellungen</string>
 </resources>

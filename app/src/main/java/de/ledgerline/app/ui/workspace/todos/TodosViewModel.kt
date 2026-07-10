@@ -38,6 +38,8 @@ class TodosViewModel @Inject constructor(
         }
     }
 
+    fun todoById(id: String): TodoItem? = cache.value.value?.manifest?.todos?.firstOrNull { it.id == id }
+
     private fun recompute() {
         val m = cache.value.value?.manifest
         val listName = m?.todoLists?.associate { it.id to it.name }.orEmpty()

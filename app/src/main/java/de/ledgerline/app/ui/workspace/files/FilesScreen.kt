@@ -19,6 +19,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -33,6 +36,13 @@ import de.ledgerline.app.ui.workspace.common.humanSize
 @Composable
 fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewModel()) {
     val ui by vm.state.collectAsStateWithLifecycle()
+    var openId by remember { mutableStateOf<String?>(null) }
+
+    val current = openId
+    if (current != null) {
+        val file = vm.fileById(current)
+        if (file != null) { FileDetailScreen(file, onBack = { openId = null }, modifier = modifier); return }
+    }
     when {
         ui.loading -> LoadingBox(modifier)
         ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() }, modifier)
@@ -60,6 +70,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                             headlineContent = { Text(file.name) },
                             supportingContent = { Text(humanSize(file.size)) },
                             leadingContent = { Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null) },
+                            modifier = Modifier.fillMaxWidth().clickable { openId = file.id },
                         )
                     }
                 }

@@ -1,6 +1,7 @@
 package de.ledgerline.app.ui.workspace.todos
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -36,12 +40,18 @@ import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
 import de.ledgerline.app.ui.workspace.common.formatDue
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewModel()) {
     val ui by vm.state.collectAsStateWithLifecycle()
+    var openId by remember { mutableStateOf<String?>(null) }
+
+    val current = openId
+    if (current != null) {
+        val todo = vm.todoById(current)
+        if (todo != null) { TodoDetailScreen(todo, onBack = { openId = null }, modifier = modifier); return }
+    }
     when {
         ui.loading -> LoadingBox(modifier)
         ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() }, modifier)
@@ -105,7 +115,7 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
                                                 }
                                                 if (showPriority) {
                                                     Text(
-                                                        todo.priority.replaceFirstChar { it.titlecase(Locale.getDefault()) },
+                                                        priorityLabel(todo.priority),
                                                         style = MaterialTheme.typography.labelSmall,
                                                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                                                         modifier = Modifier
@@ -127,6 +137,7 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
                                     Icon(Icons.Outlined.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 }
                             },
+                            modifier = Modifier.fillMaxWidth().clickable { openId = todo.id },
                         )
                     }
                 }

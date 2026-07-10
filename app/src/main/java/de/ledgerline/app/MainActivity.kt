@@ -18,9 +18,12 @@ import de.ledgerline.app.core.security.AppLock
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.LockResult
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.ui.nav.AppNav
 import de.ledgerline.app.ui.theme.LedgerlineTheme
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 /**
@@ -35,6 +38,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var idleLocker: IdleLocker
     @Inject lateinit var sessionHolder: SessionHolder
     @Inject lateinit var workspaceCache: WorkspaceCache
+    @Inject lateinit var settingsStore: SettingsStore
     private val appLock = AppLock()
 
     // Emits the latest validated pairing deep link. singleTask means a link
@@ -46,6 +50,9 @@ class MainActivity : FragmentActivity() {
         // MASVS-STORAGE: block screenshots, screen recording, recents preview.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
+
+        // Apply the persisted idle-lock timeout before any unlock can happen.
+        idleLocker.timeoutMs = runBlocking { settingsStore.timeoutMinutes.first() } * 60_000L
 
         // Cold-start: accept a validated pairing deep link from the launch intent.
         pairLink.value = extractPairLink(intent)

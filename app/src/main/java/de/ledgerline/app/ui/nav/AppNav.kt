@@ -64,6 +64,7 @@ class RootViewModel @Inject constructor(
     fun toPairing() { _dest.value = Destination.PAIRING }
     fun toUnlock() { _dest.value = Destination.UNLOCK }
     fun toHome() { _dest.value = Destination.HOME }
+    fun toWelcome() { _dest.value = Destination.WELCOME }
 }
 
 /**
@@ -95,7 +96,14 @@ fun AppNav(
         Destination.UNLOCK -> UnlockScreen(authGate = authGate, onUnlocked = { vm.toHome() })
         Destination.HOME -> {
             val unlocked by vm.unlocked.collectAsStateWithLifecycle()
-            if (unlocked) WorkspaceScaffold() else UnlockScreen(authGate = authGate, onUnlocked = { vm.toHome() })
+            if (unlocked) {
+                WorkspaceScaffold(
+                    onLockNow = { vm.toUnlock() },
+                    onDisconnected = { vm.toWelcome() },
+                )
+            } else {
+                UnlockScreen(authGate = authGate, onUnlocked = { vm.toHome() })
+            }
         }
     }
 }
