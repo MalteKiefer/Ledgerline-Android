@@ -5,6 +5,7 @@ import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.data.UploadedBlob
 import de.ledgerline.app.domain.model.*
 import de.ledgerline.app.domain.usecase.FileBlobs
+import de.ledgerline.app.domain.usecase.FilesUsage
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import kotlinx.coroutines.Dispatchers
@@ -72,7 +73,12 @@ class FilesViewModelTest {
         override suspend fun deleteBlobs(blobs: List<String>) { deleted += blobs }
     }
 
-    private fun vm() = FilesViewModel(load, cache, mutate, blobs)
+    // Stub usage: returns a fixed used/quota.
+    private val usage = object : FilesUsage {
+        override suspend fun invoke(): Pair<Long, Long> = 1024L to 10240L
+    }
+
+    private fun vm() = FilesViewModel(load, cache, mutate, blobs, usage)
 
     @Test fun root_shows_folders_then_files_excluding_trashed() = runTest {
         val vm = vm()

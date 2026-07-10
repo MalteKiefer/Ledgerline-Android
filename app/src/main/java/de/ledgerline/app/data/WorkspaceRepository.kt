@@ -43,6 +43,19 @@ class WorkspaceRepository(
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonEncoder = Json { encodeDefaults = true }
 
+    /** Files blob storage usage: (used bytes, quota bytes). Null on any failure. */
+    suspend fun filesUsage(): Pair<Long, Long>? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val res = apiProvider(session).filesUsage()
+            if (!res.isSuccessful) return null
+            val body = res.body() ?: return null
+            body.used to body.quota
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     suspend fun load(): Outcome<Workspace> {
         val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)

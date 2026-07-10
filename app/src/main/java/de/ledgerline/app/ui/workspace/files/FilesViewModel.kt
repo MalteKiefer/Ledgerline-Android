@@ -9,12 +9,14 @@ import de.ledgerline.app.domain.model.FileEntry
 import de.ledgerline.app.domain.model.NamedFolder
 import de.ledgerline.app.domain.model.WorkspaceManifest
 import de.ledgerline.app.domain.usecase.FileBlobs
+import de.ledgerline.app.domain.usecase.FilesUsage
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.io.InputStream
+import java.io.OutputStream
 import java.util.UUID
 import javax.inject.Inject
 
@@ -42,12 +44,16 @@ sealed interface ViewerState {
     data class Failed(val msg: String) : ViewerState
 }
 
+/** Files blob storage usage (used/quota bytes); null until loaded. */
+data class UsageInfo(val used: Long, val quota: Long)
+
 @HiltViewModel
 class FilesViewModel @Inject constructor(
     private val load: LoadWorkspace,
     private val cache: WorkspaceCache,
     private val mutate: MutateWorkspace,
     private val blobRepo: FileBlobs,
+    private val filesUsage: FilesUsage,
 ) : ViewModel() {
     private val stack = ArrayDeque<String?>().apply { addLast(null) }   // current folder = last
     private val _state = MutableStateFlow(FilesUi(loading = true))
@@ -55,6 +61,9 @@ class FilesViewModel @Inject constructor(
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy
+
+    private val _usage = MutableStateFlow<UsageInfo?>(null)
+    val usage: StateFlow<UsageInfo?> = _usage
 
     private val _viewer = MutableStateFlow<ViewerState>(ViewerState.Idle)
     val viewer: StateFlow<ViewerState> = _viewer
@@ -69,6 +78,12 @@ class FilesViewModel @Inject constructor(
                 if (ws != null) recompute() else _state.value = FilesUi(loading = true)
             }
         }
+        loadUsage()
+    }
+
+    /** Fetch files blob usage (used/quota) and publish it; silently ignores failure. */
+    fun loadUsage() = viewModelScope.launch {
+        filesUsage.invoke()?.let { (used, quota) -> _usage.value = UsageInfo(used, quota) }
     }
 
     fun refresh() = viewModelScope.launch {
@@ -76,6 +91,7 @@ class FilesViewModel @Inject constructor(
         if (load.invoke() is Outcome.Err) {
             _state.value = _state.value.copy(loading = false, error = true)
         }
+        loadUsage()
     }
 
     fun open(folderId: String) { stack.addLast(folderId); recompute() }
@@ -104,7 +120,10 @@ class FilesViewModel @Inject constructor(
 
     fun deleteFile(file: FileEntry) = viewModelScope.launch {
         val res = mutate.invoke { m -> m.copy(files = m.files.filterNot { it.id == file.id }) }
-        if (res is Outcome.Ok) blobRepo.deleteBlobs(listOf(file.blob))
+        if (res is Outcome.Ok) {
+            blobRepo.deleteBlobs(listOf(file.blob))
+            loadUsage()
+        }
     }
 
     fun deleteFolder(folderId: String) = viewModelScope.launch {
@@ -117,7 +136,10 @@ class FilesViewModel @Inject constructor(
                 fileFolders = m.fileFolders.filterNot { it.id in subFolders },
             )
         }
-        if (res is Outcome.Ok) blobRepo.deleteBlobs(freedBlobs)
+        if (res is Outcome.Ok) {
+            blobRepo.deleteBlobs(freedBlobs)
+            loadUsage()
+        }
     }
 
     fun uploadPicked(name: String, mime: String, size: Long, open: () -> InputStream) = viewModelScope.launch {
@@ -145,6 +167,7 @@ class FilesViewModel @Inject constructor(
         } finally {
             _busy.value = false
         }
+        loadUsage()
     }
 
     // ---- Viewer (download-to-memory) ----
@@ -172,6 +195,25 @@ class FilesViewModel @Inject constructor(
                 is Outcome.Ok -> "Saved"
                 is Outcome.Err -> "Save failed"
             }
+        } finally {
+            _busy.value = false
+        }
+    }
+
+    /**
+     * Stream-decrypt [file] straight into [os]. The **caller** owns [os] and must close it
+     * (e.g. via `use {}`) so the SAF sink is flushed and closed exactly once after all
+     * chunks are written. Returns true on success. [busy] wraps the transfer.
+     */
+    suspend fun exportToStream(os: OutputStream, file: FileEntry): Boolean {
+        _busy.value = true
+        return try {
+            when (blobRepo.downloadTo(file.blob, file.encFileKey) { chunk -> os.write(chunk) }) {
+                is Outcome.Ok -> { os.flush(); true }
+                is Outcome.Err -> false
+            }
+        } catch (_: Exception) {
+            false
         } finally {
             _busy.value = false
         }
