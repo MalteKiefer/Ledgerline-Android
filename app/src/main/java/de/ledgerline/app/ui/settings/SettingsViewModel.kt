@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.core.offline.BlobDiskCache
+import de.ledgerline.app.core.offline.Prefetcher
 import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.KeystoreSealer
@@ -20,7 +21,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,6 +37,7 @@ class SettingsViewModel @Inject constructor(
     private val keystoreSealer: KeystoreSealer,
     private val storeCache: StoreDiskCache,
     private val blobCache: BlobDiskCache,
+    private val prefetcher: Prefetcher,
 ) : ViewModel() {
 
     /** Current idle-lock timeout in minutes, backed by the plaintext settings store. */
@@ -64,31 +65,53 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setOfflineEnabled(enabled) }
     }
 
-    // Temporary C1 mapping of the two 5a on/off switches onto the new enum policies:
-    // a switch is "on" iff the policy is not OFF; toggling writes ON_DEMAND / OFF.
-    // C4 replaces these with proper Off / On-demand / All (+ Thumbnails) selectors.
+    /** File-content blob caching policy (Off / On demand / All). */
+    val filesPolicy: StateFlow<FileBlobPolicy> = settingsStore.filesPolicy
+        .stateIn(viewModelScope, SharingStarted.Eagerly, FileBlobPolicy.ON_DEMAND)
 
-    /** Whether file-content blobs are cached on disk (policy != OFF). */
-    val filesBlobsOffline: StateFlow<Boolean> = settingsStore.filesPolicy
-        .map { it != FileBlobPolicy.OFF }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
-
-    fun setFilesBlobsOffline(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsStore.setFilesPolicy(if (enabled) FileBlobPolicy.ON_DEMAND else FileBlobPolicy.OFF)
-        }
+    fun setFilesPolicy(p: FileBlobPolicy) {
+        viewModelScope.launch { settingsStore.setFilesPolicy(p) }
     }
 
-    /** Whether photo blobs (originals/thumbs/renditions) are cached on disk (policy != OFF). */
-    val photosBlobsOffline: StateFlow<Boolean> = settingsStore.photosPolicy
-        .map { it != PhotoBlobPolicy.OFF }
+    /** Photo blob caching policy (Off / Thumbnails / On demand / All). */
+    val photosPolicy: StateFlow<PhotoBlobPolicy> = settingsStore.photosPolicy
+        .stateIn(viewModelScope, SharingStarted.Eagerly, PhotoBlobPolicy.ON_DEMAND)
+
+    fun setPhotosPolicy(p: PhotoBlobPolicy) {
+        viewModelScope.launch { settingsStore.setPhotosPolicy(p) }
+    }
+
+    /** Cache size limit in MB (`0` = unlimited). */
+    val cacheMaxMb: StateFlow<Int> = settingsStore.cacheMaxMb
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_CACHE_MAX_MB)
+
+    fun setCacheMaxMb(mb: Int) {
+        viewModelScope.launch { settingsStore.setCacheMaxMb(mb) }
+    }
+
+    /** Whether prefetch is restricted to unmetered (Wi-Fi) networks. */
+    val prefetchWifiOnly: StateFlow<Boolean> = settingsStore.prefetchWifiOnly
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    fun setPhotosBlobsOffline(enabled: Boolean) {
-        viewModelScope.launch {
-            settingsStore.setPhotosPolicy(if (enabled) PhotoBlobPolicy.ON_DEMAND else PhotoBlobPolicy.OFF)
-        }
+    fun setPrefetchWifiOnly(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setPrefetchWifiOnly(enabled) }
     }
+
+    /** Whether prefetch is restricted to when the device is charging. */
+    val prefetchChargingOnly: StateFlow<Boolean> = settingsStore.prefetchChargingOnly
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setPrefetchChargingOnly(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setPrefetchChargingOnly(enabled) }
+    }
+
+    /** Manual "Prefetch now"; the shared [OpProgressOverlay] shows PREFETCH progress. */
+    fun prefetchNow() = prefetcher.prefetchNow()
+
+    /** Reason surfaced by a manual prefetch (e.g. `"constraints"`) for the UI snackbar. */
+    val prefetchMessage: StateFlow<String?> = prefetcher.message
+
+    fun clearPrefetchMessage() = prefetcher.clearMessage()
 
     /** Total on-disk size of both offline caches, refreshed on demand + after a clear. */
     private val _cacheSizeBytes = MutableStateFlow(0L)
