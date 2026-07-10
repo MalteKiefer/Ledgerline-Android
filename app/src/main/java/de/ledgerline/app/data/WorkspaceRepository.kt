@@ -5,6 +5,9 @@ import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.core.crypto.Crypto
+import de.ledgerline.app.core.offline.OfflineFlags
+import de.ledgerline.app.core.offline.StoreEnvelope
+import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
@@ -24,6 +27,8 @@ class WorkspaceRepository(
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
     private val cache: WorkspaceCache,
+    private val storeCache: StoreDiskCache,
+    private val offlineFlags: OfflineFlags,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
     /** Production constructor used by Hilt. */
@@ -32,13 +37,21 @@ class WorkspaceRepository(
         vaultKeyHolder: VaultKeyHolder,
         crypto: Crypto,
         cache: WorkspaceCache,
+        storeCache: StoreDiskCache,
+        offlineFlags: OfflineFlags,
     ) : this(
         sessionHolder,
         vaultKeyHolder,
         crypto,
         cache,
+        storeCache,
+        offlineFlags,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
+
+    private companion object {
+        const val KEY = "workspace"
+    }
 
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonEncoder = Json { encodeDefaults = true }
@@ -63,19 +76,42 @@ class WorkspaceRepository(
         return try {
             val res = api.store()
             when {
+                // 401 stays an auth failure → forced-logout path; never fall back to cache.
                 res.code() == HttpURLConnection.HTTP_UNAUTHORIZED -> Outcome.Err(ErrorKind.HTTP)
-                !res.isSuccessful -> Outcome.Err(ErrorKind.NETWORK)
+                !res.isSuccessful -> cachedOr(Outcome.Err(ErrorKind.NETWORK), vk)
                 else -> {
                     val body = res.body()!!
                     val manifest = body.ciphertext?.let { ct ->
                         val plain = crypto.openManifest(ct, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
                         json.decodeFromString<WorkspaceManifest>(plain)
                     } ?: WorkspaceManifest()
+                    if (offlineFlags.enabled()) {
+                        storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
+                    }
                     Outcome.Ok(Workspace(manifest, body.version))
                 }
             }
         } catch (e: Exception) {
-            Outcome.Err(ErrorKind.NETWORK, e)
+            cachedOr(Outcome.Err(ErrorKind.NETWORK, e), vk)
+        }
+    }
+
+    /**
+     * Network-first cache fallback: when a fetch fails with a non-auth error, try the
+     * on-disk sealed envelope and decrypt it in-memory with [vk]. Returns [err]
+     * unchanged if offline caching is off, no entry exists, or decryption fails.
+     */
+    private fun cachedOr(err: Outcome<Workspace>, vk: ByteArray): Outcome<Workspace> {
+        if (!offlineFlags.enabled()) return err
+        val env = storeCache.get(KEY) ?: return err
+        return try {
+            val manifest = env.ciphertext?.let { ct ->
+                val plain = crypto.openManifest(ct, vk) ?: return err
+                json.decodeFromString<WorkspaceManifest>(plain)
+            } ?: WorkspaceManifest()
+            Outcome.Ok(Workspace(manifest, env.version))
+        } catch (_: Exception) {
+            err
         }
     }
 
@@ -121,6 +157,9 @@ class WorkspaceRepository(
                     val newVersion = put.body()?.version ?: (version!! + 1)
                     val ws = Workspace(next, newVersion)
                     cache.set(ws)
+                    if (offlineFlags.enabled()) {
+                        storeCache.put(KEY, StoreEnvelope(ciphertext, newVersion))
+                    }
                     return Outcome.Ok(ws)
                 }
                 put.code() == 409 -> {

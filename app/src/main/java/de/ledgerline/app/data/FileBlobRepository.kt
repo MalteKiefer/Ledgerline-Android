@@ -4,6 +4,8 @@ import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
+import de.ledgerline.app.core.offline.BlobDiskCache
+import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
@@ -13,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MultipartBody
+import java.io.File
 import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,6 +36,8 @@ class FileBlobRepository(
     private val sessionHolder: SessionHolder,
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
+    private val blobCache: BlobDiskCache,
+    private val offlineFlags: OfflineFlags,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) : FileBlobs {
     /** Production constructor used by Hilt (Hilt can't inject the default lambda). */
@@ -40,10 +45,14 @@ class FileBlobRepository(
         sessionHolder: SessionHolder,
         vaultKeyHolder: VaultKeyHolder,
         crypto: Crypto,
+        blobCache: BlobDiskCache,
+        offlineFlags: OfflineFlags,
     ) : this(
         sessionHolder,
         vaultKeyHolder,
         crypto,
+        blobCache,
+        offlineFlags,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
@@ -102,13 +111,43 @@ class FileBlobRepository(
         val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
         return try {
             val res = apiProvider(session).rawFile(blob)
-            if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
+            // Non-2xx (except the 401 auth path) may fall back to the ciphertext cache.
+            if (!res.isSuccessful) {
+                return if (res.code() == java.net.HttpURLConnection.HTTP_UNAUTHORIZED) {
+                    Outcome.Err(ErrorKind.NETWORK)
+                } else {
+                    cachedOr(blob, encFileKey, vk, Outcome.Err(ErrorKind.NETWORK), consume)
+                }
+            }
             val bytes = res.body()!!.bytes()
+            if (offlineFlags.filesBlobs()) blobCache.put(blob, bytes)
             val plain = BlobDownloader.decrypt(bytes, encFileKey, vk, crypto)
             consume(plain)
             Outcome.Ok(Unit)
         } catch (e: Exception) {
-            Outcome.Err(ErrorKind.DECRYPT, e)
+            cachedOr(blob, encFileKey, vk, Outcome.Err(ErrorKind.DECRYPT, e), consume)
+        }
+    }
+
+    /**
+     * Network-first cache fallback for a blob: when the fetch fails, try the on-disk
+     * ciphertext cache (if file-contents caching is on), decrypt it in-memory, and
+     * feed it to [consume]. Returns [err] if disabled, absent, or decryption fails.
+     */
+    private fun cachedOr(
+        blob: String,
+        encFileKey: String,
+        vk: ByteArray,
+        err: Outcome<Unit>,
+        consume: (ByteArray) -> Unit,
+    ): Outcome<Unit> {
+        if (!offlineFlags.filesBlobs()) return err
+        val bytes = blobCache.get(blob) ?: return err
+        return try {
+            consume(BlobDownloader.decrypt(bytes, encFileKey, vk, crypto))
+            Outcome.Ok(Unit)
+        } catch (_: Exception) {
+            err
         }
     }
 
@@ -146,8 +185,17 @@ class FileBlobRepository(
             sessionHolder = SessionHolder().apply { set(Session(baseUrl, "tok", "", null)) },
             vaultKeyHolder = VaultKeyHolder().apply { set(ByteArray(32)) },
             crypto = UnusedCrypto,
+            blobCache = BlobDiskCache(File(System.getProperty("java.io.tmpdir"), "t-blob-" + System.nanoTime())),
+            offlineFlags = NoOfflineFlags,
             apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = null, allowCleartext = true) },
         )
+
+        /** Offline flags stub used where caching must stay inert (all toggles off). */
+        private val NoOfflineFlags = object : OfflineFlags {
+            override fun enabled() = false
+            override fun filesBlobs() = false
+            override fun photosBlobs() = false
+        }
 
         /** A [Crypto] that throws on every call; only used where crypto is never invoked. */
         private val UnusedCrypto = object : Crypto {
