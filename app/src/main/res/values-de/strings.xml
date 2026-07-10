@@ -26,4 +26,16 @@
     <string name="lock_title">Ledgerline entsperren</string>
     <string name="lock_subtitle">Zum Fortfahren authentifizieren</string>
     <string name="lock_locked">Gesperrt. Zum Fortfahren authentifizieren.</string>
+    <string name="tab_files">Dateien</string>
+    <string name="tab_notes">Notizen</string>
+    <string name="tab_bookmarks">Lesezeichen</string>
+    <string name="tab_todos">Todos</string>
+    <string name="ws_empty_files">Noch keine Dateien.</string>
+    <string name="ws_empty_notes">Noch keine Notizen.</string>
+    <string name="ws_empty_bookmarks">Noch keine Lesezeichen.</string>
+    <string name="ws_empty_todos">Noch keine Todos.</string>
+    <string name="ws_error">Workspace konnte nicht geladen werden.</string>
+    <string name="ws_retry">Erneut versuchen</string>
+    <string name="ws_reauth">Sitzung abgelaufen — Gerät neu koppeln.</string>
+    <string name="ws_file_phase3">Dateien öffnen kommt in einer späteren Version.</string>
 </resources>

@@ -26,4 +26,16 @@
     <string name="lock_title">Unlock Ledgerline</string>
     <string name="lock_subtitle">Authenticate to continue</string>
     <string name="lock_locked">Locked. Authenticate to continue.</string>
+    <string name="tab_files">Files</string>
+    <string name="tab_notes">Notes</string>
+    <string name="tab_bookmarks">Bookmarks</string>
+    <string name="tab_todos">Todos</string>
+    <string name="ws_empty_files">No files yet.</string>
+    <string name="ws_empty_notes">No notes yet.</string>
+    <string name="ws_empty_bookmarks">No bookmarks yet.</string>
+    <string name="ws_empty_todos">No todos yet.</string>
+    <string name="ws_error">Couldn\'t load your workspace.</string>
+    <string name="ws_retry">Retry</string>
+    <string name="ws_reauth">Session expired — re-pair this device.</string>
+    <string name="ws_file_phase3">Opening files arrives in a later version.</string>
 </resources>
