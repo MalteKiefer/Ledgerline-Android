@@ -103,6 +103,9 @@
     <string name="action_more">More</string>
 
     <!-- Gallery -->
+    <string name="gallery_add">Add photos</string>
+    <string name="gallery_uploading">Uploading %1$d/%2$d</string>
+    <string name="gallery_upload_failed">%1$d upload(s) failed</string>
     <string name="gallery_empty">No photos yet.</string>
     <string name="gallery_error">Couldn\'t load the gallery.</string>
     <string name="gallery_usage">%1$s used</string>

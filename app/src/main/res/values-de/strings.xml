@@ -103,6 +103,9 @@
     <string name="action_more">Mehr</string>
 
     <!-- Galerie -->
+    <string name="gallery_add">Fotos hinzufügen</string>
+    <string name="gallery_uploading">Lade hoch %1$d/%2$d</string>
+    <string name="gallery_upload_failed">%1$d Upload(s) fehlgeschlagen</string>
     <string name="gallery_empty">Noch keine Fotos.</string>
     <string name="gallery_error">Galerie konnte nicht geladen werden.</string>
     <string name="gallery_usage">%1$s belegt</string>
