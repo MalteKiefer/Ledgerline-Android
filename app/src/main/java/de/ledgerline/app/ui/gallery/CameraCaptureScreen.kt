@@ -1,7 +1,10 @@
 package de.ledgerline.app.ui.gallery
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -50,13 +53,17 @@ import de.ledgerline.app.ui.workspace.LocalFullscreen
  * [ImageCapture.OnImageCapturedCallback] returns an [ImageProxy] whose plane[0]
  * buffer holds the complete JPEG directly in RAM.
  *
+ * Device location is obtained via AOSP [LocationManager] (no Google Play Services)
+ * and passed to [onCaptured] as [lat]/[lng]. If the user denies location permission
+ * or no last-known fix is available, both values are null — the photo is still taken.
+ *
  * Callers must check/request CAMERA permission before showing this screen, or
  * rely on the built-in permission gate rendered here when permission is absent.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CameraCaptureScreen(
-    onCaptured: (ByteArray) -> Unit,
+    onCaptured: (bytes: ByteArray, lat: Double?, lng: Double?) -> Unit,
     onBack: () -> Unit,
 ) {
     // Hide scaffold chrome while this screen is visible.
@@ -64,14 +71,30 @@ fun CameraCaptureScreen(
     DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
 
     val context = LocalContext.current
+
+    // --- Camera permission ---
     var hasPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
         )
     }
+
+    // --- Location permission state (fine preferred, coarse acceptable) ---
+    var hasLocationPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    // Request both camera and location together in one system dialog.
     val permLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted -> hasPermission = granted }
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        hasPermission = grants[Manifest.permission.CAMERA] == true
+        hasLocationPermission = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true
+            || grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+    }
 
     // ImageCapture use-case — kept in remembered state so the shutter button
     // can reference the same instance bound to the camera lifecycle.
@@ -103,7 +126,13 @@ fun CameraCaptureScreen(
                 !hasPermission -> {
                     // Permission gate — request on first composition, show message if denied.
                     DisposableEffect(Unit) {
-                        permLauncher.launch(Manifest.permission.CAMERA)
+                        permLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.CAMERA,
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION,
+                            )
+                        )
                         onDispose { }
                     }
                     Text(
@@ -123,6 +152,18 @@ fun CameraCaptureScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
 
+                    // Location hint shown when location permission was granted.
+                    if (hasLocationPermission) {
+                        Text(
+                            text = stringResource(R.string.camera_location_hint),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 8.dp),
+                        )
+                    }
+
                     // Shutter FAB.
                     if (capturing) {
                         CircularProgressIndicator(
@@ -135,6 +176,14 @@ fun CameraCaptureScreen(
                         FloatingActionButton(
                             onClick = {
                                 capturing = true
+                                // Read the best last-known location from AOSP LocationManager
+                                // before invoking the shutter. Guard with a runtime permission
+                                // check immediately before the read (hasLocationPermission may
+                                // have changed since composition).
+                                val location: Location? = if (hasLocationPermission) {
+                                    readLastKnownLocation(context)
+                                } else null
+
                                 imageCapture.takePicture(
                                     ContextCompat.getMainExecutor(context),
                                     object : ImageCapture.OnImageCapturedCallback() {
@@ -146,7 +195,7 @@ fun CameraCaptureScreen(
                                             buf.get(bytes)
                                             image.close()
                                             capturing = false
-                                            onCaptured(bytes)
+                                            onCaptured(bytes, location?.latitude, location?.longitude)
                                         }
 
                                         override fun onError(exc: ImageCaptureException) {
@@ -170,6 +219,27 @@ fun CameraCaptureScreen(
             }
         }
     }
+}
+
+/**
+ * Reads the most recent last-known location from the AOSP [LocationManager] by
+ * querying GPS, Network, and the AOSP fused provider (constant `"fused"` — this is
+ * NOT Google Play Services' FusedLocationProviderClient). Returns the fix with the
+ * newest timestamp, or null when no fix is available or permission is absent.
+ *
+ * The [SuppressLint] is intentional: we check permission immediately before every
+ * call to this function, so the suppress is safe.
+ */
+@SuppressLint("MissingPermission")
+private fun readLastKnownLocation(context: android.content.Context): Location? {
+    val lm = context.getSystemService(LocationManager::class.java) ?: return null
+    return listOf(
+        LocationManager.GPS_PROVIDER,
+        LocationManager.NETWORK_PROVIDER,
+        LocationManager.FUSED_PROVIDER,
+    ).mapNotNull { provider ->
+        runCatching { lm.getLastKnownLocation(provider) }.getOrNull()
+    }.maxByOrNull { it.time }
 }
 
 /** Binds a CameraX [Preview] + [ImageCapture] to the current lifecycle owner. */

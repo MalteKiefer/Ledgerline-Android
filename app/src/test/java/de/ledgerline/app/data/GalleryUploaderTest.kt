@@ -65,4 +65,32 @@ class GalleryUploaderTest {
         assertEquals("sig1", photo.sig)
         assertEquals("image", photo.media_type)
     }
+
+    /**
+     * When the server's process response contains no EXIF GPS (camera capture path),
+     * the device-supplied [lat]/[lng] must be used as the fallback coordinates.
+     */
+    @Test
+    fun device_location_used_when_exif_has_no_gps() = runBlocking {
+        // ProcessResponse with EXIF that has NO lat/lon fields.
+        val process = ProcessResponse(
+            exif = Json.parseToJsonElement("""{"camera":"Pixel","taken_at":"2026-06-01"}"""),
+            faces = emptyList(),
+        )
+        val api = FakeApi(process)
+
+        val out = uploader(api).upload(
+            name = "IMG_1.jpg",
+            mime = "image/jpeg",
+            sig = "sig2",
+            bytes = byteArrayOf(7, 8, 9),
+            createdIso = "2026-06-01T12:00:00Z",
+            lat = 48.1,
+            lng = 11.6,
+        )
+        val photo = (out as Outcome.Ok).value
+
+        assertEquals(48.1, photo.lat!!, 1e-9)
+        assertEquals(11.6, photo.lng!!, 1e-9)
+    }
 }

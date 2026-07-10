@@ -107,10 +107,20 @@ fun GalleryScreen(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltView
     // Camera capture screen — full-screen, like the photo viewer.
     if (showCamera) {
         CameraCaptureScreen(
-            onCaptured = { bytes ->
+            onCaptured = { bytes, lat, lng ->
                 showCamera = false
                 val ts = System.currentTimeMillis()
-                vm.uploadAll(listOf(PhotoSource("IMG_$ts.jpg", "image/jpeg") { bytes }))
+                vm.uploadAll(
+                    listOf(
+                        PhotoSource(
+                            name = "IMG_$ts.jpg",
+                            mime = "image/jpeg",
+                            read = { bytes },
+                            lat = lat,
+                            lng = lng,
+                        )
+                    )
+                )
             },
             onBack = { showCamera = false },
         )

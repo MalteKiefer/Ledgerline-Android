@@ -24,8 +24,18 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
-/** A content source for [GalleryViewModel.uploadAll]: name + mime + lazy byte reader. */
-data class PhotoSource(val name: String, val mime: String, val read: () -> ByteArray)
+/**
+ * A content source for [GalleryViewModel.uploadAll]: name + mime + lazy byte reader.
+ * [lat]/[lng] are optional device coordinates for camera-captured photos (where the
+ * EXIF strip has no GPS). Picker photos leave them null — the server reads their EXIF.
+ */
+data class PhotoSource(
+    val name: String,
+    val mime: String,
+    val read: () -> ByteArray,
+    val lat: Double? = null,
+    val lng: Double? = null,
+)
 
 data class GalleryUi(
     val loading: Boolean = false,
@@ -117,7 +127,7 @@ class GalleryViewModel @Inject constructor(
                 continue
             }
 
-            when (val up = uploader.upload(src.name, src.mime, sig, bytes, nowIso())) {
+            when (val up = uploader.upload(src.name, src.mime, sig, bytes, nowIso(), src.lat, src.lng)) {
                 is Outcome.Ok -> {
                     mutate.invoke { it.copy(photos = it.photos + up.value) }
                     existing += sig

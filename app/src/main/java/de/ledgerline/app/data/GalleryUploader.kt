@@ -39,6 +39,8 @@ open class GalleryUploader @Inject constructor(private val blobs: GalleryUploadA
         sig: String,
         bytes: ByteArray,
         createdIso: String,
+        lat: Double? = null,
+        lng: Double? = null,
     ): Outcome<GalleryPhoto> {
         val original = blobs.uploadBytes(bytes, name).okOr { return it }
         val d = blobs.process(bytes, name, mime).okOr { return it }
@@ -97,7 +99,7 @@ open class GalleryUploader @Inject constructor(private val blobs: GalleryUploadA
             metaRef = meta.id, metaKey = meta.encFileKey,
             faceCropRefs = faceRefs,
             sig = sig,
-            lat = exifDbl("lat"), lng = exifDbl("lon"),
+            lat = exifDbl("lat") ?: lat, lng = exifDbl("lon") ?: lng,
             width = d.width, height = d.height, duration = d.duration,
             taken_at = exifStr("taken_at") ?: createdIso,
             camera = exifStr("camera"),

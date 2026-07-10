@@ -144,7 +144,7 @@ class GalleryViewModelTest {
         val vm = makeVm(cache, uploader = uploader, mutate = FakeMutateGallery(cache))
 
         val bytes = byteArrayOf(1, 2, 3)
-        val source = PhotoSource("a.jpg", "image/jpeg") { bytes }
+        val source = PhotoSource("a.jpg", "image/jpeg", read = { bytes })
 
         // First upload — should go through.
         vm.uploadAll(listOf(source))
