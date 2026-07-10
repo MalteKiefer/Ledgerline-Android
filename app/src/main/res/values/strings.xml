@@ -90,6 +90,15 @@
     <string name="settings_background_ops_title">Background processing</string>
     <string name="settings_background_ops_subtitle">Operations (scans, uploads) keep running when you leave the app; a notification shows while they run. Turn off to lock immediately on background.</string>
     <string name="settings_account">Account</string>
+    <!-- Offline cache -->
+    <string name="settings_offline_section">Offline</string>
+    <string name="settings_offline_title">Offline cache</string>
+    <string name="settings_offline_subtitle">Keeps viewed data available without a connection — stored encrypted.</string>
+    <string name="settings_offline_files">File contents offline</string>
+    <string name="settings_offline_photos">Photos offline</string>
+    <string name="settings_offline_size">Cache size: %1$s</string>
+    <string name="settings_offline_clear">Clear cache</string>
+    <string name="settings_offline_clear_confirm">Clear the offline cache? Viewed data will need to be loaded again.</string>
     <!-- Background operation foreground-service notification (counts only, never names/paths). -->
     <string name="ops_channel_name">Background operations</string>
     <string name="ops_channel_desc">Shown while scans or uploads run in the background.</string>

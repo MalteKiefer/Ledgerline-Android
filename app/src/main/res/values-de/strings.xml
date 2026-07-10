@@ -90,6 +90,14 @@
     <string name="settings_background_ops_title">Hintergrund-Verarbeitung</string>
     <string name="settings_background_ops_subtitle">Vorgänge (Scans, Uploads) laufen weiter, wenn du die App verlässt; währenddessen wird eine Benachrichtigung angezeigt. Ausschalten, um beim Wechsel in den Hintergrund sofort zu sperren.</string>
     <string name="settings_account">Konto</string>
+    <string name="settings_offline_section">Offline</string>
+    <string name="settings_offline_title">Offline-Cache</string>
+    <string name="settings_offline_subtitle">Hält angesehene Daten ohne Verbindung verfügbar — verschlüsselt gespeichert.</string>
+    <string name="settings_offline_files">Datei-Inhalte offline</string>
+    <string name="settings_offline_photos">Fotos offline</string>
+    <string name="settings_offline_size">Cache-Größe: %1$s</string>
+    <string name="settings_offline_clear">Cache leeren</string>
+    <string name="settings_offline_clear_confirm">Offline-Cache leeren? Angesehene Daten müssen erneut geladen werden.</string>
     <string name="ops_channel_name">Hintergrundvorgänge</string>
     <string name="ops_channel_desc">Wird angezeigt, während Scans oder Uploads im Hintergrund laufen.</string>
     <string name="ops_notification_idle">Verarbeitung läuft…</string>
