@@ -9,6 +9,8 @@ import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.domain.model.GalleryPhoto
+import de.ledgerline.app.domain.model.PhotoMetaBlob
+import de.ledgerline.app.domain.model.PhotoPlace
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUsage
 import de.ledgerline.app.domain.usecase.LoadGallery
@@ -16,6 +18,7 @@ import de.ledgerline.app.ui.workspace.files.UsageInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
 data class GalleryUi(
@@ -32,6 +35,7 @@ class GalleryViewModel @Inject constructor(
     private val thumbs: ThumbCache,
     private val galleryUsage: GalleryUsage,
 ) : ViewModel() {
+    private val placeCache = mutableMapOf<String, PhotoPlace?>()
     private val _state = MutableStateFlow(GalleryUi(loading = true))
     val state: StateFlow<GalleryUi> = _state
 
@@ -69,6 +73,26 @@ class GalleryViewModel @Inject constructor(
     }
 
     suspend fun downloadBytes(ref: String, key: String): Outcome<ByteArray> = blobs.download(ref, key)
+
+    /** Lazily loads and decodes the encrypted meta blob's place. Cached per photo id. Returns null on any failure. */
+    suspend fun loadPlace(photo: GalleryPhoto): PhotoPlace? {
+        if (placeCache.containsKey(photo.id)) return placeCache[photo.id]
+        val ref = photo.metaRef ?: return null
+        val key = photo.metaKey ?: return null
+        val place = try {
+            when (val r = blobs.download(ref, key)) {
+                is Outcome.Ok -> {
+                    val metaJson = Json { ignoreUnknownKeys = true }
+                    metaJson.decodeFromString<PhotoMetaBlob>(String(r.value)).place
+                }
+                is Outcome.Err -> null
+            }
+        } catch (_: Exception) {
+            null
+        }
+        placeCache[photo.id] = place
+        return place
+    }
 
     fun photoById(id: String) = cache.value.value?.manifest?.photos?.firstOrNull { it.id == id }
 

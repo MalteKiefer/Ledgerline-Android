@@ -109,6 +109,13 @@
     <string name="gallery_usage_full">%1$s von %2$s belegt</string>
     <string name="photo_original">Original anzeigen</string>
     <string name="photo_video_soon">Videowiedergabe kommt später.</string>
+    <string name="info_title">Foto-Info</string>
+    <string name="info_file">Datei</string>
+    <string name="info_taken">Aufgenommen</string>
+    <string name="info_camera">Kamera</string>
+    <string name="info_resolution">Auflösung</string>
+    <string name="info_location">Ort</string>
+    <string name="info_unknown">—</string>
     <string name="menu_bookmarks">Lesezeichen</string>
     <string name="menu_more">Mehr</string>
 </resources>
