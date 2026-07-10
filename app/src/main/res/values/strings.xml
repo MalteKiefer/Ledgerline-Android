@@ -87,7 +87,17 @@
     <string name="settings_security">Security</string>
     <string name="settings_idle_timeout">Auto-lock after</string>
     <string name="settings_lock_now">Lock now</string>
+    <string name="settings_background_ops_title">Background processing</string>
+    <string name="settings_background_ops_subtitle">Operations (scans, uploads) keep running when you leave the app; a notification shows while they run. Turn off to lock immediately on background.</string>
     <string name="settings_account">Account</string>
+    <!-- Background operation foreground-service notification (counts only, never names/paths). -->
+    <string name="ops_channel_name">Background operations</string>
+    <string name="ops_channel_desc">Shown while scans or uploads run in the background.</string>
+    <string name="ops_notification_idle">Working…</string>
+    <string name="ops_kind_face_scan">Face scan</string>
+    <string name="ops_kind_duplicate_scan">Duplicate scan</string>
+    <string name="ops_kind_upload">Upload</string>
+    <string name="ops_kind_blob_cleanup">Cleanup</string>
     <string name="settings_disconnect">Disconnect this device</string>
     <string name="settings_disconnect_confirm">Disconnect this device? You will need to pair again by scanning a new QR code.</string>
     <string name="settings_about">About</string>

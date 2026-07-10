@@ -16,6 +16,7 @@ import androidx.biometric.BiometricPrompt
 import de.ledgerline.app.core.security.AppLock
 import de.ledgerline.app.core.security.CryptoAuth
 import de.ledgerline.app.core.security.IdleLocker
+import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.core.security.VaultLocker
 import de.ledgerline.app.data.SettingsStore
@@ -38,6 +39,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var locker: VaultLocker
     @Inject lateinit var settingsStore: SettingsStore
     @Inject lateinit var lockGuard: LockGuard
+    @Inject lateinit var operationManager: OperationManager
     private val appLock = AppLock()
 
     // Emits the latest validated pairing deep link. singleTask means a link
@@ -65,14 +67,23 @@ class MainActivity : FragmentActivity() {
             override fun onStop(owner: LifecycleOwner) {
                 // Skip exactly one auto-lock when WE launched a system picker (SAF)
                 // or credential prompt, which briefly backgrounds us. A real
-                // background (home button) has no armed skip → wipe normally.
-                if (!lockGuard.consumeSkip()) {
+                // background (home button) has no armed skip.
+                if (lockGuard.consumeSkip()) return
+
+                // Defer the wipe while a background-enabled op is running: the op keeps
+                // the VK alive (behind the foreground-service notification) and the
+                // OperationManager wipes via VaultLocker when the last op drains.
+                if (operationManager.isBackgroundEnabled() && operationManager.hasActive()) {
+                    operationManager.onAppBackground()
+                } else {
                     locker.lock()
                 }
             }
 
             override fun onResume(owner: LifecycleOwner) {
-                if (idleLocker.isExpired()) {
+                operationManager.onAppForeground()
+                // Idle wipe is deferred while an op runs — idle does not abort it.
+                if (idleLocker.isExpired() && !operationManager.hasActive()) {
                     locker.lock()
                 } else idleLocker.touch()
                 // Defensive: if a picker returned via a dialog path without onStop,

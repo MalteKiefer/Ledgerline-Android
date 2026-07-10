@@ -8,6 +8,11 @@
          exclusively to geotag the shot. Never used for background tracking. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Foreground service keeps long ops (scans/uploads) alive when backgrounded,
+         behind a visible notification. Data-sync type; AOSP only, no Google. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
@@ -37,5 +42,10 @@
                 <data android:scheme="ledgerline" android:host="pair" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".core.ops.BackgroundOpService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
     </application>
 </manifest>
