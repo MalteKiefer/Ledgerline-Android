@@ -265,7 +265,7 @@ private fun queryPhotoName(context: Context, uri: Uri): String {
 }
 
 @Composable
-private fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onClick: () -> Unit) {
+internal fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onClick: () -> Unit) {
     val bmp by produceState<android.graphics.Bitmap?>(initialValue = null, photo.id) {
         value = vm.thumb(photo)
     }
