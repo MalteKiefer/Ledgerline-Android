@@ -18,6 +18,7 @@ import de.ledgerline.app.domain.usecase.DownloadFile
 import de.ledgerline.app.domain.usecase.FileBlobs
 import de.ledgerline.app.domain.usecase.FilesUsage
 import de.ledgerline.app.domain.usecase.GalleryBlobs
+import de.ledgerline.app.domain.usecase.GalleryUploadApi
 import de.ledgerline.app.domain.usecase.GalleryUsage
 import de.ledgerline.app.domain.usecase.LoadGallery
 import de.ledgerline.app.domain.usecase.LoadWorkspace
@@ -37,5 +38,6 @@ abstract class WorkspaceModule {
     @Binds abstract fun bindFilesUsage(impl: FilesUsageImpl): FilesUsage
     @Binds abstract fun bindLoadGallery(impl: LoadGalleryImpl): LoadGallery
     @Binds abstract fun bindGalleryBlobs(impl: GalleryBlobRepository): GalleryBlobs
+    @Binds abstract fun bindGalleryUploadApi(impl: GalleryBlobRepository): GalleryUploadApi
     @Binds abstract fun bindGalleryUsage(impl: GalleryUsageImpl): GalleryUsage
 }

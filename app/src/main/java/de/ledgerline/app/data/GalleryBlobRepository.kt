@@ -10,6 +10,7 @@ import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.usecase.GalleryBlobs
+import de.ledgerline.app.domain.usecase.GalleryUploadApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -24,7 +25,7 @@ class GalleryBlobRepository private constructor(
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
     private val apiProvider: (Session) -> LedgerlineApi,
-) : GalleryBlobs {
+) : GalleryBlobs, GalleryUploadApi {
     @Inject constructor(sessionHolder: SessionHolder, vaultKeyHolder: VaultKeyHolder, crypto: Crypto) :
         this(sessionHolder, vaultKeyHolder, crypto, { s -> NetworkFactory.create(s.baseUrl, { s.token }, s.spkiPin) })
 
@@ -39,7 +40,7 @@ class GalleryBlobRepository private constructor(
         } catch (e: Exception) { Outcome.Err(ErrorKind.DECRYPT, e) }
     }
 
-    suspend fun uploadBytes(bytes: ByteArray, name: String): Outcome<UploadedBlob> = withContext(Dispatchers.IO) {
+    override suspend fun uploadBytes(bytes: ByteArray, name: String): Outcome<UploadedBlob> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val enc = crypto.newContentEncryptor(vk)
@@ -52,7 +53,7 @@ class GalleryBlobRepository private constructor(
         } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
     }
 
-    suspend fun process(bytes: ByteArray, name: String, mime: String): Outcome<ProcessResponse> = withContext(Dispatchers.IO) {
+    override suspend fun process(bytes: ByteArray, name: String, mime: String): Outcome<ProcessResponse> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         try {
             val requestBody = bytes.toRequestBody(mime.toMediaTypeOrNull())
