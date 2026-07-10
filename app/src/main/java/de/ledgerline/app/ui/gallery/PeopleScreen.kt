@@ -3,7 +3,6 @@ package de.ledgerline.app.ui.gallery
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -20,7 +19,6 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -52,7 +49,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
+import de.ledgerline.app.core.ops.OpKind
 import de.ledgerline.app.domain.model.GalleryPerson
+import de.ledgerline.app.ui.ops.OpProgressOverlay
+import de.ledgerline.app.ui.ops.OpsViewModel
 import de.ledgerline.app.ui.workspace.common.CenteredMessage
 
 @Composable
@@ -63,8 +63,9 @@ fun PeopleScreen(
     onOpenPerson: (String) -> Unit,
 ) {
     val people by peopleVm.people.collectAsStateWithLifecycle()
-    val scanning by peopleVm.scanning.collectAsStateWithLifecycle()
-    val progress by peopleVm.progress.collectAsStateWithLifecycle()
+    val opsVm: OpsViewModel = hiltViewModel()
+    val ops by opsVm.active.collectAsStateWithLifecycle()
+    val scanning = ops.any { it.kind == OpKind.FACE_SCAN }
     var scanMenu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<GalleryPerson?>(null) }
 
@@ -136,28 +137,8 @@ fun PeopleScreen(
             )
         }
 
-        // Scan progress overlay.
-        if (scanning) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator(color = Color.White)
-                    val p = progress
-                    Text(
-                        text = stringResource(R.string.people_scanning, p?.first ?: 0, p?.second ?: 0),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-        }
+        // Shared progress overlay (face scan / uploads / duplicate scan).
+        OpProgressOverlay()
     }
 }
 

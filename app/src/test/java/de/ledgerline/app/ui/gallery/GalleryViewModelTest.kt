@@ -4,6 +4,9 @@ import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
+import de.ledgerline.app.core.ops.BackgroundOpsSetting
+import de.ledgerline.app.core.ops.OperationManager
+import de.ledgerline.app.core.ops.ServiceController
 import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.data.GalleryUploader
 import de.ledgerline.app.data.UploadedBlob
@@ -16,8 +19,10 @@ import de.ledgerline.app.domain.usecase.GalleryUploadApi
 import de.ledgerline.app.domain.usecase.GalleryUsage
 import de.ledgerline.app.domain.usecase.LoadGallery
 import de.ledgerline.app.domain.usecase.MutateGallery
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -81,6 +86,18 @@ private class FakeMutateGallery(private val cache: GalleryCache) : MutateGallery
     }
 }
 
+/** A real [OperationManager] that runs the op block inline (setting on, no service). */
+private fun testOperationManager(): OperationManager {
+    val setting = object : BackgroundOpsSetting {
+        override val enabledFlow = MutableStateFlow(true)
+    }
+    val service = object : ServiceController {
+        override fun start() {}
+        override fun stop() {}
+    }
+    return OperationManager(setting, mockk(relaxed = true), service)
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class GalleryViewModelTest {
     @Before fun setUp() { Dispatchers.setMain(UnconfinedTestDispatcher()) }
@@ -99,6 +116,7 @@ class GalleryViewModelTest {
         },
         uploader: GalleryUploader = fakeUploader(FakeGalleryUploadApi(ProcessResponse())),
         mutate: MutateGallery = FakeMutateGallery(cache),
+        operationManager: OperationManager = testOperationManager(),
     ) = GalleryViewModel(
         load = load,
         cache = cache,
@@ -109,7 +127,18 @@ class GalleryViewModelTest {
         mutate = mutate,
         lockGuard = LockGuard(),
         vaultKeyHolder = de.ledgerline.app.core.security.VaultKeyHolder(),
+        operationManager = operationManager,
     )
+
+    /**
+     * Blocks (real time) until no operation is active. The op runs on the manager's own
+     * app scope (real [Dispatchers.Default]), not the virtual-time test scheduler, so we
+     * poll on wall-clock time rather than the test dispatcher.
+     */
+    private fun awaitIdle(om: OperationManager) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (om.hasActive() && System.currentTimeMillis() < deadline) Thread.sleep(5)
+    }
 
     @Test fun newest_first_trashed_hidden() = runTest {
         val cache = GalleryCache()
@@ -142,13 +171,16 @@ class GalleryViewModelTest {
         )
         val fakeApi = FakeGalleryUploadApi(processResponse)
         val uploader = fakeUploader(fakeApi)
-        val vm = makeVm(cache, uploader = uploader, mutate = FakeMutateGallery(cache))
+        val om = testOperationManager()
+        val vm = makeVm(cache, uploader = uploader, mutate = FakeMutateGallery(cache), operationManager = om)
 
         val bytes = byteArrayOf(1, 2, 3)
         val source = PhotoSource("a.jpg", "image/jpeg", read = { bytes })
 
-        // First upload — should go through.
+        // First upload — should go through. The op runs on the manager's app scope, so
+        // wait for it to drain before asserting.
         vm.uploadAll(listOf(source))
+        awaitIdle(om)
 
         val photosAfterFirst = cache.value.value?.manifest?.photos.orEmpty()
         assertEquals("Expected exactly one photo after first upload", 1, photosAfterFirst.size)
@@ -164,6 +196,7 @@ class GalleryViewModelTest {
 
         // Second upload with the same bytes — must be deduped (sigs match).
         vm.uploadAll(listOf(source))
+        awaitIdle(om)
 
         assertEquals(
             "Upload count must not grow after dedup",

@@ -68,6 +68,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.GalleryPhoto
+import de.ledgerline.app.ui.ops.OpProgressOverlay
 import de.ledgerline.app.ui.workspace.common.CenteredMessage
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
@@ -164,7 +165,6 @@ private fun PhotosTab(
 ) {
     val ui by vm.state.collectAsStateWithLifecycle()
     val usage by vm.usage.collectAsStateWithLifecycle()
-    val uploadProgress by vm.uploadProgress.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     var openId by remember { mutableStateOf<String?>(null) }
     var showCamera by remember { mutableStateOf(false) }
@@ -367,28 +367,8 @@ private fun PhotosTab(
             )
         }
 
-        // Upload progress overlay.
-        val p = uploadProgress
-        if (p != null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.5f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp),
-                ) {
-                    CircularProgressIndicator(color = Color.White)
-                    Text(
-                        text = stringResource(R.string.gallery_uploading, p.current, p.total),
-                        color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            }
-        }
+        // Shared progress overlay (uploads / scans).
+        OpProgressOverlay()
 
         // Snackbar host at bottom.
         SnackbarHost(

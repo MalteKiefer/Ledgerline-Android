@@ -8,6 +8,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
+import de.ledgerline.app.core.ops.OpKind
+import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.data.GalleryUploader
 import de.ledgerline.app.domain.model.GalleryPhoto
@@ -54,8 +56,8 @@ class GalleryViewModel @Inject constructor(
     private val mutate: MutateGallery,
     private val lockGuard: LockGuard,
     private val vaultKeyHolder: de.ledgerline.app.core.security.VaultKeyHolder,
+    private val operationManager: OperationManager,
 ) : ViewModel() {
-    data class Progress(val current: Int, val total: Int)
 
     private val placeCache = mutableMapOf<String, PhotoPlace?>()
     private val _state = MutableStateFlow(GalleryUi(loading = true))
@@ -63,9 +65,6 @@ class GalleryViewModel @Inject constructor(
 
     private val _usage = MutableStateFlow<UsageInfo?>(null)
     val usage: StateFlow<UsageInfo?> = _usage
-
-    private val _uploadProgress = MutableStateFlow<Progress?>(null)
-    val uploadProgress: StateFlow<Progress?> = _uploadProgress
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
@@ -105,51 +104,54 @@ class GalleryViewModel @Inject constructor(
     /**
      * Upload each source serially: read bytes, compute sha-256 sig, dedup against
      * already-known sigs, upload, and append the new entry to the gallery index.
-     * Progress is published via [uploadProgress]; failures are counted and surfaced
-     * as `"upload_failed:N"` in [message]. [loadUsage] is called when the queue drains.
+     * The work runs through [OperationManager] so it survives backgrounding and its
+     * progress feeds the shared overlay + service notification; failures are counted
+     * and surfaced as `"upload_failed:N"` in [message]. [loadUsage] is called when the
+     * queue drains.
      */
-    fun uploadAll(sources: List<PhotoSource>) = viewModelScope.launch {
-        val existing = cache.value.value?.manifest?.photos
-            ?.mapNotNull { it.sig }
-            ?.toMutableSet()
-            ?: mutableSetOf()
+    fun uploadAll(sources: List<PhotoSource>) {
+        operationManager.run(OpKind.UPLOAD, total = sources.size) { report ->
+            val existing = cache.value.value?.manifest?.photos
+                ?.mapNotNull { it.sig }
+                ?.toMutableSet()
+                ?: mutableSetOf()
 
-        _uploadProgress.value = Progress(0, sources.size)
-        var done = 0
-        var failed = 0
+            report(0, sources.size)
+            var done = 0
+            var failed = 0
 
-        for (src in sources) {
-            val bytes = try {
-                src.read()
-            } catch (_: Exception) {
-                failed++
-                done++
-                _uploadProgress.value = Progress(done, sources.size)
-                continue
-            }
-
-            val sig = fileSig(bytes)
-            if (sig in existing) {
-                // Dedup: already present in the gallery index.
-                done++
-                _uploadProgress.value = Progress(done, sources.size)
-                continue
-            }
-
-            when (val up = uploader.upload(src.name, src.mime, sig, bytes, nowIso(), src.lat, src.lng)) {
-                is Outcome.Ok -> {
-                    mutate.invoke { it.copy(photos = it.photos + up.value) }
-                    existing += sig
+            for (src in sources) {
+                val bytes = try {
+                    src.read()
+                } catch (_: Exception) {
+                    failed++
+                    done++
+                    report(done, sources.size)
+                    continue
                 }
-                is Outcome.Err -> failed++
-            }
-            done++
-            _uploadProgress.value = Progress(done, sources.size)
-        }
 
-        _uploadProgress.value = null
-        loadUsage()
-        if (failed > 0) _message.value = "upload_failed:$failed"
+                val sig = fileSig(bytes)
+                if (sig in existing) {
+                    // Dedup: already present in the gallery index.
+                    done++
+                    report(done, sources.size)
+                    continue
+                }
+
+                when (val up = uploader.upload(src.name, src.mime, sig, bytes, nowIso(), src.lat, src.lng)) {
+                    is Outcome.Ok -> {
+                        mutate.invoke { it.copy(photos = it.photos + up.value) }
+                        existing += sig
+                    }
+                    is Outcome.Err -> failed++
+                }
+                done++
+                report(done, sources.size)
+            }
+
+            loadUsage()
+            if (failed > 0) _message.value = "upload_failed:$failed"
+        }
     }
 
     /** Returns a cached thumbnail bitmap or downloads+decodes it (cached). Null on failure. */
