@@ -6,10 +6,13 @@ import de.ledgerline.app.ui.common.ConfirmDialog
 import de.ledgerline.app.ui.common.TextInputDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -18,9 +21,11 @@ import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -36,6 +41,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +62,7 @@ import de.ledgerline.app.domain.model.FileEntry
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
+import de.ledgerline.app.ui.workspace.common.TrashBar
 import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
@@ -67,6 +74,8 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     val viewer by vm.viewer.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val usage by vm.usage.collectAsStateWithLifecycle()
+    val showTrash by vm.showTrash.collectAsStateWithLifecycle()
+    val trashCount by vm.trashCount.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -134,6 +143,8 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     var renameFile by remember { mutableStateOf<Pair<String, String>?>(null) }
     var deleteFolderId by remember { mutableStateOf<String?>(null) }
     var deleteFileEntry by remember { mutableStateOf<FileEntry?>(null) }
+    var deleteForeverEntry by remember { mutableStateOf<FileEntry?>(null) }
+    var confirmEmptyTrash by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -144,7 +155,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
         contentWindowInsets = WindowInsets(0),
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            if (!ui.loading && !ui.error) {
+            if (!ui.loading && !ui.error && !showTrash) {
                 FilesFab(
                     onUpload = { vm.armLockSuppression(); uploadLauncher.launch(arrayOf("*/*")) },
                     onNewFolder = { showNewFolder = true },

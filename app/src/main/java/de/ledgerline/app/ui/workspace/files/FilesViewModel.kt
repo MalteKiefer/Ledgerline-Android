@@ -14,6 +14,7 @@ import de.ledgerline.app.domain.usecase.FilesUsage
 import de.ledgerline.app.domain.usecase.ImportFile
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
+import de.ledgerline.app.domain.workspace.FileOps
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -65,6 +66,14 @@ class FilesViewModel @Inject constructor(
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy
+
+    /** When true, the list shows only trashed files (the trash view). */
+    private val _showTrash = MutableStateFlow(false)
+    val showTrash: StateFlow<Boolean> = _showTrash
+
+    /** Number of trashed files across all folders (drives the "Trash (N)" affordance). */
+    private val _trashCount = MutableStateFlow(0)
+    val trashCount: StateFlow<Int> = _trashCount
 
     private val _usage = MutableStateFlow<UsageInfo?>(null)
     val usage: StateFlow<UsageInfo?> = _usage
@@ -128,10 +137,43 @@ class FilesViewModel @Inject constructor(
         }
     }
 
+    /** Soft-delete: move the file to the trash. No blobs are freed here — that only
+     * happens on permanent delete (see [deleteForever] / [emptyTrash]). */
     fun deleteFile(file: FileEntry) = viewModelScope.launch {
-        val res = mutate.invoke { m -> m.copy(files = m.files.filterNot { it.id == file.id }) }
+        mutate.invoke { FileOps.trashFile(it, file.id) }
+    }
+
+    // ---- Trash view ----
+
+    fun setTrash(show: Boolean) {
+        _showTrash.value = show
+        recompute()
+    }
+
+    fun toggleTrash() = setTrash(!_showTrash.value)
+
+    /** Move a trashed file back to the active list. */
+    fun restore(id: String) = viewModelScope.launch {
+        mutate.invoke { FileOps.restoreFile(it, id) }
+    }
+
+    /** Permanently delete a trashed file: drop the manifest entry, then free its content
+     * blob and every version blob to reclaim quota. */
+    fun deleteForever(file: FileEntry) = viewModelScope.launch {
+        val res = mutate.invoke { FileOps.removeFile(it, file.id) }
         if (res is Outcome.Ok) {
-            blobRepo.deleteBlobs(listOf(file.blob))
+            blobRepo.deleteBlobs(listOf(file.blob) + file.versions.map { it.blob })
+            loadUsage()
+        }
+    }
+
+    /** Empty the trash: drop every trashed file and free all their blobs (incl. versions). */
+    fun emptyTrash() = viewModelScope.launch {
+        val trashed = cache.value.value?.manifest?.files?.filter { it.trashed }.orEmpty()
+        val freedBlobs = trashed.flatMap { listOf(it.blob) + it.versions.map { v -> v.blob } }
+        val res = mutate.invoke { FileOps.emptyTrashFiles(it) }
+        if (res is Outcome.Ok) {
+            blobRepo.deleteBlobs(freedBlobs)
             loadUsage()
         }
     }
@@ -229,9 +271,17 @@ class FilesViewModel @Inject constructor(
 
     private fun recompute() {
         val m = cache.value.value?.manifest
+        val allFiles = m?.files.orEmpty()
+        _trashCount.value = allFiles.count { it.trashed }
+        if (_showTrash.value) {
+            // Trash view: ALL trashed files across every folder, by name. No folders / no "..".
+            val files = allFiles.filter { it.trashed }.sortedBy { it.name.lowercase() }
+            _state.value = FilesUi(false, false, emptyList(), files, canGoBack = false)
+            return
+        }
         val cwd = stack.last()
         val folders = m?.fileFolders?.filter { it.parent == cwd }?.sortedBy { it.name.lowercase() } ?: emptyList()
-        val files = m?.files?.filter { !it.trashed && it.folder == cwd }?.sortedBy { it.name.lowercase() } ?: emptyList()
+        val files = allFiles.filter { !it.trashed && it.folder == cwd }.sortedBy { it.name.lowercase() }
         _state.value = FilesUi(false, false, folders, files, canGoBack = stack.size > 1)
     }
 }
