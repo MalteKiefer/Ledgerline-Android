@@ -13,8 +13,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
@@ -29,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -155,20 +160,31 @@ fun FileViewerScreen(
         ) {
             when {
                 editable -> {
-                    BasicTextField(
-                        value = edited,
-                        onValueChange = { edited = it },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(12.dp)
-                            .verticalScroll(rememberScrollState()),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        ),
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        visualTransformation = transformation,
-                    )
+                    androidx.compose.foundation.layout.Column(
+                        Modifier.fillMaxSize().imePadding(),
+                    ) {
+                        BasicTextField(
+                            value = edited,
+                            onValueChange = { edited = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                                .verticalScroll(rememberScrollState()),
+                            textStyle = MaterialTheme.typography.bodySmall.copy(
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            ),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            visualTransformation = transformation,
+                        )
+                        CodeKeyBar(
+                            onInsert = { edited = insertAtCursor(edited, it) },
+                            onIndent = { edited = insertAtCursor(edited, "    ") },
+                            onMoveLeft = { edited = moveCursor(edited, -1) },
+                            onMoveRight = { edited = moveCursor(edited, 1) },
+                        )
+                    }
                 }
 
                 file.mime == "application/pdf" || file.name.endsWith(".pdf", ignoreCase = true) -> {
@@ -312,5 +328,75 @@ private fun UnsupportedPreview(onSave: () -> Unit) {
         )
         Spacer(Modifier.height(16.dp))
         Button(onClick = onSave) { Text(stringResource(R.string.file_save)) }
+    }
+}
+
+/** Insert [s] at the cursor (replacing any selection); places the cursor after it. */
+private fun insertAtCursor(v: TextFieldValue, s: String): TextFieldValue {
+    val sel = v.selection
+    val text = v.text.replaceRange(sel.min, sel.max, s)
+    return v.copy(text = text, selection = androidx.compose.ui.text.TextRange(sel.min + s.length))
+}
+
+/** Move the (collapsed) cursor by [delta] characters, clamped to the text bounds. */
+private fun moveCursor(v: TextFieldValue, delta: Int): TextFieldValue {
+    val pos = (v.selection.max + delta).coerceIn(0, v.text.length)
+    return v.copy(selection = androidx.compose.ui.text.TextRange(pos))
+}
+
+/** Coding symbols the soft keyboard hides behind extra taps. */
+private val CODE_KEYS = listOf(
+    "{", "}", "(", ")", "[", "]", "<", ">", "/", "\\", "|", "&", ";", ":",
+    "=", "+", "-", "_", "*", ".", ",", "\"", "'", "`", "~", "#", "@", "$",
+    "!", "?", "%", "^",
+)
+
+/** A terminal-style accessory key row above the keyboard: Tab, cursor moves, and the
+ *  coding symbols. Rides above the IME via the parent's [imePadding]. */
+@Composable
+private fun CodeKeyBar(
+    onInsert: (String) -> Unit,
+    onIndent: () -> Unit,
+    onMoveLeft: () -> Unit,
+    onMoveRight: () -> Unit,
+) {
+    Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surfaceContainer) {
+        androidx.compose.foundation.layout.Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 4.dp, vertical = 4.dp),
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            KeyCap("Tab", onIndent)
+            KeyCap("←", onMoveLeft)
+            KeyCap("→", onMoveRight)
+            CODE_KEYS.forEach { k -> KeyCap(k) { onInsert(k) } }
+        }
+    }
+}
+
+@Composable
+private fun KeyCap(label: String, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        modifier = Modifier
+            .heightIn(min = 40.dp)
+            .widthIn(min = 40.dp),
+    ) {
+        Box(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                label,
+                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
     }
 }
