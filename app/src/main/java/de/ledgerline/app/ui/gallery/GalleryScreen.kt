@@ -93,6 +93,12 @@ fun GalleryScreen(
     var openPersonId by remember { mutableStateOf<String?>(null) }
     var showDuplicates by remember { mutableStateOf(false) }
 
+    // Entering the Gallery tab pulls the latest index from the server in the
+    // background: cached (offline) photos show immediately, then the fetch updates
+    // them. The VM's own init only loads once, so without this a re-visit would show
+    // stale/offline data until a manual pull-to-refresh.
+    LaunchedEffect(Unit) { vm.refresh() }
+
     // Duplicate scan — full-screen, hides the tabs.
     if (showDuplicates) {
         DuplicatesScreen(
