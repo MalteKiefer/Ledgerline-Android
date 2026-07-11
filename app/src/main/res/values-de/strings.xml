@@ -69,6 +69,16 @@
     <string name="list_rename">Liste umbenennen</string>
     <string name="list_delete">Liste löschen</string>
 
+    <!-- Notiz-CRUD -->
+    <string name="note_new">Neue Notiz</string>
+    <string name="note_untitled">Ohne Titel</string>
+    <string name="note_title_hint">Titel</string>
+    <string name="note_body_hint">Schreib etwas…</string>
+    <string name="note_pin">Anheften</string>
+    <string name="note_unpin">Lösen</string>
+    <string name="note_delete">Notiz löschen</string>
+    <string name="note_updated">Aktualisiert %1$s</string>
+
     <!-- Datei-Detail -->
     <string name="file_type">Typ</string>
     <string name="file_size">Größe</string>

@@ -69,6 +69,16 @@
     <string name="list_rename">Rename list</string>
     <string name="list_delete">Delete list</string>
 
+    <!-- Note CRUD -->
+    <string name="note_new">New note</string>
+    <string name="note_untitled">Untitled</string>
+    <string name="note_title_hint">Title</string>
+    <string name="note_body_hint">Write something…</string>
+    <string name="note_pin">Pin</string>
+    <string name="note_unpin">Unpin</string>
+    <string name="note_delete">Delete note</string>
+    <string name="note_updated">Updated %1$s</string>
+
     <!-- File detail -->
     <string name="file_type">Type</string>
     <string name="file_size">Size</string>
