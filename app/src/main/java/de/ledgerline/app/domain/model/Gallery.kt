@@ -23,6 +23,12 @@ data class GalleryPhoto(
     val taken_at: String? = null,
     val content_id: String? = null,
     val hasFaces: Int? = null,
+    val rotation: Int = 0,
+    val flipH: Boolean = false,
+    val flipV: Boolean = false,
+    val favorite: Boolean = false,
+    val failed: Boolean = false,
+    val procError: String? = null,
 )
 
 @Serializable

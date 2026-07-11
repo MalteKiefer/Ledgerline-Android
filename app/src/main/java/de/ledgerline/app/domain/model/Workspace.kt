@@ -27,12 +27,16 @@ data class Note(
 data class Bookmark(
     val id: String = "", val folderId: String? = null, val title: String = "", val url: String = "",
     val description: String = "", val favorite: Boolean = false, val readLater: Boolean = false,
+    val read: Boolean = false,
     @Serializable(with = FlexibleTrashedSerializer::class) val trashed: Boolean = false,
     val tags: List<String> = emptyList(),
 )
 
 @Serializable
-data class NamedFolder(val id: String = "", val name: String = "", val parent: String? = null)
+data class NamedFolder(
+    val id: String = "", val name: String = "", val parent: String? = null,
+    val color: String = "", val icon: String = "",
+)
 
 @Serializable
 data class TodoList(val id: String = "", val name: String = "")
@@ -52,6 +56,16 @@ data class FileEntry(
     val mime: String = "", val size: Long = 0, val folder: String? = null,
     val created: String? = null,
     @Serializable(with = FlexibleTrashedSerializer::class) val trashed: Boolean = false,
+    val favorite: Boolean = false,
+    val tags: List<String> = emptyList(),
+    val versions: List<FileVersion> = emptyList(),
+)
+
+@Serializable
+data class FileVersion(
+    val id: String = "", val blob: String = "", val encFileKey: String = "",
+    val size: Long = 0, val mime: String = "", val name: String = "",
+    val created: String? = null,
 )
 
 /** The decrypted manifest plus the server version (kept for Phase-3 writes). */
