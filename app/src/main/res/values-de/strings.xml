@@ -248,4 +248,7 @@
     <string name="share_import">Importieren</string>
     <string name="share_imported">%1$d importiert</string>
     <string name="share_import_failed">%1$d fehlgeschlagen</string>
+    <string name="tags_hint">Tags (kommagetrennt)</string>
+    <string name="open_with">Öffnen mit</string>
+    <string name="settings_link_chooser">Beim Öffnen von Links Browser fragen</string>
 </resources>

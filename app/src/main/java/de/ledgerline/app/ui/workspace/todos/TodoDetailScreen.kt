@@ -1,6 +1,5 @@
 package de.ledgerline.app.ui.workspace.todos
 
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,18 +31,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.ui.workspace.LocalFullscreen
+import de.ledgerline.app.ui.workspace.common.TagChips
 import de.ledgerline.app.ui.workspace.common.formatDue
 import de.ledgerline.app.ui.common.ConfirmDialog
+import de.ledgerline.app.ui.common.openUrl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodoDetailScreen(
     todo: TodoItem,
     listName: String?,
+    linkChooser: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
@@ -101,13 +102,20 @@ fun TodoDetailScreen(
                 Text(todo.description, style = MaterialTheme.typography.bodyLarge)
             }
 
+            if (todo.tags.isNotEmpty()) {
+                Column {
+                    Text(
+                        stringResource(R.string.tags_hint),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    TagChips(todo.tags, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+
             val url = todo.url.trim()
             if (url.isNotBlank() && (url.startsWith("http://") || url.startsWith("https://"))) {
-                OutlinedButton(onClick = {
-                    runCatching {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-                    }
-                }) {
+                OutlinedButton(onClick = { openUrl(context, url, linkChooser) }) {
                     Icon(Icons.AutoMirrored.Outlined.OpenInNew, null, modifier = Modifier.padding(end = 8.dp))
                     Text(stringResource(R.string.todo_open_link))
                 }

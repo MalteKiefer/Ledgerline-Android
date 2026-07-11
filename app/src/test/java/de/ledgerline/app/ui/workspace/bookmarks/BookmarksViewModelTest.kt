@@ -2,10 +2,14 @@ package de.ledgerline.app.ui.workspace.bookmarks
 
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.WorkspaceCache
+import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.domain.model.*
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -17,6 +21,9 @@ import org.junit.Test
 
 class BookmarksViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val settingsStore = mockk<SettingsStore>(relaxed = true) {
+        every { linkChooserEnabled } returns flowOf(true)
+    }
 
     @Before fun setUp() { Dispatchers.setMain(testDispatcher) }
     @After fun tearDown() { Dispatchers.resetMain() }
@@ -54,35 +61,35 @@ class BookmarksViewModelTest {
     }
 
     @Test fun items_hide_trashed_and_sort_by_title() = runTest {
-        val vm = BookmarksViewModel(load, cache, mutate)
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
         assertEquals(listOf("Alpha", "Beta"), vm.state.value.items.map { it.title })
         assertEquals(listOf("Work"), vm.folders.value.map { it.name })
     }
 
     @Test fun active_folder_filter_restricts_items() = runTest {
-        val vm = BookmarksViewModel(load, cache, mutate)
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
         vm.setActiveFolder("g1")
         assertEquals(listOf("Beta"), vm.state.value.items.map { it.title })
     }
 
     @Test fun addBookmark_appends_and_shows() = runTest {
-        val vm = BookmarksViewModel(load, cache, mutate)
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
-        vm.addBookmark("https://fresh.example", "Fresh", "", null)
+        vm.addBookmark("https://fresh.example", "Fresh", "", null, emptyList())
         assertEquals(true, vm.state.value.items.any { it.title == "Fresh" })
     }
 
     @Test fun toggleFavorite_flips() = runTest {
-        val vm = BookmarksViewModel(load, cache, mutate)
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
         vm.toggleFavorite("1")
         assertEquals(true, vm.bookmarkById("1")?.favorite)
     }
 
     @Test fun deleteFolder_orphans_bookmarks_and_clears_filter() = runTest {
-        val vm = BookmarksViewModel(load, cache, mutate)
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
         vm.setActiveFolder("g1")
         vm.deleteFolder("g1")

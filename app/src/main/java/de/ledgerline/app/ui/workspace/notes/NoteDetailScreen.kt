@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.Note
+import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.ui.workspace.LocalFullscreen
 import de.ledgerline.app.ui.workspace.common.formatDue
 import de.ledgerline.app.ui.common.ConfirmDialog
@@ -55,7 +56,7 @@ import de.ledgerline.app.ui.common.ConfirmDialog
 @Composable
 fun NoteDetailScreen(
     note: Note,
-    onSave: (title: String, content: String) -> Unit,
+    onSave: (title: String, content: String, tags: List<String>) -> Unit,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
@@ -66,12 +67,17 @@ fun NoteDetailScreen(
 
     var title by rememberSaveable(note.id) { mutableStateOf(note.title) }
     var content by rememberSaveable(note.id) { mutableStateOf(note.content) }
+    var tagsText by rememberSaveable(note.id) { mutableStateOf(Tags.formatTags(note.tags)) }
 
     // Keep the latest editor values available to the back handler without re-registering it.
     val latestTitle by rememberUpdatedState(title)
     val latestContent by rememberUpdatedState(content)
+    val latestTags by rememberUpdatedState(tagsText)
     val save: () -> Unit = {
-        if (latestTitle != note.title || latestContent != note.content) onSave(latestTitle, latestContent)
+        val parsedTags = Tags.parseTags(latestTags)
+        if (latestTitle != note.title || latestContent != note.content || parsedTags != note.tags) {
+            onSave(latestTitle, latestContent, parsedTags)
+        }
     }
 
     BackHandler { save(); onBack() }
@@ -132,6 +138,13 @@ fun NoteDetailScreen(
                     imeAction = ImeAction.Next,
                 ),
                 modifier = Modifier.fillMaxWidth().focusRequester(titleFocus),
+            )
+            OutlinedTextField(
+                value = tagsText,
+                onValueChange = { tagsText = it },
+                label = { Text(stringResource(R.string.tags_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = content,

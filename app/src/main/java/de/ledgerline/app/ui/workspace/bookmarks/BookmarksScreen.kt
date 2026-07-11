@@ -1,6 +1,5 @@
 package de.ledgerline.app.ui.workspace.bookmarks
 
-import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -55,9 +54,11 @@ import de.ledgerline.app.domain.model.Bookmark
 import de.ledgerline.app.domain.model.NamedFolder
 import de.ledgerline.app.ui.common.ConfirmDialog
 import de.ledgerline.app.ui.common.TextInputDialog
+import de.ledgerline.app.ui.common.openUrl
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
+import de.ledgerline.app.ui.workspace.common.TagChips
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +70,7 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
 
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
+    val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
 
     // The bookmark being edited; null id = create new. Null = editor closed.
     var editorFor by remember { mutableStateOf<EditorTarget?>(null) }
@@ -77,20 +79,16 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
         message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
     }
 
-    fun open(url: String) {
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())) }
-        }
-    }
+    fun open(url: String) = openUrl(context, url, linkChooser)
 
     editorFor?.let { target ->
         val existing = target.id?.let { vm.bookmarkById(it) }
         BookmarkEditorDialog(
             initial = existing ?: Bookmark(folderId = activeFolder),
             folders = folders,
-            onSave = { url, title, description, folderId ->
-                if (target.id == null) vm.addBookmark(url, title, description, folderId)
-                else vm.editBookmark(target.id, url, title, description, folderId)
+            onSave = { url, title, description, folderId, tags ->
+                if (target.id == null) vm.addBookmark(url, title, description, folderId, tags)
+                else vm.editBookmark(target.id, url, title, description, folderId, tags)
                 editorFor = null
             },
             onCreateFolder = { vm.addFolder(it) },
@@ -263,12 +261,15 @@ private fun BookmarkRow(
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         headlineContent = { Text(bookmark.title.ifBlank { bookmark.url }, maxLines = 1) },
         supportingContent = {
-            Text(
-                hostOf(bookmark.url),
-                maxLines = 1,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    hostOf(bookmark.url),
+                    maxLines = 1,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TagChips(bookmark.tags)
+            }
         },
         leadingContent = {
             IconButton(onClick = onToggleFavorite) {

@@ -29,8 +29,9 @@ object NoteOps {
         title: String,
         content: String,
         nowIso: String,
+        tags: List<String>,
     ): WorkspaceManifest = update(m, id) {
-        it.copy(title = title.trim(), content = content, updated = nowIso)
+        it.copy(title = title.trim(), content = content, updated = nowIso, tags = tags)
     }
 
     /**
@@ -44,14 +45,15 @@ object NoteOps {
         title: String,
         content: String,
         nowIso: String,
+        tags: List<String>,
     ): WorkspaceManifest =
         if (m.notes.any { it.id == id }) {
-            updateNote(m, id, title, content, nowIso)
+            updateNote(m, id, title, content, nowIso, tags)
         } else {
             m.copy(
                 notes = m.notes + Note(
                     id = id, title = title.trim(), content = content,
-                    pinned = false, trashed = false, updated = nowIso,
+                    pinned = false, trashed = false, updated = nowIso, tags = tags,
                 ),
             )
         }

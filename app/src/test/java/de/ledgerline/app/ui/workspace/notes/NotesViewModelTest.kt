@@ -72,7 +72,7 @@ class NotesViewModelTest {
         // Not in the cache yet (creation persists only on first saveNote).
         assertNull(vm.noteById(blank.id))
         // A blank save is discarded (no empty notes created).
-        vm.saveNote(blank.id, "", "")
+        vm.saveNote(blank.id, "", "", emptyList())
         assertNull(vm.noteById(blank.id))
     }
 
@@ -80,10 +80,10 @@ class NotesViewModelTest {
         val vm = NotesViewModel(load, cache, mutate)
         vm.refresh()
         val blank = vm.newBlankNote()
-        vm.saveNote(blank.id, "Fresh", "body")   // upsert → append
+        vm.saveNote(blank.id, "Fresh", "body", emptyList())   // upsert → append
         assertEquals("Fresh", vm.noteById(blank.id)?.title)
         assertTrue(vm.state.value.notes.any { it.id == blank.id })
-        vm.saveNote(blank.id, "Fresh edited", "body2")  // upsert → update
+        vm.saveNote(blank.id, "Fresh edited", "body2", emptyList())  // upsert → update
         assertEquals("Fresh edited", vm.noteById(blank.id)?.title)
     }
 
@@ -91,7 +91,7 @@ class NotesViewModelTest {
         val vm = NotesViewModel(load, cache, mutate)
         vm.refresh()
         // Update the older, unpinned note → newest updated, so it sorts above Alpha (but below the pinned Beta).
-        vm.saveNote("a", "Alpha edited", "body")
+        vm.saveNote("a", "Alpha edited", "body", emptyList())
         assertEquals("Alpha edited", vm.noteById("a")?.title)
         assertEquals(listOf("Beta", "Alpha edited"), vm.state.value.notes.map { it.title })
     }

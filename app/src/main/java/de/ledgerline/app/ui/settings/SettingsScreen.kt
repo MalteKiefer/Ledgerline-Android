@@ -70,6 +70,7 @@ fun SettingsContent(
     val scope = rememberCoroutineScope()
     val timeout by vm.timeoutMinutes.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
+    val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
     val offlineEnabled by vm.offlineEnabled.collectAsStateWithLifecycle()
     val filesPolicy by vm.filesPolicy.collectAsStateWithLifecycle()
     val photosPolicy by vm.photosPolicy.collectAsStateWithLifecycle()
@@ -155,6 +156,13 @@ fun SettingsContent(
                     notificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
             },
+        )
+
+        SwitchRow(
+            title = stringResource(R.string.settings_link_chooser),
+            subtitle = "",
+            checked = linkChooser,
+            onCheckedChange = { vm.setLinkChooserEnabled(it) },
         )
 
         // Offline

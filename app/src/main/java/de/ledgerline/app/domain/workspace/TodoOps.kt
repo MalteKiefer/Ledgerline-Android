@@ -20,6 +20,7 @@ object TodoOps {
         due: String,
         description: String,
         url: String,
+        tags: List<String>,
     ): WorkspaceManifest {
         val todo = TodoItem(
             id = id,
@@ -32,6 +33,7 @@ object TodoOps {
             due = due.trim(),
             done = false,
             trashed = false,
+            tags = tags,
         )
         return m.copy(todos = m.todos + todo)
     }
@@ -45,6 +47,7 @@ object TodoOps {
         due: String,
         description: String,
         url: String,
+        tags: List<String>,
     ): WorkspaceManifest = updateTodo(m, id) {
         it.copy(
             title = title.trim(),
@@ -53,6 +56,7 @@ object TodoOps {
             due = due.trim(),
             description = description.trim(),
             url = url.trim(),
+            tags = tags,
         )
     }
 

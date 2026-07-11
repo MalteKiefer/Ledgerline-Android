@@ -68,9 +68,9 @@ class NotesViewModel @Inject constructor(
      * Persist an edit: upsert by id (append if new, update if it exists). A note that
      * is still completely blank is discarded (no empty notes are created).
      */
-    fun saveNote(id: String, title: String, content: String) {
+    fun saveNote(id: String, title: String, content: String, tags: List<String>) {
         if (title.isBlank() && content.isBlank()) return
-        write { m -> NoteOps.upsertNote(m, id, title, content, nowIso()) }
+        write { m -> NoteOps.upsertNote(m, id, title, content, nowIso(), tags) }
     }
 
     fun togglePin(id: String) = write { m -> NoteOps.togglePin(m, id) }

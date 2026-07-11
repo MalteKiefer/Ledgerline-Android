@@ -1,7 +1,9 @@
 package de.ledgerline.app.ui.workspace.notes
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
@@ -40,6 +43,7 @@ import de.ledgerline.app.domain.model.Note
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
+import de.ledgerline.app.ui.workspace.common.TagChips
 import de.ledgerline.app.ui.common.ConfirmDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,7 +70,7 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
         if (note != null) {
             NoteDetailScreen(
                 note = note,
-                onSave = { title, content -> vm.saveNote(note.id, title, content) },
+                onSave = { title, content, tags -> vm.saveNote(note.id, title, content, tags) },
                 onTogglePin = { vm.togglePin(note.id) },
                 onDelete = { vm.trashNote(note.id); openId = null; pendingNew = null },
                 onBack = { openId = null; pendingNew = null },
@@ -139,7 +143,13 @@ private fun NoteRow(note: Note, onOpen: () -> Unit, onDelete: () -> Unit) {
         headlineContent = { Text(noteRowTitle(note, untitled)) },
         supportingContent = {
             val preview = note.content.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
-            if (note.title.isNotBlank() && preview.isNotBlank()) Text(preview.take(80), maxLines = 1)
+            val showPreview = note.title.isNotBlank() && preview.isNotBlank()
+            if (showPreview || note.tags.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (showPreview) Text(preview.take(80), maxLines = 1)
+                    TagChips(note.tags)
+                }
+            }
         },
         leadingContent = if (note.pinned) {
             { Icon(Icons.Outlined.PushPin, null, tint = MaterialTheme.colorScheme.primary) }

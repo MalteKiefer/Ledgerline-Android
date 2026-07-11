@@ -20,7 +20,7 @@ class BookmarkOpsTest {
     fun addBookmark_appends_with_correct_defaults_and_trims() {
         val out = BookmarkOps.addBookmark(
             manifest(), id = "b1", url = "  https://x.dev  ", title = "  Example  ",
-            description = "  a note  ", folderId = "f1",
+            description = "  a note  ", folderId = "f1", tags = listOf("dev", "ref"),
         )
 
         assertEquals(1, out.bookmarks.size)
@@ -30,6 +30,7 @@ class BookmarkOpsTest {
         assertEquals("Example", b.title)
         assertEquals("a note", b.description)
         assertEquals("f1", b.folderId)
+        assertEquals(listOf("dev", "ref"), b.tags)
         assertFalse(b.favorite)
         assertFalse(b.readLater)
         assertFalse(b.trashed)
@@ -37,17 +38,17 @@ class BookmarkOpsTest {
 
     @Test
     fun addBookmark_allows_null_folder() {
-        val out = BookmarkOps.addBookmark(manifest(), "b1", "https://x", "X", "", null)
+        val out = BookmarkOps.addBookmark(manifest(), "b1", "https://x", "X", "", null, emptyList())
         assertNull(out.bookmarks.first().folderId)
     }
 
     @Test
     fun editBookmark_updates_fields_and_trims() {
-        val m = manifest(bookmarks = listOf(Bookmark(id = "b1", title = "Old", url = "https://old", folderId = "f1")))
+        val m = manifest(bookmarks = listOf(Bookmark(id = "b1", title = "Old", url = "https://old", folderId = "f1", tags = listOf("old"))))
 
         val out = BookmarkOps.editBookmark(
             m, id = "b1", url = "  https://new  ", title = "  New  ",
-            description = "  desc  ", folderId = "f2",
+            description = "  desc  ", folderId = "f2", tags = listOf("x", "y"),
         )
 
         val b = out.bookmarks.first()
@@ -55,6 +56,7 @@ class BookmarkOpsTest {
         assertEquals("New", b.title)
         assertEquals("desc", b.description)
         assertEquals("f2", b.folderId)
+        assertEquals(listOf("x", "y"), b.tags)
     }
 
     @Test
@@ -118,7 +120,7 @@ class BookmarkOpsTest {
             folders = listOf(NamedFolder(id = "f1", name = "A")),
         )
 
-        assertEquals(m.bookmarks, BookmarkOps.editBookmark(m, "zzz", "https://y", "Y", "", null).bookmarks)
+        assertEquals(m.bookmarks, BookmarkOps.editBookmark(m, "zzz", "https://y", "Y", "", null, emptyList()).bookmarks)
         assertEquals(m.bookmarks, BookmarkOps.toggleFavorite(m, "zzz").bookmarks)
         assertEquals(m.bookmarks, BookmarkOps.toggleReadLater(m, "zzz").bookmarks)
         assertEquals(m.bookmarks, BookmarkOps.trashBookmark(m, "zzz").bookmarks)

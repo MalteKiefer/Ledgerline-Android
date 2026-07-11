@@ -21,6 +21,7 @@ class TodoOpsTest {
         val out = TodoOps.addTodo(
             manifest(), id = "t1", title = "  Buy milk  ", listId = "l1",
             priority = "high", due = "  2026-01-02  ", description = "  note  ", url = "  http://x  ",
+            tags = listOf("home", "urgent"),
         )
 
         assertEquals(1, out.todos.size)
@@ -32,6 +33,7 @@ class TodoOpsTest {
         assertEquals("2026-01-02", t.due)
         assertEquals("note", t.description)
         assertEquals("http://x", t.url)
+        assertEquals(listOf("home", "urgent"), t.tags)
         assertFalse(t.marked)
         assertFalse(t.done)
         assertFalse(t.trashed)
@@ -39,17 +41,18 @@ class TodoOpsTest {
 
     @Test
     fun addTodo_allows_null_list() {
-        val out = TodoOps.addTodo(manifest(), "t1", "X", null, "normal", "", "", "")
+        val out = TodoOps.addTodo(manifest(), "t1", "X", null, "normal", "", "", "", emptyList())
         assertNull(out.todos.first().listId)
     }
 
     @Test
     fun editTodo_updates_fields_and_trims_title() {
-        val m = manifest(todos = listOf(TodoItem(id = "t1", title = "Old", listId = "l1")))
+        val m = manifest(todos = listOf(TodoItem(id = "t1", title = "Old", listId = "l1", tags = listOf("old"))))
 
         val out = TodoOps.editTodo(
             m, id = "t1", title = "  New  ", listId = "l2",
             priority = "urgent", due = "2026-05-05", description = "d", url = "u",
+            tags = listOf("a", "b"),
         )
 
         val t = out.todos.first()
@@ -59,6 +62,7 @@ class TodoOpsTest {
         assertEquals("2026-05-05", t.due)
         assertEquals("d", t.description)
         assertEquals("u", t.url)
+        assertEquals(listOf("a", "b"), t.tags)
     }
 
     @Test
@@ -122,7 +126,7 @@ class TodoOpsTest {
             lists = listOf(TodoList(id = "l1", name = "A")),
         )
 
-        assertEquals(m.todos, TodoOps.editTodo(m, "zzz", "X", null, "high", "", "", "").todos)
+        assertEquals(m.todos, TodoOps.editTodo(m, "zzz", "X", null, "high", "", "", "", emptyList()).todos)
         assertEquals(m.todos, TodoOps.toggleDone(m, "zzz").todos)
         assertEquals(m.todos, TodoOps.toggleMarked(m, "zzz").todos)
         assertEquals(m.todos, TodoOps.trashTodo(m, "zzz").todos)

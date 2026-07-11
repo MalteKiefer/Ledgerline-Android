@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.domain.model.TodoList
+import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.ui.workspace.LocalFullscreen
 import de.ledgerline.app.ui.common.TextInputDialog
 
@@ -54,7 +55,7 @@ fun TodoEditor(
     title: String,
     initial: TodoItem,
     lists: List<TodoList>,
-    onSave: (title: String, listId: String?, priority: String, due: String, description: String, url: String) -> Unit,
+    onSave: (title: String, listId: String?, priority: String, due: String, description: String, url: String, tags: List<String>) -> Unit,
     onCreateList: (name: String) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -70,6 +71,7 @@ fun TodoEditor(
     var due by rememberSaveable { mutableStateOf(initial.due) }
     var description by rememberSaveable { mutableStateOf(initial.description) }
     var url by rememberSaveable { mutableStateOf(initial.url) }
+    var tagsText by rememberSaveable { mutableStateOf(Tags.formatTags(initial.tags)) }
 
     var showNewList by rememberSaveable { mutableStateOf(false) }
 
@@ -86,7 +88,7 @@ fun TodoEditor(
                 actions = {
                     TextButton(
                         enabled = todoTitle.isNotBlank(),
-                        onClick = { onSave(todoTitle, listId, priority, due, description, url) },
+                        onClick = { onSave(todoTitle, listId, priority, due, description, url, Tags.parseTags(tagsText)) },
                     ) { Text(stringResource(R.string.action_save)) }
                 },
             )
@@ -150,6 +152,13 @@ fun TodoEditor(
                 value = url,
                 onValueChange = { url = it },
                 label = { Text(stringResource(R.string.todo_url_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = tagsText,
+                onValueChange = { tagsText = it },
+                label = { Text(stringResource(R.string.tags_hint)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )

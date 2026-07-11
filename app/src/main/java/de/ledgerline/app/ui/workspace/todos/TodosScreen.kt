@@ -53,6 +53,7 @@ import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
+import de.ledgerline.app.ui.workspace.common.TagChips
 import de.ledgerline.app.ui.workspace.common.formatDue
 import de.ledgerline.app.ui.common.ConfirmDialog
 import de.ledgerline.app.ui.common.TextInputDialog
@@ -64,6 +65,7 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
     val lists by vm.lists.collectAsStateWithLifecycle()
     val activeList by vm.activeList.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
 
     val snackbar = remember { SnackbarHostState() }
 
@@ -82,9 +84,9 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
             title = stringResource(if (target.id == null) R.string.todo_new else R.string.todo_edit),
             initial = existing ?: TodoItem(listId = activeList),
             lists = lists,
-            onSave = { title, listId, priority, due, description, url ->
-                if (target.id == null) vm.addTodo(title, listId, priority, due, description, url)
-                else vm.editTodo(target.id, title, listId, priority, due, description, url)
+            onSave = { title, listId, priority, due, description, url, tags ->
+                if (target.id == null) vm.addTodo(title, listId, priority, due, description, url, tags)
+                else vm.editTodo(target.id, title, listId, priority, due, description, url, tags)
                 editorFor = null
             },
             onCreateList = { vm.addList(it) },
@@ -102,6 +104,7 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
             TodoDetailScreen(
                 todo = todo,
                 listName = lists.firstOrNull { it.id == todo.listId }?.name,
+                linkChooser = linkChooser,
                 onEdit = { editorFor = EditorTarget(todo.id) },
                 onDelete = { vm.trashTodo(todo.id); openId = null },
                 onBack = { openId = null },
@@ -280,7 +283,7 @@ private fun TodoRow(
             )
         },
         supportingContent = {
-            if (todo.description.isNotBlank() || dueText.isNotBlank() || showPriority) {
+            if (todo.description.isNotBlank() || dueText.isNotBlank() || showPriority || todo.tags.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     if (todo.description.isNotBlank()) {
                         Text(
@@ -328,6 +331,7 @@ private fun TodoRow(
                             }
                         }
                     }
+                    TagChips(todo.tags)
                 }
             }
         },

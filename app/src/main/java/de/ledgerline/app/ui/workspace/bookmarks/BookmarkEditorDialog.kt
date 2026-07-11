@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.Bookmark
 import de.ledgerline.app.domain.model.NamedFolder
+import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.ui.common.TextInputDialog
 
 /**
@@ -39,7 +40,7 @@ import de.ledgerline.app.ui.common.TextInputDialog
 fun BookmarkEditorDialog(
     initial: Bookmark,
     folders: List<NamedFolder>,
-    onSave: (url: String, title: String, description: String, folderId: String?) -> Unit,
+    onSave: (url: String, title: String, description: String, folderId: String?, tags: List<String>) -> Unit,
     onCreateFolder: (name: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -47,6 +48,7 @@ fun BookmarkEditorDialog(
     var title by rememberSaveable { mutableStateOf(initial.title) }
     var description by rememberSaveable { mutableStateOf(initial.description) }
     var folderId by rememberSaveable { mutableStateOf(initial.folderId) }
+    var tagsText by rememberSaveable { mutableStateOf(Tags.formatTags(initial.tags)) }
     var showNewFolder by rememberSaveable { mutableStateOf(false) }
 
     AlertDialog(
@@ -75,6 +77,13 @@ fun BookmarkEditorDialog(
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = tagsText,
+                    onValueChange = { tagsText = it },
+                    label = { Text(stringResource(R.string.tags_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 val folderName = folders.firstOrNull { it.id == folderId }?.name
                     ?: stringResource(R.string.bm_no_folder)
                 FolderPickerField(label = stringResource(R.string.bm_folder), value = folderName) { dismiss ->
@@ -95,7 +104,7 @@ fun BookmarkEditorDialog(
         confirmButton = {
             TextButton(
                 enabled = url.isNotBlank(),
-                onClick = { onSave(url, title, description, folderId) },
+                onClick = { onSave(url, title, description, folderId, Tags.parseTags(tagsText)) },
             ) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = {

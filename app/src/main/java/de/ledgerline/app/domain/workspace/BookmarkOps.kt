@@ -18,6 +18,7 @@ object BookmarkOps {
         title: String,
         description: String,
         folderId: String?,
+        tags: List<String>,
     ): WorkspaceManifest {
         val bookmark = Bookmark(
             id = id,
@@ -28,6 +29,7 @@ object BookmarkOps {
             favorite = false,
             readLater = false,
             trashed = false,
+            tags = tags,
         )
         return m.copy(bookmarks = m.bookmarks + bookmark)
     }
@@ -39,12 +41,14 @@ object BookmarkOps {
         title: String,
         description: String,
         folderId: String?,
+        tags: List<String>,
     ): WorkspaceManifest = updateBookmark(m, id) {
         it.copy(
             url = url.trim(),
             title = title.trim(),
             description = description.trim(),
             folderId = folderId,
+            tags = tags,
         )
     }
 

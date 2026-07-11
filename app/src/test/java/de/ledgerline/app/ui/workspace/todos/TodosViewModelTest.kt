@@ -2,10 +2,14 @@ package de.ledgerline.app.ui.workspace.todos
 
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.WorkspaceCache
+import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.domain.model.*
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
+import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -17,6 +21,9 @@ import org.junit.Test
 
 class TodosViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val settingsStore = mockk<SettingsStore>(relaxed = true) {
+        every { linkChooserEnabled } returns flowOf(true)
+    }
 
     @Before fun setUp() { Dispatchers.setMain(testDispatcher) }
     @After fun tearDown() { Dispatchers.resetMain() }
@@ -55,35 +62,35 @@ class TodosViewModelTest {
     }
 
     @Test fun items_hide_trashed_and_put_open_first() = runTest {
-        val vm = TodosViewModel(load, cache, mutate)
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
         // all-lists filter: open before done, higher priority before lower
         assertEquals(listOf("Open one", "Work item", "Done one"), vm.state.value.items.map { it.title })
     }
 
     @Test fun active_list_filter_restricts_items() = runTest {
-        val vm = TodosViewModel(load, cache, mutate)
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
         vm.setActiveList("l2")
         assertEquals(listOf("Work item"), vm.state.value.items.map { it.title })
     }
 
     @Test fun toggleDone_flips_and_reflows() = runTest {
-        val vm = TodosViewModel(load, cache, mutate)
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
         vm.toggleDone("t2")
         assertEquals(true, vm.todoById("t2")?.done)
     }
 
     @Test fun addTodo_appends_and_shows() = runTest {
-        val vm = TodosViewModel(load, cache, mutate)
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
-        vm.addTodo("Fresh", "l1", "normal", "", "", "")
+        vm.addTodo("Fresh", "l1", "normal", "", "", "", emptyList())
         assertEquals(true, vm.state.value.items.any { it.title == "Fresh" })
     }
 
     @Test fun deleteList_orphans_todos_and_clears_filter() = runTest {
-        val vm = TodosViewModel(load, cache, mutate)
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
         vm.setActiveList("l1")
         vm.deleteList("l1")

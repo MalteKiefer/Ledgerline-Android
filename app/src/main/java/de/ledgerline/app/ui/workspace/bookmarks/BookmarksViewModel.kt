@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.WorkspaceCache
+import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.domain.model.Bookmark
 import de.ledgerline.app.domain.model.NamedFolder
 import de.ledgerline.app.domain.model.WorkspaceManifest
@@ -12,7 +13,9 @@ import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.workspace.BookmarkOps
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -28,9 +31,14 @@ class BookmarksViewModel @Inject constructor(
     private val load: LoadWorkspace,
     private val cache: WorkspaceCache,
     private val mutate: MutateWorkspace,
+    settingsStore: SettingsStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(BookmarksUi(loading = true))
     val state: StateFlow<BookmarksUi> = _state
+
+    /** Whether opening a link shows the app chooser ("ask which browser"); default on. */
+    val linkChooserEnabled: StateFlow<Boolean> = settingsStore.linkChooserEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     private val _folders = MutableStateFlow<List<NamedFolder>>(emptyList())
     val folders: StateFlow<List<NamedFolder>> = _folders
@@ -68,11 +76,11 @@ class BookmarksViewModel @Inject constructor(
 
     // ---- Manifest mutations (the cache-flow collector recomputes the list automatically) ----
 
-    fun addBookmark(url: String, title: String, description: String, folderId: String?) =
-        write { m -> BookmarkOps.addBookmark(m, newId(), url, title, description, folderId) }
+    fun addBookmark(url: String, title: String, description: String, folderId: String?, tags: List<String>) =
+        write { m -> BookmarkOps.addBookmark(m, newId(), url, title, description, folderId, tags) }
 
-    fun editBookmark(id: String, url: String, title: String, description: String, folderId: String?) =
-        write { m -> BookmarkOps.editBookmark(m, id, url, title, description, folderId) }
+    fun editBookmark(id: String, url: String, title: String, description: String, folderId: String?, tags: List<String>) =
+        write { m -> BookmarkOps.editBookmark(m, id, url, title, description, folderId, tags) }
 
     fun toggleFavorite(id: String) = write { m -> BookmarkOps.toggleFavorite(m, id) }
     fun toggleReadLater(id: String) = write { m -> BookmarkOps.toggleReadLater(m, id) }

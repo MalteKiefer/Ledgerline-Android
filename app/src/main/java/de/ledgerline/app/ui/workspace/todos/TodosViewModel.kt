@@ -5,13 +5,16 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.WorkspaceCache
+import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.domain.model.TodoList
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.workspace.TodoOps
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -27,9 +30,14 @@ class TodosViewModel @Inject constructor(
     private val load: LoadWorkspace,
     private val cache: WorkspaceCache,
     private val mutate: MutateWorkspace,
+    settingsStore: SettingsStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(TodosUi(loading = true))
     val state: StateFlow<TodosUi> = _state
+
+    /** Whether opening a link shows the app chooser ("ask which browser"); default on. */
+    val linkChooserEnabled: StateFlow<Boolean> = settingsStore.linkChooserEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     private val _lists = MutableStateFlow<List<TodoList>>(emptyList())
     val lists: StateFlow<List<TodoList>> = _lists
@@ -73,7 +81,8 @@ class TodosViewModel @Inject constructor(
         due: String,
         description: String,
         url: String,
-    ) = write { m -> TodoOps.addTodo(m, newId(), title, listId, priority, due, description, url) }
+        tags: List<String>,
+    ) = write { m -> TodoOps.addTodo(m, newId(), title, listId, priority, due, description, url, tags) }
 
     fun editTodo(
         id: String,
@@ -83,7 +92,8 @@ class TodosViewModel @Inject constructor(
         due: String,
         description: String,
         url: String,
-    ) = write { m -> TodoOps.editTodo(m, id, title, listId, priority, due, description, url) }
+        tags: List<String>,
+    ) = write { m -> TodoOps.editTodo(m, id, title, listId, priority, due, description, url, tags) }
 
     fun toggleDone(id: String) = write { m -> TodoOps.toggleDone(m, id) }
     fun toggleMarked(id: String) = write { m -> TodoOps.toggleMarked(m, id) }

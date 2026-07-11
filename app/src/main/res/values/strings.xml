@@ -250,4 +250,7 @@
     <string name="share_import">Import</string>
     <string name="share_imported">Imported %1$d item(s)</string>
     <string name="share_import_failed">%1$d failed</string>
+    <string name="tags_hint">Tags (comma-separated)</string>
+    <string name="open_with">Open with</string>
+    <string name="settings_link_chooser">Ask which browser to open links</string>
 </resources>

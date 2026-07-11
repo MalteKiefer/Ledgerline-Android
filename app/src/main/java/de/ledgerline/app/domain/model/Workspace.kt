@@ -18,12 +18,14 @@ data class WorkspaceManifest(
 data class Note(
     val id: String = "", val title: String = "", val content: String = "",
     val pinned: Boolean = false, val trashed: Boolean = false, val updated: String? = null,
+    val tags: List<String> = emptyList(),
 )
 
 @Serializable
 data class Bookmark(
     val id: String = "", val folderId: String? = null, val title: String = "", val url: String = "",
     val description: String = "", val favorite: Boolean = false, val readLater: Boolean = false, val trashed: Boolean = false,
+    val tags: List<String> = emptyList(),
 )
 
 @Serializable
@@ -37,6 +39,7 @@ data class TodoItem(
     val id: String = "", val listId: String? = null, val title: String = "", val description: String = "",
     val url: String = "", val priority: String = "normal", val marked: Boolean = false,
     val due: String = "", val done: Boolean = false, val trashed: Boolean = false,
+    val tags: List<String> = emptyList(),
 )
 
 @Serializable
