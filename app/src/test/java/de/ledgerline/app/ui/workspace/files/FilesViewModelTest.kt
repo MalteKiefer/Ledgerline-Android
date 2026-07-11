@@ -107,4 +107,28 @@ class FilesViewModelTest {
         vm.createFolder("New")
         assertTrue("New".let { name -> vm.state.value.folders.any { it.name == name } })
     }
+
+    @Test fun setQuery_filters_files_and_folders_by_name() = runTest {
+        val vm = vm()
+        vm.refresh()
+        vm.setQuery("root")   // matches the file name, not the "Docs" folder
+        assertEquals(emptyList<String>(), vm.state.value.folders.map { it.name })
+        assertEquals(listOf("root.txt"), vm.state.value.files.map { it.name })
+
+        vm.setQuery("docs")   // matches the folder name, not "root.txt"
+        assertEquals(listOf("Docs"), vm.state.value.folders.map { it.name })
+        assertEquals(emptyList<String>(), vm.state.value.files.map { it.name })
+
+        vm.setQuery("")
+        assertEquals(listOf("Docs"), vm.state.value.folders.map { it.name })
+        assertEquals(listOf("root.txt"), vm.state.value.files.map { it.name })
+    }
+
+    @Test fun setQuery_does_not_affect_trash_view() = runTest {
+        val vm = vm()
+        vm.refresh()
+        vm.setTrash(true)
+        vm.setQuery("nomatch")
+        assertEquals(listOf("gone.txt"), vm.state.value.files.map { it.name })
+    }
 }

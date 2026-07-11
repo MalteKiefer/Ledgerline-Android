@@ -2,11 +2,9 @@ package de.ledgerline.app.ui.workspace
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Description
@@ -16,13 +14,10 @@ import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -40,6 +35,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import de.ledgerline.app.R
+import de.ledgerline.app.ui.common.AppScaffold
+import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.gallery.GalleryScreen
 import de.ledgerline.app.ui.settings.SettingsContent
 import de.ledgerline.app.ui.workspace.bookmarks.BookmarksScreen
@@ -84,7 +81,12 @@ fun WorkspaceScaffold(
 
     val sheetState = rememberModalBottomSheetState()
 
-    Scaffold(
+    // The outer scaffold hosts the primary tabs. When a nested full-screen view is
+    // composed (chromeHidden) it drops its own bars AND stops consuming the system-bar
+    // insets (immersive = true) — the nested view owns its top bar/insets. This is the
+    // single edge-to-edge model: no phantom top gap, content never clipped.
+    AppScaffold(
+        immersive = chromeHidden,
         topBar = {
             if (!chromeHidden) {
                 TopAppBar(
@@ -113,50 +115,18 @@ fun WorkspaceScaffold(
                 }
             }
         },
-        // When a full-screen view is shown, the outer scaffold must NOT consume the
-        // status-bar inset — the inner view's own TopAppBar handles it. This removes
-        // the double inset / gap.
-        contentWindowInsets = if (chromeHidden) WindowInsets(0, 0, 0, 0) else ScaffoldDefaults.contentWindowInsets,
     ) { innerPadding ->
         CompositionLocalProvider(LocalFullscreen provides fullscreen) {
             when (overflow) {
-                Overflow.Bookmarks -> Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            title = { Text(stringResource(R.string.menu_bookmarks)) },
-                            navigationIcon = {
-                                IconButton(onClick = { overflow = null }) {
-                                    Icon(
-                                        Icons.AutoMirrored.Outlined.ArrowBack,
-                                        contentDescription = stringResource(R.string.action_back),
-                                    )
-                                }
-                            },
-                        )
-                    },
+                Overflow.Bookmarks -> AppScaffold(
+                    topBar = { AppTopBar(stringResource(R.string.menu_bookmarks), onBack = { overflow = null }) },
                 ) { p -> BookmarksScreen(Modifier.padding(p)) }
 
-                Overflow.Settings -> Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            title = { Text(stringResource(R.string.settings_title)) },
-                            navigationIcon = {
-                                IconButton(onClick = { overflow = null }) {
-                                    Icon(
-                                        Icons.AutoMirrored.Outlined.ArrowBack,
-                                        contentDescription = stringResource(R.string.action_back),
-                                    )
-                                }
-                            },
-                        )
-                    },
-                ) { p ->
-                    SettingsContent(
-                        modifier = Modifier.padding(p),
-                        onLockNow = onLockNow,
-                        onDisconnected = onDisconnected,
-                    )
-                }
+                Overflow.Settings -> SettingsContent(
+                    onLockNow = onLockNow,
+                    onDisconnected = onDisconnected,
+                    onBack = { overflow = null },
+                )
 
                 null -> {
                     val m = Modifier.padding(innerPadding)

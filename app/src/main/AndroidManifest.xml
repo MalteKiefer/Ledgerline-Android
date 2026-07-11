@@ -16,6 +16,16 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
+    <!-- See installed browsers (Android 11+ package visibility) so the "ask which
+         browser" link chooser can enumerate them. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+
     <application
         android:name=".LedgerlineApp"
         android:allowBackup="false"

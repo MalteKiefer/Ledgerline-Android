@@ -72,6 +72,7 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun galleryUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
     override suspend fun galleryProcess(file: MultipartBody.Part): Response<ProcessResponse> = throw NotImplementedError()
     override suspend fun galleryStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
+    override suspend fun deleteGalleryBlob(blob: String): Response<Unit> = throw NotImplementedError()
 }
 
 /**

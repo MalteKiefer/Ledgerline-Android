@@ -26,9 +26,13 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PhotoCamera
@@ -40,6 +44,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -47,8 +52,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +99,19 @@ fun GalleryScreen(
     var openAlbumId by remember { mutableStateOf<String?>(null) }
     var openPersonId by remember { mutableStateOf<String?>(null) }
     var showDuplicates by remember { mutableStateOf(false) }
+    val showTrash by vm.showTrash.collectAsStateWithLifecycle()
+    val trashCount by vm.trashCount.collectAsStateWithLifecycle()
+    // Photo/video viewer + camera open state is hoisted here so these full-screen
+    // views replace the WHOLE gallery (segmented control included) — otherwise the
+    // tabs stayed on top, sliding under the status bar.
+    var openPhotoId by remember { mutableStateOf<String?>(null) }
+    var showCamera by remember { mutableStateOf(false) }
+
+    // Entering the Gallery tab pulls the latest index from the server in the
+    // background: cached (offline) photos show immediately, then the fetch updates
+    // them. The VM's own init only loads once, so without this a re-visit would show
+    // stale/offline data until a manual pull-to-refresh.
+    LaunchedEffect(Unit) { vm.refresh() }
 
     // Duplicate scan — full-screen, hides the tabs.
     if (showDuplicates) {
@@ -99,6 +119,16 @@ fun GalleryScreen(
             modifier = modifier,
             galleryVm = vm,
             onBack = { showDuplicates = false },
+        )
+        return
+    }
+
+    // Trash — full-screen, hides the tabs.
+    if (showTrash) {
+        GalleryTrashScreen(
+            modifier = modifier,
+            vm = vm,
+            onBack = { vm.setTrash(false) },
         )
         return
     }
@@ -124,6 +154,32 @@ fun GalleryScreen(
             onBack = { openPersonId = null },
         )
         return
+    }
+
+    // Camera capture — full-screen, hides the tabs.
+    if (showCamera) {
+        CameraCaptureScreen(
+            onCaptured = { bytes, lat, lng ->
+                showCamera = false
+                val ts = System.currentTimeMillis()
+                vm.uploadAll(
+                    listOf(PhotoSource(name = "IMG_$ts.jpg", mime = "image/jpeg", read = { bytes }, lat = lat, lng = lng))
+                )
+            },
+            onBack = { showCamera = false },
+        )
+        return
+    }
+
+    // Photo/video viewer — full-screen, hides the tabs.
+    openPhotoId?.let { id ->
+        val photo = vm.photoById(id)
+        if (photo != null) {
+            PhotoViewerScreen(photo, vm, onBack = { openPhotoId = null }, modifier = modifier)
+            return
+        } else {
+            openPhotoId = null
+        }
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -169,7 +225,14 @@ fun GalleryScreen(
                             showDuplicates = true
                         },
                     )
-                }
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.trash_open, trashCount)) },
+                        onClick = {
+                            overflowOpen = false
+                            vm.setTrash(true)
+                        },
+                    )
+}
             }
         }
 
@@ -177,6 +240,8 @@ fun GalleryScreen(
             GalleryTab.PHOTOS -> PhotosTab(
                 vm = vm,
                 albumsVm = albumsVm,
+                onOpenPhoto = { openPhotoId = it },
+                onOpenCamera = { showCamera = true },
                 modifier = Modifier.fillMaxSize(),
             )
             GalleryTab.ALBUMS -> AlbumsScreen(
@@ -199,13 +264,13 @@ fun GalleryScreen(
 private fun PhotosTab(
     vm: GalleryViewModel,
     albumsVm: AlbumsViewModel,
+    onOpenPhoto: (String) -> Unit,
+    onOpenCamera: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val ui by vm.state.collectAsStateWithLifecycle()
     val usage by vm.usage.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
-    var openId by remember { mutableStateOf<String?>(null) }
-    var showCamera by remember { mutableStateOf(false) }
     var fabExpanded by remember { mutableStateOf(false) }
 
     // Selection mode.
@@ -213,6 +278,7 @@ private fun PhotosTab(
     val selected = remember { mutableStateListOf<String>() }
     var showNewAlbum by remember { mutableStateOf(false) }
     var showAddToAlbum by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     fun exitSelection() {
         selectionMode = false
@@ -250,38 +316,6 @@ private fun PhotosTab(
                 )
             }
             vm.clearMessage()
-        }
-    }
-
-    // Camera capture screen — full-screen, like the photo viewer.
-    if (showCamera) {
-        CameraCaptureScreen(
-            onCaptured = { bytes, lat, lng ->
-                showCamera = false
-                val ts = System.currentTimeMillis()
-                vm.uploadAll(
-                    listOf(
-                        PhotoSource(
-                            name = "IMG_$ts.jpg",
-                            mime = "image/jpeg",
-                            read = { bytes },
-                            lat = lat,
-                            lng = lng,
-                        )
-                    )
-                )
-            },
-            onBack = { showCamera = false },
-        )
-        return
-    }
-
-    val current = openId
-    if (current != null) {
-        val photo = vm.photoById(current)
-        if (photo != null) {
-            PhotoViewerScreen(photo, vm, onBack = { openId = null }, modifier = modifier)
-            return
         }
     }
 
@@ -335,7 +369,7 @@ private fun PhotosTab(
                                     if (photo.id in selected) selected.remove(photo.id)
                                     else selected.add(photo.id)
                                 } else {
-                                    openId = photo.id
+                                    onOpenPhoto(photo.id)
                                 }
                             },
                             onLongClick = {
@@ -387,21 +421,25 @@ private fun PhotosTab(
                         },
                         onClick = {
                             fabExpanded = false
-                            showCamera = true
+                            onOpenCamera()
                         },
                     )
                 }
             }
         }
 
-        // Selection action bar overlays the top while selecting.
+        // Selection actions float at the bottom (like the web toolbar) instead of a
+        // top bar; the add-photo FAB is hidden while selecting.
         if (selectionMode) {
             SelectionBar(
                 count = selected.size,
                 onClose = { exitSelection() },
                 onNewAlbum = { showNewAlbum = true },
                 onAddToAlbum = { showAddToAlbum = true },
-                modifier = Modifier.align(Alignment.TopCenter),
+                onDelete = { showDeleteConfirm = true },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp),
             )
         }
 
@@ -443,6 +481,19 @@ private fun PhotosTab(
             onDismiss = { showAddToAlbum = false },
         )
     }
+
+    if (showDeleteConfirm) {
+        de.ledgerline.app.ui.common.ConfirmDialog(
+            message = stringResource(R.string.selection_delete_confirm, selected.size),
+            confirmLabel = stringResource(R.string.action_delete),
+            onConfirm = {
+                vm.trashPhotos(selected.toSet())
+                showDeleteConfirm = false
+                exitSelection()
+            },
+            onDismiss = { showDeleteConfirm = false },
+        )
+    }
 }
 
 @Composable
@@ -451,17 +502,19 @@ private fun SelectionBar(
     onClose: () -> Unit,
     onNewAlbum: () -> Unit,
     onAddToAlbum: () -> Unit,
+    onDelete: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        tonalElevation = 3.dp,
+        modifier = modifier,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp,
     ) {
         androidx.compose.foundation.layout.Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 4.dp),
+            modifier = Modifier.padding(start = 4.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onClose) {
@@ -470,13 +523,16 @@ private fun SelectionBar(
             Text(
                 text = stringResource(R.string.selection_count, count),
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f).padding(start = 8.dp),
+                modifier = Modifier.padding(end = 8.dp),
             )
             IconButton(onClick = onNewAlbum) {
                 Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = stringResource(R.string.album_new))
             }
             IconButton(onClick = onAddToAlbum) {
                 Icon(Icons.AutoMirrored.Outlined.PlaylistAdd, contentDescription = stringResource(R.string.album_add_to))
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete))
             }
         }
     }
@@ -518,6 +574,169 @@ private fun AddToAlbumDialog(
             }
         },
     )
+}
+
+/**
+ * Full-screen Gallery trash: shows ONLY trashed photos (newest-first) in a
+ * selection-style grid. The user multi-selects, then a floating toolbar offers
+ * Restore + Delete-forever (confirm). The top bar has back + Empty-trash. Claims
+ * its own insets via [LocalFullscreen] so it doesn't slide under the status bar.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GalleryTrashScreen(
+    vm: GalleryViewModel,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val ui by vm.state.collectAsStateWithLifecycle()
+
+    // Full-screen: hide the outer workspace chrome so this screen owns its insets.
+    val fs = de.ledgerline.app.ui.workspace.LocalFullscreen.current
+    DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
+
+    val selected = remember { mutableStateListOf<String>() }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showEmptyConfirm by remember { mutableStateOf(false) }
+
+    // Prune selections that are no longer trashed (restored/purged elsewhere).
+    LaunchedEffect(ui.photos) {
+        val ids = ui.photos.map { it.id }.toSet()
+        selected.retainAll { it in ids }
+    }
+
+    Scaffold(
+        modifier = modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.trash_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = stringResource(R.string.action_back),
+                        )
+                    }
+                },
+                actions = {
+                    if (ui.photos.isNotEmpty()) {
+                        IconButton(onClick = { showEmptyConfirm = true }) {
+                            Icon(
+                                Icons.Outlined.DeleteForever,
+                                contentDescription = stringResource(R.string.trash_empty),
+                            )
+                        }
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            if (ui.photos.isEmpty()) {
+                CenteredMessage(stringResource(R.string.trash_empty_state))
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 116.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    items(ui.photos, key = { it.id }) { photo ->
+                        SelectableThumbCell(
+                            photo = photo,
+                            vm = vm,
+                            selectionMode = true,
+                            selected = photo.id in selected,
+                            onClick = {
+                                if (photo.id in selected) selected.remove(photo.id)
+                                else selected.add(photo.id)
+                            },
+                            onLongClick = {},
+                        )
+                    }
+                }
+            }
+
+            if (selected.isNotEmpty()) {
+                TrashSelectionBar(
+                    count = selected.size,
+                    onClose = { selected.clear() },
+                    onRestore = {
+                        vm.restorePhotos(selected.toSet())
+                        selected.clear()
+                    },
+                    onDeleteForever = { showDeleteConfirm = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                )
+            }
+
+            OpProgressOverlay()
+        }
+    }
+
+    if (showDeleteConfirm) {
+        de.ledgerline.app.ui.common.ConfirmDialog(
+            message = stringResource(R.string.delete_forever_confirm),
+            confirmLabel = stringResource(R.string.action_delete_forever),
+            onConfirm = {
+                vm.deleteForever(selected.toSet())
+                showDeleteConfirm = false
+                selected.clear()
+            },
+            onDismiss = { showDeleteConfirm = false },
+        )
+    }
+
+    if (showEmptyConfirm) {
+        de.ledgerline.app.ui.common.ConfirmDialog(
+            message = stringResource(R.string.trash_empty_confirm),
+            confirmLabel = stringResource(R.string.action_delete_forever),
+            onConfirm = {
+                vm.emptyTrash()
+                showEmptyConfirm = false
+                selected.clear()
+            },
+            onDismiss = { showEmptyConfirm = false },
+        )
+    }
+}
+
+@Composable
+private fun TrashSelectionBar(
+    count: Int,
+    onClose: () -> Unit,
+    onRestore: () -> Unit,
+    onDeleteForever: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 4.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_cancel))
+            }
+            Text(
+                text = stringResource(R.string.selection_count, count),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(end = 8.dp),
+            )
+            IconButton(onClick = onRestore) {
+                Icon(Icons.Outlined.RestoreFromTrash, contentDescription = stringResource(R.string.action_restore))
+            }
+            IconButton(onClick = onDeleteForever) {
+                Icon(Icons.Outlined.DeleteForever, contentDescription = stringResource(R.string.action_delete_forever))
+            }
+        }
+    }
 }
 
 /** Resolve DISPLAY_NAME from a content URI; falls back to "photo.jpg". */

@@ -105,6 +105,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setPrefetchChargingOnly(enabled) }
     }
 
+    /** Whether opening a link shows the app chooser ("ask which browser"); default on. */
+    val linkChooserEnabled: StateFlow<Boolean> = settingsStore.linkChooserEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setLinkChooserEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setLinkChooserEnabled(enabled) }
+    }
+
     /** Manual "Prefetch now"; the shared [OpProgressOverlay] shows PREFETCH progress. */
     fun prefetchNow() = prefetcher.prefetchNow()
 

@@ -28,6 +28,7 @@ class SettingsStore(private val context: Context) {
     private val cacheMaxMbKey = intPreferencesKey("offline_cache_max_mb")
     private val prefetchWifiOnlyKey = booleanPreferencesKey("prefetch_wifi_only")
     private val prefetchChargingOnlyKey = booleanPreferencesKey("prefetch_charging_only")
+    private val linkChooserKey = booleanPreferencesKey("link_chooser_enabled")
 
     // Legacy 5a boolean keys, retained only so a stored value migrates into the new
     // enum policies when the new key is absent (§C1).
@@ -111,6 +112,17 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setPrefetchChargingOnly(enabled: Boolean) {
         context.settingsDataStore.edit { it[prefetchChargingOnlyKey] = enabled }
+    }
+
+    /**
+     * Whether opening a link shows the Android app chooser ("ask which browser").
+     * Defaults to ON (ask), mirroring the web's chooser-first behaviour.
+     */
+    val linkChooserEnabled: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[linkChooserKey] ?: true }
+
+    suspend fun setLinkChooserEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[linkChooserKey] = enabled }
     }
 
     companion object {

@@ -49,7 +49,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.ByteArrayDataSource
+import androidx.media3.datasource.DataSource
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.ui.PlayerView
 import de.ledgerline.app.R
+import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.model.PhotoPlace
@@ -72,8 +81,12 @@ fun PhotoViewerScreen(
     var oy by remember { mutableFloatStateOf(0f) }
     var showInfo by remember { mutableStateOf(false) }
 
-    // Load medium rendition, fall back to thumb bytes if mediumRef is absent.
+    val isVideo = photo.media_type == "video"
+
+    // Image path: load medium rendition, fall back to thumb bytes if mediumRef is
+    // absent. Skipped entirely for videos (handled by VideoPlayer below).
     val bmp by produceState<android.graphics.Bitmap?>(initialValue = null, photo.id) {
+        if (isVideo) return@produceState
         val ref = photo.mediumRef ?: photo.thumbRef
         val key = photo.mediumKey ?: photo.thumbKey
         value = if (ref != null && key != null) {
@@ -90,7 +103,7 @@ fun PhotoViewerScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(photo.created?.take(10) ?: "") },
+                title = { Text(formatTakenAt(photo.taken_at ?: photo.created)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -112,6 +125,7 @@ fun PhotoViewerScreen(
         ) {
             val b = bmp
             when {
+                isVideo -> VideoPlayer(photo = photo, vm = vm, modifier = Modifier.fillMaxSize())
                 b != null -> Image(
                     bitmap = b.asImageBitmap(),
                     contentDescription = null,
@@ -131,10 +145,6 @@ fun PhotoViewerScreen(
                             }
                         },
                 )
-                photo.media_type == "video" -> Text(
-                    text = stringResource(R.string.photo_video_soon),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 else -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
@@ -142,6 +152,79 @@ fun PhotoViewerScreen(
         if (showInfo) {
             PhotoInfoSheet(photo = photo, vm = vm, onDismiss = { showInfo = false })
         }
+    }
+}
+
+/**
+ * In-memory encrypted-video playback.
+ *
+ * We decrypt the whole blob to a [ByteArray] in RAM (via [GalleryViewModel.downloadBytes],
+ * which runs the secretstream decrypt) and feed those bytes straight into ExoPlayer through a
+ * [ByteArrayDataSource]. Plaintext video bytes therefore never touch disk — they live only in
+ * memory while this composable is on screen.
+ *
+ * Ref selection: use `originalRef/originalKey` — the actual uploaded video. (`medium` is a poster
+ * IMAGE for videos, which ExoPlayer can't play → UnrecognizedInputFormatException.)
+ *
+ * MVP note: loading the full original video into RAM is acceptable for now. A future optimization
+ * for very large originals is a streaming secretstream-backed [DataSource] that decrypts chunk by
+ * chunk on demand instead of materializing the whole file.
+ */
+@OptIn(UnstableApi::class)
+@Composable
+private fun VideoPlayer(
+    photo: GalleryPhoto,
+    vm: GalleryViewModel,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+
+    // Decrypt the video bytes off the UI, mirroring the photo path's produceState.
+    val bytes by produceState<Outcome<ByteArray>?>(initialValue = null, photo.id) {
+        // For videos the ORIGINAL is the playable file; `medium` is a poster image
+        // (an image container ExoPlayer can't play). Use the original video bytes.
+        val ref = photo.originalRef ?: photo.mediumRef
+        val key = photo.originalKey ?: photo.mediumKey
+        value = if (ref != null && key != null) {
+            vm.downloadBytes(ref, key)
+        } else {
+            Outcome.Err(ErrorKind.NOT_CONFIGURED)
+        }
+    }
+
+    // One ExoPlayer per open viewer; released on dispose so it never leaks.
+    val player = remember { ExoPlayer.Builder(context).build() }
+    DisposableEffect(Unit) {
+        onDispose { player.release() }
+    }
+
+    // When the decrypted bytes arrive, wire them into the player from memory.
+    val ok = bytes as? Outcome.Ok
+    LaunchedEffect(ok) {
+        val data = ok?.value ?: return@LaunchedEffect
+        val factory = DataSource.Factory { ByteArrayDataSource(data) }
+        val source = ProgressiveMediaSource.Factory(factory)
+            .createMediaSource(MediaItem.fromUri(Uri.EMPTY))
+        player.setMediaSource(source)
+        player.prepare()
+        player.playWhenReady = true
+    }
+
+    when (bytes) {
+        null -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        is Outcome.Err -> Text(
+            text = stringResource(R.string.video_load_failed),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        is Outcome.Ok -> AndroidView(
+            modifier = modifier,
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    this.player = player
+                    useController = true
+                }
+            },
+        )
     }
 }
 
@@ -283,4 +366,15 @@ private fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null)
             modifier = Modifier.weight(0.6f),
         )
     }
+}
+
+/** Format an ISO-8601 timestamp as a local "dd.MM.yyyy HH:mm"; falls back to the raw
+ *  string (trimmed) when it can't be parsed, and to "" when null/blank. */
+private fun formatTakenAt(iso: String?): String {
+    if (iso.isNullOrBlank()) return ""
+    return runCatching {
+        java.time.OffsetDateTime.parse(iso)
+            .atZoneSameInstant(java.time.ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+    }.getOrElse { iso.take(16).replace('T', ' ') }
 }

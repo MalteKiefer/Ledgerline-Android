@@ -205,6 +205,11 @@ fun AlbumDetailScreen(
         return
     }
 
+    // Full-screen detail: hide the outer workspace chrome so this screen's own top bar
+    // owns the status-bar inset (otherwise content slid under the clock).
+    val fs = de.ledgerline.app.ui.workspace.LocalFullscreen.current
+    androidx.compose.runtime.DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
+
     val photos = remember(album) { albumsVm.albumPhotos(album) }
 
     val current = openId
