@@ -55,6 +55,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -209,6 +210,7 @@ fun GalleryScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         var overflowOpen by remember { mutableStateOf(false) }
+        var searchActive by rememberSaveable { mutableStateOf(false) }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -220,31 +222,36 @@ fun GalleryScreen(
                     selected = tab == GalleryTab.PHOTOS,
                     onClick = { tab = GalleryTab.PHOTOS },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                ) { Text(stringResource(R.string.gallery_tab_photos)) }
+                ) { Text(stringResource(R.string.gallery_tab_photos), maxLines = 1) }
                 SegmentedButton(
                     selected = tab == GalleryTab.ALBUMS,
                     onClick = { tab = GalleryTab.ALBUMS },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                ) { Text(stringResource(R.string.gallery_tab_albums)) }
+                ) { Text(stringResource(R.string.gallery_tab_albums), maxLines = 1) }
                 SegmentedButton(
                     selected = tab == GalleryTab.PEOPLE,
                     onClick = { tab = GalleryTab.PEOPLE },
                     shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                ) { Text(stringResource(R.string.gallery_tab_people)) }
+                ) { Text(stringResource(R.string.gallery_tab_people), maxLines = 1) }
             }
             if (tab == GalleryTab.PHOTOS) {
-                FilterChip(
-                    selected = favoritesOnly,
-                    onClick = { vm.toggleFavoritesOnly() },
-                    label = { Text(stringResource(R.string.gallery_favorites_only)) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (favoritesOnly) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                            contentDescription = null,
-                        )
-                    },
-                    modifier = Modifier.padding(start = 8.dp),
-                )
+                IconButton(onClick = {
+                    searchActive = !searchActive
+                    if (!searchActive) vm.clearSearch()
+                }) {
+                    Icon(
+                        Icons.Outlined.Search,
+                        contentDescription = stringResource(R.string.gallery_search_hint),
+                        tint = if (searchActive) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
+                }
+                IconButton(onClick = { vm.toggleFavoritesOnly() }) {
+                    Icon(
+                        imageVector = if (favoritesOnly) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        contentDescription = stringResource(R.string.gallery_favorites_only),
+                        tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
+                }
             }
             Box {
                 IconButton(onClick = { overflowOpen = true }) {
@@ -282,7 +289,9 @@ fun GalleryScreen(
             }
         }
 
-        if (tab == GalleryTab.PHOTOS) {
+        // Search field appears only when the search icon is toggled — keeps the
+        // header a single compact row otherwise.
+        if (tab == GalleryTab.PHOTOS && searchActive) {
             GallerySearchField(vm)
         }
 
