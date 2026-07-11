@@ -355,6 +355,12 @@ class GalleryViewModel @Inject constructor(
 
     fun photoById(id: String) = cache.value.value?.manifest?.photos?.firstOrNull { it.id == id }
 
+    /** All non-trashed photos that carry a geotag (both [GalleryPhoto.lat] and
+     *  [GalleryPhoto.lng] set) — the set rendered on the full-gallery map. */
+    fun geotaggedPhotos(): List<GalleryPhoto> =
+        cache.value.value?.manifest?.photos.orEmpty()
+            .filter { !it.trashed && it.lat != null && it.lng != null }
+
     private fun recompute() {
         // Sort by capture date (EXIF taken_at), falling back to upload time — matches
         // the web timeline (newest first). Parse to an epoch so mixed ISO / EXIF

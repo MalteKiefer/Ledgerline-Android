@@ -246,6 +246,8 @@
     <string name="gallery_tab_albums">Alben</string>
     <string name="gallery_tab_people">Personen</string>
     <string name="duplicates_action">Duplikate suchen</string>
+    <string name="gallery_map">Karte</string>
+    <string name="gallery_map_empty">Keine Fotos mit Ort</string>
     <string name="duplicates_title">Duplikate</string>
     <string name="duplicates_rescan">Neu scannen</string>
     <string name="duplicates_mark_rest">Rest markieren</string>

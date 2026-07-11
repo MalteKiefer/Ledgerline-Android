@@ -312,6 +312,21 @@ class GalleryViewModelTest {
         assertEquals(before, cache.value.value!!.version)
     }
 
+    @Test fun geotagged_photos_only_non_trashed_with_lat_and_lng() = runTest {
+        val cache = GalleryCache().apply {
+            set(Gallery(GalleryManifest(photos = listOf(
+                GalleryPhoto(id = "both", lat = 52.5, lng = 13.4),
+                GalleryPhoto(id = "lat_only", lat = 52.5, lng = null),
+                GalleryPhoto(id = "lng_only", lat = null, lng = 13.4),
+                GalleryPhoto(id = "none"),
+                GalleryPhoto(id = "trashed", trashed = true, lat = 48.1, lng = 11.5),
+                GalleryPhoto(id = "both2", lat = 40.7, lng = -74.0),
+            )), version = 1))
+        }
+        val vm = makeVm(cache)
+        assertEquals(setOf("both", "both2"), vm.geotaggedPhotos().map { it.id }.toSet())
+    }
+
     @Test fun search_blank_clears_results() = runTest {
         val cache = GalleryCache().apply { set(gallery()) }
         val vm = makeVm(cache)

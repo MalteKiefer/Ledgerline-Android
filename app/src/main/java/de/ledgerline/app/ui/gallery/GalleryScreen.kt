@@ -110,6 +110,7 @@ fun GalleryScreen(
     var openAlbumId by remember { mutableStateOf<String?>(null) }
     var openPersonId by remember { mutableStateOf<String?>(null) }
     var showDuplicates by remember { mutableStateOf(false) }
+    var showMap by remember { mutableStateOf(false) }
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
     val favoritesOnly by vm.favoritesOnly.collectAsStateWithLifecycle()
@@ -131,6 +132,17 @@ fun GalleryScreen(
             modifier = modifier,
             galleryVm = vm,
             onBack = { showDuplicates = false },
+        )
+        return
+    }
+
+    // Full-gallery map — full-screen, hides the tabs.
+    if (showMap) {
+        GalleryMapScreen(
+            vm = vm,
+            onOpenPhoto = { openPhotoId = it; showMap = false },
+            onBack = { showMap = false },
+            modifier = modifier,
         )
         return
     }
@@ -244,6 +256,13 @@ fun GalleryScreen(
                     expanded = overflowOpen,
                     onDismissRequest = { overflowOpen = false },
                 ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.gallery_map)) },
+                        onClick = {
+                            overflowOpen = false
+                            showMap = true
+                        },
+                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.duplicates_action)) },
                         onClick = {
