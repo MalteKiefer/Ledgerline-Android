@@ -218,6 +218,8 @@
     <string name="album_new">Neues Album</string>
     <string name="album_add_to">Zu Album hinzufügen</string>
     <string name="selection_count">%1$d ausgewählt</string>
+    <string name="action_delete">Löschen</string>
+    <string name="selection_delete_confirm">%1$d Element(e) in den Papierkorb?</string>
     <string name="albums_empty">Noch keine Alben.</string>
     <string name="album_rename">Umbenennen</string>
     <string name="album_delete">Löschen</string>

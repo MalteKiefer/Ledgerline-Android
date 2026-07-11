@@ -40,6 +40,7 @@ class GalleryViewModel @Inject constructor(
     private val thumbs: ThumbCache,
     private val galleryUsage: GalleryUsage,
     private val importPhotos: ImportPhotos,
+    private val mutate: de.ledgerline.app.domain.usecase.MutateGallery,
     private val lockGuard: LockGuard,
     private val vaultKeyHolder: de.ledgerline.app.core.security.VaultKeyHolder,
     private val operationManager: OperationManager,
@@ -56,6 +57,13 @@ class GalleryViewModel @Inject constructor(
     val message: StateFlow<String?> = _message
 
     fun clearMessage() { _message.value = null }
+
+    /** Soft-delete (trash) the selected photos — sets `trashed=true` in the gallery
+     *  index (recoverable, matching the web). The read side filters trashed out. */
+    fun trashPhotos(ids: Set<String>) = viewModelScope.launch {
+        if (ids.isEmpty()) return@launch
+        mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id in ids) it.copy(trashed = true) else it }) }
+    }
 
     init {
         viewModelScope.launch {
@@ -139,9 +147,28 @@ class GalleryViewModel @Inject constructor(
     fun photoById(id: String) = cache.value.value?.manifest?.photos?.firstOrNull { it.id == id }
 
     private fun recompute() {
+        // Sort by capture date (EXIF taken_at), falling back to upload time — matches
+        // the web timeline (newest first). Parse to an epoch so mixed ISO / EXIF
+        // (`2026:07:11 ...`) formats compare correctly instead of clustering by the
+        // just-uploaded order.
         val photos = cache.value.value?.manifest?.photos.orEmpty()
             .filter { !it.trashed }
-            .sortedByDescending { it.created ?: "" }
+            .sortedByDescending { epochOf(it.taken_at ?: it.created) }
         _state.value = GalleryUi(false, false, photos)
+    }
+
+    /** Best-effort epoch millis from an ISO-8601 or EXIF (`yyyy:MM:dd HH:mm:ss`)
+     *  timestamp; 0 when null/unparseable (sorts oldest). */
+    private fun epochOf(ts: String?): Long {
+        if (ts.isNullOrBlank()) return 0L
+        runCatching { return java.time.OffsetDateTime.parse(ts).toInstant().toEpochMilli() }
+        runCatching { return java.time.Instant.parse(ts).toEpochMilli() }
+        // EXIF "yyyy:MM:dd HH:mm:ss" → normalise the date part to ISO and retry as local.
+        runCatching {
+            val norm = ts.trim().replaceFirst(Regex("^(\\d{4}):(\\d{2}):(\\d{2})"), "$1-$2-$3").replace(' ', 'T')
+            return java.time.LocalDateTime.parse(norm)
+                .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        }
+        return 0L
     }
 }

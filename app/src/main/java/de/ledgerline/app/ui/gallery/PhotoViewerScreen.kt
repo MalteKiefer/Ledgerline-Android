@@ -103,7 +103,7 @@ fun PhotoViewerScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(photo.created?.take(10) ?: "") },
+                title = { Text(formatTakenAt(photo.taken_at ?: photo.created)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
@@ -163,10 +163,10 @@ fun PhotoViewerScreen(
  * [ByteArrayDataSource]. Plaintext video bytes therefore never touch disk — they live only in
  * memory while this composable is on screen.
  *
- * Ref selection: prefer the smaller `mediumRef/mediumKey` rendition to bound memory usage; fall
- * back to `originalRef/originalKey` when no medium exists.
+ * Ref selection: use `originalRef/originalKey` — the actual uploaded video. (`medium` is a poster
+ * IMAGE for videos, which ExoPlayer can't play → UnrecognizedInputFormatException.)
  *
- * MVP note: loading the full (medium) video into RAM is acceptable for now. A future optimization
+ * MVP note: loading the full original video into RAM is acceptable for now. A future optimization
  * for very large originals is a streaming secretstream-backed [DataSource] that decrypts chunk by
  * chunk on demand instead of materializing the whole file.
  */
@@ -181,8 +181,10 @@ private fun VideoPlayer(
 
     // Decrypt the video bytes off the UI, mirroring the photo path's produceState.
     val bytes by produceState<Outcome<ByteArray>?>(initialValue = null, photo.id) {
-        val ref = photo.mediumRef ?: photo.originalRef
-        val key = photo.mediumKey ?: photo.originalKey
+        // For videos the ORIGINAL is the playable file; `medium` is a poster image
+        // (an image container ExoPlayer can't play). Use the original video bytes.
+        val ref = photo.originalRef ?: photo.mediumRef
+        val key = photo.originalKey ?: photo.mediumKey
         value = if (ref != null && key != null) {
             vm.downloadBytes(ref, key)
         } else {
@@ -364,4 +366,15 @@ private fun InfoRow(label: String, value: String, onClick: (() -> Unit)? = null)
             modifier = Modifier.weight(0.6f),
         )
     }
+}
+
+/** Format an ISO-8601 timestamp as a local "dd.MM.yyyy HH:mm"; falls back to the raw
+ *  string (trimmed) when it can't be parsed, and to "" when null/blank. */
+private fun formatTakenAt(iso: String?): String {
+    if (iso.isNullOrBlank()) return ""
+    return runCatching {
+        java.time.OffsetDateTime.parse(iso)
+            .atZoneSameInstant(java.time.ZoneId.systemDefault())
+            .format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+    }.getOrElse { iso.take(16).replace('T', ' ') }
 }
