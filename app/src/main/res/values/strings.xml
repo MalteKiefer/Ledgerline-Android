@@ -134,6 +134,20 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
+    <!-- Settings landing categories -->
+    <string name="settings_cat_appearance">Appearance &amp; language</string>
+    <string name="settings_cat_appearance_sub">App language</string>
+    <string name="settings_cat_security">Security &amp; lock</string>
+    <string name="settings_cat_security_sub">Auto-lock timeout, lock now</string>
+    <string name="settings_cat_offline">Offline &amp; storage</string>
+    <string name="settings_cat_offline_sub">Offline cache, policies, cache size</string>
+    <string name="settings_cat_background">Background &amp; links</string>
+    <string name="settings_cat_background_sub">Background processing, link handling</string>
+    <string name="settings_cat_account">Account</string>
+    <string name="settings_cat_account_sub">Disconnect this device</string>
+    <string name="settings_cat_about">About</string>
+    <string name="settings_cat_about_sub">Version, zero-knowledge</string>
+    <string name="settings_lock_note">Your vault stays locked with your passphrase. Biometrics may unlock a saved session where enabled; the encryption key never leaves this device.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_system">System default</string>
     <string name="settings_language_de">Deutsch</string>

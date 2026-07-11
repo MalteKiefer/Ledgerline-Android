@@ -124,6 +124,20 @@
 
     <!-- Einstellungen -->
     <string name="settings_title">Einstellungen</string>
+    <!-- Kategorien der Einstellungs-Übersicht -->
+    <string name="settings_cat_appearance">Darstellung &amp; Sprache</string>
+    <string name="settings_cat_appearance_sub">App-Sprache</string>
+    <string name="settings_cat_security">Sicherheit &amp; Sperre</string>
+    <string name="settings_cat_security_sub">Auto-Sperre, jetzt sperren</string>
+    <string name="settings_cat_offline">Offline &amp; Speicher</string>
+    <string name="settings_cat_offline_sub">Offline-Cache, Richtlinien, Cache-Größe</string>
+    <string name="settings_cat_background">Hintergrund &amp; Links</string>
+    <string name="settings_cat_background_sub">Hintergrund-Verarbeitung, Link-Verhalten</string>
+    <string name="settings_cat_account">Konto</string>
+    <string name="settings_cat_account_sub">Dieses Gerät trennen</string>
+    <string name="settings_cat_about">Über</string>
+    <string name="settings_cat_about_sub">Version, Zero-Knowledge</string>
+    <string name="settings_lock_note">Dein Tresor bleibt mit deiner Passphrase gesperrt. Biometrie kann eine gespeicherte Sitzung entsperren, wo aktiviert; der Schlüssel verlässt dieses Gerät nie.</string>
     <string name="settings_language">Sprache</string>
     <string name="settings_language_system">Systemstandard</string>
     <string name="settings_language_de">Deutsch</string>

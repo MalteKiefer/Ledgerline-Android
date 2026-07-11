@@ -122,15 +122,11 @@ fun WorkspaceScaffold(
                     topBar = { AppTopBar(stringResource(R.string.menu_bookmarks), onBack = { overflow = null }) },
                 ) { p -> BookmarksScreen(Modifier.padding(p)) }
 
-                Overflow.Settings -> AppScaffold(
-                    topBar = { AppTopBar(stringResource(R.string.settings_title), onBack = { overflow = null }) },
-                ) { p ->
-                    SettingsContent(
-                        modifier = Modifier.padding(p),
-                        onLockNow = onLockNow,
-                        onDisconnected = onDisconnected,
-                    )
-                }
+                Overflow.Settings -> SettingsContent(
+                    onLockNow = onLockNow,
+                    onDisconnected = onDisconnected,
+                    onBack = { overflow = null },
+                )
 
                 null -> {
                     val m = Modifier.padding(innerPadding)
