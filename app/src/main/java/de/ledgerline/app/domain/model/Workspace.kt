@@ -88,6 +88,7 @@ data class PostalAddress(
 @Serializable
 data class Contact(
     val id: String = "",
+    val uid: String? = null,        // vCard UID (urn:uuid) — preserved for round-trip/export
     val fn: String = "",            // formatted/display name
     val first: String = "", val last: String = "", val middle: String = "",
     val prefix: String = "", val suffix: String = "", val nickname: String = "",
