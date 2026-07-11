@@ -128,6 +128,7 @@ class GalleryViewModelTest {
         thumbs = ThumbCache(),
         galleryUsage = FakeGalleryUsage(),
         importPhotos = importPhotos,
+        mutate = mutate,
         lockGuard = LockGuard(),
         vaultKeyHolder = de.ledgerline.app.core.security.VaultKeyHolder(),
         operationManager = operationManager,
