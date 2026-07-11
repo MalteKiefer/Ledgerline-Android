@@ -41,14 +41,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.FileEntry
@@ -85,6 +90,29 @@ fun FileViewerScreen(
     }
     val original = remember(bytes) { if (editable) String(bytes, Charsets.UTF_8) else "" }
     val dirty = editable && edited.text != original
+
+    // Offline, self-rolled syntax highlighting. The language is inferred from the
+    // file name; token colors are derived from the M3 theme. Applied as a
+    // VisualTransformation with OffsetMapping.Identity, which is correct because
+    // highlight() never adds or removes characters — so cursor/selection stay
+    // aligned and the field remains fully editable. Re-highlights as text changes.
+    val lang = remember(file.name) { langOf(file.name) }
+    val highlightColors = HighlightColors(
+        keyword = MaterialTheme.colorScheme.primary,
+        string = if (MaterialTheme.colorScheme.background.luminance() > 0.5f) {
+            Color(0xFF2E7D32) // green-ish string, readable on light surfaces
+        } else {
+            Color(0xFF9CCC65)
+        },
+        number = MaterialTheme.colorScheme.tertiary,
+        comment = MaterialTheme.colorScheme.onSurfaceVariant,
+        default = MaterialTheme.colorScheme.onSurface,
+    )
+    val transformation = remember(edited.text, lang, highlightColors) {
+        VisualTransformation {
+            TransformedText(highlight(edited.text, lang, highlightColors), OffsetMapping.Identity)
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -136,6 +164,7 @@ fun FileViewerScreen(
                             color = MaterialTheme.colorScheme.onSurface,
                         ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        visualTransformation = transformation,
                     )
                 }
 
