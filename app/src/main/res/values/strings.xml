@@ -117,6 +117,7 @@
     <string name="file_rename">Rename</string>
     <string name="file_delete">Delete</string>
     <string name="file_delete_confirm">Delete this item? This cannot be undone.</string>
+    <string name="file_trash_confirm">Move this item to trash?</string>
     <string name="file_open">Open</string>
     <string name="file_save">Save</string>
     <string name="file_saved">Saved</string>

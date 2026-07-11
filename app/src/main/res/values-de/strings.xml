@@ -107,6 +107,7 @@
     <string name="file_rename">Umbenennen</string>
     <string name="file_delete">Löschen</string>
     <string name="file_delete_confirm">Dieses Element löschen? Das kann nicht rückgängig gemacht werden.</string>
+    <string name="file_trash_confirm">Dieses Element in den Papierkorb?</string>
     <string name="file_open">Öffnen</string>
     <string name="file_save">Speichern</string>
     <string name="file_saved">Gespeichert</string>
