@@ -63,6 +63,7 @@ import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
 import de.ledgerline.app.ui.workspace.common.SearchField
 import de.ledgerline.app.ui.workspace.common.TagChips
+import de.ledgerline.app.ui.workspace.common.TagFilterRow
 import de.ledgerline.app.ui.workspace.common.TrashBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -75,6 +76,9 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
+    val allTags by vm.allTags.collectAsStateWithLifecycle()
+    val activeTag by vm.activeTag.collectAsStateWithLifecycle()
+    val bookmarkView by vm.bookmarkView.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -132,6 +136,10 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
                             emptyEnabled = ui.items.isNotEmpty(),
                         )
                     } else {
+                        BookmarkViewChips(
+                            view = bookmarkView,
+                            onSelectView = { vm.setView(it) },
+                        )
                         BookmarksToolbar(
                             folders = folders,
                             activeFolder = activeFolder,
@@ -144,6 +152,13 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
                         )
                     }
                     if (!showTrash) SearchField(query = query, onQueryChange = { vm.setQuery(it) })
+                    if (!showTrash) {
+                        TagFilterRow(
+                            tags = allTags,
+                            activeTag = activeTag,
+                            onSelect = { vm.setActiveTag(it) },
+                        )
+                    }
                     val emptyText = if (showTrash) R.string.trash_empty_state
                     else if (query.isNotBlank()) R.string.search_no_results
                     else R.string.ws_empty_bookmarks
@@ -199,6 +214,41 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
 
 /** Which bookmark the editor is editing; a null [id] means "create new". */
 private data class EditorTarget(val id: String?)
+
+/** A compact chip row selecting the active view: All / Favorites / Read-later. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BookmarkViewChips(
+    view: BookmarkView,
+    onSelectView: (BookmarkView) -> Unit,
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilterChip(
+            selected = view == BookmarkView.ALL,
+            onClick = { onSelectView(BookmarkView.ALL) },
+            label = { Text(stringResource(R.string.bm_view_all)) },
+        )
+        FilterChip(
+            selected = view == BookmarkView.FAVORITES,
+            onClick = { onSelectView(BookmarkView.FAVORITES) },
+            leadingIcon = { Icon(Icons.Outlined.Star, null) },
+            label = { Text(stringResource(R.string.bm_view_favorites)) },
+        )
+        FilterChip(
+            selected = view == BookmarkView.READ_LATER,
+            onClick = { onSelectView(BookmarkView.READ_LATER) },
+            leadingIcon = { Icon(Icons.Outlined.Bookmark, null) },
+            label = { Text(stringResource(R.string.bm_view_readlater)) },
+        )
+    }
+}
 
 /** Folder filter chips + a "manage folders" overflow (add/rename/delete). */
 @OptIn(ExperimentalMaterial3Api::class)

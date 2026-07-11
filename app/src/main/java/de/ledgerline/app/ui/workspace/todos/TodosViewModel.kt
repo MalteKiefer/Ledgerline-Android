@@ -10,6 +10,7 @@ import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.domain.model.TodoList
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
+import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.domain.workspace.TodoOps
 import de.ledgerline.app.domain.workspace.WorkspaceSearch
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,6 +63,14 @@ class TodosViewModel @Inject constructor(
     /** Live text-search query; filters the active (non-trash) list. */
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query
+
+    /** Sorted distinct union of tags across non-trashed todos (drives filter chips). */
+    private val _allTags = MutableStateFlow<List<String>>(emptyList())
+    val allTags: StateFlow<List<String>> = _allTags
+
+    /** Current tag filter; null = all tags. */
+    private val _activeTag = MutableStateFlow<String?>(null)
+    val activeTag: StateFlow<String?> = _activeTag
 
     init {
         viewModelScope.launch {
@@ -126,6 +135,11 @@ class TodosViewModel @Inject constructor(
         recompute()
     }
 
+    fun setActiveTag(tag: String?) {
+        _activeTag.value = tag
+        recompute()
+    }
+
     fun restore(id: String) = write { m -> TodoOps.restoreTodo(m, id) }
     fun deleteForever(id: String) = write { m -> TodoOps.removeTodo(m, id) }
     fun emptyTrash() = write { m -> TodoOps.emptyTrashTodos(m) }
@@ -161,13 +175,19 @@ class TodosViewModel @Inject constructor(
         _lists.value = m?.todoLists.orEmpty()
         val all = m?.todos.orEmpty()
         _trashCount.value = all.count { it.trashed }
+        _allTags.value = Tags.union(all.filter { !it.trashed }.map { it.tags })
         val filter = _activeList.value
+        val tag = _activeTag.value
         val items = if (_showTrash.value) {
             // Trash shows all trashed todos regardless of the list filter.
             all.filter { it.trashed }
                 .sortedWith(compareBy({ priorityRank(it.priority) }, { it.title.lowercase() }))
         } else {
-            all.filter { !it.trashed && (filter == null || it.listId == filter) && WorkspaceSearch.matches(it, _query.value) }
+            all.filter {
+                !it.trashed && (filter == null || it.listId == filter) &&
+                    WorkspaceSearch.matches(it, _query.value) &&
+                    (tag == null || Tags.contains(it.tags, tag))
+            }
                 .sortedWith(
                     compareBy({ it.done }, { priorityRank(it.priority) }, { it.title.lowercase() }),
                 )

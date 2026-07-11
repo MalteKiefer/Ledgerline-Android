@@ -101,6 +101,10 @@
     <string name="bm_read_later">Später lesen</string>
     <string name="bm_all_folders">Alle</string>
     <string name="bm_manage_folders">Ordner verwalten</string>
+    <string name="bm_view_all">Alle</string>
+    <string name="bm_view_favorites">Favoriten</string>
+    <string name="bm_view_readlater">Später lesen</string>
+    <string name="filter_all_tags">Alle Tags</string>
     <string name="folder_rename">Ordner umbenennen</string>
     <string name="folder_delete">Ordner löschen</string>
 

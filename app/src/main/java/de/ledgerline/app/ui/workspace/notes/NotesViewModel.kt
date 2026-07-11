@@ -10,6 +10,7 @@ import de.ledgerline.app.domain.model.WorkspaceManifest
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.workspace.NoteOps
+import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.domain.workspace.WorkspaceSearch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,6 +50,14 @@ class NotesViewModel @Inject constructor(
     /** Live text-search query; filters the active (non-trash) list. */
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query
+
+    /** Sorted distinct union of tags across non-trashed notes (drives filter chips). */
+    private val _allTags = MutableStateFlow<List<String>>(emptyList())
+    val allTags: StateFlow<List<String>> = _allTags
+
+    /** Current tag filter; null = all tags. */
+    private val _activeTag = MutableStateFlow<String?>(null)
+    val activeTag: StateFlow<String?> = _activeTag
 
     init {
         viewModelScope.launch {
@@ -103,6 +112,11 @@ class NotesViewModel @Inject constructor(
         recompute()
     }
 
+    fun setActiveTag(tag: String?) {
+        _activeTag.value = tag
+        recompute()
+    }
+
     fun restore(id: String) = write { m -> NoteOps.restoreNote(m, id) }
     fun deleteForever(id: String) = write { m -> NoteOps.removeNote(m, id) }
     fun emptyTrash() = write { m -> NoteOps.emptyTrashNotes(m) }
@@ -121,10 +135,15 @@ class NotesViewModel @Inject constructor(
     private fun recompute() {
         val all = cache.value.value?.manifest?.notes.orEmpty()
         _trashCount.value = all.count { it.trashed }
+        _allTags.value = Tags.union(all.filter { !it.trashed }.map { it.tags })
+        val tag = _activeTag.value
         val notes = if (_showTrash.value) {
             all.filter { it.trashed }.sortedByDescending { it.updated ?: "" }
         } else {
-            all.filter { !it.trashed && WorkspaceSearch.matches(it, _query.value) }
+            all.filter {
+                !it.trashed && WorkspaceSearch.matches(it, _query.value) &&
+                    (tag == null || Tags.contains(it.tags, tag))
+            }
                 .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updated ?: "" })
         }
         _state.value = NotesUi(false, false, notes)

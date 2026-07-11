@@ -57,6 +57,7 @@ import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
 import de.ledgerline.app.ui.workspace.common.SearchField
 import de.ledgerline.app.ui.workspace.common.TagChips
+import de.ledgerline.app.ui.workspace.common.TagFilterRow
 import de.ledgerline.app.ui.workspace.common.TrashBar
 import de.ledgerline.app.ui.workspace.common.formatDue
 import de.ledgerline.app.ui.common.ConfirmDialog
@@ -73,6 +74,8 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
+    val allTags by vm.allTags.collectAsStateWithLifecycle()
+    val activeTag by vm.activeTag.collectAsStateWithLifecycle()
 
     val snackbar = remember { SnackbarHostState() }
 
@@ -163,6 +166,13 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
                         )
                     }
                     if (!showTrash) SearchField(query = query, onQueryChange = { vm.setQuery(it) })
+                    if (!showTrash) {
+                        TagFilterRow(
+                            tags = allTags,
+                            activeTag = activeTag,
+                            onSelect = { vm.setActiveTag(it) },
+                        )
+                    }
                     val emptyText = if (showTrash) R.string.trash_empty_state
                     else if (query.isNotBlank()) R.string.search_no_results
                     else R.string.ws_empty_todos

@@ -29,9 +29,9 @@ class NotesViewModelTest {
     private fun ws() = Workspace(
         WorkspaceManifest(
             notes = listOf(
-                Note(id = "a", title = "Alpha", updated = "2026-01-01T00:00:00Z"),
-                Note(id = "b", title = "Beta", pinned = true, updated = "2026-01-02T00:00:00Z"),
-                Note(id = "c", title = "Gone", trashed = true),
+                Note(id = "a", title = "Alpha", updated = "2026-01-01T00:00:00Z", tags = listOf("Work", "urgent")),
+                Note(id = "b", title = "Beta", pinned = true, updated = "2026-01-02T00:00:00Z", tags = listOf("home")),
+                Note(id = "c", title = "Gone", trashed = true, tags = listOf("secret")),
             )
         ),
         version = 1,
@@ -158,6 +158,40 @@ class NotesViewModelTest {
         vm.setTrash(true)
         vm.setQuery("nomatch")
         // Trash view ignores the query: the trashed note is still shown.
+        assertEquals(listOf("c"), vm.state.value.notes.map { it.id })
+    }
+
+    @Test fun allTags_is_sorted_distinct_union_of_non_trashed() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        // "secret" (trashed) excluded; sorted case-insensitively.
+        assertEquals(listOf("home", "urgent", "Work"), vm.allTags.value)
+    }
+
+    @Test fun setActiveTag_filters_case_insensitively() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.setActiveTag("work")   // exact match, case-insensitive
+        assertEquals(listOf("Alpha"), vm.state.value.notes.map { it.title })
+        vm.setActiveTag(null)
+        assertEquals(listOf("Beta", "Alpha"), vm.state.value.notes.map { it.title })
+    }
+
+    @Test fun activeTag_combines_with_query() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.setActiveTag("urgent")
+        vm.setQuery("beta")   // Beta has no "urgent" tag → AND yields nothing
+        assertTrue(vm.state.value.notes.isEmpty())
+        vm.setQuery("alpha")
+        assertEquals(listOf("Alpha"), vm.state.value.notes.map { it.title })
+    }
+
+    @Test fun activeTag_ignored_in_trash_view() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.setActiveTag("work")   // no trashed note has "work"
+        vm.setTrash(true)
         assertEquals(listOf("c"), vm.state.value.notes.map { it.id })
     }
 
