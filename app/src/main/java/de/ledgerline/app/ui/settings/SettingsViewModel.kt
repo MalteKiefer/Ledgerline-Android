@@ -11,11 +11,13 @@ import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.NetworkFactory
+import de.ledgerline.app.data.remote.dto.MeUser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -38,7 +40,17 @@ class SettingsViewModel @Inject constructor(
     private val storeCache: StoreDiskCache,
     private val blobCache: BlobDiskCache,
     private val prefetcher: Prefetcher,
+    private val accountRepository: AccountRepository,
 ) : ViewModel() {
+
+    /** Signed-in account (name/email/groups), fetched once from `/api/v1/me`; null while
+     *  loading, offline, or on failure — the Account screen degrades gracefully. */
+    private val _account = MutableStateFlow<MeUser?>(null)
+    val account: StateFlow<MeUser?> = _account.asStateFlow()
+
+    init {
+        viewModelScope.launch { _account.value = accountRepository.me() }
+    }
 
     /** Current idle-lock timeout in minutes, backed by the plaintext settings store. */
     val timeoutMinutes: StateFlow<Int> = settingsStore.timeoutMinutes

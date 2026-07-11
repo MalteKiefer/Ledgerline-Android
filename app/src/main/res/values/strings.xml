@@ -23,6 +23,10 @@
     <string name="unlock_button">Unlock</string>
     <string name="unlock_not_configured">No vault yet. Set it up in the web app first.</string>
     <string name="unlock_error">Wrong passphrase or unable to unlock.</string>
+    <string name="unlock_use_recovery">Use recovery code</string>
+    <string name="unlock_recovery_hint">Recovery code</string>
+    <string name="unlock_recovery_button">Unlock</string>
+    <string name="unlock_recovery_back">Use passphrase</string>
     <string name="lock_title">Unlock Ledgerline</string>
     <string name="lock_subtitle">Authenticate to continue</string>
     <string name="lock_locked">Locked. Authenticate to continue.</string>
@@ -167,6 +171,10 @@
     <string name="settings_background_ops_title">Background processing</string>
     <string name="settings_background_ops_subtitle">Operations (scans, uploads) keep running when you leave the app; a notification shows while they run. Turn off to lock immediately on background.</string>
     <string name="settings_account">Account</string>
+    <string name="account_name">Name</string>
+    <string name="account_email">Email</string>
+    <string name="account_groups">Groups</string>
+    <string name="account_loading">Loading…</string>
     <!-- Offline cache -->
     <string name="settings_offline_section">Offline</string>
     <string name="settings_offline_title">Offline cache</string>

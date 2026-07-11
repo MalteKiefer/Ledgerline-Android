@@ -2,6 +2,7 @@ package de.ledgerline.app.data.remote
 
 import de.ledgerline.app.data.remote.dto.EmbedTextRequest
 import de.ledgerline.app.data.remote.dto.EmbedTextResponse
+import de.ledgerline.app.data.remote.dto.MeResponse
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
@@ -31,6 +32,9 @@ interface LedgerlineApi {
 
     @GET("api/v1/auth/pair")
     suspend fun pollPair(@Query("code") code: String): Response<PairPollResponse>
+
+    @GET("api/v1/me")
+    suspend fun me(): Response<MeResponse>
 
     @GET("api/v1/vault")
     suspend fun vault(): Response<VaultResponse>

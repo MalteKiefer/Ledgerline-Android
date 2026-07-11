@@ -17,6 +17,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -28,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -49,6 +51,8 @@ fun UnlockScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     var passphrase by remember { mutableStateOf("") }
+    var recoveryCode by remember { mutableStateOf("") }
+    var recoveryMode by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(state) { if (state is UnlockUiState.Unlocked) onUnlocked() }
@@ -90,27 +94,63 @@ fun UnlockScreen(
                 Modifier.fillMaxWidth().padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                OutlinedTextField(
-                    value = passphrase,
-                    onValueChange = { passphrase = it; vm.reset() },
-                    label = { Text(stringResource(R.string.unlock_passphrase)) },
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        val entered = passphrase.toCharArray()
-                        passphrase = ""
-                        // Exactly one biometric, triggered inside load() via authorize.
-                        scope.launch { vm.unlock(entered, authorize) }
-                    },
-                    enabled = state != UnlockUiState.Working,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Text(stringResource(R.string.unlock_button), style = MaterialTheme.typography.labelLarge)
+                if (!recoveryMode) {
+                    OutlinedTextField(
+                        value = passphrase,
+                        onValueChange = { passphrase = it; vm.reset() },
+                        label = { Text(stringResource(R.string.unlock_passphrase)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            val entered = passphrase.toCharArray()
+                            passphrase = ""
+                            // Exactly one biometric, triggered inside load() via authorize.
+                            scope.launch { vm.unlock(entered, authorize) }
+                        },
+                        enabled = state != UnlockUiState.Working,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Text(stringResource(R.string.unlock_button), style = MaterialTheme.typography.labelLarge)
+                    }
+                    TextButton(
+                        onClick = { recoveryMode = true; vm.reset() },
+                        enabled = state != UnlockUiState.Working,
+                    ) {
+                        Text(stringResource(R.string.unlock_use_recovery))
+                    }
+                } else {
+                    OutlinedTextField(
+                        value = recoveryCode,
+                        onValueChange = { recoveryCode = it; vm.reset() },
+                        label = { Text(stringResource(R.string.unlock_recovery_hint)) },
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+                        singleLine = false,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            val entered = recoveryCode
+                            recoveryCode = ""
+                            scope.launch { vm.unlockWithRecovery(entered, authorize) }
+                        },
+                        enabled = state != UnlockUiState.Working,
+                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Text(stringResource(R.string.unlock_recovery_button), style = MaterialTheme.typography.labelLarge)
+                    }
+                    TextButton(
+                        onClick = { recoveryMode = false; recoveryCode = ""; vm.reset() },
+                        enabled = state != UnlockUiState.Working,
+                    ) {
+                        Text(stringResource(R.string.unlock_recovery_back))
+                    }
                 }
                 when (state) {
                     is UnlockUiState.Working -> {

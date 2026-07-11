@@ -23,6 +23,10 @@
     <string name="unlock_button">Entsperren</string>
     <string name="unlock_not_configured">Noch kein Tresor. Bitte zuerst in der Web-App einrichten.</string>
     <string name="unlock_error">Falsche Passphrase oder Entsperren nicht möglich.</string>
+    <string name="unlock_use_recovery">Wiederherstellungscode verwenden</string>
+    <string name="unlock_recovery_hint">Wiederherstellungscode</string>
+    <string name="unlock_recovery_button">Entsperren</string>
+    <string name="unlock_recovery_back">Passphrase verwenden</string>
     <string name="lock_title">Ledgerline entsperren</string>
     <string name="lock_subtitle">Zum Fortfahren authentifizieren</string>
     <string name="lock_locked">Gesperrt. Zum Fortfahren authentifizieren.</string>
@@ -152,6 +156,10 @@
     <string name="settings_background_ops_title">Hintergrund-Verarbeitung</string>
     <string name="settings_background_ops_subtitle">Vorgänge (Scans, Uploads) laufen weiter, wenn du die App verlässt; währenddessen wird eine Benachrichtigung angezeigt. Ausschalten, um beim Wechsel in den Hintergrund sofort zu sperren.</string>
     <string name="settings_account">Konto</string>
+    <string name="account_name">Name</string>
+    <string name="account_email">E-Mail</string>
+    <string name="account_groups">Gruppen</string>
+    <string name="account_loading">Lädt…</string>
     <string name="settings_offline_section">Offline</string>
     <string name="settings_offline_title">Offline-Cache</string>
     <string name="settings_offline_subtitle">Hält angesehene Daten ohne Verbindung verfügbar — verschlüsselt gespeichert.</string>

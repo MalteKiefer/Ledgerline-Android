@@ -64,6 +64,7 @@ class GallerySaveTest {
         // All other endpoints — throw so any accidental call is visible.
         override suspend fun claimPair(b: PairClaimRequest): Response<PairClaimResponse> = throw NotImplementedError()
         override suspend fun pollPair(c: String): Response<PairPollResponse> = throw NotImplementedError()
+        override suspend fun me(): Response<de.ledgerline.app.data.remote.dto.MeResponse> = throw NotImplementedError()
         override suspend fun vault(): Response<VaultResponse> = throw NotImplementedError()
         override suspend fun store(): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun putStore(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
