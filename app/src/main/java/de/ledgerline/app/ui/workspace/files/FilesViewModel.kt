@@ -15,6 +15,7 @@ import de.ledgerline.app.domain.usecase.ImportFile
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.workspace.FileOps
+import de.ledgerline.app.domain.workspace.WorkspaceSearch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -85,6 +86,10 @@ class FilesViewModel @Inject constructor(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
+    /** Live text-search query; filters the current folder view (files + folders by name). */
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query
+
     init {
         viewModelScope.launch {
             cache.value.collect { ws ->
@@ -151,6 +156,11 @@ class FilesViewModel @Inject constructor(
     }
 
     fun toggleTrash() = setTrash(!_showTrash.value)
+
+    fun setQuery(q: String) {
+        _query.value = q
+        recompute()
+    }
 
     /** Move a trashed file back to the active list. */
     fun restore(id: String) = viewModelScope.launch {
@@ -280,8 +290,13 @@ class FilesViewModel @Inject constructor(
             return
         }
         val cwd = stack.last()
-        val folders = m?.fileFolders?.filter { it.parent == cwd }?.sortedBy { it.name.lowercase() } ?: emptyList()
-        val files = allFiles.filter { !it.trashed && it.folder == cwd }.sortedBy { it.name.lowercase() }
+        val q = _query.value
+        val folders = m?.fileFolders
+            ?.filter { it.parent == cwd && WorkspaceSearch.matches(it, q) }
+            ?.sortedBy { it.name.lowercase() } ?: emptyList()
+        val files = allFiles
+            .filter { !it.trashed && it.folder == cwd && WorkspaceSearch.matches(it, q) }
+            .sortedBy { it.name.lowercase() }
         _state.value = FilesUi(false, false, folders, files, canGoBack = stack.size > 1)
     }
 }

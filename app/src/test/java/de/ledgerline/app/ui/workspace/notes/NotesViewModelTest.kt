@@ -143,6 +143,24 @@ class NotesViewModelTest {
         assertEquals(0, vm.trashCount.value)
     }
 
+    @Test fun setQuery_filters_active_list() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.setQuery("alph")
+        assertEquals(listOf("Alpha"), vm.state.value.notes.map { it.title })
+        vm.setQuery("")
+        assertEquals(listOf("Beta", "Alpha"), vm.state.value.notes.map { it.title })
+    }
+
+    @Test fun setQuery_does_not_affect_trash_view() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.setTrash(true)
+        vm.setQuery("nomatch")
+        // Trash view ignores the query: the trashed note is still shown.
+        assertEquals(listOf("c"), vm.state.value.notes.map { it.id })
+    }
+
     @Test fun emptyTrash_drops_all_trashed_keeps_live() = runTest {
         val vm = NotesViewModel(load, cache, mutate)
         vm.refresh()

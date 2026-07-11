@@ -106,6 +106,25 @@ class BookmarksViewModelTest {
         assertEquals(listOf("3"), vm.state.value.items.map { it.id })
     }
 
+    @Test fun setQuery_filters_active_list() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setQuery("alpha")
+        assertEquals(listOf("Alpha"), vm.state.value.items.map { it.title })
+        vm.setQuery("b.example")   // matches by url
+        assertEquals(listOf("Alpha"), vm.state.value.items.map { it.title })
+        vm.setQuery("")
+        assertEquals(listOf("Alpha", "Beta"), vm.state.value.items.map { it.title })
+    }
+
+    @Test fun setQuery_does_not_affect_trash_view() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setTrash(true)
+        vm.setQuery("nomatch")
+        assertEquals(listOf("3"), vm.state.value.items.map { it.id })
+    }
+
     @Test fun restore_deleteForever_and_emptyTrash() = runTest {
         val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
         vm.refresh()

@@ -63,6 +63,7 @@ import de.ledgerline.app.domain.model.FileEntry
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
+import de.ledgerline.app.ui.workspace.common.SearchField
 import de.ledgerline.app.ui.workspace.common.TrashBar
 import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
@@ -77,6 +78,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     val usage by vm.usage.collectAsStateWithLifecycle()
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
+    val query by vm.query.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -185,6 +187,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                             }
                         }
                     }
+                    if (!showTrash) SearchField(query = query, onQueryChange = { vm.setQuery(it) })
                     PullToRefreshBox(isRefreshing = ui.loading, onRefresh = { vm.refresh() }, modifier = Modifier.weight(1f)) {
                         when {
                             showTrash && ui.files.isEmpty() ->
@@ -209,6 +212,8 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                     )
                                 }
                             }
+                            query.isNotBlank() && ui.folders.isEmpty() && ui.files.isEmpty() ->
+                                RefreshableMessage(stringResource(R.string.search_no_results))
                             ui.folders.isEmpty() && ui.files.isEmpty() && !ui.canGoBack ->
                                 RefreshableMessage(stringResource(R.string.ws_empty_files))
                             else -> LazyColumn(Modifier.fillMaxSize()) {

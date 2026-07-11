@@ -11,6 +11,7 @@ import de.ledgerline.app.domain.model.TodoList
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.workspace.TodoOps
+import de.ledgerline.app.domain.workspace.WorkspaceSearch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +58,10 @@ class TodosViewModel @Inject constructor(
     /** Transient one-shot user message (failure); cleared once shown. */
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
+
+    /** Live text-search query; filters the active (non-trash) list. */
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query
 
     init {
         viewModelScope.launch {
@@ -116,6 +121,11 @@ class TodosViewModel @Inject constructor(
 
     fun toggleTrash() = setTrash(!_showTrash.value)
 
+    fun setQuery(q: String) {
+        _query.value = q
+        recompute()
+    }
+
     fun restore(id: String) = write { m -> TodoOps.restoreTodo(m, id) }
     fun deleteForever(id: String) = write { m -> TodoOps.removeTodo(m, id) }
     fun emptyTrash() = write { m -> TodoOps.emptyTrashTodos(m) }
@@ -157,7 +167,7 @@ class TodosViewModel @Inject constructor(
             all.filter { it.trashed }
                 .sortedWith(compareBy({ priorityRank(it.priority) }, { it.title.lowercase() }))
         } else {
-            all.filter { !it.trashed && (filter == null || it.listId == filter) }
+            all.filter { !it.trashed && (filter == null || it.listId == filter) && WorkspaceSearch.matches(it, _query.value) }
                 .sortedWith(
                     compareBy({ it.done }, { priorityRank(it.priority) }, { it.title.lowercase() }),
                 )

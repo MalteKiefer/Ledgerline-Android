@@ -12,6 +12,7 @@ import de.ledgerline.app.domain.model.WorkspaceManifest
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.workspace.BookmarkOps
+import de.ledgerline.app.domain.workspace.WorkspaceSearch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -59,6 +60,10 @@ class BookmarksViewModel @Inject constructor(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
+    /** Live text-search query; filters the active (non-trash) list. */
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query
+
     init {
         viewModelScope.launch {
             cache.value.collect { ws ->
@@ -103,6 +108,11 @@ class BookmarksViewModel @Inject constructor(
 
     fun toggleTrash() = setTrash(!_showTrash.value)
 
+    fun setQuery(q: String) {
+        _query.value = q
+        recompute()
+    }
+
     fun restore(id: String) = write { m -> BookmarkOps.restoreBookmark(m, id) }
     fun deleteForever(id: String) = write { m -> BookmarkOps.removeBookmark(m, id) }
     fun emptyTrash() = write { m -> BookmarkOps.emptyTrashBookmarks(m) }
@@ -135,7 +145,7 @@ class BookmarksViewModel @Inject constructor(
             // Trash shows all trashed bookmarks regardless of the folder filter.
             all.filter { it.trashed }.sortedBy { it.title.ifBlank { it.url }.lowercase() }
         } else {
-            all.filter { !it.trashed && (filter == null || it.folderId == filter) }
+            all.filter { !it.trashed && (filter == null || it.folderId == filter) && WorkspaceSearch.matches(it, _query.value) }
                 .sortedBy { it.title.ifBlank { it.url }.lowercase() }
         }
         _state.value = BookmarksUi(false, false, items)

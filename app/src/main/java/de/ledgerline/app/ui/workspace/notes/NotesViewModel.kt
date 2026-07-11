@@ -10,6 +10,7 @@ import de.ledgerline.app.domain.model.WorkspaceManifest
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.workspace.NoteOps
+import de.ledgerline.app.domain.workspace.WorkspaceSearch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -44,6 +45,10 @@ class NotesViewModel @Inject constructor(
     /** Transient one-shot user message (failure); cleared once shown. */
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
+
+    /** Live text-search query; filters the active (non-trash) list. */
+    private val _query = MutableStateFlow("")
+    val query: StateFlow<String> = _query
 
     init {
         viewModelScope.launch {
@@ -93,6 +98,11 @@ class NotesViewModel @Inject constructor(
 
     fun toggleTrash() = setTrash(!_showTrash.value)
 
+    fun setQuery(q: String) {
+        _query.value = q
+        recompute()
+    }
+
     fun restore(id: String) = write { m -> NoteOps.restoreNote(m, id) }
     fun deleteForever(id: String) = write { m -> NoteOps.removeNote(m, id) }
     fun emptyTrash() = write { m -> NoteOps.emptyTrashNotes(m) }
@@ -114,7 +124,7 @@ class NotesViewModel @Inject constructor(
         val notes = if (_showTrash.value) {
             all.filter { it.trashed }.sortedByDescending { it.updated ?: "" }
         } else {
-            all.filter { !it.trashed }
+            all.filter { !it.trashed && WorkspaceSearch.matches(it, _query.value) }
                 .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updated ?: "" })
         }
         _state.value = NotesUi(false, false, notes)

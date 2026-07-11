@@ -107,6 +107,23 @@ class TodosViewModelTest {
         assertEquals(listOf("t3"), vm.state.value.items.map { it.id })
     }
 
+    @Test fun setQuery_filters_active_list() = runTest {
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setQuery("work")
+        assertEquals(listOf("Work item"), vm.state.value.items.map { it.title })
+        vm.setQuery("")
+        assertEquals(listOf("Open one", "Work item", "Done one"), vm.state.value.items.map { it.title })
+    }
+
+    @Test fun setQuery_does_not_affect_trash_view() = runTest {
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setTrash(true)
+        vm.setQuery("nomatch")
+        assertEquals(listOf("t3"), vm.state.value.items.map { it.id })
+    }
+
     @Test fun restore_deleteForever_and_emptyTrash() = runTest {
         val vm = TodosViewModel(load, cache, mutate, settingsStore)
         vm.refresh()

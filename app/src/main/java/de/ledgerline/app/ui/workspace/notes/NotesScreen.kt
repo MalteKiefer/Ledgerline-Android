@@ -48,6 +48,7 @@ import de.ledgerline.app.domain.model.Note
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
+import de.ledgerline.app.ui.workspace.common.SearchField
 import de.ledgerline.app.ui.workspace.common.TagChips
 import de.ledgerline.app.ui.workspace.common.TrashBar
 import de.ledgerline.app.ui.common.ConfirmDialog
@@ -59,6 +60,7 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
     val message by vm.message.collectAsStateWithLifecycle()
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
+    val query by vm.query.collectAsStateWithLifecycle()
 
     val snackbar = remember { SnackbarHostState() }
     var openId by remember { mutableStateOf<String?>(null) }
@@ -126,7 +128,10 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
                             }
                         }
                     }
-                    val emptyText = if (showTrash) R.string.trash_empty_state else R.string.ws_empty_notes
+                    if (!showTrash) SearchField(query = query, onQueryChange = { vm.setQuery(it) })
+                    val emptyText = if (showTrash) R.string.trash_empty_state
+                    else if (query.isNotBlank()) R.string.search_no_results
+                    else R.string.ws_empty_notes
                     PullToRefreshBox(ui.loading, { vm.refresh() }, Modifier.weight(1f)) {
                         if (ui.notes.isEmpty()) {
                             RefreshableMessage(stringResource(emptyText))
