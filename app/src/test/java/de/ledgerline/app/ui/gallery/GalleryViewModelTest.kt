@@ -280,6 +280,38 @@ class GalleryViewModelTest {
         assertTrue(!cache.value.value!!.manifest.photos.first { it.id == "a" }.favorite)
     }
 
+    @Test fun set_date_sets_taken_at_on_ids_only() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        val iso = "2026-05-04T00:00:00Z"
+        vm.setDate(setOf("a", "b"), iso)
+        val photos = cache.value.value!!.manifest.photos.associateBy { it.id }
+        assertEquals(iso, photos["a"]!!.taken_at)
+        assertEquals(iso, photos["b"]!!.taken_at)
+        // "c" was not targeted → unchanged (still null).
+        assertEquals(null, photos["c"]!!.taken_at)
+    }
+
+    @Test fun set_location_sets_lat_lng_on_ids_only() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.setLocation(setOf("a"), 52.5, 13.4)
+        val photos = cache.value.value!!.manifest.photos.associateBy { it.id }
+        assertEquals(52.5, photos["a"]!!.lat)
+        assertEquals(13.4, photos["a"]!!.lng)
+        // Others untouched.
+        assertEquals(null, photos["b"]!!.lat)
+        assertEquals(null, photos["b"]!!.lng)
+    }
+
+    @Test fun set_date_empty_ids_is_noop() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        val before = cache.value.value!!.version
+        vm.setDate(emptySet(), "2026-05-04T00:00:00Z")
+        assertEquals(before, cache.value.value!!.version)
+    }
+
     @Test fun search_blank_clears_results() = runTest {
         val cache = GalleryCache().apply { set(gallery()) }
         val vm = makeVm(cache)

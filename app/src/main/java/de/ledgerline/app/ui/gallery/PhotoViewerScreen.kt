@@ -23,9 +23,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.RotateRight
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -86,9 +89,26 @@ fun PhotoViewerScreen(
     var ox by remember { mutableFloatStateOf(0f) }
     var oy by remember { mutableFloatStateOf(0f) }
     var showInfo by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showLocationPicker by remember { mutableStateOf(false) }
     var viewport by remember { mutableStateOf(IntSize.Zero) }
 
     val isVideo = photo.media_type == "video"
+
+    // Location picker is full-screen — replaces the viewer while open.
+    if (showLocationPicker) {
+        LocationPickerScreen(
+            initialLat = photo.lat,
+            initialLng = photo.lng,
+            onPick = { lat, lng ->
+                vm.setLocation(setOf(photo.id), lat, lng)
+                showLocationPicker = false
+            },
+            onBack = { showLocationPicker = false },
+            modifier = modifier,
+        )
+        return
+    }
 
     // Image path: load medium rendition, fall back to thumb bytes if mediumRef is
     // absent. Skipped entirely for videos (handled by VideoPlayer below).
@@ -200,8 +220,23 @@ fun PhotoViewerScreen(
         }
 
         if (showInfo) {
-            PhotoInfoSheet(photo = photo, vm = vm, onDismiss = { showInfo = false })
+            PhotoInfoSheet(
+                photo = photo,
+                vm = vm,
+                onDismiss = { showInfo = false },
+                onEditDate = { showInfo = false; showDatePicker = true },
+                onEditLocation = { showInfo = false; showLocationPicker = true },
+            )
         }
+    }
+
+    // Single-photo date edit — day-granularity picker, applies to this photo only.
+    if (showDatePicker) {
+        PhotoDatePickerDialog(
+            initialIso = photo.taken_at ?: photo.created,
+            onConfirm = { iso -> vm.setDate(setOf(photo.id), iso) },
+            onDismiss = { showDatePicker = false },
+        )
     }
 }
 
@@ -284,6 +319,8 @@ private fun PhotoInfoSheet(
     photo: GalleryPhoto,
     vm: GalleryViewModel,
     onDismiss: () -> Unit,
+    onEditDate: () -> Unit,
+    onEditLocation: () -> Unit,
 ) {
     var place by remember { mutableStateOf<PhotoPlace?>(null) }
     LaunchedEffect(photo.id) {
@@ -385,6 +422,28 @@ private fun PhotoInfoSheet(
                 )
             } else {
                 InfoRow(label = stringResource(R.string.info_location), value = locationValue)
+            }
+
+            // Edit actions — day-granularity date + map location picker (this photo).
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+            ) {
+                TextButton(onClick = onEditDate, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Outlined.CalendarMonth, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.action_edit_date),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                TextButton(onClick = onEditLocation, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Outlined.Place, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.action_edit_location),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
             }
         }
     }

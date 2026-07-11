@@ -36,13 +36,19 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -359,10 +365,30 @@ private fun PhotosTab(
     var showNewAlbum by remember { mutableStateOf(false) }
     var showAddToAlbum by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showLocationPicker by remember { mutableStateOf(false) }
 
     fun exitSelection() {
         selectionMode = false
         selected.clear()
+    }
+
+    // Location picker is full-screen — replace the whole Photos tab while it's open.
+    if (showLocationPicker) {
+        val ids = selected.toSet()
+        val first = ui.photos.firstOrNull { it.id in ids }
+        LocationPickerScreen(
+            initialLat = first?.lat,
+            initialLng = first?.lng,
+            onPick = { lat, lng ->
+                vm.setLocation(ids, lat, lng)
+                showLocationPicker = false
+                exitSelection()
+            },
+            onBack = { showLocationPicker = false },
+            modifier = modifier,
+        )
+        return
     }
 
     val context = LocalContext.current
@@ -548,6 +574,8 @@ private fun PhotosTab(
                 onNewAlbum = { showNewAlbum = true },
                 onAddToAlbum = { showAddToAlbum = true },
                 onDelete = { showDeleteConfirm = true },
+                onSetDate = { showDatePicker = true },
+                onSetLocation = { showLocationPicker = true },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp),
@@ -603,6 +631,20 @@ private fun PhotosTab(
                 exitSelection()
             },
             onDismiss = { showDeleteConfirm = false },
+        )
+    }
+
+    // Bulk set capture date on the selection.
+    if (showDatePicker) {
+        val ids = selected.toSet()
+        val initial = ui.photos.firstOrNull { it.id in ids }?.let { it.taken_at ?: it.created }
+        PhotoDatePickerDialog(
+            initialIso = initial,
+            onConfirm = { iso ->
+                vm.setDate(ids, iso)
+                exitSelection()
+            },
+            onDismiss = { showDatePicker = false },
         )
     }
 }
@@ -679,8 +721,11 @@ private fun SelectionBar(
     onNewAlbum: () -> Unit,
     onAddToAlbum: () -> Unit,
     onDelete: () -> Unit,
+    onSetDate: () -> Unit,
+    onSetLocation: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var overflow by remember { mutableStateOf(false) }
     Surface(
         modifier = modifier,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
@@ -712,6 +757,23 @@ private fun SelectionBar(
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete))
+            }
+            Box {
+                IconButton(onClick = { overflow = true }) {
+                    Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more))
+                }
+                DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_set_date)) },
+                        leadingIcon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+                        onClick = { overflow = false; onSetDate() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_set_location)) },
+                        leadingIcon = { Icon(Icons.Outlined.Place, contentDescription = null) },
+                        onClick = { overflow = false; onSetLocation() },
+                    )
+                }
             }
         }
     }
@@ -916,6 +978,59 @@ private fun TrashSelectionBar(
             }
         }
     }
+}
+
+/**
+ * M3 date picker in a dialog. On confirm it hands back the chosen day formatted as an
+ * ISO instant at local start-of-day (day granularity, matching the web's date-only
+ * pick). [initialIso] pre-selects the current capture date when parseable.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun PhotoDatePickerDialog(
+    initialIso: String?,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val state = rememberDatePickerState(initialSelectedDateMillis = parseIsoToUtcMillis(initialIso))
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val millis = state.selectedDateMillis
+                    if (millis != null) onConfirm(utcMillisToIso(millis))
+                    onDismiss()
+                },
+                enabled = state.selectedDateMillis != null,
+            ) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    ) {
+        DatePicker(state = state)
+    }
+}
+
+/** Best-effort UTC-midnight millis for the day of an ISO/EXIF timestamp; null if unparseable. */
+private fun parseIsoToUtcMillis(iso: String?): Long? {
+    if (iso.isNullOrBlank()) return null
+    val date = runCatching { java.time.OffsetDateTime.parse(iso).toLocalDate() }
+        .recoverCatching { java.time.Instant.parse(iso).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }
+        .recoverCatching {
+            val norm = iso.trim().replaceFirst(Regex("^(\\d{4}):(\\d{2}):(\\d{2})"), "$1-$2-$3").take(10)
+            java.time.LocalDate.parse(norm)
+        }
+        .getOrNull() ?: return null
+    return date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+}
+
+/** The M3 date picker returns UTC-midnight millis for the picked day; format it as an
+ *  ISO instant at LOCAL start-of-day so it lands on the intended calendar day. */
+private fun utcMillisToIso(millis: Long): String {
+    val day = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+    return day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toString()
 }
 
 /** Resolve DISPLAY_NAME from a content URI; falls back to "photo.jpg". */

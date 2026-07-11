@@ -231,6 +231,13 @@
     <string name="info_location">Location</string>
     <string name="info_unknown">—</string>
     <string name="map_open_hint">Tap the map to navigate</string>
+    <string name="action_set_date">Set date</string>
+    <string name="action_set_location">Set location</string>
+    <string name="action_edit_date">Edit date</string>
+    <string name="action_edit_location">Edit location</string>
+    <string name="loc_search_hint">Search address</string>
+    <string name="loc_not_found">Address not found</string>
+    <string name="loc_confirm">Use this location</string>
     <string name="menu_bookmarks">Bookmarks</string>
     <string name="menu_more">More</string>
     <string name="welcome_location_title">Location for photos</string>

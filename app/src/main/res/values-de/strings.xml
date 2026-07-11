@@ -229,6 +229,13 @@
     <string name="info_location">Ort</string>
     <string name="info_unknown">—</string>
     <string name="map_open_hint">Auf die Karte tippen zum Navigieren</string>
+    <string name="action_set_date">Datum setzen</string>
+    <string name="action_set_location">Ort setzen</string>
+    <string name="action_edit_date">Datum bearbeiten</string>
+    <string name="action_edit_location">Ort bearbeiten</string>
+    <string name="loc_search_hint">Adresse suchen</string>
+    <string name="loc_not_found">Adresse nicht gefunden</string>
+    <string name="loc_confirm">Diesen Ort verwenden</string>
     <string name="menu_bookmarks">Lesezeichen</string>
     <string name="menu_more">Mehr</string>
     <string name="welcome_location_title">Standort für Fotos</string>

@@ -126,6 +126,20 @@ class GalleryViewModel @Inject constructor(
         mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id in ids) it.copy(favorite = favorite) else it }) }
     }
 
+    /** Bulk-set the capture date (`taken_at`, ISO instant) on the given photos.
+     *  Single-photo callers pass `setOf(id)`. Matches the web `bulkApplyDate`. */
+    fun setDate(ids: Set<String>, iso: String) = viewModelScope.launch {
+        if (ids.isEmpty()) return@launch
+        mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id in ids) it.copy(taken_at = iso) else it }) }
+    }
+
+    /** Bulk-set the location (`lat`/`lng`) on the given photos. Single-photo callers
+     *  pass `setOf(id)`. Matches the web location picker (single + bulk). */
+    fun setLocation(ids: Set<String>, lat: Double, lng: Double) = viewModelScope.launch {
+        if (ids.isEmpty()) return@launch
+        mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id in ids) it.copy(lat = lat, lng = lng) else it }) }
+    }
+
     fun clearMessage() { _message.value = null }
 
     // --- Semantic search (CLIP embed-text + cosine over cached embeddings) ---
