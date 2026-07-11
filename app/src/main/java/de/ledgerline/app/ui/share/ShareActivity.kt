@@ -9,26 +9,8 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricPrompt
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.core.content.IntentCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -139,7 +121,17 @@ class ShareActivity : FragmentActivity() {
                 if (!unlocked) {
                     UnlockScreen(authorize = authorize, onUnlocked = {})
                 } else {
-                    ShareConfirmPlaceholder(items = items, onCancel = { finish() })
+                    val shareVm: ShareViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+                    // Surface the import summary (imported/failed counts) as a Toast that
+                    // outlives finish(). Consumed once, then the message is cleared.
+                    val message by shareVm.message.collectAsStateWithLifecycle()
+                    androidx.compose.runtime.LaunchedEffect(message) {
+                        message?.let { m ->
+                            toastFor(m)?.let { Toast.makeText(this@ShareActivity, it, Toast.LENGTH_SHORT).show() }
+                            shareVm.clearMessage()
+                        }
+                    }
+                    ShareScreen(items = items, vm = shareVm, onDone = { finish() })
                 }
             }
         }
@@ -179,70 +171,14 @@ class ShareActivity : FragmentActivity() {
         }
         return "shared"
     }
-}
 
-/**
- * S1 placeholder confirm UI. Shows the classified counts and a Cancel button.
- * S2 replaces this with the real bottom sheet + folder picker + upload.
- */
-@Composable
-private fun ShareConfirmPlaceholder(
-    items: List<SharedItem>,
-    onCancel: () -> Unit,
-) {
-    val photos = items.count { it.target == ShareTarget.GALLERY }
-    val files = items.count { it.target == ShareTarget.FILES }
-    Column(
-        Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            stringResource(R.string.share_title),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onBackground,
-        )
-        Spacer(Modifier.height(24.dp))
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                if (photos > 0) {
-                    Text(
-                        stringResource(R.string.share_summary_photos, photos),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                if (files > 0) {
-                    if (photos > 0) Spacer(Modifier.height(8.dp))
-                    Text(
-                        stringResource(R.string.share_summary_files, files),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                Spacer(Modifier.height(20.dp))
-                // Import is deferred to S2.
-                Button(
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Text("Import (todo)", style = MaterialTheme.typography.labelLarge)
-                }
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onCancel,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(16.dp),
-                ) {
-                    Text(stringResource(R.string.action_cancel), style = MaterialTheme.typography.labelLarge)
-                }
-            }
-        }
+    /** Turns a `"import_done:<ok>:<failed>"` message into a localized summary, or null. */
+    private fun toastFor(message: String): String? {
+        val parts = message.split(":")
+        if (parts.size != 3 || parts[0] != "import_done") return null
+        val ok = parts[1].toIntOrNull() ?: return null
+        val failed = parts[2].toIntOrNull() ?: 0
+        val base = getString(R.string.share_imported, ok)
+        return if (failed > 0) "$base — ${getString(R.string.share_import_failed, failed)}" else base
     }
 }

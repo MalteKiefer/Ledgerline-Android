@@ -202,4 +202,9 @@
     <string name="share_none">Nothing to import</string>
     <string name="share_summary_photos">%1$d photos/videos → Gallery</string>
     <string name="share_summary_files">%1$d files → Files</string>
+    <string name="share_target_folder">Folder</string>
+    <string name="share_root">Root</string>
+    <string name="share_import">Import</string>
+    <string name="share_imported">Imported %1$d item(s)</string>
+    <string name="share_import_failed">%1$d failed</string>
 </resources>

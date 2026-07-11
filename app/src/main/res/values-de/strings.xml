@@ -200,4 +200,9 @@
     <string name="share_none">Nichts zu importieren</string>
     <string name="share_summary_photos">%1$d Fotos/Videos → Galerie</string>
     <string name="share_summary_files">%1$d Dateien → Dateien</string>
+    <string name="share_target_folder">Ordner</string>
+    <string name="share_root">Stamm</string>
+    <string name="share_import">Importieren</string>
+    <string name="share_imported">%1$d importiert</string>
+    <string name="share_import_failed">%1$d fehlgeschlagen</string>
 </resources>
