@@ -32,10 +32,10 @@ class TodosViewModelTest {
         WorkspaceManifest(
             todoLists = listOf(TodoList(id = "l1", name = "Home"), TodoList(id = "l2", name = "Work")),
             todos = listOf(
-                TodoItem(id = "t1", listId = "l1", title = "Done one", done = true),
-                TodoItem(id = "t2", listId = "l1", title = "Open one", done = false, priority = "high"),
-                TodoItem(id = "t3", listId = "l1", title = "Gone", trashed = true),
-                TodoItem(id = "t4", listId = "l2", title = "Work item", done = false),
+                TodoItem(id = "t1", listId = "l1", title = "Done one", done = true, tags = listOf("chore")),
+                TodoItem(id = "t2", listId = "l1", title = "Open one", done = false, priority = "high", tags = listOf("Urgent")),
+                TodoItem(id = "t3", listId = "l1", title = "Gone", trashed = true, tags = listOf("secret")),
+                TodoItem(id = "t4", listId = "l2", title = "Work item", done = false, tags = listOf("urgent")),
             ),
         ),
         version = 1,
@@ -121,6 +121,30 @@ class TodosViewModelTest {
         vm.refresh()
         vm.setTrash(true)
         vm.setQuery("nomatch")
+        assertEquals(listOf("t3"), vm.state.value.items.map { it.id })
+    }
+
+    @Test fun allTags_is_sorted_distinct_union_of_non_trashed() = runTest {
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        // "Urgent"/"urgent" collapse case-insensitively (first-seen casing); "secret" trashed → excluded.
+        assertEquals(listOf("chore", "Urgent"), vm.allTags.value)
+    }
+
+    @Test fun setActiveTag_filters_case_insensitively_and_combines_with_list() = runTest {
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setActiveTag("urgent")
+        assertEquals(listOf("t2", "t4"), vm.state.value.items.map { it.id })
+        vm.setActiveList("l2")   // AND with list filter
+        assertEquals(listOf("t4"), vm.state.value.items.map { it.id })
+    }
+
+    @Test fun activeTag_ignored_in_trash_view() = runTest {
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setActiveTag("urgent")   // no trashed todo has "urgent"
+        vm.setTrash(true)
         assertEquals(listOf("t3"), vm.state.value.items.map { it.id })
     }
 

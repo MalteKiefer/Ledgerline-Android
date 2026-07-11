@@ -76,6 +76,33 @@ class UnlockViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Unlock via recovery code. Mirrors [unlock] (session load + one biometric via
+     * [authorize]), but derives the VK from the recovery code instead of the passphrase.
+     * The code is entered as hex in 4-char groups with spaces; whitespace is stripped
+     * before it is passed to the crypto layer (web: `from_hex(code without spaces)`).
+     */
+    fun unlockWithRecovery(code: String, authorize: suspend (Cipher) -> Cipher?) {
+        viewModelScope.launch {
+            _state.value = UnlockUiState.Working
+            val session = sessionStore.load(authorize)
+                ?: run { _state.value = UnlockUiState.Error("no session or auth cancelled"); return@launch }
+            sessionHolder.set(session)
+            val hex = code.filterNot { it.isWhitespace() }
+            val result = withContext(Dispatchers.Default) {
+                UnlockVault(crypto, holder).withRecoveryCode(VaultRepository(session), hex)
+            }
+            _state.value = when (result) {
+                is Outcome.Ok -> UnlockUiState.Unlocked
+                is Outcome.Err -> when (result.kind) {
+                    ErrorKind.WRONG_PASSPHRASE -> UnlockUiState.Error("wrong")
+                    ErrorKind.NOT_CONFIGURED -> UnlockUiState.NotConfigured
+                    else -> UnlockUiState.Error(result.kind.name)
+                }
+            }
+        }
+    }
+
     private fun charsToUtf8(chars: CharArray): ByteArray {
         val bb = Charsets.UTF_8.newEncoder().encode(CharBuffer.wrap(chars))
         return ByteArray(bb.remaining()).also { bb.get(it) }

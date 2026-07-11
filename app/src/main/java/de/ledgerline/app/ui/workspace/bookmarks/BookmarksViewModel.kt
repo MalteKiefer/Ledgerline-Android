@@ -12,6 +12,7 @@ import de.ledgerline.app.domain.model.WorkspaceManifest
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.workspace.BookmarkOps
+import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.domain.workspace.WorkspaceSearch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +27,9 @@ data class BookmarksUi(
     val error: Boolean = false,
     val items: List<Bookmark> = emptyList(),
 )
+
+/** Which subset of (non-trashed) bookmarks the active view shows. */
+enum class BookmarkView { ALL, FAVORITES, READ_LATER }
 
 @HiltViewModel
 class BookmarksViewModel @Inject constructor(
@@ -63,6 +67,26 @@ class BookmarksViewModel @Inject constructor(
     /** Live text-search query; filters the active (non-trash) list. */
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query
+
+    /** Sorted distinct union of tags across non-trashed bookmarks (drives filter chips). */
+    private val _allTags = MutableStateFlow<List<String>>(emptyList())
+    val allTags: StateFlow<List<String>> = _allTags
+
+    /** Current tag filter; null = all tags. */
+    private val _activeTag = MutableStateFlow<String?>(null)
+    val activeTag: StateFlow<String?> = _activeTag
+
+    /** Which view (all / favorites / read-later) the active (non-trash) list shows. */
+    private val _bookmarkView = MutableStateFlow(BookmarkView.ALL)
+    val bookmarkView: StateFlow<BookmarkView> = _bookmarkView
+
+    /** Number of non-trashed favorite bookmarks. */
+    private val _favoritesCount = MutableStateFlow(0)
+    val favoritesCount: StateFlow<Int> = _favoritesCount
+
+    /** Number of non-trashed read-later bookmarks. */
+    private val _readLaterCount = MutableStateFlow(0)
+    val readLaterCount: StateFlow<Int> = _readLaterCount
 
     init {
         viewModelScope.launch {
@@ -113,6 +137,16 @@ class BookmarksViewModel @Inject constructor(
         recompute()
     }
 
+    fun setActiveTag(tag: String?) {
+        _activeTag.value = tag
+        recompute()
+    }
+
+    fun setView(v: BookmarkView) {
+        _bookmarkView.value = v
+        recompute()
+    }
+
     fun restore(id: String) = write { m -> BookmarkOps.restoreBookmark(m, id) }
     fun deleteForever(id: String) = write { m -> BookmarkOps.removeBookmark(m, id) }
     fun emptyTrash() = write { m -> BookmarkOps.emptyTrashBookmarks(m) }
@@ -140,12 +174,27 @@ class BookmarksViewModel @Inject constructor(
         _folders.value = m?.bookmarkFolders.orEmpty()
         val all = m?.bookmarks.orEmpty()
         _trashCount.value = all.count { it.trashed }
+        val active = all.filter { !it.trashed }
+        _allTags.value = Tags.union(active.map { it.tags })
+        _favoritesCount.value = active.count { it.favorite }
+        _readLaterCount.value = active.count { it.readLater }
         val filter = _activeFolder.value
+        val tag = _activeTag.value
+        val view = _bookmarkView.value
         val items = if (_showTrash.value) {
-            // Trash shows all trashed bookmarks regardless of the folder filter.
+            // Trash shows all trashed bookmarks regardless of the folder/tag/view filters.
             all.filter { it.trashed }.sortedBy { it.title.ifBlank { it.url }.lowercase() }
         } else {
-            all.filter { !it.trashed && (filter == null || it.folderId == filter) && WorkspaceSearch.matches(it, _query.value) }
+            active.filter {
+                (filter == null || it.folderId == filter) &&
+                    WorkspaceSearch.matches(it, _query.value) &&
+                    (tag == null || Tags.contains(it.tags, tag)) &&
+                    when (view) {
+                        BookmarkView.ALL -> true
+                        BookmarkView.FAVORITES -> it.favorite
+                        BookmarkView.READ_LATER -> it.readLater
+                    }
+            }
                 .sortedBy { it.title.ifBlank { it.url }.lowercase() }
         }
         _state.value = BookmarksUi(false, false, items)

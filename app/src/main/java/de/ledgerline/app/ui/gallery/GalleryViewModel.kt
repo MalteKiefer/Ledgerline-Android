@@ -64,6 +64,11 @@ class GalleryViewModel @Inject constructor(
     private val metaCache: MetaCache,
 ) : ViewModel() {
 
+    /** IO dispatcher for meta-blob downloads during search — overridable in tests so
+     *  the work runs deterministically and doesn't leak a coroutine past the test. */
+    @get:androidx.annotation.VisibleForTesting
+    internal var ioDispatcher: kotlinx.coroutines.CoroutineDispatcher = kotlinx.coroutines.Dispatchers.IO
+
     private val metaJson = Json { ignoreUnknownKeys = true }
 
     private val placeCache = mutableMapOf<String, PhotoPlace?>()
@@ -187,7 +192,7 @@ class GalleryViewModel @Inject constructor(
             val targets = cache.value.value?.manifest?.photos.orEmpty().filter { !it.trashed }
 
             // Ensure decrypted meta for every candidate (skip those already cached).
-            withContext(Dispatchers.IO) {
+            withContext(ioDispatcher) {
                 val toFetch = targets.filter { it.metaRef != null && !metaCache.has(it.id) }
                 _searchProgress.value = 0 to toFetch.size
                 var done = 0

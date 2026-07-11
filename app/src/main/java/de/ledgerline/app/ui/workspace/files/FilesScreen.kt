@@ -112,10 +112,16 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
         }
     }
 
-    // Surface transient VM messages (upload result, etc.) as snackbars.
+    // Surface transient VM messages (upload result, save result, etc.) as snackbars.
+    // Sentinel tokens are mapped to localized strings; anything else shows verbatim.
     LaunchedEffect(message) {
         message?.let {
-            snackbar.showSnackbar(it)
+            val text = when (it) {
+                FilesViewModel.SAVED -> context.getString(R.string.file_saved)
+                FilesViewModel.SAVE_FAILED -> context.getString(R.string.file_save_failed)
+                else -> it
+            }
+            snackbar.showSnackbar(text)
             vm.clearMessage()
         }
     }
@@ -130,11 +136,14 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
 
     // In-app viewer takes over the whole screen when a file's bytes are ready.
     if (ready != null) {
+        val saving by vm.saving.collectAsStateWithLifecycle()
         FileViewerScreen(
             file = ready.file,
             bytes = ready.bytes,
+            saving = saving,
             onBack = { vm.closeViewer() },
-            onSave = { vm.armLockSuppression(); exportLauncher.launch(ready.file.name) },
+            onExport = { vm.armLockSuppression(); exportLauncher.launch(ready.file.name) },
+            onSaveText = { content -> vm.saveText(ready.file, content) },
             modifier = modifier,
         )
         return

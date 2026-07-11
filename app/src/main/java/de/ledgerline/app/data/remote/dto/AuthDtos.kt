@@ -17,3 +17,22 @@ import kotlinx.serialization.Serializable
     val email: String? = null,
     val locale: String? = null,
 )
+
+/** `GET /api/v1/me` — account identity + usage. All fields tolerant/defaulted. */
+@Serializable data class MeResponse(
+    val user: MeUser,
+    val usage: MeUsage? = null,
+)
+
+@Serializable data class MeUser(
+    val id: Long? = null,
+    val name: String? = null,
+    val email: String? = null,
+    val locale: String? = null,
+    val groups: List<String> = emptyList(),
+)
+
+@Serializable data class MeUsage(
+    val files: Long? = null,
+    val gallery: Long? = null,
+)
