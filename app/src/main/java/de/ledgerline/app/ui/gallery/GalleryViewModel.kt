@@ -31,6 +31,16 @@ data class GalleryUi(
     val loading: Boolean = false,
     val error: Boolean = false,
     val photos: List<GalleryPhoto> = emptyList(),
+    /** The same [photos], grouped by capture day for the timeline grid. Presentation only. */
+    val dayGroups: List<DayGroup> = emptyList(),
+)
+
+/** One capture-day bucket for the timeline grid: a stable day key, a display
+ *  label, and the photos taken that day (newest-day-first, in-day order preserved). */
+data class DayGroup(
+    val dayKey: String,
+    val label: String,
+    val photos: List<GalleryPhoto>,
 )
 
 @HiltViewModel
@@ -245,7 +255,7 @@ class GalleryViewModel @Inject constructor(
             .filter { it.trashed == _showTrash.value }
             .filter { !_favoritesOnly.value || _showTrash.value || it.favorite }
             .sortedByDescending { epochOf(it.taken_at ?: it.created) }
-        _state.value = GalleryUi(false, false, photos)
+        _state.value = GalleryUi(false, false, photos, groupByDay(photos))
     }
 
     /** Best-effort epoch millis from an ISO-8601 or EXIF (`yyyy:MM:dd HH:mm:ss`)
@@ -261,5 +271,43 @@ class GalleryViewModel @Inject constructor(
                 .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         }
         return 0L
+    }
+
+    companion object {
+        /**
+         * Group an already-sorted, already-filtered photo list by capture DAY
+         * (the day part of `taken_at ?: created`) for the timeline grid — matching
+         * the web. Input order is preserved: the first photo of each day fixes the
+         * day's position (so a descending-by-date input yields newest-day-first
+         * groups), and within a day photos keep their input order. Photos with a
+         * blank/unparseable date land in the "unknown" group (label "—"), which — as
+         * the last entries of a newest-first list (epoch 0) — sorts last.
+         */
+        fun groupByDay(photos: List<GalleryPhoto>): List<DayGroup> {
+            val buckets = LinkedHashMap<String, MutableList<GalleryPhoto>>()
+            for (p in photos) {
+                val key = dayKeyOf(p.taken_at ?: p.created)
+                buckets.getOrPut(key) { mutableListOf() }.add(p)
+            }
+            return buckets.map { (key, ps) -> DayGroup(key, dayLabel(key), ps) }
+        }
+
+        /** First 10 chars of an ISO/EXIF date (`yyyy-MM-dd`), or "unknown" if blank/short. */
+        private fun dayKeyOf(ts: String?): String {
+            if (ts.isNullOrBlank()) return "unknown"
+            // Normalise EXIF `yyyy:MM:dd` to `yyyy-MM-dd`, then take the date part.
+            val norm = ts.trim().replaceFirst(Regex("^(\\d{4}):(\\d{2}):(\\d{2})"), "$1-$2-$3")
+            val date = norm.take(10)
+            return if (date.length == 10) date else "unknown"
+        }
+
+        /** Localized long date from a `yyyy-MM-dd` key; "unknown" → "—", else the raw key on failure. */
+        private fun dayLabel(dayKey: String): String {
+            if (dayKey == "unknown") return "—"
+            return runCatching {
+                java.time.LocalDate.parse(dayKey)
+                    .format(java.time.format.DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.LONG))
+            }.getOrDefault(dayKey)
+        }
     }
 }

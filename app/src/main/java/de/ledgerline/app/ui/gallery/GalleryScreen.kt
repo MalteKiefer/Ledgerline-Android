@@ -376,27 +376,35 @@ private fun PhotosTab(
                             )
                         }
                     }
-                    items(ui.photos, key = { it.id }) { photo ->
-                        SelectableThumbCell(
-                            photo = photo,
-                            vm = vm,
-                            selectionMode = selectionMode,
-                            selected = photo.id in selected,
-                            onClick = {
-                                if (selectionMode) {
-                                    if (photo.id in selected) selected.remove(photo.id)
-                                    else selected.add(photo.id)
-                                } else {
-                                    onOpenPhoto(photo.id)
-                                }
-                            },
-                            onLongClick = {
-                                if (!selectionMode) {
-                                    selectionMode = true
-                                    if (photo.id !in selected) selected.add(photo.id)
-                                }
-                            },
-                        )
+                    ui.dayGroups.forEach { group ->
+                        item(
+                            span = { GridItemSpan(maxLineSpan) },
+                            key = "day-${group.dayKey}",
+                        ) {
+                            DayHeader(group.label)
+                        }
+                        items(group.photos, key = { it.id }) { photo ->
+                            SelectableThumbCell(
+                                photo = photo,
+                                vm = vm,
+                                selectionMode = selectionMode,
+                                selected = photo.id in selected,
+                                onClick = {
+                                    if (selectionMode) {
+                                        if (photo.id in selected) selected.remove(photo.id)
+                                        else selected.add(photo.id)
+                                    } else {
+                                        onOpenPhoto(photo.id)
+                                    }
+                                },
+                                onLongClick = {
+                                    if (!selectionMode) {
+                                        selectionMode = true
+                                        if (photo.id !in selected) selected.add(photo.id)
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -775,6 +783,19 @@ private fun queryPhotoName(context: Context, uri: Uri): String {
         if (ni >= 0 && c.moveToFirst() && !c.isNull(ni)) return c.getString(ni)
     }
     return "photo.jpg"
+}
+
+/** Full-span timeline day header shown above each capture-day group in the grid. */
+@Composable
+private fun DayHeader(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 6.dp),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
