@@ -1,0 +1,30 @@
+package de.ledgerline.app.domain.usecase
+
+/**
+ * A content source for a gallery import: name + mime + lazy byte reader.
+ * [lat]/[lng] are optional device coordinates for camera-captured photos (where the
+ * EXIF strip has no GPS). Picker/share photos leave them null — the server reads their EXIF.
+ */
+data class PhotoSource(
+    val name: String,
+    val mime: String,
+    val read: () -> ByteArray,
+    val lat: Double? = null,
+    val lng: Double? = null,
+)
+
+/** Result of an [ImportPhotos] run: number of sources uploaded/deduped vs. failed. */
+data class ImportResult(val done: Int, val failed: Int)
+
+/**
+ * Uploads a batch of photos into the gallery index: read bytes, compute the sha-256
+ * signature, dedup against the already-known sigs, upload, and append the new entry.
+ *
+ * This is the pure import loop shared by the Gallery screen and the share target. It
+ * does NOT wrap itself in [de.ledgerline.app.core.ops.OperationManager] — the caller
+ * owns the operation and passes a [report] reporter so progress feeds the shared
+ * overlay + service notification.
+ */
+interface ImportPhotos {
+    suspend fun invoke(sources: List<PhotoSource>, report: (Int, Int) -> Unit): ImportResult
+}

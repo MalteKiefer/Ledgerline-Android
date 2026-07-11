@@ -11,6 +11,7 @@ import de.ledgerline.app.domain.model.NamedFolder
 import de.ledgerline.app.domain.model.WorkspaceManifest
 import de.ledgerline.app.domain.usecase.FileBlobs
 import de.ledgerline.app.domain.usecase.FilesUsage
+import de.ledgerline.app.domain.usecase.ImportFile
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +57,7 @@ class FilesViewModel @Inject constructor(
     private val blobRepo: FileBlobs,
     private val filesUsage: FilesUsage,
     private val lockGuard: LockGuard,
+    private val importFile: ImportFile,
 ) : ViewModel() {
     private val stack = ArrayDeque<String?>().apply { addLast(null) }   // current folder = last
     private val _state = MutableStateFlow(FilesUi(loading = true))
@@ -153,24 +155,8 @@ class FilesViewModel @Inject constructor(
     fun uploadPicked(name: String, mime: String, size: Long, open: () -> InputStream) = viewModelScope.launch {
         _busy.value = true
         try {
-            when (val up = blobRepo.upload(name, mime, size, open)) {
-                is Outcome.Ok -> {
-                    val cwd = stack.last()
-                    mutate.invoke { m ->
-                        m.copy(
-                            files = m.files + FileEntry(
-                                id = newId(),          // entry id distinct from the blob id (matches the web contract)
-                                blob = up.value.id,
-                                encFileKey = up.value.encFileKey,
-                                name = name,
-                                mime = mime,
-                                size = size,
-                                folder = cwd,
-                            ),
-                        )
-                    }
-                }
-                is Outcome.Err -> _message.value = "Upload failed"
+            if (importFile.invoke(name, mime, size, folder = stack.last(), open = open) is Outcome.Err) {
+                _message.value = "Upload failed"
             }
         } finally {
             _busy.value = false
