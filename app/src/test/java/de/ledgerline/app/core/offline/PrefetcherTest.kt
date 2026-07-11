@@ -76,7 +76,7 @@ class PrefetcherTest {
     private fun fileRepo(api: LedgerlineApi, cache: BlobDiskCache): FileBlobRepository {
         val sh = SessionHolder().apply { set(Session("https://x", "tok", "", null)) }
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
-        return FileBlobRepository(sh, vh, SealTagCrypto(), cache, FakeOfflineFlags(), apiProvider = { api })
+        return FileBlobRepository(sh, vh, SealTagCrypto(), cache, FakeOfflineFlags(), File(System.getProperty("java.io.tmpdir")), apiProvider = { api })
     }
 
     private fun prefetcher(

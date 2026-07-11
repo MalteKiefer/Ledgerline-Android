@@ -16,4 +16,11 @@ interface FileBlobs {
     suspend fun downloadToBytes(blob: String, encFileKey: String): Outcome<ByteArray>
     suspend fun downloadTo(blob: String, encFileKey: String, write: (ByteArray) -> Unit): Outcome<Unit>
     suspend fun deleteBlobs(blobs: List<String>)
+
+    /**
+     * Quota self-heal: tell the server the full set of blob ids the manifest still
+     * references; it frees its own blobs NOT in the list (older than the grace window).
+     * Returns the resulting (used, quota) bytes, or null on any failure (best-effort).
+     */
+    suspend fun reconcile(referencedBlobs: List<String>): Pair<Long, Long>?
 }

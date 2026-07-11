@@ -7,12 +7,21 @@ import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
 import de.ledgerline.app.data.remote.dto.ProcessResponse
+import de.ledgerline.app.data.remote.dto.ReconcileRequest
+import de.ledgerline.app.data.remote.dto.ReconcileResponse
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
+import de.ledgerline.app.data.remote.dto.UploadAbortRequest
+import de.ledgerline.app.data.remote.dto.UploadCompleteRequest
+import de.ledgerline.app.data.remote.dto.UploadCompleteResponse
+import de.ledgerline.app.data.remote.dto.UploadInitRequest
+import de.ledgerline.app.data.remote.dto.UploadInitResponse
+import de.ledgerline.app.data.remote.dto.UploadPartResponse
 import de.ledgerline.app.data.remote.dto.UploadResponse
 import de.ledgerline.app.data.remote.dto.UsageResponse
 import de.ledgerline.app.data.remote.dto.VaultResponse
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -53,8 +62,28 @@ interface LedgerlineApi {
     @POST("api/v1/files/upload")
     suspend fun uploadFile(@Part file: MultipartBody.Part): Response<UploadResponse>
 
+    @POST("api/v1/files/upload/init")
+    suspend fun uploadInit(@Body body: UploadInitRequest): Response<UploadInitResponse>
+
+    @Multipart
+    @POST("api/v1/files/upload/part")
+    suspend fun uploadPart(
+        @Part("token") token: RequestBody,
+        @Part("part") part: RequestBody,
+        @Part chunk: MultipartBody.Part,
+    ): Response<UploadPartResponse>
+
+    @POST("api/v1/files/upload/complete")
+    suspend fun uploadComplete(@Body body: UploadCompleteRequest): Response<UploadCompleteResponse>
+
+    @POST("api/v1/files/upload/abort")
+    suspend fun uploadAbort(@Body body: UploadAbortRequest): Response<Unit>
+
     @DELETE("api/v1/files/blob/{blob}")
     suspend fun deleteBlob(@Path("blob") blob: String): Response<Unit>
+
+    @POST("api/v1/files/blobs/reconcile")
+    suspend fun reconcileFiles(@Body body: ReconcileRequest): Response<ReconcileResponse>
 
     @PUT("api/v1/store")
     suspend fun putStore(@Body body: StorePutRequest): Response<StoreResponse>
@@ -85,6 +114,9 @@ interface LedgerlineApi {
 
     @DELETE("api/v1/gallery/blob/{blob}")
     suspend fun deleteGalleryBlob(@Path("blob") blob: String): Response<Unit>
+
+    @POST("api/v1/gallery/blobs/reconcile")
+    suspend fun reconcileGallery(@Body body: ReconcileRequest): Response<ReconcileResponse>
 
     @POST("api/v1/gallery/embed-text")
     suspend fun embedText(@Body body: EmbedTextRequest): Response<EmbedTextResponse>

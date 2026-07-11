@@ -117,6 +117,22 @@ class FilesViewModel @Inject constructor(
             _state.value = _state.value.copy(loading = false, error = true)
         }
         loadUsage()
+        reconcile()
+    }
+
+    /**
+     * Quota self-heal (best-effort): send the server the full set of blob ids the manifest
+     * still references (each file's content blob plus every version blob) so it can free
+     * orphaned blobs older than its grace window. Updates usage from the response; ignores
+     * failure. Nothing to do until a manifest is loaded.
+     */
+    private fun reconcile() = viewModelScope.launch {
+        val m = cache.value.value?.manifest ?: return@launch
+        val referenced = m.files
+            .flatMap { listOf(it.blob) + it.versions.map { v -> v.blob } }
+            .filter { it.isNotBlank() }
+            .distinct()
+        blobRepo.reconcile(referenced)?.let { (used, quota) -> _usage.value = UsageInfo(used, quota) }
     }
 
     /**

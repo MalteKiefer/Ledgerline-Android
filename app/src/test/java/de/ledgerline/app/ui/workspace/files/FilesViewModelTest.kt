@@ -30,9 +30,12 @@ class FilesViewModelTest {
     private fun ws() = Workspace(
         WorkspaceManifest(
             files = listOf(
-                FileEntry(id = "f1", name = "root.txt", size = 10, folder = null),
-                FileEntry(id = "f2", name = "in-docs.txt", size = 20, folder = "d1"),
-                FileEntry(id = "f3", name = "gone.txt", size = 5, folder = null, trashed = true),
+                FileEntry(
+                    id = "f1", blob = "b1", name = "root.txt", size = 10, folder = null,
+                    versions = listOf(FileVersion(id = "v1", blob = "b1v1")),
+                ),
+                FileEntry(id = "f2", blob = "b2", name = "in-docs.txt", size = 20, folder = "d1"),
+                FileEntry(id = "f3", blob = "b3", name = "gone.txt", size = 5, folder = null, trashed = true),
             ),
             fileFolders = listOf(NamedFolder(id = "d1", name = "Docs", parent = null)),
         ),
@@ -72,7 +75,14 @@ class FilesViewModelTest {
             return Outcome.Ok(Unit)
         }
         override suspend fun deleteBlobs(blobs: List<String>) { deleted += blobs }
+        override suspend fun reconcile(referencedBlobs: List<String>): Pair<Long, Long>? {
+            reconciled += referencedBlobs
+            return null
+        }
     }
+
+    /** Captures the referenced-blob set passed to reconcile (last call wins for asserts). */
+    private val reconciled = mutableListOf<String>()
 
     // Stub usage: returns a fixed used/quota.
     private val usage = object : FilesUsage {
@@ -122,6 +132,13 @@ class FilesViewModelTest {
         vm.setQuery("")
         assertEquals(listOf("Docs"), vm.state.value.folders.map { it.name })
         assertEquals(listOf("root.txt"), vm.state.value.files.map { it.name })
+    }
+
+    @Test fun refresh_reconciles_with_all_referenced_blobs() = runTest {
+        val vm = vm()
+        vm.refresh()
+        // f1's content blob + its version blob, f2, and f3 (trashed still references its blob).
+        assertEquals(setOf("b1", "b1v1", "b2", "b3"), reconciled.toSet())
     }
 
     @Test fun setQuery_does_not_affect_trash_view() = runTest {

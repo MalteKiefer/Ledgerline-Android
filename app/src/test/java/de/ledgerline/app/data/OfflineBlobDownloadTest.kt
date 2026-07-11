@@ -12,6 +12,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.Response
+import java.io.File
 
 /**
  * A2 — network-first, cache-fallback for content blobs. An online download caches
@@ -38,7 +39,9 @@ class OfflineBlobDownloadTest {
         FileBlobRepository(
             SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) },
             VaultKeyHolder().apply { set(vk) },
-            crypto, blobCache, flags, apiProvider = { api },
+            crypto, blobCache, flags,
+            cacheDir = File(System.getProperty("java.io.tmpdir")),
+            apiProvider = { api },
         )
 
     @Test fun files_online_caches_then_offline_serves_from_cache() = runBlocking {
