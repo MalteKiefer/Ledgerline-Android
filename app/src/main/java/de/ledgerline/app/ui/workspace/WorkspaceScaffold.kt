@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.MoreVert
@@ -40,6 +41,7 @@ import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.gallery.GalleryScreen
 import de.ledgerline.app.ui.settings.SettingsContent
 import de.ledgerline.app.ui.workspace.bookmarks.BookmarksScreen
+import de.ledgerline.app.ui.workspace.contacts.ContactsScreen
 import de.ledgerline.app.ui.workspace.files.FilesScreen
 import de.ledgerline.app.ui.workspace.notes.NotesScreen
 import de.ledgerline.app.ui.workspace.todos.TodosScreen
@@ -47,7 +49,7 @@ import de.ledgerline.app.ui.workspace.todos.TodosScreen
 private data class Tab(val labelRes: Int, val icon: ImageVector)
 
 /** Secondary destinations reached from the bottom-bar "More" sheet. */
-private enum class Overflow { Bookmarks, Settings }
+private enum class Overflow { Bookmarks, Contacts, Settings }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -118,6 +120,10 @@ fun WorkspaceScaffold(
                     topBar = { AppTopBar(stringResource(R.string.menu_bookmarks), onBack = { overflow = null }) },
                 ) { p -> BookmarksScreen(Modifier.padding(p)) }
 
+                Overflow.Contacts -> AppScaffold(
+                    topBar = { AppTopBar(stringResource(R.string.menu_contacts), onBack = { overflow = null }) },
+                ) { p -> ContactsScreen(Modifier.padding(p)) }
+
                 Overflow.Settings -> SettingsContent(
                     onLockNow = onLockNow,
                     onDisconnected = onDisconnected,
@@ -148,6 +154,13 @@ fun WorkspaceScaffold(
                     .clickable { overflow = Overflow.Bookmarks; showSheet = false },
                 leadingContent = { Icon(Icons.Outlined.Bookmarks, contentDescription = null) },
                 headlineContent = { Text(stringResource(R.string.menu_bookmarks)) },
+            )
+            ListItem(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { overflow = Overflow.Contacts; showSheet = false },
+                leadingContent = { Icon(Icons.Outlined.Contacts, contentDescription = null) },
+                headlineContent = { Text(stringResource(R.string.menu_contacts)) },
             )
             ListItem(
                 modifier = Modifier

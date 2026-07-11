@@ -1,6 +1,7 @@
 package de.ledgerline.app.domain.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class WorkspaceManifest(
@@ -12,6 +13,7 @@ data class WorkspaceManifest(
     val todoLists: List<TodoList> = emptyList(),
     val files: List<FileEntry> = emptyList(),
     val fileFolders: List<NamedFolder> = emptyList(),
+    val contacts: List<Contact> = emptyList(),
 )
 
 @Serializable
@@ -66,6 +68,44 @@ data class FileVersion(
     val id: String = "", val blob: String = "", val encFileKey: String = "",
     val size: Long = 0, val mime: String = "", val name: String = "",
     val created: String? = null,
+)
+
+@Serializable
+data class LabeledValue(val value: String = "", val type: String = "home")
+
+@Serializable
+data class PostalAddress(
+    val street: String = "", val city: String = "", val region: String = "",
+    val zip: String = "", val country: String = "", val type: String = "home",
+)
+
+/**
+ * A zero-knowledge contact record. Lives in the sealed `/store` manifest; only the
+ * optional avatar is a separate encrypted blob (`avatarRef`/`avatarKey`). Every field
+ * is defaulted and tolerant so web-authored records decode cleanly; `_x` preserves
+ * unknown vCard properties through a decode→encode round-trip (Phase-A integrity fix).
+ */
+@Serializable
+data class Contact(
+    val id: String = "",
+    val fn: String = "",            // formatted/display name
+    val first: String = "", val last: String = "", val middle: String = "",
+    val prefix: String = "", val suffix: String = "", val nickname: String = "",
+    val org: String = "", val department: String = "", val title: String = "", val role: String = "",
+    val emails: List<LabeledValue> = emptyList(),
+    val phones: List<LabeledValue> = emptyList(),
+    val impp: List<LabeledValue> = emptyList(),
+    val urls: List<LabeledValue> = emptyList(),
+    val addresses: List<PostalAddress> = emptyList(),
+    val bday: String = "", val anniversary: String = "",
+    val note: String = "",
+    val categories: List<String> = emptyList(),
+    val favorite: Boolean = false,
+    @Serializable(with = FlexibleTrashedSerializer::class) val trashed: Boolean = false,
+    val avatarRef: String? = null, val avatarKey: String? = null,
+    val bdayNotified: Int? = null, val annivNotified: Int? = null,
+    val _x: List<JsonElement> = emptyList(),  // preserve unknown vCard props round-trip
+    val updated: String? = null,
 )
 
 /** The decrypted manifest plus the server version (kept for Phase-3 writes). */

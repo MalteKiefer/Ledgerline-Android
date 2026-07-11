@@ -322,4 +322,41 @@
     <string name="tags_hint">Tags (kommagetrennt)</string>
     <string name="open_with">Öffnen mit</string>
     <string name="settings_link_chooser">Beim Öffnen von Links Browser fragen</string>
+
+    <!-- Contacts -->
+    <string name="tab_contacts">Kontakte</string>
+    <string name="menu_contacts">Kontakte</string>
+    <string name="contact_new">Neuer Kontakt</string>
+    <string name="contact_edit">Kontakt bearbeiten</string>
+    <string name="contact_delete">Kontakt löschen</string>
+    <string name="contact_untitled">Kein Name</string>
+    <string name="contacts_empty">Noch keine Kontakte.</string>
+    <string name="contact_first">Vorname</string>
+    <string name="contact_last">Nachname</string>
+    <string name="contact_nickname">Spitzname</string>
+    <string name="contact_org">Organisation</string>
+    <string name="contact_department">Abteilung</string>
+    <string name="contact_title">Titel</string>
+    <string name="contact_role">Rolle</string>
+    <string name="contact_email">E-Mail</string>
+    <string name="contact_phone">Telefon</string>
+    <string name="contact_address">Adresse</string>
+    <string name="contact_note">Notiz</string>
+    <string name="contact_favorite">Favorit</string>
+    <string name="contact_bday">Geburtstag</string>
+    <string name="contact_anniversary">Jahrestag</string>
+    <string name="contact_add_email">E-Mail hinzufügen</string>
+    <string name="contact_add_phone">Telefon hinzufügen</string>
+    <string name="contact_add_address">Adresse hinzufügen</string>
+    <string name="contact_avatar_pick">Foto wählen</string>
+    <string name="contact_avatar_remove">Foto entfernen</string>
+    <string name="address_street">Straße</string>
+    <string name="address_zip">PLZ</string>
+    <string name="address_city">Stadt</string>
+    <string name="address_region">Region</string>
+    <string name="address_country">Land</string>
+    <string name="type_home">Privat</string>
+    <string name="type_work">Arbeit</string>
+    <string name="type_cell">Mobil</string>
+    <string name="type_other">Sonstige</string>
 </resources>

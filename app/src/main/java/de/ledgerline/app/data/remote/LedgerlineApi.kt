@@ -7,6 +7,8 @@ import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
 import de.ledgerline.app.data.remote.dto.ProcessResponse
+import de.ledgerline.app.data.remote.dto.ReconcileRequest
+import de.ledgerline.app.data.remote.dto.ReconcileResponse
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
 import de.ledgerline.app.data.remote.dto.UploadResponse
@@ -88,4 +90,23 @@ interface LedgerlineApi {
 
     @POST("api/v1/gallery/embed-text")
     suspend fun embedText(@Body body: EmbedTextRequest): Response<EmbedTextResponse>
+
+    // --- Contacts avatar blobs (records themselves live in the /store manifest) ---
+
+    @GET("api/v1/contacts/usage")
+    suspend fun contactsUsage(): Response<UsageResponse>
+
+    @POST("api/v1/contacts/blobs/reconcile")
+    suspend fun contactsReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
+
+    @Multipart
+    @POST("api/v1/contacts/upload")
+    suspend fun contactsUpload(@Part file: MultipartBody.Part): Response<UploadResponse>
+
+    @GET("api/v1/contacts/raw/{blob}")
+    @Streaming
+    suspend fun contactsRaw(@Path("blob") blob: String): Response<ResponseBody>
+
+    @DELETE("api/v1/contacts/blob/{blob}")
+    suspend fun deleteContactBlob(@Path("blob") blob: String): Response<Unit>
 }

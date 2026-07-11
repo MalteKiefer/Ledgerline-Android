@@ -324,4 +324,41 @@
     <string name="tags_hint">Tags (comma-separated)</string>
     <string name="open_with">Open with</string>
     <string name="settings_link_chooser">Ask which browser to open links</string>
+
+    <!-- Contacts -->
+    <string name="tab_contacts">Contacts</string>
+    <string name="menu_contacts">Contacts</string>
+    <string name="contact_new">New contact</string>
+    <string name="contact_edit">Edit contact</string>
+    <string name="contact_delete">Delete contact</string>
+    <string name="contact_untitled">No name</string>
+    <string name="contacts_empty">No contacts yet.</string>
+    <string name="contact_first">First name</string>
+    <string name="contact_last">Last name</string>
+    <string name="contact_nickname">Nickname</string>
+    <string name="contact_org">Organization</string>
+    <string name="contact_department">Department</string>
+    <string name="contact_title">Title</string>
+    <string name="contact_role">Role</string>
+    <string name="contact_email">Email</string>
+    <string name="contact_phone">Phone</string>
+    <string name="contact_address">Address</string>
+    <string name="contact_note">Note</string>
+    <string name="contact_favorite">Favorite</string>
+    <string name="contact_bday">Birthday</string>
+    <string name="contact_anniversary">Anniversary</string>
+    <string name="contact_add_email">Add email</string>
+    <string name="contact_add_phone">Add phone</string>
+    <string name="contact_add_address">Add address</string>
+    <string name="contact_avatar_pick">Choose photo</string>
+    <string name="contact_avatar_remove">Remove photo</string>
+    <string name="address_street">Street</string>
+    <string name="address_zip">ZIP</string>
+    <string name="address_city">City</string>
+    <string name="address_region">Region</string>
+    <string name="address_country">Country</string>
+    <string name="type_home">Home</string>
+    <string name="type_work">Work</string>
+    <string name="type_cell">Mobile</string>
+    <string name="type_other">Other</string>
 </resources>
