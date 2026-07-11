@@ -6,11 +6,14 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.LocaleList
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,10 +22,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
@@ -37,9 +49,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -51,25 +65,42 @@ import de.ledgerline.app.R
 import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
+import de.ledgerline.app.ui.common.AppScaffold
+import de.ledgerline.app.ui.common.AppTopBar
+import de.ledgerline.app.ui.common.SectionHeader
 import de.ledgerline.app.ui.ops.OpProgressOverlay
 import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
+/** Internal Settings destinations — a categorized landing (ROOT) plus one sub-screen per category. */
+private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, OFFLINE, BACKGROUND, ACCOUNT, ABOUT }
+
 /**
- * Settings body — scrollable sections only, no Scaffold or TopAppBar.
- * Intended to be embedded directly in [WorkspaceScaffold] as the Settings tab content.
+ * Settings screen — a categorized landing list plus per-category sub-screens, in the
+ * style of Android system settings. Owns its own [AppTopBar] and internal navigation
+ * (via a [rememberSaveable] [SettingsRoute]); no Navigation-Compose is used.
+ *
+ * Top-level back: if a sub-screen is open, return to the landing list; if already on the
+ * landing list, invoke [onBack] to exit Settings entirely (the caller closes the overflow).
+ *
+ * Mounted from [de.ledgerline.app.ui.workspace.WorkspaceScaffold].
  */
 @Composable
 fun SettingsContent(
-    modifier: Modifier = Modifier,
     onLockNow: () -> Unit,
     onDisconnected: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
     vm: SettingsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Collect every flow the sub-screens need here in the parent, then pass state +
+    // callbacks down. Wiring to SettingsViewModel is unchanged — only the layout moves.
     val timeout by vm.timeoutMinutes.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
+    val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
     val offlineEnabled by vm.offlineEnabled.collectAsStateWithLifecycle()
     val filesPolicy by vm.filesPolicy.collectAsStateWithLifecycle()
     val photosPolicy by vm.photosPolicy.collectAsStateWithLifecycle()
@@ -78,13 +109,15 @@ fun SettingsContent(
     val prefetchChargingOnly by vm.prefetchChargingOnly.collectAsStateWithLifecycle()
     val prefetchMessage by vm.prefetchMessage.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSizeBytes.collectAsStateWithLifecycle()
+
+    var route by rememberSaveable { mutableStateOf(SettingsRoute.ROOT) }
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
     var showDisconnectConfirm by remember { mutableStateOf(false) }
     var showClearCacheConfirm by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val constraintsMsg = stringResource(R.string.settings_prefetch_constraints)
 
-    // Compute the cache-size line once when the Settings tab is shown.
+    // Compute the cache-size line once when the Settings screen is shown.
     LaunchedEffect(Unit) { vm.refreshCacheSize() }
 
     // Surface the manual-prefetch "constraints not met" reason as a snackbar, once.
@@ -100,185 +133,100 @@ fun SettingsContent(
     val notificationsLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-    Box(modifier.fillMaxSize()) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-    ) {
-        // Language
-        SectionHeader(stringResource(R.string.settings_language))
-        Column(Modifier.selectableGroup()) {
-            RadioRow(stringResource(R.string.settings_language_system), currentLang == "") {
-                applyLanguage(context, ""); currentLang = ""
-            }
-            RadioRow(stringResource(R.string.settings_language_de), currentLang == "de") {
-                applyLanguage(context, "de"); currentLang = "de"
-            }
-            RadioRow(stringResource(R.string.settings_language_en), currentLang == "en") {
-                applyLanguage(context, "en"); currentLang = "en"
-            }
-        }
-
-        // Security
-        SectionHeader(stringResource(R.string.settings_security))
-        Text(
-            stringResource(R.string.settings_idle_timeout),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        Column(Modifier.selectableGroup()) {
-            SettingsStore.TIMEOUT_OPTIONS.forEach { minutes ->
-                RadioRow(timeoutLabel(minutes), timeout == minutes) { vm.setTimeoutMinutes(minutes) }
-            }
-        }
-        OutlinedButton(
-            onClick = onLockNow,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) { Text(stringResource(R.string.settings_lock_now)) }
-
-        SwitchRow(
-            title = stringResource(R.string.settings_background_ops_title),
-            subtitle = stringResource(R.string.settings_background_ops_subtitle),
-            checked = backgroundOps,
-            onCheckedChange = { enabled ->
-                vm.setBackgroundOpsEnabled(enabled)
-                // Ask for POST_NOTIFICATIONS on enable (Android 13+) so the ongoing
-                // foreground-service notification is visible while ops run.
-                if (enabled &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-                    PackageManager.PERMISSION_GRANTED
-                ) {
-                    notificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
-            },
-        )
-
-        // Offline
-        SectionHeader(stringResource(R.string.settings_offline_section))
-        SwitchRow(
-            title = stringResource(R.string.settings_offline_title),
-            subtitle = stringResource(R.string.settings_offline_subtitle),
-            checked = offlineEnabled,
-            onCheckedChange = { vm.setOfflineEnabled(it) },
-        )
-        // Files policy: Off / On demand / All.
-        SelectorGroup(
-            title = stringResource(R.string.settings_files_policy),
-            enabled = offlineEnabled,
-        ) {
-            RadioRow(stringResource(R.string.policy_off), filesPolicy == FileBlobPolicy.OFF, offlineEnabled) {
-                vm.setFilesPolicy(FileBlobPolicy.OFF)
-            }
-            RadioRow(stringResource(R.string.policy_on_demand), filesPolicy == FileBlobPolicy.ON_DEMAND, offlineEnabled) {
-                vm.setFilesPolicy(FileBlobPolicy.ON_DEMAND)
-            }
-            RadioRow(stringResource(R.string.policy_all), filesPolicy == FileBlobPolicy.ALL, offlineEnabled) {
-                vm.setFilesPolicy(FileBlobPolicy.ALL)
-            }
-        }
-
-        // Photos policy: Off / Thumbnails / On demand / All.
-        SelectorGroup(
-            title = stringResource(R.string.settings_photos_policy),
-            enabled = offlineEnabled,
-        ) {
-            RadioRow(stringResource(R.string.policy_off), photosPolicy == PhotoBlobPolicy.OFF, offlineEnabled) {
-                vm.setPhotosPolicy(PhotoBlobPolicy.OFF)
-            }
-            RadioRow(stringResource(R.string.policy_thumbs), photosPolicy == PhotoBlobPolicy.THUMBS, offlineEnabled) {
-                vm.setPhotosPolicy(PhotoBlobPolicy.THUMBS)
-            }
-            RadioRow(stringResource(R.string.policy_on_demand), photosPolicy == PhotoBlobPolicy.ON_DEMAND, offlineEnabled) {
-                vm.setPhotosPolicy(PhotoBlobPolicy.ON_DEMAND)
-            }
-            RadioRow(stringResource(R.string.policy_all), photosPolicy == PhotoBlobPolicy.ALL, offlineEnabled) {
-                vm.setPhotosPolicy(PhotoBlobPolicy.ALL)
-            }
-        }
-
-        // Cache size limit: 512 MB / 1 GB / 2 GB / Unlimited.
-        SelectorGroup(
-            title = stringResource(R.string.settings_cache_limit),
-            enabled = offlineEnabled,
-        ) {
-            SettingsStore.CACHE_MAX_MB_OPTIONS.forEach { mb ->
-                RadioRow(cacheLimitLabel(mb), cacheMaxMb == mb, offlineEnabled) { vm.setCacheMaxMb(mb) }
-            }
-        }
-
-        SwitchRow(
-            title = stringResource(R.string.settings_prefetch_wifi),
-            subtitle = "",
-            checked = prefetchWifiOnly,
-            enabled = offlineEnabled,
-            onCheckedChange = { vm.setPrefetchWifiOnly(it) },
-        )
-        SwitchRow(
-            title = stringResource(R.string.settings_prefetch_charging),
-            subtitle = "",
-            checked = prefetchChargingOnly,
-            enabled = offlineEnabled,
-            onCheckedChange = { vm.setPrefetchChargingOnly(it) },
-        )
-        OutlinedButton(
-            onClick = { vm.prefetchNow() },
-            enabled = offlineEnabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) { Text(stringResource(R.string.settings_prefetch_now)) }
-
-        Text(
-            stringResource(R.string.settings_offline_size, humanSize(cacheSize)),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        TextButton(
-            onClick = { showClearCacheConfirm = true },
-            modifier = Modifier.padding(horizontal = 8.dp),
-        ) { Text(stringResource(R.string.settings_offline_clear)) }
-
-        // Account
-        SectionHeader(stringResource(R.string.settings_account))
-        Button(
-            onClick = { showDisconnectConfirm = true },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                contentColor = MaterialTheme.colorScheme.onError,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) { Text(stringResource(R.string.settings_disconnect)) }
-
-        // About
-        SectionHeader(stringResource(R.string.settings_about))
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium)
-            Text(
-                stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                stringResource(R.string.settings_zero_knowledge),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-        }
+    // Back: a sub-screen returns to the landing list; the landing list exits Settings.
+    BackHandler {
+        if (route == SettingsRoute.ROOT) onBack() else route = SettingsRoute.ROOT
     }
-        // Shared op overlay: a manual "Prefetch now" (OpKind.PREFETCH) shows here.
-        OpProgressOverlay()
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+
+    val title = when (route) {
+        SettingsRoute.ROOT -> stringResource(R.string.settings_title)
+        SettingsRoute.APPEARANCE -> stringResource(R.string.settings_cat_appearance)
+        SettingsRoute.SECURITY -> stringResource(R.string.settings_cat_security)
+        SettingsRoute.OFFLINE -> stringResource(R.string.settings_cat_offline)
+        SettingsRoute.BACKGROUND -> stringResource(R.string.settings_cat_background)
+        SettingsRoute.ACCOUNT -> stringResource(R.string.settings_cat_account)
+        SettingsRoute.ABOUT -> stringResource(R.string.settings_cat_about)
+    }
+
+    AppScaffold(
+        modifier = modifier,
+        topBar = {
+            AppTopBar(
+                title = title,
+                onBack = { if (route == SettingsRoute.ROOT) onBack() else route = SettingsRoute.ROOT },
+            )
+        },
+    ) { innerPadding ->
+        Box(Modifier.fillMaxSize()) {
+            when (route) {
+                SettingsRoute.ROOT -> SettingsRoot(innerPadding) { route = it }
+
+                SettingsRoute.APPEARANCE -> AppearanceSettings(
+                    padding = innerPadding,
+                    currentLang = currentLang,
+                    onSelectLang = { tag -> applyLanguage(context, tag); currentLang = tag },
+                )
+
+                SettingsRoute.SECURITY -> SecuritySettings(
+                    padding = innerPadding,
+                    timeout = timeout,
+                    onSetTimeout = vm::setTimeoutMinutes,
+                    onLockNow = onLockNow,
+                )
+
+                SettingsRoute.OFFLINE -> OfflineSettings(
+                    padding = innerPadding,
+                    offlineEnabled = offlineEnabled,
+                    filesPolicy = filesPolicy,
+                    photosPolicy = photosPolicy,
+                    cacheMaxMb = cacheMaxMb,
+                    prefetchWifiOnly = prefetchWifiOnly,
+                    prefetchChargingOnly = prefetchChargingOnly,
+                    cacheSize = cacheSize,
+                    onSetOffline = vm::setOfflineEnabled,
+                    onSetFilesPolicy = vm::setFilesPolicy,
+                    onSetPhotosPolicy = vm::setPhotosPolicy,
+                    onSetCacheMaxMb = vm::setCacheMaxMb,
+                    onSetWifiOnly = vm::setPrefetchWifiOnly,
+                    onSetChargingOnly = vm::setPrefetchChargingOnly,
+                    onPrefetchNow = vm::prefetchNow,
+                    onClearCache = { showClearCacheConfirm = true },
+                )
+
+                SettingsRoute.BACKGROUND -> BackgroundSettings(
+                    padding = innerPadding,
+                    backgroundOps = backgroundOps,
+                    linkChooser = linkChooser,
+                    onSetBackgroundOps = { enabled ->
+                        vm.setBackgroundOpsEnabled(enabled)
+                        // Ask for POST_NOTIFICATIONS on enable (Android 13+) so the ongoing
+                        // foreground-service notification is visible while ops run.
+                        if (enabled &&
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+                            PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    },
+                    onSetLinkChooser = vm::setLinkChooserEnabled,
+                )
+
+                SettingsRoute.ACCOUNT -> AccountSettings(
+                    padding = innerPadding,
+                    onDisconnect = { showDisconnectConfirm = true },
+                )
+
+                SettingsRoute.ABOUT -> AboutSettings(innerPadding)
+            }
+
+            // Shared op overlay: a manual "Prefetch now" (OpKind.PREFETCH) shows here.
+            OpProgressOverlay()
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 
     if (showDisconnectConfirm) {
@@ -320,16 +268,304 @@ fun SettingsContent(
     }
 }
 
+/* ----------------------------- Landing list ----------------------------- */
+
 @Composable
-private fun SectionHeader(text: String) {
-    HorizontalDivider()
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth().padding(16.dp, 16.dp, 16.dp, 4.dp),
+private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .verticalScroll(rememberScrollState()),
+    ) {
+        CategoryRow(
+            icon = Icons.Outlined.Language,
+            title = stringResource(R.string.settings_cat_appearance),
+            subtitle = stringResource(R.string.settings_cat_appearance_sub),
+        ) { onNavigate(SettingsRoute.APPEARANCE) }
+        CategoryRow(
+            icon = Icons.Outlined.Lock,
+            title = stringResource(R.string.settings_cat_security),
+            subtitle = stringResource(R.string.settings_cat_security_sub),
+        ) { onNavigate(SettingsRoute.SECURITY) }
+        CategoryRow(
+            icon = Icons.Outlined.CloudOff,
+            title = stringResource(R.string.settings_cat_offline),
+            subtitle = stringResource(R.string.settings_cat_offline_sub),
+        ) { onNavigate(SettingsRoute.OFFLINE) }
+        CategoryRow(
+            icon = Icons.Outlined.Sync,
+            title = stringResource(R.string.settings_cat_background),
+            subtitle = stringResource(R.string.settings_cat_background_sub),
+        ) { onNavigate(SettingsRoute.BACKGROUND) }
+        CategoryRow(
+            icon = Icons.Outlined.AccountCircle,
+            title = stringResource(R.string.settings_cat_account),
+            subtitle = stringResource(R.string.settings_cat_account_sub),
+        ) { onNavigate(SettingsRoute.ACCOUNT) }
+        CategoryRow(
+            icon = Icons.Outlined.Info,
+            title = stringResource(R.string.settings_cat_about),
+            subtitle = stringResource(R.string.settings_cat_about_sub),
+        ) { onNavigate(SettingsRoute.ABOUT) }
+    }
+}
+
+/** A single tappable category row on a tonal surface: leading icon + title + short subtitle. */
+@Composable
+private fun CategoryRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    ListItem(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
+        leadingContent = { Icon(icon, contentDescription = null) },
+        headlineContent = { Text(title) },
+        supportingContent = { Text(subtitle) },
     )
 }
+
+/* --------------------------- Category sub-screens --------------------------- */
+
+@Composable
+private fun AppearanceSettings(
+    padding: PaddingValues,
+    currentLang: String,
+    onSelectLang: (String) -> Unit,
+) {
+    SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_language))
+        Column(Modifier.selectableGroup()) {
+            RadioRow(stringResource(R.string.settings_language_system), currentLang == "") {
+                onSelectLang("")
+            }
+            RadioRow(stringResource(R.string.settings_language_de), currentLang == "de") {
+                onSelectLang("de")
+            }
+            RadioRow(stringResource(R.string.settings_language_en), currentLang == "en") {
+                onSelectLang("en")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SecuritySettings(
+    padding: PaddingValues,
+    timeout: Int,
+    onSetTimeout: (Int) -> Unit,
+    onLockNow: () -> Unit,
+) {
+    SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_security))
+        Text(
+            stringResource(R.string.settings_idle_timeout),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        Column(Modifier.selectableGroup()) {
+            SettingsStore.TIMEOUT_OPTIONS.forEach { minutes ->
+                RadioRow(timeoutLabel(minutes), timeout == minutes) { onSetTimeout(minutes) }
+            }
+        }
+        OutlinedButton(
+            onClick = onLockNow,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) { Text(stringResource(R.string.settings_lock_now)) }
+        Text(
+            stringResource(R.string.settings_lock_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun OfflineSettings(
+    padding: PaddingValues,
+    offlineEnabled: Boolean,
+    filesPolicy: FileBlobPolicy,
+    photosPolicy: PhotoBlobPolicy,
+    cacheMaxMb: Int,
+    prefetchWifiOnly: Boolean,
+    prefetchChargingOnly: Boolean,
+    cacheSize: Long,
+    onSetOffline: (Boolean) -> Unit,
+    onSetFilesPolicy: (FileBlobPolicy) -> Unit,
+    onSetPhotosPolicy: (PhotoBlobPolicy) -> Unit,
+    onSetCacheMaxMb: (Int) -> Unit,
+    onSetWifiOnly: (Boolean) -> Unit,
+    onSetChargingOnly: (Boolean) -> Unit,
+    onPrefetchNow: () -> Unit,
+    onClearCache: () -> Unit,
+) {
+    SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_offline_section))
+        SwitchRow(
+            title = stringResource(R.string.settings_offline_title),
+            subtitle = stringResource(R.string.settings_offline_subtitle),
+            checked = offlineEnabled,
+            onCheckedChange = onSetOffline,
+        )
+        // Files policy: Off / On demand / All.
+        SelectorGroup(
+            title = stringResource(R.string.settings_files_policy),
+            enabled = offlineEnabled,
+        ) {
+            RadioRow(stringResource(R.string.policy_off), filesPolicy == FileBlobPolicy.OFF, offlineEnabled) {
+                onSetFilesPolicy(FileBlobPolicy.OFF)
+            }
+            RadioRow(stringResource(R.string.policy_on_demand), filesPolicy == FileBlobPolicy.ON_DEMAND, offlineEnabled) {
+                onSetFilesPolicy(FileBlobPolicy.ON_DEMAND)
+            }
+            RadioRow(stringResource(R.string.policy_all), filesPolicy == FileBlobPolicy.ALL, offlineEnabled) {
+                onSetFilesPolicy(FileBlobPolicy.ALL)
+            }
+        }
+
+        // Photos policy: Off / Thumbnails / On demand / All.
+        SelectorGroup(
+            title = stringResource(R.string.settings_photos_policy),
+            enabled = offlineEnabled,
+        ) {
+            RadioRow(stringResource(R.string.policy_off), photosPolicy == PhotoBlobPolicy.OFF, offlineEnabled) {
+                onSetPhotosPolicy(PhotoBlobPolicy.OFF)
+            }
+            RadioRow(stringResource(R.string.policy_thumbs), photosPolicy == PhotoBlobPolicy.THUMBS, offlineEnabled) {
+                onSetPhotosPolicy(PhotoBlobPolicy.THUMBS)
+            }
+            RadioRow(stringResource(R.string.policy_on_demand), photosPolicy == PhotoBlobPolicy.ON_DEMAND, offlineEnabled) {
+                onSetPhotosPolicy(PhotoBlobPolicy.ON_DEMAND)
+            }
+            RadioRow(stringResource(R.string.policy_all), photosPolicy == PhotoBlobPolicy.ALL, offlineEnabled) {
+                onSetPhotosPolicy(PhotoBlobPolicy.ALL)
+            }
+        }
+
+        // Cache size limit: 512 MB / 1 GB / 2 GB / Unlimited.
+        SelectorGroup(
+            title = stringResource(R.string.settings_cache_limit),
+            enabled = offlineEnabled,
+        ) {
+            SettingsStore.CACHE_MAX_MB_OPTIONS.forEach { mb ->
+                RadioRow(cacheLimitLabel(mb), cacheMaxMb == mb, offlineEnabled) { onSetCacheMaxMb(mb) }
+            }
+        }
+
+        SwitchRow(
+            title = stringResource(R.string.settings_prefetch_wifi),
+            subtitle = "",
+            checked = prefetchWifiOnly,
+            enabled = offlineEnabled,
+            onCheckedChange = onSetWifiOnly,
+        )
+        SwitchRow(
+            title = stringResource(R.string.settings_prefetch_charging),
+            subtitle = "",
+            checked = prefetchChargingOnly,
+            enabled = offlineEnabled,
+            onCheckedChange = onSetChargingOnly,
+        )
+        OutlinedButton(
+            onClick = onPrefetchNow,
+            enabled = offlineEnabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) { Text(stringResource(R.string.settings_prefetch_now)) }
+
+        Text(
+            stringResource(R.string.settings_offline_size, humanSize(cacheSize)),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        TextButton(
+            onClick = onClearCache,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        ) { Text(stringResource(R.string.settings_offline_clear)) }
+    }
+}
+
+@Composable
+private fun BackgroundSettings(
+    padding: PaddingValues,
+    backgroundOps: Boolean,
+    linkChooser: Boolean,
+    onSetBackgroundOps: (Boolean) -> Unit,
+    onSetLinkChooser: (Boolean) -> Unit,
+) {
+    SubScreen(padding) {
+        SwitchRow(
+            title = stringResource(R.string.settings_background_ops_title),
+            subtitle = stringResource(R.string.settings_background_ops_subtitle),
+            checked = backgroundOps,
+            onCheckedChange = onSetBackgroundOps,
+        )
+        SwitchRow(
+            title = stringResource(R.string.settings_link_chooser),
+            subtitle = "",
+            checked = linkChooser,
+            onCheckedChange = onSetLinkChooser,
+        )
+    }
+}
+
+@Composable
+private fun AccountSettings(padding: PaddingValues, onDisconnect: () -> Unit) {
+    SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_account))
+        Button(
+            onClick = onDisconnect,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error,
+                contentColor = MaterialTheme.colorScheme.onError,
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) { Text(stringResource(R.string.settings_disconnect)) }
+    }
+}
+
+@Composable
+private fun AboutSettings(padding: PaddingValues) {
+    SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_about))
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium)
+            Text(
+                stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(R.string.settings_zero_knowledge),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+    }
+}
+
+/** Shared scrolling container for a sub-screen — a single vertical scroll, no nesting. */
+@Composable
+private fun SubScreen(padding: PaddingValues, content: @Composable () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(padding)
+            .verticalScroll(rememberScrollState()),
+    ) { content() }
+}
+
+/* ------------------------------ Row helpers ------------------------------ */
 
 @Composable
 private fun SwitchRow(

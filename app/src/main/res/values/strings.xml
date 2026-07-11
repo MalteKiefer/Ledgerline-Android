@@ -53,6 +53,64 @@
     <string name="todo_priority">Priority</string>
     <string name="todo_due">Due</string>
 
+    <!-- Todo CRUD -->
+    <string name="todo_new">New todo</string>
+    <string name="todo_edit">Edit todo</string>
+    <string name="todo_delete">Delete todo</string>
+    <string name="todo_title_hint">Title</string>
+    <string name="todo_list">List</string>
+    <string name="todo_no_list">No list</string>
+    <string name="todo_new_list">New list…</string>
+    <string name="todo_description">Description</string>
+    <string name="todo_url_hint">Link (optional)</string>
+    <string name="todo_due_hint">Due date (e.g. 2026-07-15)</string>
+    <string name="todo_manage_lists">Manage lists</string>
+    <string name="todo_all_lists">All lists</string>
+    <string name="list_rename">Rename list</string>
+    <string name="list_delete">Delete list</string>
+
+    <!-- Note CRUD -->
+    <string name="note_new">New note</string>
+    <string name="note_untitled">Untitled</string>
+    <string name="note_title_hint">Title</string>
+    <string name="note_body_hint">Write something…</string>
+    <string name="note_pin">Pin</string>
+    <string name="note_unpin">Unpin</string>
+    <string name="note_delete">Delete note</string>
+    <string name="note_updated">Updated %1$s</string>
+
+    <!-- Bookmark CRUD -->
+    <string name="bm_new">New bookmark</string>
+    <string name="bm_edit">Edit bookmark</string>
+    <string name="bm_delete">Delete bookmark</string>
+    <string name="bm_url_hint">URL</string>
+    <string name="bm_title_hint">Title</string>
+    <string name="bm_desc_hint">Description</string>
+    <string name="bm_folder">Folder</string>
+    <string name="bm_no_folder">No folder</string>
+    <string name="bm_new_folder">New folder…</string>
+    <string name="bm_favorite">Favorite</string>
+    <string name="bm_read_later">Read later</string>
+    <string name="bm_all_folders">All</string>
+    <string name="bm_manage_folders">Manage folders</string>
+    <string name="folder_rename">Rename folder</string>
+    <string name="folder_delete">Delete folder</string>
+
+    <!-- Trash (notes / bookmarks / todos) -->
+    <string name="trash_title">Trash</string>
+    <string name="trash_open">Trash (%1$d)</string>
+    <string name="trash_empty">Empty trash</string>
+    <string name="trash_empty_confirm">Permanently delete all trashed items?</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_delete_forever">Delete forever</string>
+    <string name="delete_forever_confirm">Permanently delete this item?</string>
+    <string name="trash_empty_state">Trash is empty</string>
+
+    <!-- Search -->
+    <string name="search_hint">Search</string>
+    <string name="search_clear">Clear</string>
+    <string name="search_no_results">No matches</string>
+
     <!-- File detail -->
     <string name="file_type">Type</string>
     <string name="file_size">Size</string>
@@ -64,6 +122,7 @@
     <string name="file_rename">Rename</string>
     <string name="file_delete">Delete</string>
     <string name="file_delete_confirm">Delete this item? This cannot be undone.</string>
+    <string name="file_trash_confirm">Move this item to trash?</string>
     <string name="file_open">Open</string>
     <string name="file_save">Save</string>
     <string name="file_saved">Saved</string>
@@ -80,6 +139,20 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
+    <!-- Settings landing categories -->
+    <string name="settings_cat_appearance">Appearance &amp; language</string>
+    <string name="settings_cat_appearance_sub">App language</string>
+    <string name="settings_cat_security">Security &amp; lock</string>
+    <string name="settings_cat_security_sub">Auto-lock timeout, lock now</string>
+    <string name="settings_cat_offline">Offline &amp; storage</string>
+    <string name="settings_cat_offline_sub">Offline cache, policies, cache size</string>
+    <string name="settings_cat_background">Background &amp; links</string>
+    <string name="settings_cat_background_sub">Background processing, link handling</string>
+    <string name="settings_cat_account">Account</string>
+    <string name="settings_cat_account_sub">Disconnect this device</string>
+    <string name="settings_cat_about">About</string>
+    <string name="settings_cat_about_sub">Version, zero-knowledge</string>
+    <string name="settings_lock_note">Your vault stays locked with your passphrase. Biometrics may unlock a saved session where enabled; the encryption key never leaves this device.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_system">System default</string>
     <string name="settings_language_de">Deutsch</string>
@@ -149,7 +222,7 @@
     <string name="gallery_usage">%1$s used</string>
     <string name="gallery_usage_full">%1$s of %2$s used</string>
     <string name="photo_original">View original</string>
-    <string name="photo_video_soon">Video playback comes later.</string>
+    <string name="video_load_failed">Couldn\'t play this video</string>
     <string name="info_title">Photo info</string>
     <string name="info_file">File</string>
     <string name="info_taken">Taken</string>
@@ -177,6 +250,8 @@
     <string name="album_new">New album</string>
     <string name="album_add_to">Add to album</string>
     <string name="selection_count">%1$d selected</string>
+    <string name="action_delete">Delete</string>
+    <string name="selection_delete_confirm">Move %1$d item(s) to trash?</string>
     <string name="albums_empty">No albums yet.</string>
     <string name="album_rename">Rename</string>
     <string name="album_delete">Delete</string>
@@ -207,4 +282,7 @@
     <string name="share_import">Import</string>
     <string name="share_imported">Imported %1$d item(s)</string>
     <string name="share_import_failed">%1$d failed</string>
+    <string name="tags_hint">Tags (comma-separated)</string>
+    <string name="open_with">Open with</string>
+    <string name="settings_link_chooser">Ask which browser to open links</string>
 </resources>

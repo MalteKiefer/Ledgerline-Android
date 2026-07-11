@@ -46,6 +46,15 @@ android {
         }
     }
     testOptions { unitTests.isIncludeAndroidResources = true }
+    lint {
+        // The bundled lifecycle lint detector `NonNullableMutableLiveDataDetector`
+        // (check id `NullSafeMutableLiveData`) crashes against the Kotlin analysis
+        // API pulled in by the Compose BOM 2026.01.01 upgrade
+        // ("Found class KaCallableMemberCall, but interface was expected"). This is a
+        // lint/AGP bug, not a code issue — disable the single offending check so the
+        // release lint-vital pass runs. Revisit when AGP/lint ships a compatible build.
+        disable += "NullSafeMutableLiveData"
+    }
 }
 
 dependencies {
@@ -77,6 +86,10 @@ dependencies {
     implementation(libs.camera.camera2)
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
+    // AndroidX Media3 (ExoPlayer) — open-source, no Google Play Services.
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.datasource)
     implementation(libs.zxing.core)
     implementation(libs.biometric)
     implementation(libs.androidx.lifecycle.runtime.compose)

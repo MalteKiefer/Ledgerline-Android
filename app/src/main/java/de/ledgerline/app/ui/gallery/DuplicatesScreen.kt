@@ -66,6 +66,10 @@ fun DuplicatesScreen(
     val scanned by dupVm.scanned.collectAsStateWithLifecycle()
     val marked by dupVm.marked.collectAsStateWithLifecycle()
 
+    // Full-screen: hide the outer workspace chrome so this screen owns its insets.
+    val fs = de.ledgerline.app.ui.workspace.LocalFullscreen.current
+    androidx.compose.runtime.DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
+
     // Auto-scan once on first entry.
     LaunchedEffect(Unit) {
         if (!scanned) dupVm.scan()

@@ -53,6 +53,49 @@
     <string name="todo_priority">Priorität</string>
     <string name="todo_due">Fällig</string>
 
+    <!-- Todo CRUD -->
+    <string name="todo_new">Neue Aufgabe</string>
+    <string name="todo_edit">Aufgabe bearbeiten</string>
+    <string name="todo_delete">Aufgabe löschen</string>
+    <string name="todo_title_hint">Titel</string>
+    <string name="todo_list">Liste</string>
+    <string name="todo_no_list">Keine Liste</string>
+    <string name="todo_new_list">Neue Liste…</string>
+    <string name="todo_description">Beschreibung</string>
+    <string name="todo_url_hint">Link (optional)</string>
+    <string name="todo_due_hint">Fälligkeitsdatum (z. B. 2026-07-15)</string>
+    <string name="todo_manage_lists">Listen verwalten</string>
+    <string name="todo_all_lists">Alle Listen</string>
+    <string name="list_rename">Liste umbenennen</string>
+    <string name="list_delete">Liste löschen</string>
+
+    <!-- Notiz-CRUD -->
+    <string name="note_new">Neue Notiz</string>
+    <string name="note_untitled">Ohne Titel</string>
+    <string name="note_title_hint">Titel</string>
+    <string name="note_body_hint">Schreib etwas…</string>
+    <string name="note_pin">Anheften</string>
+    <string name="note_unpin">Lösen</string>
+    <string name="note_delete">Notiz löschen</string>
+    <string name="note_updated">Aktualisiert %1$s</string>
+
+    <!-- Lesezeichen-CRUD -->
+    <string name="bm_new">Neues Lesezeichen</string>
+    <string name="bm_edit">Lesezeichen bearbeiten</string>
+    <string name="bm_delete">Lesezeichen löschen</string>
+    <string name="bm_url_hint">URL</string>
+    <string name="bm_title_hint">Titel</string>
+    <string name="bm_desc_hint">Beschreibung</string>
+    <string name="bm_folder">Ordner</string>
+    <string name="bm_no_folder">Kein Ordner</string>
+    <string name="bm_new_folder">Neuer Ordner…</string>
+    <string name="bm_favorite">Favorit</string>
+    <string name="bm_read_later">Später lesen</string>
+    <string name="bm_all_folders">Alle</string>
+    <string name="bm_manage_folders">Ordner verwalten</string>
+    <string name="folder_rename">Ordner umbenennen</string>
+    <string name="folder_delete">Ordner löschen</string>
+
     <!-- Datei-Detail -->
     <string name="file_type">Typ</string>
     <string name="file_size">Größe</string>
@@ -64,6 +107,7 @@
     <string name="file_rename">Umbenennen</string>
     <string name="file_delete">Löschen</string>
     <string name="file_delete_confirm">Dieses Element löschen? Das kann nicht rückgängig gemacht werden.</string>
+    <string name="file_trash_confirm">Dieses Element in den Papierkorb?</string>
     <string name="file_open">Öffnen</string>
     <string name="file_save">Speichern</string>
     <string name="file_saved">Gespeichert</string>
@@ -80,6 +124,20 @@
 
     <!-- Einstellungen -->
     <string name="settings_title">Einstellungen</string>
+    <!-- Kategorien der Einstellungs-Übersicht -->
+    <string name="settings_cat_appearance">Darstellung &amp; Sprache</string>
+    <string name="settings_cat_appearance_sub">App-Sprache</string>
+    <string name="settings_cat_security">Sicherheit &amp; Sperre</string>
+    <string name="settings_cat_security_sub">Auto-Sperre, jetzt sperren</string>
+    <string name="settings_cat_offline">Offline &amp; Speicher</string>
+    <string name="settings_cat_offline_sub">Offline-Cache, Richtlinien, Cache-Größe</string>
+    <string name="settings_cat_background">Hintergrund &amp; Links</string>
+    <string name="settings_cat_background_sub">Hintergrund-Verarbeitung, Link-Verhalten</string>
+    <string name="settings_cat_account">Konto</string>
+    <string name="settings_cat_account_sub">Dieses Gerät trennen</string>
+    <string name="settings_cat_about">Über</string>
+    <string name="settings_cat_about_sub">Version, Zero-Knowledge</string>
+    <string name="settings_lock_note">Dein Tresor bleibt mit deiner Passphrase gesperrt. Biometrie kann eine gespeicherte Sitzung entsperren, wo aktiviert; der Schlüssel verlässt dieses Gerät nie.</string>
     <string name="settings_language">Sprache</string>
     <string name="settings_language_system">Systemstandard</string>
     <string name="settings_language_de">Deutsch</string>
@@ -133,6 +191,21 @@
     <string name="action_settings">Einstellungen</string>
     <string name="action_more">Mehr</string>
 
+    <!-- Papierkorb (Notizen / Lesezeichen / Todos) -->
+    <string name="trash_title">Papierkorb</string>
+    <string name="trash_open">Papierkorb (%1$d)</string>
+    <string name="trash_empty">Papierkorb leeren</string>
+    <string name="trash_empty_confirm">Alle Elemente im Papierkorb endgültig löschen?</string>
+    <string name="action_restore">Wiederherstellen</string>
+    <string name="action_delete_forever">Endgültig löschen</string>
+    <string name="delete_forever_confirm">Dieses Element endgültig löschen?</string>
+    <string name="trash_empty_state">Papierkorb ist leer</string>
+
+    <!-- Suche -->
+    <string name="search_hint">Suchen</string>
+    <string name="search_clear">Löschen</string>
+    <string name="search_no_results">Keine Treffer</string>
+
     <!-- Galerie -->
     <string name="gallery_add">Fotos hinzufügen</string>
     <string name="gallery_upload_photos">Fotos hochladen</string>
@@ -147,7 +220,7 @@
     <string name="gallery_usage">%1$s belegt</string>
     <string name="gallery_usage_full">%1$s von %2$s belegt</string>
     <string name="photo_original">Original anzeigen</string>
-    <string name="photo_video_soon">Videowiedergabe kommt später.</string>
+    <string name="video_load_failed">Video konnte nicht abgespielt werden</string>
     <string name="info_title">Foto-Info</string>
     <string name="info_file">Datei</string>
     <string name="info_taken">Aufgenommen</string>
@@ -164,7 +237,7 @@
     <string name="welcome_location_granted">Standort aktiviert</string>
     <string name="gallery_tab_photos">Fotos</string>
     <string name="gallery_tab_albums">Alben</string>
-    <string name="gallery_tab_people">People</string>
+    <string name="gallery_tab_people">Personen</string>
     <string name="duplicates_action">Duplikate suchen</string>
     <string name="duplicates_title">Duplikate</string>
     <string name="duplicates_rescan">Neu scannen</string>
@@ -175,6 +248,8 @@
     <string name="album_new">Neues Album</string>
     <string name="album_add_to">Zu Album hinzufügen</string>
     <string name="selection_count">%1$d ausgewählt</string>
+    <string name="action_delete">Löschen</string>
+    <string name="selection_delete_confirm">%1$d Element(e) in den Papierkorb?</string>
     <string name="albums_empty">Noch keine Alben.</string>
     <string name="album_rename">Umbenennen</string>
     <string name="album_delete">Löschen</string>
@@ -205,4 +280,7 @@
     <string name="share_import">Importieren</string>
     <string name="share_imported">%1$d importiert</string>
     <string name="share_import_failed">%1$d fehlgeschlagen</string>
+    <string name="tags_hint">Tags (kommagetrennt)</string>
+    <string name="open_with">Öffnen mit</string>
+    <string name="settings_link_chooser">Beim Öffnen von Links Browser fragen</string>
 </resources>

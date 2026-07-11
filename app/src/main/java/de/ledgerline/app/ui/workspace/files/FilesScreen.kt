@@ -2,8 +2,13 @@ package de.ledgerline.app.ui.workspace.files
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import de.ledgerline.app.ui.common.ConfirmDialog
+import de.ledgerline.app.ui.common.TextInputDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,9 +21,12 @@ import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -34,6 +42,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +63,8 @@ import de.ledgerline.app.domain.model.FileEntry
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
+import de.ledgerline.app.ui.workspace.common.SearchField
+import de.ledgerline.app.ui.workspace.common.TrashBar
 import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
@@ -65,6 +76,9 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     val viewer by vm.viewer.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val usage by vm.usage.collectAsStateWithLifecycle()
+    val showTrash by vm.showTrash.collectAsStateWithLifecycle()
+    val trashCount by vm.trashCount.collectAsStateWithLifecycle()
+    val query by vm.query.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -132,6 +146,8 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     var renameFile by remember { mutableStateOf<Pair<String, String>?>(null) }
     var deleteFolderId by remember { mutableStateOf<String?>(null) }
     var deleteFileEntry by remember { mutableStateOf<FileEntry?>(null) }
+    var deleteForeverEntry by remember { mutableStateOf<FileEntry?>(null) }
+    var confirmEmptyTrash by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -142,7 +158,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
         contentWindowInsets = WindowInsets(0),
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            if (!ui.loading && !ui.error) {
+            if (!ui.loading && !ui.error && !showTrash) {
                 FilesFab(
                     onUpload = { vm.armLockSuppression(); uploadLauncher.launch(arrayOf("*/*")) },
                     onNewFolder = { showNewFolder = true },
@@ -154,59 +170,102 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
             when {
                 ui.loading -> LoadingBox()
                 ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() })
-                else -> PullToRefreshBox(isRefreshing = ui.loading, onRefresh = { vm.refresh() }) {
-                    if (ui.folders.isEmpty() && ui.files.isEmpty() && !ui.canGoBack) {
-                        RefreshableMessage(stringResource(R.string.ws_empty_files))
-                    } else {
-                        LazyColumn(Modifier.fillMaxSize()) {
-                            usage?.let { u ->
-                                item {
-                                    val usageText = if (u.quota <= 0) {
-                                        stringResource(R.string.file_usage_unlimited, humanSize(u.used))
-                                    } else {
-                                        stringResource(R.string.file_usage, humanSize(u.used), humanSize(u.quota))
-                                    }
-                                    Text(
-                                        usageText,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                else -> Column(Modifier.fillMaxSize()) {
+                    // Fixed header: trash bar in trash view, else a "Trash (N)" entry
+                    // (only when the trash has something).
+                    if (showTrash) {
+                        TrashBar(
+                            onBack = { vm.setTrash(false) },
+                            onEmptyTrash = { confirmEmptyTrash = true },
+                            emptyEnabled = ui.files.isNotEmpty(),
+                        )
+                    } else if (trashCount > 0) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                            TextButton(onClick = { vm.setTrash(true) }) {
+                                Icon(Icons.Outlined.Delete, null, Modifier.padding(end = 4.dp).size(18.dp))
+                                Text(stringResource(R.string.trash_open, trashCount))
+                            }
+                        }
+                    }
+                    if (!showTrash) SearchField(query = query, onQueryChange = { vm.setQuery(it) })
+                    PullToRefreshBox(isRefreshing = ui.loading, onRefresh = { vm.refresh() }, modifier = Modifier.weight(1f)) {
+                        when {
+                            showTrash && ui.files.isEmpty() ->
+                                RefreshableMessage(stringResource(R.string.trash_empty_state))
+                            showTrash -> LazyColumn(Modifier.fillMaxSize()) {
+                                items(ui.files, key = { it.id }) { file ->
+                                    ListItem(
+                                        headlineContent = { Text(file.name) },
+                                        supportingContent = { Text(humanSize(file.size)) },
+                                        leadingContent = { Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null) },
+                                        trailingContent = {
+                                            Row {
+                                                IconButton(onClick = { vm.restore(file.id) }) {
+                                                    Icon(Icons.Outlined.RestoreFromTrash, stringResource(R.string.action_restore))
+                                                }
+                                                IconButton(onClick = { deleteForeverEntry = file }) {
+                                                    Icon(Icons.Outlined.DeleteForever, stringResource(R.string.action_delete_forever))
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
                             }
-                            if (ui.canGoBack) item {
-                                ListItem(
-                                    headlineContent = { Text("..") },
-                                    leadingContent = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) },
-                                    modifier = Modifier.fillMaxWidth().clickable { vm.back() },
-                                )
-                            }
-                            items(ui.folders, key = { it.id }) { f ->
-                                ListItem(
-                                    headlineContent = { Text(f.name) },
-                                    leadingContent = { Icon(Icons.Outlined.Folder, null, tint = MaterialTheme.colorScheme.primary) },
-                                    trailingContent = {
-                                        RowOverflow(
-                                            onRename = { renameFolder = f.id to f.name },
-                                            onDelete = { deleteFolderId = f.id },
+                            query.isNotBlank() && ui.folders.isEmpty() && ui.files.isEmpty() ->
+                                RefreshableMessage(stringResource(R.string.search_no_results))
+                            ui.folders.isEmpty() && ui.files.isEmpty() && !ui.canGoBack ->
+                                RefreshableMessage(stringResource(R.string.ws_empty_files))
+                            else -> LazyColumn(Modifier.fillMaxSize()) {
+                                usage?.let { u ->
+                                    item {
+                                        val usageText = if (u.quota <= 0) {
+                                            stringResource(R.string.file_usage_unlimited, humanSize(u.used))
+                                        } else {
+                                            stringResource(R.string.file_usage, humanSize(u.used), humanSize(u.quota))
+                                        }
+                                        Text(
+                                            usageText,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                                         )
-                                    },
-                                    modifier = Modifier.fillMaxWidth().clickable { vm.open(f.id) },
-                                )
-                            }
-                            items(ui.files, key = { it.id }) { file ->
-                                ListItem(
-                                    headlineContent = { Text(file.name) },
-                                    supportingContent = { Text(humanSize(file.size)) },
-                                    leadingContent = { Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null) },
-                                    trailingContent = {
-                                        RowOverflow(
-                                            onRename = { renameFile = file.id to file.name },
-                                            onDelete = { deleteFileEntry = file },
-                                        )
-                                    },
-                                    modifier = Modifier.fillMaxWidth().clickable { vm.openFile(file) },
-                                )
+                                    }
+                                }
+                                if (ui.canGoBack) item {
+                                    ListItem(
+                                        headlineContent = { Text("..") },
+                                        leadingContent = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) },
+                                        modifier = Modifier.fillMaxWidth().clickable { vm.back() },
+                                    )
+                                }
+                                items(ui.folders, key = { it.id }) { f ->
+                                    ListItem(
+                                        headlineContent = { Text(f.name) },
+                                        leadingContent = { Icon(Icons.Outlined.Folder, null, tint = MaterialTheme.colorScheme.primary) },
+                                        trailingContent = {
+                                            RowOverflow(
+                                                onRename = { renameFolder = f.id to f.name },
+                                                onDelete = { deleteFolderId = f.id },
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth().clickable { vm.open(f.id) },
+                                    )
+                                }
+                                items(ui.files, key = { it.id }) { file ->
+                                    ListItem(
+                                        headlineContent = { Text(file.name) },
+                                        supportingContent = { Text(humanSize(file.size)) },
+                                        leadingContent = { Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null) },
+                                        trailingContent = {
+                                            RowOverflow(
+                                                onRename = { renameFile = file.id to file.name },
+                                                onDelete = { deleteFileEntry = file },
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth().clickable { vm.openFile(file) },
+                                    )
+                                }
                             }
                         }
                     }
@@ -268,10 +327,26 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     }
     deleteFileEntry?.let { file ->
         ConfirmDialog(
-            message = stringResource(R.string.file_delete_confirm),
+            message = stringResource(R.string.file_trash_confirm),
             confirmLabel = stringResource(R.string.file_delete),
             onConfirm = { vm.deleteFile(file); deleteFileEntry = null },
             onDismiss = { deleteFileEntry = null },
+        )
+    }
+    deleteForeverEntry?.let { file ->
+        ConfirmDialog(
+            message = stringResource(R.string.delete_forever_confirm),
+            confirmLabel = stringResource(R.string.action_delete_forever),
+            onConfirm = { vm.deleteForever(file); deleteForeverEntry = null },
+            onDismiss = { deleteForeverEntry = null },
+        )
+    }
+    if (confirmEmptyTrash) {
+        ConfirmDialog(
+            message = stringResource(R.string.trash_empty_confirm),
+            confirmLabel = stringResource(R.string.trash_empty),
+            onConfirm = { vm.emptyTrash(); confirmEmptyTrash = false },
+            onDismiss = { confirmEmptyTrash = false },
         )
     }
 }

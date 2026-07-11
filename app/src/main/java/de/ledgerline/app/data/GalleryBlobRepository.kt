@@ -15,6 +15,7 @@ import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUploadApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -105,6 +106,29 @@ class GalleryBlobRepository private constructor(
             if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
             Outcome.Ok(UploadedBlob(res.body()!!.id, enc.sealKey(), bytes.size.toLong()))
         } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
+    }
+
+    /**
+     * Delete freed gallery blobs, honoring `Retry-After` on 429 (backoff capped at
+     * 30 s, max 3 attempts per blob). Sequential is fine — the bulk sizes here are small.
+     */
+    override suspend fun deleteBlobs(refs: List<String>) = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext
+        val api = apiProvider(session)
+        for (ref in refs.filter { it.isNotBlank() }.distinct()) {
+            var attempt = 0
+            while (attempt < 3) {
+                val res = try { api.deleteGalleryBlob(ref) } catch (_: Exception) { break }
+                if (res.code() == 429) {
+                    val retryAfterMs = res.headers()["Retry-After"]?.toLongOrNull()?.times(1000)
+                        ?: (1000L shl attempt)
+                    delay(minOf(retryAfterMs, 30_000L))
+                    attempt++
+                } else {
+                    break
+                }
+            }
+        }
     }
 
     override suspend fun process(bytes: ByteArray, name: String, mime: String): Outcome<ProcessResponse> = withContext(Dispatchers.IO) {
