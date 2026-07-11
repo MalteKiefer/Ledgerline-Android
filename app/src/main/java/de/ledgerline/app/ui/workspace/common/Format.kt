@@ -33,3 +33,19 @@ fun formatDue(due: String): String {
         due  // fall back to the raw value rather than hiding it
     }
 }
+
+/** True when the todo `due` value (ISO date or date-time) is strictly before today. */
+fun isOverdue(due: String): Boolean {
+    if (due.isBlank()) return false
+    return try {
+        val date = when {
+            due.contains('T') && (due.endsWith("Z") || due.contains('+')) ->
+                OffsetDateTime.parse(due).toLocalDate()
+            due.contains('T') -> LocalDateTime.parse(due).toLocalDate()
+            else -> LocalDate.parse(due)
+        }
+        date.isBefore(LocalDate.now())
+    } catch (_: Exception) {
+        false
+    }
+}

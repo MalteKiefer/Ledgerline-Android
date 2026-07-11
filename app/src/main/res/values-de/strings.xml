@@ -64,6 +64,8 @@
     <string name="todo_description">Beschreibung</string>
     <string name="todo_url_hint">Link (optional)</string>
     <string name="todo_due_hint">Fälligkeitsdatum (z. B. 2026-07-15)</string>
+    <string name="todo_due_set">Fälligkeit setzen</string>
+    <string name="todo_due_clear">Fälligkeit entfernen</string>
     <string name="todo_manage_lists">Listen verwalten</string>
     <string name="todo_all_lists">Alle Listen</string>
     <string name="list_rename">Liste umbenennen</string>
@@ -78,6 +80,8 @@
     <string name="note_unpin">Lösen</string>
     <string name="note_delete">Notiz löschen</string>
     <string name="note_updated">Aktualisiert %1$s</string>
+    <string name="note_edit_mode">Bearbeiten</string>
+    <string name="note_preview_mode">Vorschau</string>
 
     <!-- Lesezeichen-CRUD -->
     <string name="bm_new">Neues Lesezeichen</string>

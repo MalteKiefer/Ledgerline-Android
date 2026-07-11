@@ -13,7 +13,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,6 +89,9 @@ fun NoteDetailScreen(
     val titleFocus = remember { FocusRequester() }
     val isNew = note.title.isBlank() && note.content.isBlank()
 
+    // Brand-new blank notes open in edit; existing notes open in the rendered preview.
+    var preview by rememberSaveable(note.id) { mutableStateOf(!isNew) }
+
     // Brand-new note → land the cursor in the title.
     LaunchedEffect(note.id) {
         if (isNew) { titleFocus.requestFocus(); keyboard?.show() }
@@ -103,6 +108,13 @@ fun NoteDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { preview = !preview }) {
+                        if (preview) {
+                            Icon(Icons.Outlined.Edit, stringResource(R.string.note_edit_mode))
+                        } else {
+                            Icon(Icons.Outlined.Visibility, stringResource(R.string.note_preview_mode))
+                        }
+                    }
                     IconButton(onClick = onTogglePin) {
                         Icon(
                             Icons.Outlined.PushPin,
@@ -128,33 +140,44 @@ fun NoteDetailScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text(stringResource(R.string.note_title_hint)) },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                    imeAction = ImeAction.Next,
-                ),
-                modifier = Modifier.fillMaxWidth().focusRequester(titleFocus),
-            )
-            OutlinedTextField(
-                value = tagsText,
-                onValueChange = { tagsText = it },
-                label = { Text(stringResource(R.string.tags_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = content,
-                onValueChange = { content = it },
-                label = { Text(stringResource(R.string.note_body_hint)) },
-                minLines = 10,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            if (preview) {
+                if (title.isNotBlank()) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+                MarkdownText(content, modifier = Modifier.fillMaxWidth())
+            } else {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(stringResource(R.string.note_title_hint)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Next,
+                    ),
+                    modifier = Modifier.fillMaxWidth().focusRequester(titleFocus),
+                )
+                OutlinedTextField(
+                    value = tagsText,
+                    onValueChange = { tagsText = it },
+                    label = { Text(stringResource(R.string.tags_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = content,
+                    onValueChange = { content = it },
+                    label = { Text(stringResource(R.string.note_body_hint)) },
+                    minLines = 10,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             val updated = note.updated?.let { formatDue(it) }.orEmpty()
             if (updated.isNotBlank()) {
                 Text(

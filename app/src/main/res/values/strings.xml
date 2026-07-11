@@ -64,6 +64,8 @@
     <string name="todo_description">Description</string>
     <string name="todo_url_hint">Link (optional)</string>
     <string name="todo_due_hint">Due date (e.g. 2026-07-15)</string>
+    <string name="todo_due_set">Set due date</string>
+    <string name="todo_due_clear">Clear due date</string>
     <string name="todo_manage_lists">Manage lists</string>
     <string name="todo_all_lists">All lists</string>
     <string name="list_rename">Rename list</string>
@@ -78,6 +80,8 @@
     <string name="note_unpin">Unpin</string>
     <string name="note_delete">Delete note</string>
     <string name="note_updated">Updated %1$s</string>
+    <string name="note_edit_mode">Edit</string>
+    <string name="note_preview_mode">Preview</string>
 
     <!-- Bookmark CRUD -->
     <string name="bm_new">New bookmark</string>
