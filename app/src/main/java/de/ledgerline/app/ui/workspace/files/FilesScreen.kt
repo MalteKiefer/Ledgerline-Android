@@ -2,6 +2,8 @@ package de.ledgerline.app.ui.workspace.files
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import de.ledgerline.app.ui.common.ConfirmDialog
+import de.ledgerline.app.ui.common.TextInputDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets

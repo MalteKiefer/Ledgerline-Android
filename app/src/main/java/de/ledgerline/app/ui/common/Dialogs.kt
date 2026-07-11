@@ -1,4 +1,4 @@
-package de.ledgerline.app.ui.workspace.files
+package de.ledgerline.app.ui.common
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField

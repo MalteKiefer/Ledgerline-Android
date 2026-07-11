@@ -54,8 +54,8 @@ import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
 import de.ledgerline.app.ui.workspace.common.formatDue
-import de.ledgerline.app.ui.workspace.files.ConfirmDialog
-import de.ledgerline.app.ui.workspace.files.TextInputDialog
+import de.ledgerline.app.ui.common.ConfirmDialog
+import de.ledgerline.app.ui.common.TextInputDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

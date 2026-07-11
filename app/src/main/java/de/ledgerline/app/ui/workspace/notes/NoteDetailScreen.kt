@@ -44,7 +44,7 @@ import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.Note
 import de.ledgerline.app.ui.workspace.LocalFullscreen
 import de.ledgerline.app.ui.workspace.common.formatDue
-import de.ledgerline.app.ui.workspace.files.ConfirmDialog
+import de.ledgerline.app.ui.common.ConfirmDialog
 
 /**
  * Inline editor for a single note: an editable title + a multiline plain-text body

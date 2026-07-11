@@ -37,7 +37,7 @@ import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.ui.workspace.LocalFullscreen
 import de.ledgerline.app.ui.workspace.common.formatDue
-import de.ledgerline.app.ui.workspace.files.ConfirmDialog
+import de.ledgerline.app.ui.common.ConfirmDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

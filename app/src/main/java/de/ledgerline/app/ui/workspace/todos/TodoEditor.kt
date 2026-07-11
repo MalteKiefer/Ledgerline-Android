@@ -37,7 +37,7 @@ import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.domain.model.TodoList
 import de.ledgerline.app.ui.workspace.LocalFullscreen
-import de.ledgerline.app.ui.workspace.files.TextInputDialog
+import de.ledgerline.app.ui.common.TextInputDialog
 
 /** The four supported priority values, highest urgency first. */
 private val PRIORITIES = listOf("urgent", "high", "normal", "low")
