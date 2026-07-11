@@ -45,7 +45,12 @@ android {
             pickFirsts += "**/libsodium.so"
         }
     }
-    testOptions { unitTests.isIncludeAndroidResources = true }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        // The unit-test suite grew large; give the forked test JVM enough heap so the
+        // MockWebServer/OkHttp-based repo tests don't OutOfMemoryError.
+        unitTests.all { it.maxHeapSize = "1536m" }
+    }
     lint {
         // The bundled lifecycle lint detector `NonNullableMutableLiveDataDetector`
         // (check id `NullSafeMutableLiveData`) crashes against the Kotlin analysis
