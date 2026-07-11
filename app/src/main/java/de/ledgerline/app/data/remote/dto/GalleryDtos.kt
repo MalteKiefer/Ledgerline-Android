@@ -26,3 +26,11 @@ data class ProcessFace(
     val embedding: JsonElement? = null,
     val crop: String? = null,
 )
+
+/** `POST /gallery/embed-text` request: the free-text query to embed. */
+@Serializable
+data class EmbedTextRequest(val q: String)
+
+/** `POST /gallery/embed-text` response: the CLIP text embedding for the query. */
+@Serializable
+data class EmbedTextResponse(val embedding: List<Double> = emptyList())

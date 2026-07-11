@@ -2,6 +2,7 @@ package de.ledgerline.app.ui.gallery
 
 import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.GalleryCache
+import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.ops.BackgroundOpsSetting
@@ -15,6 +16,7 @@ import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.domain.model.Gallery
 import de.ledgerline.app.domain.model.GalleryManifest
 import de.ledgerline.app.domain.model.GalleryPhoto
+import de.ledgerline.app.domain.usecase.EmbedText
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUploadApi
 import de.ledgerline.app.domain.usecase.GalleryUsage
@@ -45,6 +47,11 @@ private class FakeBlobs : GalleryBlobs {
 
 private class FakeGalleryUsage : GalleryUsage {
     override suspend fun invoke(): Pair<Long, Long>? = null
+}
+
+/** Returns a canned query embedding (or null to force metadata-only search). */
+private class FakeEmbedText(private val embedding: List<Double>? = null) : EmbedText {
+    override suspend fun invoke(query: String): List<Double>? = embedding
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +131,7 @@ class GalleryViewModelTest {
         importPhotos: ImportPhotos = ImportPhotosImpl(cache, uploader, mutate),
         operationManager: OperationManager = testOperationManager(),
         blobs: FakeBlobs = FakeBlobs(),
+        embedText: EmbedText = FakeEmbedText(),
     ) = GalleryViewModel(
         load = load,
         cache = cache,
@@ -135,6 +143,8 @@ class GalleryViewModelTest {
         lockGuard = LockGuard(),
         vaultKeyHolder = de.ledgerline.app.core.security.VaultKeyHolder(),
         operationManager = operationManager,
+        embedText = embedText,
+        metaCache = MetaCache(),
     )
 
     /**
@@ -145,6 +155,12 @@ class GalleryViewModelTest {
     private fun awaitIdle(om: OperationManager) {
         val deadline = System.currentTimeMillis() + 5_000
         while (om.hasActive() && System.currentTimeMillis() < deadline) Thread.sleep(5)
+    }
+
+    /** Wait (wall-clock) until the search coroutine (which hops to a real IO dispatcher) settles. */
+    private fun awaitSearch(vm: GalleryViewModel) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (vm.searching.value && System.currentTimeMillis() < deadline) Thread.sleep(5)
     }
 
     @Test fun newest_first_trashed_hidden() = runTest {
@@ -262,6 +278,37 @@ class GalleryViewModelTest {
         assertTrue(photos["b"]!!.favorite)
         vm.setFavorite(setOf("a"), false)
         assertTrue(!cache.value.value!!.manifest.photos.first { it.id == "a" }.favorite)
+    }
+
+    @Test fun search_blank_clears_results() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.search("   ")
+        assertEquals(null, vm.searchResults.value)
+    }
+
+    @Test fun search_matches_metadata_name_when_no_embedding() = runTest {
+        val cache = GalleryCache().apply {
+            set(Gallery(GalleryManifest(photos = listOf(
+                GalleryPhoto(id = "beach", name = "Beach sunset.jpg"),
+                GalleryPhoto(id = "car", name = "car.jpg", camera = "Pixel 8"),
+            )), version = 1))
+        }
+        // No embedding → embedText returns null → metadata-only fallback (web try/catch).
+        val vm = makeVm(cache, embedText = FakeEmbedText(null))
+        vm.search("beach"); awaitSearch(vm)
+        assertEquals(listOf("beach"), vm.searchResults.value?.map { it.id })
+        vm.search("pixel"); awaitSearch(vm)
+        assertEquals(listOf("car"), vm.searchResults.value?.map { it.id })
+    }
+
+    @Test fun clear_search_resets_state() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.search("anything")
+        vm.clearSearch()
+        assertEquals(null, vm.searchResults.value)
+        assertTrue(!vm.searching.value)
     }
 
     /**

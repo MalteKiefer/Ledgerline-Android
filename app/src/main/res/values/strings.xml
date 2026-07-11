@@ -257,6 +257,10 @@
     <string name="action_favorite">Favorite</string>
     <string name="action_unfavorite">Unfavorite</string>
     <string name="gallery_favorites_only">Favorites</string>
+    <string name="gallery_search_hint">Search photos</string>
+    <string name="gallery_search_results">%1$d results</string>
+    <string name="gallery_search_none">No matches</string>
+    <string name="gallery_searching">Searching…</string>
     <string name="selection_delete_confirm">Move %1$d item(s) to trash?</string>
     <string name="albums_empty">No albums yet.</string>
     <string name="album_rename">Rename</string>

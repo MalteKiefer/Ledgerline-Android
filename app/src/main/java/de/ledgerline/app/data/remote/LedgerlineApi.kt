@@ -1,5 +1,7 @@
 package de.ledgerline.app.data.remote
 
+import de.ledgerline.app.data.remote.dto.EmbedTextRequest
+import de.ledgerline.app.data.remote.dto.EmbedTextResponse
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
@@ -79,4 +81,7 @@ interface LedgerlineApi {
 
     @DELETE("api/v1/gallery/blob/{blob}")
     suspend fun deleteGalleryBlob(@Path("blob") blob: String): Response<Unit>
+
+    @POST("api/v1/gallery/embed-text")
+    suspend fun embedText(@Body body: EmbedTextRequest): Response<EmbedTextResponse>
 }

@@ -255,6 +255,10 @@
     <string name="action_favorite">Favorit</string>
     <string name="action_unfavorite">Favorit entfernen</string>
     <string name="gallery_favorites_only">Favoriten</string>
+    <string name="gallery_search_hint">Fotos suchen</string>
+    <string name="gallery_search_results">%1$d Treffer</string>
+    <string name="gallery_search_none">Keine Treffer</string>
+    <string name="gallery_searching">Suche…</string>
     <string name="selection_delete_confirm">%1$d Element(e) in den Papierkorb?</string>
     <string name="albums_empty">Noch keine Alben.</string>
     <string name="album_rename">Umbenennen</string>

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -51,6 +52,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -254,6 +256,10 @@ fun GalleryScreen(
             }
         }
 
+        if (tab == GalleryTab.PHOTOS) {
+            GallerySearchField(vm)
+        }
+
         when (tab) {
             GalleryTab.PHOTOS -> PhotosTab(
                 vm = vm,
@@ -277,6 +283,60 @@ fun GalleryScreen(
     }
 }
 
+/**
+ * Semantic photo search field for the Photos tab. Submitting (or the debounce) runs
+ * [GalleryViewModel.search]; the clear (×) resets to the normal grouped grid. A leading
+ * search icon; the trailing × appears once there's text. Local text state drives the
+ * field; the VM owns the results.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GallerySearchField(vm: GalleryViewModel) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val searching by vm.searching.collectAsStateWithLifecycle()
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
+    OutlinedTextField(
+        value = query,
+        onValueChange = {
+            query = it
+            if (it.isBlank()) vm.clearSearch()
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        singleLine = true,
+        placeholder = { Text(stringResource(R.string.gallery_search_hint)) },
+        leadingIcon = {
+            if (searching) {
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+            } else {
+                Icon(Icons.Outlined.Search, contentDescription = null)
+            }
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = {
+                    query = ""
+                    vm.clearSearch()
+                    keyboard?.hide()
+                }) {
+                    Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_cancel))
+                }
+            }
+        },
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            imeAction = androidx.compose.ui.text.input.ImeAction.Search,
+        ),
+        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+            onSearch = {
+                vm.search(query)
+                keyboard?.hide()
+            },
+        ),
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PhotosTab(
@@ -289,6 +349,8 @@ private fun PhotosTab(
     val ui by vm.state.collectAsStateWithLifecycle()
     val usage by vm.usage.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val searchResults by vm.searchResults.collectAsStateWithLifecycle()
+    val searching by vm.searching.collectAsStateWithLifecycle()
     var fabExpanded by remember { mutableStateOf(false) }
 
     // Selection mode.
@@ -338,7 +400,23 @@ private fun PhotosTab(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
+        val results = searchResults
         when {
+            // Search active — flat, ranked grid (no day headers), replacing the timeline.
+            results != null -> SearchResultsGrid(
+                results = results,
+                searching = searching,
+                vm = vm,
+                selectionMode = selectionMode,
+                selected = selected,
+                onOpenPhoto = onOpenPhoto,
+                onToggleSelect = { id ->
+                    if (id in selected) selected.remove(id) else selected.add(id)
+                },
+                onStartSelection = { id ->
+                    if (!selectionMode) { selectionMode = true; if (id !in selected) selected.add(id) }
+                },
+            )
             ui.loading && ui.photos.isEmpty() -> LoadingBox(Modifier.fillMaxSize())
             ui.error -> ErrorBox(
                 stringResource(R.string.gallery_error),
@@ -526,6 +604,70 @@ private fun PhotosTab(
             },
             onDismiss = { showDeleteConfirm = false },
         )
+    }
+}
+
+/**
+ * Flat, ranked search-results grid (no day grouping) with a small "N results" label —
+ * replaces the timeline while a query is active. Shows a spinner+label while searching,
+ * "No matches" for an empty result, and keeps selection/thumbnails working.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SearchResultsGrid(
+    results: List<GalleryPhoto>,
+    searching: Boolean,
+    vm: GalleryViewModel,
+    selectionMode: Boolean,
+    selected: List<String>,
+    onOpenPhoto: (String) -> Unit,
+    onToggleSelect: (String) -> Unit,
+    onStartSelection: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        when {
+            searching -> Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                Text(
+                    stringResource(R.string.gallery_searching),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp),
+                )
+            }
+            results.isEmpty() -> Text(
+                stringResource(R.string.gallery_search_none),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+            else -> Text(
+                stringResource(R.string.gallery_search_results, results.size),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 116.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            items(results, key = { it.id }) { photo ->
+                SelectableThumbCell(
+                    photo = photo,
+                    vm = vm,
+                    selectionMode = selectionMode,
+                    selected = photo.id in selected,
+                    onClick = {
+                        if (selectionMode) onToggleSelect(photo.id) else onOpenPhoto(photo.id)
+                    },
+                    onLongClick = { onStartSelection(photo.id) },
+                )
+            }
+        }
     }
 }
 

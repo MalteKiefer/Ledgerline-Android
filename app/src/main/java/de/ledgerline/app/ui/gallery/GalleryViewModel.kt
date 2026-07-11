@@ -6,24 +6,29 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.GalleryCache
+import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.ops.OpKind
 import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.domain.gallery.GalleryTrashOps
+import de.ledgerline.app.domain.gallery.SemanticSearch
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.model.PhotoMetaBlob
 import de.ledgerline.app.domain.model.PhotoPlace
+import de.ledgerline.app.domain.usecase.EmbedText
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUsage
 import de.ledgerline.app.domain.usecase.ImportPhotos
 import de.ledgerline.app.domain.usecase.LoadGallery
 import de.ledgerline.app.domain.usecase.PhotoSource
 import de.ledgerline.app.ui.workspace.files.UsageInfo
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 
@@ -55,7 +60,11 @@ class GalleryViewModel @Inject constructor(
     private val lockGuard: LockGuard,
     private val vaultKeyHolder: de.ledgerline.app.core.security.VaultKeyHolder,
     private val operationManager: OperationManager,
+    private val embedText: EmbedText,
+    private val metaCache: MetaCache,
 ) : ViewModel() {
+
+    private val metaJson = Json { ignoreUnknownKeys = true }
 
     private val placeCache = mutableMapOf<String, PhotoPlace?>()
     private val _state = MutableStateFlow(GalleryUi(loading = true))
@@ -118,6 +127,96 @@ class GalleryViewModel @Inject constructor(
     }
 
     fun clearMessage() { _message.value = null }
+
+    // --- Semantic search (CLIP embed-text + cosine over cached embeddings) ---
+    //
+    // Mirrors the web `_doSearch` (resources/js/app.js): embed the query text, cosine
+    // it against each non-trashed photo's normalised CLIP embedding (kept `> 0.2`,
+    // ranked desc, capped), then supplement with a case-insensitive metadata substring
+    // match (name/camera on the index, place from the decrypted meta) — content hits
+    // first, deduped. A lightweight `viewModelScope.launch` (NOT the foreground-service
+    // OperationManager) drives it; `searching` gates a spinner.
+
+    /** null = no active query (normal grouped grid). Empty list = searched, no matches. */
+    private val _searchResults = MutableStateFlow<List<GalleryPhoto>?>(null)
+    val searchResults: StateFlow<List<GalleryPhoto>?> = _searchResults
+
+    private val _searching = MutableStateFlow(false)
+    val searching: StateFlow<Boolean> = _searching
+
+    /** Meta fetched / total for the loading label; 0/0 when idle. */
+    private val _searchProgress = MutableStateFlow(0 to 0)
+    val searchProgress: StateFlow<Pair<Int, Int>> = _searchProgress
+
+    private var searchJob: kotlinx.coroutines.Job? = null
+
+    fun clearSearch() {
+        searchJob?.cancel()
+        _searching.value = false
+        _searchProgress.value = 0 to 0
+        _searchResults.value = null
+    }
+
+    /**
+     * Run a semantic + metadata search over the non-trashed photos. Cancels any prior
+     * search. Blank query clears. Embeds the query, ensures meta (embeddings/place) is
+     * decrypted+cached (only for photos not already in [MetaCache]), ranks by cosine,
+     * then appends metadata substring matches, deduped.
+     */
+    fun search(query: String) {
+        val q = query.trim()
+        searchJob?.cancel()
+        if (q.isBlank()) { clearSearch(); return }
+        searchJob = viewModelScope.launch {
+            _searching.value = true
+            val lc = q.lowercase()
+            val targets = cache.value.value?.manifest?.photos.orEmpty().filter { !it.trashed }
+
+            // Ensure decrypted meta for every candidate (skip those already cached).
+            withContext(Dispatchers.IO) {
+                val toFetch = targets.filter { it.metaRef != null && !metaCache.has(it.id) }
+                _searchProgress.value = 0 to toFetch.size
+                var done = 0
+                for (p in toFetch) {
+                    val ref = p.metaRef ?: continue
+                    when (val r = blobs.download(ref, p.metaKey ?: "")) {
+                        is Outcome.Ok -> metaCache.put(
+                            p.id,
+                            try { metaJson.decodeFromString<PhotoMetaBlob>(String(r.value)) } catch (_: Exception) { null },
+                        )
+                        is Outcome.Err -> metaCache.put(p.id, null)
+                    }
+                    _searchProgress.value = ++done to toFetch.size
+                }
+            }
+
+            // CLIP content matches: embed text, cosine vs cached normalised embeddings.
+            val contentIds = embedText.invoke(q)?.let { qv ->
+                val qn = SemanticSearch.norm(qv)
+                val items = targets.map { p ->
+                    p.id to metaCache.get(p.id)?.embedding?.takeIf { it.isNotEmpty() }
+                        ?.let { SemanticSearch.norm(it) }
+                }
+                SemanticSearch.rank(qn, items, threshold = SEARCH_THRESHOLD)
+            }.orEmpty()
+
+            // Metadata supplement (case-insensitive substring on name/camera/place).
+            val metaIds = targets.filter { p ->
+                (p.name?.lowercase()?.contains(lc) == true) ||
+                    (p.camera?.lowercase()?.contains(lc) == true) ||
+                    (metaCache.get(p.id)?.place?.let { pl ->
+                        listOfNotNull(pl.name, pl.display, pl.city, pl.state, pl.country)
+                            .any { it.lowercase().contains(lc) }
+                    } == true)
+            }.map { it.id }
+
+            val byId = targets.associateBy { it.id }
+            val order = (contentIds + metaIds).distinct()
+            _searchResults.value = order.mapNotNull { byId[it] }
+            _searching.value = false
+            _searchProgress.value = 0 to 0
+        }
+    }
 
     /** Soft-delete (trash) the selected photos — sets `trashed=true` in the gallery
      *  index (recoverable, matching the web). The read side filters trashed out. */
@@ -274,6 +373,12 @@ class GalleryViewModel @Inject constructor(
     }
 
     companion object {
+        /**
+         * Cosine cutoff for CLIP text↔image content matches. Kept strictly greater than
+         * this, matching the web `_doSearch` (`resources/js/app.js`): `s > 0.2`.
+         */
+        const val SEARCH_THRESHOLD = 0.2
+
         /**
          * Group an already-sorted, already-filtered photo list by capture DAY
          * (the day part of `taken_at ?: created`) for the timeline grid — matching
