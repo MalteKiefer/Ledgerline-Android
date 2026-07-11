@@ -66,6 +66,7 @@ class WorkspaceSaveTest {
         override suspend fun rawFile(blob: String): Response<ResponseBody> = throw NotImplementedError()
         override suspend fun uploadFile(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
         override suspend fun deleteBlob(blob: String): Response<Unit> = throw NotImplementedError()
+        override suspend fun deleteGalleryBlob(blob: String): Response<Unit> = throw NotImplementedError()
         override suspend fun filesUsage(): Response<UsageResponse> = throw NotImplementedError()
         override suspend fun deleteSession(): Response<Unit> = throw NotImplementedError()
         override suspend fun galleryStore(): Response<StoreResponse> = throw NotImplementedError()

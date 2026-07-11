@@ -37,8 +37,10 @@ import org.junit.Before
 import org.junit.Test
 
 private class FakeBlobs : GalleryBlobs {
+    val deleted = mutableListOf<String>()
     override suspend fun download(ref: String, key: String): Outcome<ByteArray> =
         Outcome.Err(ErrorKind.NETWORK)
+    override suspend fun deleteBlobs(refs: List<String>) { deleted += refs }
 }
 
 private class FakeGalleryUsage : GalleryUsage {
@@ -121,10 +123,11 @@ class GalleryViewModelTest {
         mutate: MutateGallery = FakeMutateGallery(cache),
         importPhotos: ImportPhotos = ImportPhotosImpl(cache, uploader, mutate),
         operationManager: OperationManager = testOperationManager(),
+        blobs: FakeBlobs = FakeBlobs(),
     ) = GalleryViewModel(
         load = load,
         cache = cache,
-        blobs = FakeBlobs(),
+        blobs = blobs,
         thumbs = ThumbCache(),
         galleryUsage = FakeGalleryUsage(),
         importPhotos = importPhotos,
@@ -155,6 +158,52 @@ class GalleryViewModelTest {
         val vm = makeVm(cache, load = load)
         vm.refresh()
         assertEquals(listOf("b", "a"), vm.state.value.photos.map { it.id })
+        assertEquals(1, vm.trashCount.value)
+    }
+
+    @Test fun trash_view_shows_only_trashed() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.setTrash(true)
+        assertTrue(vm.showTrash.value)
+        assertEquals(listOf("c"), vm.state.value.photos.map { it.id })
+        vm.setTrash(false)
+        assertEquals(listOf("b", "a"), vm.state.value.photos.map { it.id })
+    }
+
+    @Test fun restore_clears_trashed() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.restorePhotos(setOf("c"))
+        assertTrue(cache.value.value!!.manifest.photos.first { it.id == "c" }.trashed.not())
+    }
+
+    @Test fun delete_forever_removes_photo_and_frees_blobs() = runTest {
+        val cache = GalleryCache().apply {
+            set(Gallery(GalleryManifest(photos = listOf(
+                GalleryPhoto(id = "x", trashed = true, originalRef = "o", thumbRef = "t",
+                    metaRef = "m", faceCropRefs = listOf("f1", "f2")),
+            )), version = 1))
+        }
+        val blobs = FakeBlobs()
+        val vm = makeVm(cache, blobs = blobs)
+        vm.deleteForever(setOf("x"))
+        assertTrue(cache.value.value!!.manifest.photos.none { it.id == "x" })
+        assertEquals(setOf("o", "t", "m", "f1", "f2"), blobs.deleted.toSet())
+    }
+
+    @Test fun empty_trash_removes_only_trashed_and_frees_blobs() = runTest {
+        val cache = GalleryCache().apply {
+            set(Gallery(GalleryManifest(photos = listOf(
+                GalleryPhoto(id = "keep", originalRef = "ko"),
+                GalleryPhoto(id = "gone", trashed = true, originalRef = "go", thumbRef = "gt"),
+            )), version = 1))
+        }
+        val blobs = FakeBlobs()
+        val vm = makeVm(cache, blobs = blobs)
+        vm.emptyTrash()
+        assertEquals(listOf("keep"), cache.value.value!!.manifest.photos.map { it.id })
+        assertEquals(setOf("go", "gt"), blobs.deleted.toSet())
     }
 
     /**

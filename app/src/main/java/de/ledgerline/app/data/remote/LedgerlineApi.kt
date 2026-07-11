@@ -76,4 +76,7 @@ interface LedgerlineApi {
 
     @PUT("api/v1/gallery/store")
     suspend fun galleryStorePut(@Body body: StorePutRequest): Response<StoreResponse>
+
+    @DELETE("api/v1/gallery/blob/{blob}")
+    suspend fun deleteGalleryBlob(@Path("blob") blob: String): Response<Unit>
 }

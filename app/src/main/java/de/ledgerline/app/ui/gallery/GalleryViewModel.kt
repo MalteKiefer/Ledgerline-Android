@@ -11,6 +11,7 @@ import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.ops.OpKind
 import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.core.security.LockGuard
+import de.ledgerline.app.domain.gallery.GalleryTrashOps
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.model.PhotoMetaBlob
 import de.ledgerline.app.domain.model.PhotoPlace
@@ -56,6 +57,21 @@ class GalleryViewModel @Inject constructor(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
 
+    /** True while the full-screen trash view is showing (grid = only trashed photos). */
+    private val _showTrash = MutableStateFlow(false)
+    val showTrash: StateFlow<Boolean> = _showTrash
+
+    /** Count of trashed photos (drives the overflow "Trash (N)" entry). */
+    private val _trashCount = MutableStateFlow(0)
+    val trashCount: StateFlow<Int> = _trashCount
+
+    fun setTrash(show: Boolean) {
+        _showTrash.value = show
+        recompute()
+    }
+
+    fun toggleTrash() = setTrash(!_showTrash.value)
+
     fun clearMessage() { _message.value = null }
 
     /** Soft-delete (trash) the selected photos — sets `trashed=true` in the gallery
@@ -63,6 +79,41 @@ class GalleryViewModel @Inject constructor(
     fun trashPhotos(ids: Set<String>) = viewModelScope.launch {
         if (ids.isEmpty()) return@launch
         mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id in ids) it.copy(trashed = true) else it }) }
+    }
+
+    /** Restore the given photos from the trash (clears `trashed`). */
+    fun restorePhotos(ids: Set<String>) = viewModelScope.launch {
+        if (ids.isEmpty()) return@launch
+        mutate.invoke { m -> GalleryTrashOps.restore(m, ids) }
+    }
+
+    /**
+     * Permanently delete the given photos: collect their freed blob refs, drop the
+     * photos from the manifest (also cleaning dangling album/person references via
+     * [GalleryTrashOps.remove]), then release the freed blobs (429-aware). Usage is
+     * refreshed once the deletes have landed.
+     */
+    fun deleteForever(ids: Set<String>) = viewModelScope.launch {
+        if (ids.isEmpty()) return@launch
+        val freed = cache.value.value?.manifest?.let { GalleryTrashOps.freedRefs(it, ids) }.orEmpty()
+        val res = mutate.invoke { m -> GalleryTrashOps.remove(m, ids) }
+        if (res is Outcome.Ok) {
+            blobs.deleteBlobs(freed)
+            loadUsage()
+        }
+    }
+
+    /** Permanently delete ALL trashed photos, freeing their blobs and cleaning refs. */
+    fun emptyTrash() = viewModelScope.launch {
+        val current = cache.value.value?.manifest ?: return@launch
+        val trashedIds = current.photos.filter { it.trashed }.map { it.id }.toSet()
+        if (trashedIds.isEmpty()) return@launch
+        val freed = GalleryTrashOps.freedRefs(current, trashedIds)
+        val res = mutate.invoke { m -> GalleryTrashOps.emptyTrash(m) }
+        if (res is Outcome.Ok) {
+            blobs.deleteBlobs(freed)
+            loadUsage()
+        }
     }
 
     init {
@@ -151,8 +202,11 @@ class GalleryViewModel @Inject constructor(
         // the web timeline (newest first). Parse to an epoch so mixed ISO / EXIF
         // (`2026:07:11 ...`) formats compare correctly instead of clustering by the
         // just-uploaded order.
-        val photos = cache.value.value?.manifest?.photos.orEmpty()
-            .filter { !it.trashed }
+        val all = cache.value.value?.manifest?.photos.orEmpty()
+        _trashCount.value = all.count { it.trashed }
+        // Normal grid = untrashed; trash view = only trashed. Both newest-first.
+        val photos = all
+            .filter { it.trashed == _showTrash.value }
             .sortedByDescending { epochOf(it.taken_at ?: it.created) }
         _state.value = GalleryUi(false, false, photos)
     }
