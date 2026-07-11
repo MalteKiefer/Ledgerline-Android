@@ -137,6 +137,19 @@
     <string name="folder_name">Ordnername</string>
     <string name="action_create">Erstellen</string>
 
+    <!-- Files: move -->
+    <string name="file_move">Verschieben</string>
+    <string name="file_move_to">Verschieben nach…</string>
+    <string name="folder_root">Stamm</string>
+
+    <!-- Files: version history -->
+    <string name="file_versions">Versionen</string>
+    <string name="file_versions_count">Versionen (%1$d)</string>
+    <string name="file_version_open">Öffnen</string>
+    <string name="file_version_restore">Wiederherstellen</string>
+    <string name="file_version_restore_confirm">Diese Version wiederherstellen? Die aktuelle bleibt im Verlauf.</string>
+    <string name="file_version_restored">Version wiederhergestellt</string>
+
     <!-- Einstellungen -->
     <string name="settings_title">Einstellungen</string>
     <!-- Kategorien der Einstellungs-Übersicht -->
@@ -209,6 +222,7 @@
     <string name="action_back">Zurück</string>
     <string name="action_settings">Einstellungen</string>
     <string name="action_more">Mehr</string>
+    <string name="action_close">Schließen</string>
 
     <!-- Papierkorb (Notizen / Lesezeichen / Todos) -->
     <string name="trash_title">Papierkorb</string>

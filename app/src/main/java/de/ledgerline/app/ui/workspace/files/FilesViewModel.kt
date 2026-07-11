@@ -195,6 +195,34 @@ class FilesViewModel @Inject constructor(
         }
     }
 
+    // ---- Move (file / folder) ----
+
+    /** All file folders (for the move picker). */
+    fun allFolders(): List<NamedFolder> = cache.value.value?.manifest?.fileFolders.orEmpty()
+
+    /** A breadcrumb-ish label for folder [id] ("Docs / Sub"); "" for root/unknown. */
+    fun folderPath(id: String?): String {
+        if (id == null) return ""
+        val byId = allFolders().associateBy { it.id }
+        val parts = ArrayDeque<String>()
+        var cur: String? = id
+        val seen = mutableSetOf<String>()
+        while (cur != null && seen.add(cur)) {
+            val f = byId[cur] ?: break
+            parts.addFirst(f.name)
+            cur = f.parent
+        }
+        return parts.joinToString(" / ")
+    }
+
+    fun moveFile(fileId: String, target: String?) = viewModelScope.launch {
+        mutate.invoke { FileOps.moveFile(it, fileId, target) }
+    }
+
+    fun moveFolder(folderId: String, target: String?) = viewModelScope.launch {
+        mutate.invoke { FileOps.moveFolder(it, folderId, target) }
+    }
+
     fun deleteFolder(folderId: String) = viewModelScope.launch {
         val current = cache.value.value?.manifest ?: return@launch
         val subFolders = collectSubtreeFolderIds(current, folderId)
@@ -295,6 +323,49 @@ class FilesViewModel @Inject constructor(
         }
     }
 
+    // ---- Version history ----
+
+    /**
+     * Open a saved [version] of [file] read-only in the in-app viewer: download+decrypt
+     * that version's blob into [ViewerState.Ready] (reusing the same viewer path as the
+     * current content). The version's own name/mime/size drive the preview.
+     */
+    fun openVersion(file: FileEntry, version: FileVersion) = viewModelScope.launch {
+        _viewer.value = ViewerState.Loading
+        val display = file.copy(
+            blob = version.blob,
+            encFileKey = version.encFileKey,
+            name = version.name.ifBlank { file.name },
+            mime = version.mime.ifBlank { file.mime },
+            size = version.size,
+        )
+        _viewer.value = when (val res = blobRepo.downloadToBytes(version.blob, version.encFileKey)) {
+            is Outcome.Ok -> ViewerState.Ready(display, res.value)
+            is Outcome.Err -> ViewerState.Failed("Could not open file")
+        }
+    }
+
+    /**
+     * Restore [version] as the current content (mirrors the web `restoreVersion`): snapshot
+     * the current blob as a new version, swap the entry to the version's blob, drop the
+     * restored version from the list (it becomes current), free any overflow blobs, and
+     * persist the manifest. No content blobs are downloaded — this is a pure blob-ref swap.
+     */
+    fun restoreVersion(file: FileEntry, version: FileVersion) = viewModelScope.launch {
+        val now = Instant.now().toString()
+        val result = FileOps.restoreVersion(file, version.id, now)
+        val res = mutate.invoke { m ->
+            m.copy(files = m.files.map { if (it.id == file.id) result.entry else it })
+        }
+        if (res is Outcome.Ok) {
+            if (result.freedBlobs.isNotEmpty()) blobRepo.deleteBlobs(result.freedBlobs)
+            _message.value = VERSION_RESTORED
+            loadUsage()
+        } else {
+            _message.value = SAVE_FAILED
+        }
+    }
+
     // ---- Export (streamed to a SAF sink) ----
 
     /**
@@ -350,6 +421,7 @@ class FilesViewModel @Inject constructor(
         /** Sentinel messages the UI maps to localized strings (see FilesScreen). */
         const val SAVED = "msg.saved"
         const val SAVE_FAILED = "msg.save_failed"
+        const val VERSION_RESTORED = "msg.version_restored"
     }
 
     private fun recompute() {

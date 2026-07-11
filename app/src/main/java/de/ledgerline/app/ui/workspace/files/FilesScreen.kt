@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CreateNewFolder
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.UploadFile
@@ -119,6 +121,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
             val text = when (it) {
                 FilesViewModel.SAVED -> context.getString(R.string.file_saved)
                 FilesViewModel.SAVE_FAILED -> context.getString(R.string.file_save_failed)
+                FilesViewModel.VERSION_RESTORED -> context.getString(R.string.file_version_restored)
                 else -> it
             }
             snackbar.showSnackbar(text)
@@ -157,6 +160,12 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     var deleteFileEntry by remember { mutableStateOf<FileEntry?>(null) }
     var deleteForeverEntry by remember { mutableStateOf<FileEntry?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
+    // Move: either a file id or a folder id is set (not both).
+    var moveFileId by remember { mutableStateOf<String?>(null) }
+    var moveFolderId by remember { mutableStateOf<String?>(null) }
+    // Version history: the file whose versions are shown, and a pending restore confirm.
+    var versionsFor by remember { mutableStateOf<FileEntry?>(null) }
+    var restoreVersion by remember { mutableStateOf<Pair<FileEntry, de.ledgerline.app.domain.model.FileVersion>?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -256,6 +265,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                             RowOverflow(
                                                 onRename = { renameFolder = f.id to f.name },
                                                 onDelete = { deleteFolderId = f.id },
+                                                onMove = { moveFolderId = f.id },
                                             )
                                         },
                                         modifier = Modifier.fillMaxWidth().clickable { vm.open(f.id) },
@@ -270,6 +280,9 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                             RowOverflow(
                                                 onRename = { renameFile = file.id to file.name },
                                                 onDelete = { deleteFileEntry = file },
+                                                onMove = { moveFileId = file.id },
+                                                versionCount = file.versions.size,
+                                                onVersions = { versionsFor = file },
                                             )
                                         },
                                         modifier = Modifier.fillMaxWidth().clickable { vm.openFile(file) },
@@ -358,6 +371,68 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
             onDismiss = { confirmEmptyTrash = false },
         )
     }
+
+    // Move a file: pick any folder (or root); no exclusions.
+    moveFileId?.let { id ->
+        MovePickerDialog(
+            folders = vm.allFolders(),
+            excludeIds = emptySet(),
+            onPick = { target -> vm.moveFile(id, target); moveFileId = null },
+            onDismiss = { moveFileId = null },
+        )
+    }
+    // Move a folder: exclude itself + its whole subtree so it can't move into itself.
+    moveFolderId?.let { id ->
+        val folders = vm.allFolders()
+        val exclude = remember(id, folders) { subtreeFolderIds(folders, id) }
+        MovePickerDialog(
+            folders = folders,
+            excludeIds = exclude,
+            onPick = { target -> vm.moveFolder(id, target); moveFolderId = null },
+            onDismiss = { moveFolderId = null },
+        )
+    }
+
+    // Version history: re-read the entry from the VM so it reflects a just-done restore.
+    versionsFor?.let { shown ->
+        val live = vm.fileById(shown.id)
+        if (live == null || live.versions.isEmpty()) {
+            versionsFor = null
+        } else {
+            VersionsDialog(
+                file = live,
+                onOpen = { v -> vm.openVersion(live, v); versionsFor = null },
+                onRestore = { v -> restoreVersion = live to v },
+                onDismiss = { versionsFor = null },
+            )
+        }
+    }
+    restoreVersion?.let { (file, version) ->
+        ConfirmDialog(
+            message = stringResource(R.string.file_version_restore_confirm),
+            confirmLabel = stringResource(R.string.file_version_restore),
+            onConfirm = {
+                vm.restoreVersion(file, version)
+                restoreVersion = null
+                versionsFor = null
+            },
+            onDismiss = { restoreVersion = null },
+        )
+    }
+}
+
+/** Folder id [root] plus every descendant folder id (used to exclude a folder's own subtree). */
+private fun subtreeFolderIds(
+    folders: List<de.ledgerline.app.domain.model.NamedFolder>,
+    root: String,
+): Set<String> {
+    val out = mutableSetOf(root)
+    var changed = true
+    while (changed) {
+        changed = false
+        for (f in folders) if (f.parent in out && out.add(f.id)) changed = true
+    }
+    return out
 }
 
 @Composable
@@ -383,7 +458,13 @@ private fun FilesFab(onUpload: () -> Unit, onNewFolder: () -> Unit) {
 }
 
 @Composable
-private fun RowOverflow(onRename: () -> Unit, onDelete: () -> Unit) {
+private fun RowOverflow(
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    onMove: (() -> Unit)? = null,
+    versionCount: Int = 0,
+    onVersions: (() -> Unit)? = null,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
@@ -395,11 +476,165 @@ private fun RowOverflow(onRename: () -> Unit, onDelete: () -> Unit) {
                 leadingIcon = { Icon(Icons.Outlined.Edit, null) },
                 onClick = { expanded = false; onRename() },
             )
+            if (onMove != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.file_move)) },
+                    leadingIcon = { Icon(Icons.AutoMirrored.Outlined.DriveFileMove, null) },
+                    onClick = { expanded = false; onMove() },
+                )
+            }
+            if (onVersions != null && versionCount > 0) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.file_versions_count, versionCount)) },
+                    leadingIcon = { Icon(Icons.Outlined.History, null) },
+                    onClick = { expanded = false; onVersions() },
+                )
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.file_delete)) },
                 leadingIcon = { Icon(Icons.Outlined.Delete, null) },
                 onClick = { expanded = false; onDelete() },
             )
+        }
+    }
+}
+
+/**
+ * Folder-picker for a move. Lists "Root" plus every folder indented by depth; [excludeIds]
+ * (the folder being moved + its descendants) are hidden so a folder can't be moved into
+ * itself. Selecting an entry calls [onPick] with the folder id (null = root).
+ */
+@Composable
+private fun MovePickerDialog(
+    folders: List<de.ledgerline.app.domain.model.NamedFolder>,
+    excludeIds: Set<String>,
+    onPick: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val ordered = remember(folders, excludeIds) { orderFoldersByDepth(folders, excludeIds) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.file_move_to)) },
+        text = {
+            LazyColumn(Modifier.fillMaxWidth()) {
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.folder_root)) },
+                        leadingContent = { Icon(Icons.Outlined.Folder, null) },
+                        modifier = Modifier.fillMaxWidth().clickable { onPick(null) },
+                    )
+                }
+                items(ordered, key = { it.folder.id }) { row ->
+                    ListItem(
+                        headlineContent = { Text(row.folder.name) },
+                        leadingContent = {
+                            Icon(
+                                Icons.Outlined.Folder,
+                                null,
+                                Modifier.padding(start = (row.depth * 16).dp),
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth().clickable { onPick(row.folder.id) },
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    )
+}
+
+private data class FolderRow(val folder: de.ledgerline.app.domain.model.NamedFolder, val depth: Int)
+
+/** Depth-first order of [folders] (parent-before-children), skipping [excludeIds] subtrees. */
+private fun orderFoldersByDepth(
+    folders: List<de.ledgerline.app.domain.model.NamedFolder>,
+    excludeIds: Set<String>,
+): List<FolderRow> {
+    val byParent = folders.groupBy { it.parent }
+    val out = mutableListOf<FolderRow>()
+    fun walk(parent: String?, depth: Int) {
+        byParent[parent].orEmpty()
+            .filter { it.id !in excludeIds }
+            .sortedBy { it.name.lowercase() }
+            .forEach { f ->
+                out += FolderRow(f, depth)
+                walk(f.id, depth + 1)
+            }
+    }
+    walk(null, 0)
+    return out
+}
+
+/**
+ * Version history for [file]: each row shows the version's date + size with Open (view
+ * read-only) and Restore (confirm) actions.
+ */
+@Composable
+private fun VersionsDialog(
+    file: FileEntry,
+    onOpen: (de.ledgerline.app.domain.model.FileVersion) -> Unit,
+    onRestore: (de.ledgerline.app.domain.model.FileVersion) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.file_versions)) },
+        text = {
+            LazyColumn(Modifier.fillMaxWidth()) {
+                items(file.versions, key = { it.id }) { v ->
+                    ListItem(
+                        headlineContent = { Text(formatVersionDate(v.created)) },
+                        supportingContent = { Text(humanSize(v.size)) },
+                        trailingContent = {
+                            Row {
+                                TextButton(onClick = { onOpen(v) }) {
+                                    Text(stringResource(R.string.file_version_open))
+                                }
+                                TextButton(onClick = { onRestore(v) }) {
+                                    Text(stringResource(R.string.file_version_restore))
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) }
+        },
+    )
+}
+
+/** ISO instant → localized date-time; falls back to the raw value (or "—" when absent). */
+private fun formatVersionDate(iso: String?): String {
+    if (iso.isNullOrBlank()) return "—"
+    return try {
+        java.time.OffsetDateTime.parse(iso)
+            .toLocalDateTime()
+            .format(
+                java.time.format.DateTimeFormatter.ofLocalizedDateTime(
+                    java.time.format.FormatStyle.MEDIUM,
+                    java.time.format.FormatStyle.SHORT,
+                ),
+            )
+    } catch (_: Exception) {
+        try {
+            java.time.Instant.parse(iso)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDateTime()
+                .format(
+                    java.time.format.DateTimeFormatter.ofLocalizedDateTime(
+                        java.time.format.FormatStyle.MEDIUM,
+                        java.time.format.FormatStyle.SHORT,
+                    ),
+                )
+        } catch (_: Exception) {
+            iso
         }
     }
 }
