@@ -53,6 +53,22 @@
     <string name="todo_priority">Priority</string>
     <string name="todo_due">Due</string>
 
+    <!-- Todo CRUD -->
+    <string name="todo_new">New todo</string>
+    <string name="todo_edit">Edit todo</string>
+    <string name="todo_delete">Delete todo</string>
+    <string name="todo_title_hint">Title</string>
+    <string name="todo_list">List</string>
+    <string name="todo_no_list">No list</string>
+    <string name="todo_new_list">New list…</string>
+    <string name="todo_description">Description</string>
+    <string name="todo_url_hint">Link (optional)</string>
+    <string name="todo_due_hint">Due date (e.g. 2026-07-15)</string>
+    <string name="todo_manage_lists">Manage lists</string>
+    <string name="todo_all_lists">All lists</string>
+    <string name="list_rename">Rename list</string>
+    <string name="list_delete">Delete list</string>
+
     <!-- File detail -->
     <string name="file_type">Type</string>
     <string name="file_size">Size</string>

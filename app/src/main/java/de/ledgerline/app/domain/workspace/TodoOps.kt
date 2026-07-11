@@ -1,0 +1,86 @@
+package de.ledgerline.app.domain.workspace
+
+import de.ledgerline.app.domain.model.TodoItem
+import de.ledgerline.app.domain.model.TodoList
+import de.ledgerline.app.domain.model.WorkspaceManifest
+
+/**
+ * Pure manifest transforms for todo & todo-list management. Each returns a new
+ * [WorkspaceManifest]; mutating an unknown id is a safe no-op. Mirrors the web
+ * `vaultWorkspace` todo ops (see `AlbumOps` for the same style).
+ */
+object TodoOps {
+
+    fun addTodo(
+        m: WorkspaceManifest,
+        id: String,
+        title: String,
+        listId: String?,
+        priority: String,
+        due: String,
+        description: String,
+        url: String,
+    ): WorkspaceManifest {
+        val todo = TodoItem(
+            id = id,
+            listId = listId,
+            title = title.trim(),
+            description = description.trim(),
+            url = url.trim(),
+            priority = priority,
+            marked = false,
+            due = due.trim(),
+            done = false,
+            trashed = false,
+        )
+        return m.copy(todos = m.todos + todo)
+    }
+
+    fun editTodo(
+        m: WorkspaceManifest,
+        id: String,
+        title: String,
+        listId: String?,
+        priority: String,
+        due: String,
+        description: String,
+        url: String,
+    ): WorkspaceManifest = updateTodo(m, id) {
+        it.copy(
+            title = title.trim(),
+            listId = listId,
+            priority = priority,
+            due = due.trim(),
+            description = description.trim(),
+            url = url.trim(),
+        )
+    }
+
+    fun toggleDone(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        updateTodo(m, id) { it.copy(done = !it.done) }
+
+    fun toggleMarked(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        updateTodo(m, id) { it.copy(marked = !it.marked) }
+
+    fun trashTodo(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        updateTodo(m, id) { it.copy(trashed = true) }
+
+    fun addList(m: WorkspaceManifest, id: String, name: String): WorkspaceManifest =
+        m.copy(todoLists = m.todoLists + TodoList(id = id, name = name.trim()))
+
+    fun renameList(m: WorkspaceManifest, id: String, name: String): WorkspaceManifest =
+        m.copy(todoLists = m.todoLists.map { if (it.id == id) it.copy(name = name.trim()) else it })
+
+    /** Remove the list and orphan its todos (`listId == id` → `listId = null`). */
+    fun deleteList(m: WorkspaceManifest, id: String): WorkspaceManifest = m.copy(
+        todoLists = m.todoLists.filterNot { it.id == id },
+        todos = m.todos.map { if (it.listId == id) it.copy(listId = null) else it },
+    )
+
+    private inline fun updateTodo(
+        m: WorkspaceManifest,
+        id: String,
+        transform: (TodoItem) -> TodoItem,
+    ): WorkspaceManifest =
+        m.copy(todos = m.todos.map { if (it.id == id) transform(it) else it })
+}

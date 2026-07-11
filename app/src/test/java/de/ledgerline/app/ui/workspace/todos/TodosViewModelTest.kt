@@ -4,6 +4,7 @@ import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.domain.model.*
 import de.ledgerline.app.domain.usecase.LoadWorkspace
+import de.ledgerline.app.domain.usecase.MutateWorkspace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -22,16 +23,18 @@ class TodosViewModelTest {
 
     private fun ws() = Workspace(
         WorkspaceManifest(
-            todoLists = listOf(TodoList(id = "l1", name = "Home")),
+            todoLists = listOf(TodoList(id = "l1", name = "Home"), TodoList(id = "l2", name = "Work")),
             todos = listOf(
                 TodoItem(id = "t1", listId = "l1", title = "Done one", done = true),
-                TodoItem(id = "t2", listId = "l1", title = "Open one", done = false),
+                TodoItem(id = "t2", listId = "l1", title = "Open one", done = false, priority = "high"),
                 TodoItem(id = "t3", listId = "l1", title = "Gone", trashed = true),
+                TodoItem(id = "t4", listId = "l2", title = "Work item", done = false),
             ),
         ),
         version = 1,
     )
     private val cache = WorkspaceCache()
+
     // Fake load: populates the cache (as LoadWorkspaceImpl would) then returns Ok.
     private val load = object : LoadWorkspace {
         override suspend fun invoke(): Outcome<Workspace> {
@@ -41,11 +44,50 @@ class TodosViewModelTest {
         }
     }
 
-    @Test fun sections_hide_trashed_and_put_open_first() = runTest {
-        val vm = TodosViewModel(load, cache)
+    // Fake mutate: applies the transform to the cached manifest and republishes it.
+    private val mutate = object : MutateWorkspace {
+        override suspend fun invoke(m: (WorkspaceManifest) -> WorkspaceManifest): Outcome<Workspace> {
+            val cur = cache.value.value ?: return Outcome.Err(de.ledgerline.app.core.ErrorKind.UNKNOWN)
+            val next = Workspace(m(cur.manifest), cur.version + 1)
+            cache.set(next)
+            return Outcome.Ok(next)
+        }
+    }
+
+    @Test fun items_hide_trashed_and_put_open_first() = runTest {
+        val vm = TodosViewModel(load, cache, mutate)
         vm.refresh()
-        val s = vm.state.value.sections
-        assertEquals(listOf("Home"), s.map { it.listName })
-        assertEquals(listOf("Open one", "Done one"), s[0].items.map { it.title })
+        // all-lists filter: open before done, higher priority before lower
+        assertEquals(listOf("Open one", "Work item", "Done one"), vm.state.value.items.map { it.title })
+    }
+
+    @Test fun active_list_filter_restricts_items() = runTest {
+        val vm = TodosViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.setActiveList("l2")
+        assertEquals(listOf("Work item"), vm.state.value.items.map { it.title })
+    }
+
+    @Test fun toggleDone_flips_and_reflows() = runTest {
+        val vm = TodosViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.toggleDone("t2")
+        assertEquals(true, vm.todoById("t2")?.done)
+    }
+
+    @Test fun addTodo_appends_and_shows() = runTest {
+        val vm = TodosViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.addTodo("Fresh", "l1", "normal", "", "", "")
+        assertEquals(true, vm.state.value.items.any { it.title == "Fresh" })
+    }
+
+    @Test fun deleteList_orphans_todos_and_clears_filter() = runTest {
+        val vm = TodosViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.setActiveList("l1")
+        vm.deleteList("l1")
+        assertEquals(null, vm.activeList.value)
+        assertEquals(null, vm.todoById("t2")?.listId)
     }
 }
