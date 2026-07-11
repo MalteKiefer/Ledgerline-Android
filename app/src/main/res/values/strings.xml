@@ -23,6 +23,10 @@
     <string name="unlock_button">Unlock</string>
     <string name="unlock_not_configured">No vault yet. Set it up in the web app first.</string>
     <string name="unlock_error">Wrong passphrase or unable to unlock.</string>
+    <string name="unlock_use_recovery">Use recovery code</string>
+    <string name="unlock_recovery_hint">Recovery code</string>
+    <string name="unlock_recovery_button">Unlock</string>
+    <string name="unlock_recovery_back">Use passphrase</string>
     <string name="lock_title">Unlock Ledgerline</string>
     <string name="lock_subtitle">Authenticate to continue</string>
     <string name="lock_locked">Locked. Authenticate to continue.</string>
@@ -64,6 +68,8 @@
     <string name="todo_description">Description</string>
     <string name="todo_url_hint">Link (optional)</string>
     <string name="todo_due_hint">Due date (e.g. 2026-07-15)</string>
+    <string name="todo_due_set">Set due date</string>
+    <string name="todo_due_clear">Clear due date</string>
     <string name="todo_manage_lists">Manage lists</string>
     <string name="todo_all_lists">All lists</string>
     <string name="list_rename">Rename list</string>
@@ -78,6 +84,8 @@
     <string name="note_unpin">Unpin</string>
     <string name="note_delete">Delete note</string>
     <string name="note_updated">Updated %1$s</string>
+    <string name="note_edit_mode">Edit</string>
+    <string name="note_preview_mode">Preview</string>
 
     <!-- Bookmark CRUD -->
     <string name="bm_new">New bookmark</string>
@@ -93,6 +101,10 @@
     <string name="bm_read_later">Read later</string>
     <string name="bm_all_folders">All</string>
     <string name="bm_manage_folders">Manage folders</string>
+    <string name="bm_view_all">All</string>
+    <string name="bm_view_favorites">Favorites</string>
+    <string name="bm_view_readlater">Read later</string>
+    <string name="filter_all_tags">All tags</string>
     <string name="folder_rename">Rename folder</string>
     <string name="folder_delete">Delete folder</string>
 
@@ -127,6 +139,9 @@
     <string name="file_save">Save</string>
     <string name="file_saved">Saved</string>
     <string name="file_save_failed">Save failed</string>
+    <string name="file_edit_save">Save</string>
+    <string name="file_editor_saving">Saving…</string>
+    <string name="file_export">Export</string>
     <string name="file_preview_unavailable">Preview not available for this file type.</string>
     <string name="pdf_page">Page %1$d</string>
     <string name="pdf_render_failed">Couldn\'t render this page.</string>
@@ -163,6 +178,10 @@
     <string name="settings_background_ops_title">Background processing</string>
     <string name="settings_background_ops_subtitle">Operations (scans, uploads) keep running when you leave the app; a notification shows while they run. Turn off to lock immediately on background.</string>
     <string name="settings_account">Account</string>
+    <string name="account_name">Name</string>
+    <string name="account_email">Email</string>
+    <string name="account_groups">Groups</string>
+    <string name="account_loading">Loading…</string>
     <!-- Offline cache -->
     <string name="settings_offline_section">Offline</string>
     <string name="settings_offline_title">Offline cache</string>

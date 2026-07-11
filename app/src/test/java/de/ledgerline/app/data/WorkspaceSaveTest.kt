@@ -62,6 +62,7 @@ class WorkspaceSaveTest {
         // Unused endpoints — throw so any accidental call is visible.
         override suspend fun claimPair(b: PairClaimRequest): Response<PairClaimResponse> = throw NotImplementedError()
         override suspend fun pollPair(c: String): Response<PairPollResponse> = throw NotImplementedError()
+        override suspend fun me(): Response<de.ledgerline.app.data.remote.dto.MeResponse> = throw NotImplementedError()
         override suspend fun vault(): Response<VaultResponse> = throw NotImplementedError()
         override suspend fun rawFile(blob: String): Response<ResponseBody> = throw NotImplementedError()
         override suspend fun uploadFile(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()

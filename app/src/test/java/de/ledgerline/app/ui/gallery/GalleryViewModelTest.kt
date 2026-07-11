@@ -107,7 +107,9 @@ private fun testOperationManager(): OperationManager {
         override fun start() {}
         override fun stop() {}
     }
-    return OperationManager(setting, mockk(relaxed = true), service)
+    // Run op coroutines on an eager test dispatcher so they're deterministic and
+    // don't outlive the test (avoids the flaky MainDispatcher teardown race).
+    return OperationManager(setting, mockk(relaxed = true), service, UnconfinedTestDispatcher())
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -145,7 +147,7 @@ class GalleryViewModelTest {
         operationManager = operationManager,
         embedText = embedText,
         metaCache = MetaCache(),
-    )
+    ).apply { ioDispatcher = UnconfinedTestDispatcher() }
 
     /**
      * Blocks (real time) until no operation is active. The op runs on the manager's own

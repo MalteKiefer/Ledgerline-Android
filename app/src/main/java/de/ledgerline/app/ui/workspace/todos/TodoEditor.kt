@@ -13,6 +13,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,6 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -38,7 +42,12 @@ import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.domain.model.TodoList
 import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.ui.workspace.LocalFullscreen
+import de.ledgerline.app.ui.workspace.common.formatDue
 import de.ledgerline.app.ui.common.TextInputDialog
+import java.time.Instant
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 /** The four supported priority values, highest urgency first. */
 private val PRIORITIES = listOf("urgent", "high", "normal", "low")
@@ -74,6 +83,7 @@ fun TodoEditor(
     var tagsText by rememberSaveable { mutableStateOf(Tags.formatTags(initial.tags)) }
 
     var showNewList by rememberSaveable { mutableStateOf(false) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
@@ -134,13 +144,36 @@ fun TodoEditor(
                 }
             }
 
-            OutlinedTextField(
-                value = due,
-                onValueChange = { due = it },
-                label = { Text(stringResource(R.string.todo_due_hint)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            // Due-date picker: a read-only field showing the formatted due date;
+            // tapping opens an M3 DatePickerDialog, the × clears it.
+            val dueLabel = formatDue(due).ifBlank { stringResource(R.string.todo_due_set) }
+            Box(Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = dueLabel,
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = false,
+                    label = { Text(stringResource(R.string.todo_due)) },
+                    trailingIcon = {
+                        if (due.isNotBlank()) {
+                            IconButton(onClick = { due = "" }) {
+                                Icon(Icons.Outlined.Clear, stringResource(R.string.todo_due_clear))
+                            }
+                        } else {
+                            Icon(Icons.Outlined.ArrowDropDown, null)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                // Transparent overlay to capture taps (a disabled TextField swallows clicks),
+                // but leave room for the trailing clear button on the right.
+                Box(
+                    Modifier
+                        .matchParentSize()
+                        .padding(end = if (due.isNotBlank()) 48.dp else 0.dp)
+                        .clickable { showDatePicker = true }
+                )
+            }
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
@@ -165,6 +198,29 @@ fun TodoEditor(
         }
     }
 
+    if (showDatePicker) {
+        val initialMillis = parseDueToUtcMillis(due)
+        val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { millis ->
+                        due = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                    }
+                    showDatePicker = false
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        ) {
+            DatePicker(state = state)
+        }
+    }
+
     if (showNewList) {
         TextInputDialog(
             title = stringResource(R.string.todo_new_list),
@@ -174,6 +230,25 @@ fun TodoEditor(
             onConfirm = { name -> onCreateList(name); showNewList = false },
             onDismiss = { showNewList = false },
         )
+    }
+}
+
+/**
+ * Parse a stored `due` value (ISO date `yyyy-MM-dd` or a full ISO date-time) into
+ * UTC epoch millis to pre-select the picker, or null if blank/unparseable.
+ */
+private fun parseDueToUtcMillis(due: String): Long? {
+    if (due.isBlank()) return null
+    return try {
+        val date = when {
+            due.contains('T') && (due.endsWith("Z") || due.contains('+')) ->
+                OffsetDateTime.parse(due).toLocalDate()
+            due.contains('T') -> LocalDate.parse(due.substringBefore('T'))
+            else -> LocalDate.parse(due)
+        }
+        date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    } catch (_: Exception) {
+        null
     }
 }
 

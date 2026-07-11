@@ -32,12 +32,22 @@ data class OpProgress(val id: Long, val kind: OpKind, val current: Int, val tota
  * is called immediately to restore the zero-knowledge wipe.
  */
 @Singleton
-class OperationManager @Inject constructor(
+class OperationManager(
     private val setting: BackgroundOpsSetting,
     private val locker: VaultLocker,
     private val serviceController: ServiceController,
+    dispatcher: kotlinx.coroutines.CoroutineDispatcher,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /** Production constructor — ops run on [Dispatchers.Default]. Tests use the
+     *  4-arg constructor to inject a test dispatcher so op coroutines are
+     *  deterministic and don't outlive the test (no MainDispatcher teardown race). */
+    @Inject constructor(
+        setting: BackgroundOpsSetting,
+        locker: VaultLocker,
+        serviceController: ServiceController,
+    ) : this(setting, locker, serviceController, Dispatchers.Default)
+
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
 
     private val _active = MutableStateFlow<List<OpProgress>>(emptyList())
 

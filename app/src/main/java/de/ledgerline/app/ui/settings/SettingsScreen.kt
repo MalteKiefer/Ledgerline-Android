@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -65,6 +67,7 @@ import de.ledgerline.app.R
 import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
+import de.ledgerline.app.data.remote.dto.MeUser
 import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.common.SectionHeader
@@ -109,6 +112,7 @@ fun SettingsContent(
     val prefetchChargingOnly by vm.prefetchChargingOnly.collectAsStateWithLifecycle()
     val prefetchMessage by vm.prefetchMessage.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSizeBytes.collectAsStateWithLifecycle()
+    val account by vm.account.collectAsStateWithLifecycle()
 
     var route by rememberSaveable { mutableStateOf(SettingsRoute.ROOT) }
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
@@ -214,6 +218,7 @@ fun SettingsContent(
 
                 SettingsRoute.ACCOUNT -> AccountSettings(
                     padding = innerPadding,
+                    account = account,
                     onDisconnect = { showDisconnectConfirm = true },
                 )
 
@@ -517,9 +522,40 @@ private fun BackgroundSettings(
 }
 
 @Composable
-private fun AccountSettings(padding: PaddingValues, onDisconnect: () -> Unit) {
+private fun AccountSettings(
+    padding: PaddingValues,
+    account: MeUser?,
+    onDisconnect: () -> Unit,
+) {
     SubScreen(padding) {
         SectionHeader(stringResource(R.string.settings_account))
+        if (account != null) {
+            AccountField(stringResource(R.string.account_name), account.name ?: "—")
+            AccountField(stringResource(R.string.account_email), account.email ?: "—")
+            if (account.groups.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.account_groups),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+                FlowRow(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    account.groups.forEach { g ->
+                        AssistChip(onClick = {}, label = { Text(g) })
+                    }
+                }
+            }
+        } else {
+            Text(
+                stringResource(R.string.account_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
         Button(
             onClick = onDisconnect,
             colors = ButtonDefaults.buttonColors(
@@ -551,6 +587,19 @@ private fun AboutSettings(padding: PaddingValues) {
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
+    }
+}
+
+/** A labelled read-only account field: small caption label above the value. */
+@Composable
+private fun AccountField(label: String, value: String) {
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Text(value, style = MaterialTheme.typography.bodyLarge)
     }
 }
 

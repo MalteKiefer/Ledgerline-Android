@@ -58,6 +58,7 @@ fun tmpBlobCache(): BlobDiskCache =
 open class NotImplementedApi : LedgerlineApi {
     override suspend fun claimPair(body: PairClaimRequest): Response<PairClaimResponse> = throw NotImplementedError()
     override suspend fun pollPair(code: String): Response<PairPollResponse> = throw NotImplementedError()
+    override suspend fun me(): Response<de.ledgerline.app.data.remote.dto.MeResponse> = throw NotImplementedError()
     override suspend fun vault(): Response<VaultResponse> = throw NotImplementedError()
     override suspend fun store(): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun deleteSession(): Response<Unit> = throw NotImplementedError()

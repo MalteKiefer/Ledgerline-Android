@@ -16,6 +16,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -31,9 +32,9 @@ class BookmarksViewModelTest {
     private fun ws() = Workspace(
         WorkspaceManifest(
             bookmarks = listOf(
-                Bookmark(id = "1", title = "Beta", url = "https://a.example", folderId = "g1"),
-                Bookmark(id = "2", title = "Alpha", url = "https://b.example", folderId = null),
-                Bookmark(id = "3", title = "Gone", url = "https://c.example", trashed = true),
+                Bookmark(id = "1", title = "Beta", url = "https://a.example", folderId = "g1", favorite = true, tags = listOf("News", "work")),
+                Bookmark(id = "2", title = "Alpha", url = "https://b.example", folderId = null, readLater = true, tags = listOf("work")),
+                Bookmark(id = "3", title = "Gone", url = "https://c.example", trashed = true, favorite = true, tags = listOf("secret")),
             ),
             bookmarkFolders = listOf(NamedFolder(id = "g1", name = "Work")),
         ),
@@ -84,8 +85,8 @@ class BookmarksViewModelTest {
     @Test fun toggleFavorite_flips() = runTest {
         val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
         vm.refresh()
-        vm.toggleFavorite("1")
-        assertEquals(true, vm.bookmarkById("1")?.favorite)
+        vm.toggleFavorite("2")   // "2" starts non-favorite
+        assertEquals(true, vm.bookmarkById("2")?.favorite)
     }
 
     @Test fun deleteFolder_orphans_bookmarks_and_clears_filter() = runTest {
@@ -122,6 +123,63 @@ class BookmarksViewModelTest {
         vm.refresh()
         vm.setTrash(true)
         vm.setQuery("nomatch")
+        assertEquals(listOf("3"), vm.state.value.items.map { it.id })
+    }
+
+    @Test fun allTags_is_sorted_distinct_union_of_non_trashed() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        // "secret" (trashed) excluded; "work" deduped; sorted case-insensitively.
+        assertEquals(listOf("News", "work"), vm.allTags.value)
+    }
+
+    @Test fun setActiveTag_filters_and_combines_with_folder() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setActiveTag("work")
+        assertEquals(listOf("Alpha", "Beta"), vm.state.value.items.map { it.title })
+        vm.setActiveFolder("g1")   // AND with folder filter
+        assertEquals(listOf("Beta"), vm.state.value.items.map { it.title })
+    }
+
+    @Test fun favorites_and_readLater_counts() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        // Trashed favorite ("3") excluded from the count.
+        assertEquals(1, vm.favoritesCount.value)
+        assertEquals(1, vm.readLaterCount.value)
+    }
+
+    @Test fun setView_FAVORITES_filters_to_favorites() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setView(BookmarkView.FAVORITES)
+        assertEquals(listOf("Beta"), vm.state.value.items.map { it.title })
+    }
+
+    @Test fun setView_READ_LATER_filters_to_readLater() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setView(BookmarkView.READ_LATER)
+        assertEquals(listOf("Alpha"), vm.state.value.items.map { it.title })
+    }
+
+    @Test fun view_combines_with_tag_and_query() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setView(BookmarkView.READ_LATER)
+        vm.setActiveTag("work")   // Alpha is read-later AND tagged work
+        assertEquals(listOf("Alpha"), vm.state.value.items.map { it.title })
+        vm.setQuery("beta")       // Beta is not read-later → AND yields nothing
+        assertTrue(vm.state.value.items.isEmpty())
+    }
+
+    @Test fun view_and_tag_ignored_in_trash_view() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.setView(BookmarkView.READ_LATER)   // trashed item is not read-later
+        vm.setActiveTag("work")               // trashed item is not tagged work
+        vm.setTrash(true)
         assertEquals(listOf("3"), vm.state.value.items.map { it.id })
     }
 

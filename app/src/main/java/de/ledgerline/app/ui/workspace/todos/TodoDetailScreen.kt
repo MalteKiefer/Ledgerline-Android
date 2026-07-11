@@ -38,6 +38,7 @@ import de.ledgerline.app.ui.workspace.common.TagChips
 import de.ledgerline.app.ui.workspace.common.formatDue
 import de.ledgerline.app.ui.common.ConfirmDialog
 import de.ledgerline.app.ui.common.openUrl
+import de.ledgerline.app.ui.workspace.common.isOverdue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,7 +98,14 @@ fun TodoDetailScreen(
             )
             listName?.let { DetailRow(stringResource(R.string.todo_list), it) }
             DetailRow(stringResource(R.string.todo_priority), priorityLabel(todo.priority))
-            if (due.isNotBlank()) DetailRow(stringResource(R.string.todo_due), due)
+            if (due.isNotBlank()) {
+                val overdue = !todo.done && isOverdue(todo.due)
+                DetailRow(
+                    stringResource(R.string.todo_due),
+                    due,
+                    valueColor = if (overdue) MaterialTheme.colorScheme.error else null,
+                )
+            }
             if (todo.description.isNotBlank()) {
                 Text(todo.description, style = MaterialTheme.typography.bodyLarge)
             }
@@ -134,13 +142,17 @@ fun TodoDetailScreen(
 }
 
 @Composable
-private fun DetailRow(label: String, value: String) {
+private fun DetailRow(label: String, value: String, valueColor: androidx.compose.ui.graphics.Color? = null) {
     Column {
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
         )
-        Text(value, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyLarge,
+            color = valueColor ?: MaterialTheme.colorScheme.onSurface,
+        )
     }
 }

@@ -1,6 +1,7 @@
 package de.ledgerline.app.domain.workspace
 
 import de.ledgerline.app.domain.model.FileEntry
+import de.ledgerline.app.domain.model.FileVersion
 import de.ledgerline.app.domain.model.WorkspaceManifest
 
 /**
@@ -35,4 +36,27 @@ object FileOps {
         transform: (FileEntry) -> FileEntry,
     ): WorkspaceManifest =
         m.copy(files = m.files.map { if (it.id == id) transform(it) else it })
+
+    /** Max saved versions kept per file; older ones are evicted and their blobs freed. */
+    const val MAX_VERSIONS = 20
+
+    /** The newly capped version list plus the blob refs of the evicted overflow. */
+    data class VersionUpdate(val versions: List<FileVersion>, val freedBlobs: List<String>)
+
+    /**
+     * In-app-editor save: snapshot the outgoing [previous] blob as the newest version
+     * (prepended, mirroring the web `unshift`), then cap to [keep]. Returns the capped
+     * list and the overflow blob refs the caller must free. Pure — mutates nothing.
+     */
+    fun prependVersion(
+        existing: List<FileVersion>,
+        previous: FileVersion,
+        keep: Int = MAX_VERSIONS,
+    ): VersionUpdate {
+        val all = listOf(previous) + existing
+        if (all.size <= keep) return VersionUpdate(all, emptyList())
+        val kept = all.take(keep)
+        val evicted = all.drop(keep)
+        return VersionUpdate(kept, evicted.map { it.blob })
+    }
 }
