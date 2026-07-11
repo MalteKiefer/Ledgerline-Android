@@ -10,8 +10,10 @@ import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
+import de.ledgerline.app.data.remote.dto.EmbedTextRequest
 import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.domain.model.Session
+import de.ledgerline.app.domain.usecase.EmbedText
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUploadApi
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +33,7 @@ class GalleryBlobRepository private constructor(
     private val blobCache: BlobDiskCache,
     private val offlineFlags: OfflineFlags,
     private val apiProvider: (Session) -> LedgerlineApi,
-) : GalleryBlobs, GalleryUploadApi {
+) : GalleryBlobs, GalleryUploadApi, EmbedText {
     @Inject constructor(
         sessionHolder: SessionHolder,
         vaultKeyHolder: VaultKeyHolder,
@@ -140,6 +142,15 @@ class GalleryBlobRepository private constructor(
             if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
             Outcome.Ok(res.body()!!)
         } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
+    }
+
+    override suspend fun invoke(query: String): List<Double>? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        try {
+            val res = apiProvider(session).embedText(EmbedTextRequest(query))
+            if (!res.isSuccessful) return@withContext null
+            res.body()?.embedding?.takeIf { it.isNotEmpty() }
+        } catch (_: Exception) { null }
     }
 
     companion object {

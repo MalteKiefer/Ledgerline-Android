@@ -2,6 +2,7 @@ package de.ledgerline.app.ui.gallery
 
 import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.GalleryCache
+import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.ops.BackgroundOpsSetting
@@ -15,6 +16,7 @@ import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.domain.model.Gallery
 import de.ledgerline.app.domain.model.GalleryManifest
 import de.ledgerline.app.domain.model.GalleryPhoto
+import de.ledgerline.app.domain.usecase.EmbedText
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUploadApi
 import de.ledgerline.app.domain.usecase.GalleryUsage
@@ -45,6 +47,11 @@ private class FakeBlobs : GalleryBlobs {
 
 private class FakeGalleryUsage : GalleryUsage {
     override suspend fun invoke(): Pair<Long, Long>? = null
+}
+
+/** Returns a canned query embedding (or null to force metadata-only search). */
+private class FakeEmbedText(private val embedding: List<Double>? = null) : EmbedText {
+    override suspend fun invoke(query: String): List<Double>? = embedding
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +131,7 @@ class GalleryViewModelTest {
         importPhotos: ImportPhotos = ImportPhotosImpl(cache, uploader, mutate),
         operationManager: OperationManager = testOperationManager(),
         blobs: FakeBlobs = FakeBlobs(),
+        embedText: EmbedText = FakeEmbedText(),
     ) = GalleryViewModel(
         load = load,
         cache = cache,
@@ -135,6 +143,8 @@ class GalleryViewModelTest {
         lockGuard = LockGuard(),
         vaultKeyHolder = de.ledgerline.app.core.security.VaultKeyHolder(),
         operationManager = operationManager,
+        embedText = embedText,
+        metaCache = MetaCache(),
     )
 
     /**
@@ -145,6 +155,12 @@ class GalleryViewModelTest {
     private fun awaitIdle(om: OperationManager) {
         val deadline = System.currentTimeMillis() + 5_000
         while (om.hasActive() && System.currentTimeMillis() < deadline) Thread.sleep(5)
+    }
+
+    /** Wait (wall-clock) until the search coroutine (which hops to a real IO dispatcher) settles. */
+    private fun awaitSearch(vm: GalleryViewModel) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (vm.searching.value && System.currentTimeMillis() < deadline) Thread.sleep(5)
     }
 
     @Test fun newest_first_trashed_hidden() = runTest {
@@ -204,6 +220,142 @@ class GalleryViewModelTest {
         vm.emptyTrash()
         assertEquals(listOf("keep"), cache.value.value!!.manifest.photos.map { it.id })
         assertEquals(setOf("go", "gt"), blobs.deleted.toSet())
+    }
+
+    @Test fun rotate_cycles_0_90_180_270_0() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        fun rot() = cache.value.value!!.manifest.photos.first { it.id == "a" }.rotation
+        assertEquals(0, rot())
+        vm.rotatePhoto("a"); assertEquals(90, rot())
+        vm.rotatePhoto("a"); assertEquals(180, rot())
+        vm.rotatePhoto("a"); assertEquals(270, rot())
+        vm.rotatePhoto("a"); assertEquals(0, rot())
+    }
+
+    @Test fun flip_h_and_v_toggle() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        fun p() = cache.value.value!!.manifest.photos.first { it.id == "a" }
+        assertTrue(!p().flipH && !p().flipV)
+        vm.flipHorizontal("a"); assertTrue(p().flipH)
+        vm.flipHorizontal("a"); assertTrue(!p().flipH)
+        vm.flipVertical("a"); assertTrue(p().flipV)
+        vm.flipVertical("a"); assertTrue(!p().flipV)
+    }
+
+    @Test fun toggle_favorite_flips() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        fun fav() = cache.value.value!!.manifest.photos.first { it.id == "a" }.favorite
+        assertTrue(!fav())
+        vm.toggleFavorite("a"); assertTrue(fav())
+        vm.toggleFavorite("a"); assertTrue(!fav())
+    }
+
+    @Test fun favorites_only_filters_grid() = runTest {
+        val cache = GalleryCache().apply {
+            set(Gallery(GalleryManifest(photos = listOf(
+                GalleryPhoto(id = "a", favorite = true, created = "2026-01-01T00:00:00Z"),
+                GalleryPhoto(id = "b", created = "2026-02-01T00:00:00Z"),
+            )), version = 1))
+        }
+        val vm = makeVm(cache)
+        assertEquals(listOf("b", "a"), vm.state.value.photos.map { it.id })
+        vm.toggleFavoritesOnly()
+        assertTrue(vm.favoritesOnly.value)
+        assertEquals(listOf("a"), vm.state.value.photos.map { it.id })
+        vm.toggleFavoritesOnly()
+        assertEquals(listOf("b", "a"), vm.state.value.photos.map { it.id })
+    }
+
+    @Test fun set_favorite_bulk_marks_all() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.setFavorite(setOf("a", "b"), true)
+        val photos = cache.value.value!!.manifest.photos.associateBy { it.id }
+        assertTrue(photos["a"]!!.favorite)
+        assertTrue(photos["b"]!!.favorite)
+        vm.setFavorite(setOf("a"), false)
+        assertTrue(!cache.value.value!!.manifest.photos.first { it.id == "a" }.favorite)
+    }
+
+    @Test fun set_date_sets_taken_at_on_ids_only() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        val iso = "2026-05-04T00:00:00Z"
+        vm.setDate(setOf("a", "b"), iso)
+        val photos = cache.value.value!!.manifest.photos.associateBy { it.id }
+        assertEquals(iso, photos["a"]!!.taken_at)
+        assertEquals(iso, photos["b"]!!.taken_at)
+        // "c" was not targeted → unchanged (still null).
+        assertEquals(null, photos["c"]!!.taken_at)
+    }
+
+    @Test fun set_location_sets_lat_lng_on_ids_only() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.setLocation(setOf("a"), 52.5, 13.4)
+        val photos = cache.value.value!!.manifest.photos.associateBy { it.id }
+        assertEquals(52.5, photos["a"]!!.lat)
+        assertEquals(13.4, photos["a"]!!.lng)
+        // Others untouched.
+        assertEquals(null, photos["b"]!!.lat)
+        assertEquals(null, photos["b"]!!.lng)
+    }
+
+    @Test fun set_date_empty_ids_is_noop() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        val before = cache.value.value!!.version
+        vm.setDate(emptySet(), "2026-05-04T00:00:00Z")
+        assertEquals(before, cache.value.value!!.version)
+    }
+
+    @Test fun geotagged_photos_only_non_trashed_with_lat_and_lng() = runTest {
+        val cache = GalleryCache().apply {
+            set(Gallery(GalleryManifest(photos = listOf(
+                GalleryPhoto(id = "both", lat = 52.5, lng = 13.4),
+                GalleryPhoto(id = "lat_only", lat = 52.5, lng = null),
+                GalleryPhoto(id = "lng_only", lat = null, lng = 13.4),
+                GalleryPhoto(id = "none"),
+                GalleryPhoto(id = "trashed", trashed = true, lat = 48.1, lng = 11.5),
+                GalleryPhoto(id = "both2", lat = 40.7, lng = -74.0),
+            )), version = 1))
+        }
+        val vm = makeVm(cache)
+        assertEquals(setOf("both", "both2"), vm.geotaggedPhotos().map { it.id }.toSet())
+    }
+
+    @Test fun search_blank_clears_results() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.search("   ")
+        assertEquals(null, vm.searchResults.value)
+    }
+
+    @Test fun search_matches_metadata_name_when_no_embedding() = runTest {
+        val cache = GalleryCache().apply {
+            set(Gallery(GalleryManifest(photos = listOf(
+                GalleryPhoto(id = "beach", name = "Beach sunset.jpg"),
+                GalleryPhoto(id = "car", name = "car.jpg", camera = "Pixel 8"),
+            )), version = 1))
+        }
+        // No embedding → embedText returns null → metadata-only fallback (web try/catch).
+        val vm = makeVm(cache, embedText = FakeEmbedText(null))
+        vm.search("beach"); awaitSearch(vm)
+        assertEquals(listOf("beach"), vm.searchResults.value?.map { it.id })
+        vm.search("pixel"); awaitSearch(vm)
+        assertEquals(listOf("car"), vm.searchResults.value?.map { it.id })
+    }
+
+    @Test fun clear_search_resets_state() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.search("anything")
+        vm.clearSearch()
+        assertEquals(null, vm.searchResults.value)
+        assertTrue(!vm.searching.value)
     }
 
     /**

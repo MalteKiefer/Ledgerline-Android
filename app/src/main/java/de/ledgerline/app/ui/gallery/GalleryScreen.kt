@@ -27,6 +27,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
@@ -34,20 +36,31 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MotionPhotosOn
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -99,8 +112,10 @@ fun GalleryScreen(
     var openAlbumId by remember { mutableStateOf<String?>(null) }
     var openPersonId by remember { mutableStateOf<String?>(null) }
     var showDuplicates by remember { mutableStateOf(false) }
+    var showMap by remember { mutableStateOf(false) }
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
+    val favoritesOnly by vm.favoritesOnly.collectAsStateWithLifecycle()
     // Photo/video viewer + camera open state is hoisted here so these full-screen
     // views replace the WHOLE gallery (segmented control included) — otherwise the
     // tabs stayed on top, sliding under the status bar.
@@ -119,6 +134,17 @@ fun GalleryScreen(
             modifier = modifier,
             galleryVm = vm,
             onBack = { showDuplicates = false },
+        )
+        return
+    }
+
+    // Full-gallery map — full-screen, hides the tabs.
+    if (showMap) {
+        GalleryMapScreen(
+            vm = vm,
+            onOpenPhoto = { openPhotoId = it; showMap = false },
+            onBack = { showMap = false },
+            modifier = modifier,
         )
         return
     }
@@ -184,6 +210,7 @@ fun GalleryScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         var overflowOpen by remember { mutableStateOf(false) }
+        var searchActive by rememberSaveable { mutableStateOf(false) }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -195,17 +222,36 @@ fun GalleryScreen(
                     selected = tab == GalleryTab.PHOTOS,
                     onClick = { tab = GalleryTab.PHOTOS },
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                ) { Text(stringResource(R.string.gallery_tab_photos)) }
+                ) { Text(stringResource(R.string.gallery_tab_photos), maxLines = 1) }
                 SegmentedButton(
                     selected = tab == GalleryTab.ALBUMS,
                     onClick = { tab = GalleryTab.ALBUMS },
                     shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                ) { Text(stringResource(R.string.gallery_tab_albums)) }
+                ) { Text(stringResource(R.string.gallery_tab_albums), maxLines = 1) }
                 SegmentedButton(
                     selected = tab == GalleryTab.PEOPLE,
                     onClick = { tab = GalleryTab.PEOPLE },
                     shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                ) { Text(stringResource(R.string.gallery_tab_people)) }
+                ) { Text(stringResource(R.string.gallery_tab_people), maxLines = 1) }
+            }
+            if (tab == GalleryTab.PHOTOS) {
+                IconButton(onClick = {
+                    searchActive = !searchActive
+                    if (!searchActive) vm.clearSearch()
+                }) {
+                    Icon(
+                        Icons.Outlined.Search,
+                        contentDescription = stringResource(R.string.gallery_search_hint),
+                        tint = if (searchActive) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
+                }
+                IconButton(onClick = { vm.toggleFavoritesOnly() }) {
+                    Icon(
+                        imageVector = if (favoritesOnly) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        contentDescription = stringResource(R.string.gallery_favorites_only),
+                        tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
+                }
             }
             Box {
                 IconButton(onClick = { overflowOpen = true }) {
@@ -218,6 +264,13 @@ fun GalleryScreen(
                     expanded = overflowOpen,
                     onDismissRequest = { overflowOpen = false },
                 ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.gallery_map)) },
+                        onClick = {
+                            overflowOpen = false
+                            showMap = true
+                        },
+                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.duplicates_action)) },
                         onClick = {
@@ -234,6 +287,12 @@ fun GalleryScreen(
                     )
 }
             }
+        }
+
+        // Search field appears only when the search icon is toggled — keeps the
+        // header a single compact row otherwise.
+        if (tab == GalleryTab.PHOTOS && searchActive) {
+            GallerySearchField(vm)
         }
 
         when (tab) {
@@ -259,6 +318,60 @@ fun GalleryScreen(
     }
 }
 
+/**
+ * Semantic photo search field for the Photos tab. Submitting (or the debounce) runs
+ * [GalleryViewModel.search]; the clear (×) resets to the normal grouped grid. A leading
+ * search icon; the trailing × appears once there's text. Local text state drives the
+ * field; the VM owns the results.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GallerySearchField(vm: GalleryViewModel) {
+    var query by rememberSaveable { mutableStateOf("") }
+    val searching by vm.searching.collectAsStateWithLifecycle()
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+
+    OutlinedTextField(
+        value = query,
+        onValueChange = {
+            query = it
+            if (it.isBlank()) vm.clearSearch()
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        singleLine = true,
+        placeholder = { Text(stringResource(R.string.gallery_search_hint)) },
+        leadingIcon = {
+            if (searching) {
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+            } else {
+                Icon(Icons.Outlined.Search, contentDescription = null)
+            }
+        },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = {
+                    query = ""
+                    vm.clearSearch()
+                    keyboard?.hide()
+                }) {
+                    Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.action_cancel))
+                }
+            }
+        },
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+            imeAction = androidx.compose.ui.text.input.ImeAction.Search,
+        ),
+        keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+            onSearch = {
+                vm.search(query)
+                keyboard?.hide()
+            },
+        ),
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PhotosTab(
@@ -271,6 +384,8 @@ private fun PhotosTab(
     val ui by vm.state.collectAsStateWithLifecycle()
     val usage by vm.usage.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val searchResults by vm.searchResults.collectAsStateWithLifecycle()
+    val searching by vm.searching.collectAsStateWithLifecycle()
     var fabExpanded by remember { mutableStateOf(false) }
 
     // Selection mode.
@@ -279,10 +394,30 @@ private fun PhotosTab(
     var showNewAlbum by remember { mutableStateOf(false) }
     var showAddToAlbum by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showLocationPicker by remember { mutableStateOf(false) }
 
     fun exitSelection() {
         selectionMode = false
         selected.clear()
+    }
+
+    // Location picker is full-screen — replace the whole Photos tab while it's open.
+    if (showLocationPicker) {
+        val ids = selected.toSet()
+        val first = ui.photos.firstOrNull { it.id in ids }
+        LocationPickerScreen(
+            initialLat = first?.lat,
+            initialLng = first?.lng,
+            onPick = { lat, lng ->
+                vm.setLocation(ids, lat, lng)
+                showLocationPicker = false
+                exitSelection()
+            },
+            onBack = { showLocationPicker = false },
+            modifier = modifier,
+        )
+        return
     }
 
     val context = LocalContext.current
@@ -320,7 +455,23 @@ private fun PhotosTab(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
+        val results = searchResults
         when {
+            // Search active — flat, ranked grid (no day headers), replacing the timeline.
+            results != null -> SearchResultsGrid(
+                results = results,
+                searching = searching,
+                vm = vm,
+                selectionMode = selectionMode,
+                selected = selected,
+                onOpenPhoto = onOpenPhoto,
+                onToggleSelect = { id ->
+                    if (id in selected) selected.remove(id) else selected.add(id)
+                },
+                onStartSelection = { id ->
+                    if (!selectionMode) { selectionMode = true; if (id !in selected) selected.add(id) }
+                },
+            )
             ui.loading && ui.photos.isEmpty() -> LoadingBox(Modifier.fillMaxSize())
             ui.error -> ErrorBox(
                 stringResource(R.string.gallery_error),
@@ -358,27 +509,35 @@ private fun PhotosTab(
                             )
                         }
                     }
-                    items(ui.photos, key = { it.id }) { photo ->
-                        SelectableThumbCell(
-                            photo = photo,
-                            vm = vm,
-                            selectionMode = selectionMode,
-                            selected = photo.id in selected,
-                            onClick = {
-                                if (selectionMode) {
-                                    if (photo.id in selected) selected.remove(photo.id)
-                                    else selected.add(photo.id)
-                                } else {
-                                    onOpenPhoto(photo.id)
-                                }
-                            },
-                            onLongClick = {
-                                if (!selectionMode) {
-                                    selectionMode = true
-                                    if (photo.id !in selected) selected.add(photo.id)
-                                }
-                            },
-                        )
+                    ui.dayGroups.forEach { group ->
+                        item(
+                            span = { GridItemSpan(maxLineSpan) },
+                            key = "day-${group.dayKey}",
+                        ) {
+                            DayHeader(group.label)
+                        }
+                        items(group.photos, key = { it.id }) { photo ->
+                            SelectableThumbCell(
+                                photo = photo,
+                                vm = vm,
+                                selectionMode = selectionMode,
+                                selected = photo.id in selected,
+                                onClick = {
+                                    if (selectionMode) {
+                                        if (photo.id in selected) selected.remove(photo.id)
+                                        else selected.add(photo.id)
+                                    } else {
+                                        onOpenPhoto(photo.id)
+                                    }
+                                },
+                                onLongClick = {
+                                    if (!selectionMode) {
+                                        selectionMode = true
+                                        if (photo.id !in selected) selected.add(photo.id)
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -434,9 +593,18 @@ private fun PhotosTab(
             SelectionBar(
                 count = selected.size,
                 onClose = { exitSelection() },
+                onFavorite = {
+                    // Favorite if any selected photo isn't yet a favorite, else unfavorite all.
+                    val ids = selected.toSet()
+                    val makeFav = ui.photos.any { it.id in ids && !it.favorite }
+                    vm.setFavorite(ids, makeFav)
+                    exitSelection()
+                },
                 onNewAlbum = { showNewAlbum = true },
                 onAddToAlbum = { showAddToAlbum = true },
                 onDelete = { showDeleteConfirm = true },
+                onSetDate = { showDatePicker = true },
+                onSetLocation = { showLocationPicker = true },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp),
@@ -494,17 +662,99 @@ private fun PhotosTab(
             onDismiss = { showDeleteConfirm = false },
         )
     }
+
+    // Bulk set capture date on the selection.
+    if (showDatePicker) {
+        val ids = selected.toSet()
+        val initial = ui.photos.firstOrNull { it.id in ids }?.let { it.taken_at ?: it.created }
+        PhotoDatePickerDialog(
+            initialIso = initial,
+            onConfirm = { iso ->
+                vm.setDate(ids, iso)
+                exitSelection()
+            },
+            onDismiss = { showDatePicker = false },
+        )
+    }
+}
+
+/**
+ * Flat, ranked search-results grid (no day grouping) with a small "N results" label —
+ * replaces the timeline while a query is active. Shows a spinner+label while searching,
+ * "No matches" for an empty result, and keeps selection/thumbnails working.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SearchResultsGrid(
+    results: List<GalleryPhoto>,
+    searching: Boolean,
+    vm: GalleryViewModel,
+    selectionMode: Boolean,
+    selected: List<String>,
+    onOpenPhoto: (String) -> Unit,
+    onToggleSelect: (String) -> Unit,
+    onStartSelection: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        when {
+            searching -> Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+                Text(
+                    stringResource(R.string.gallery_searching),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 12.dp),
+                )
+            }
+            results.isEmpty() -> Text(
+                stringResource(R.string.gallery_search_none),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+            else -> Text(
+                stringResource(R.string.gallery_search_results, results.size),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 116.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            items(results, key = { it.id }) { photo ->
+                SelectableThumbCell(
+                    photo = photo,
+                    vm = vm,
+                    selectionMode = selectionMode,
+                    selected = photo.id in selected,
+                    onClick = {
+                        if (selectionMode) onToggleSelect(photo.id) else onOpenPhoto(photo.id)
+                    },
+                    onLongClick = { onStartSelection(photo.id) },
+                )
+            }
+        }
+    }
 }
 
 @Composable
 private fun SelectionBar(
     count: Int,
     onClose: () -> Unit,
+    onFavorite: () -> Unit,
     onNewAlbum: () -> Unit,
     onAddToAlbum: () -> Unit,
     onDelete: () -> Unit,
+    onSetDate: () -> Unit,
+    onSetLocation: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var overflow by remember { mutableStateOf(false) }
     Surface(
         modifier = modifier,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
@@ -525,6 +775,9 @@ private fun SelectionBar(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(end = 8.dp),
             )
+            IconButton(onClick = onFavorite) {
+                Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.action_favorite))
+            }
             IconButton(onClick = onNewAlbum) {
                 Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = stringResource(R.string.album_new))
             }
@@ -533,6 +786,23 @@ private fun SelectionBar(
             }
             IconButton(onClick = onDelete) {
                 Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete))
+            }
+            Box {
+                IconButton(onClick = { overflow = true }) {
+                    Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more))
+                }
+                DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_set_date)) },
+                        leadingIcon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+                        onClick = { overflow = false; onSetDate() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_set_location)) },
+                        leadingIcon = { Icon(Icons.Outlined.Place, contentDescription = null) },
+                        onClick = { overflow = false; onSetLocation() },
+                    )
+                }
             }
         }
     }
@@ -739,6 +1009,59 @@ private fun TrashSelectionBar(
     }
 }
 
+/**
+ * M3 date picker in a dialog. On confirm it hands back the chosen day formatted as an
+ * ISO instant at local start-of-day (day granularity, matching the web's date-only
+ * pick). [initialIso] pre-selects the current capture date when parseable.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun PhotoDatePickerDialog(
+    initialIso: String?,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val state = rememberDatePickerState(initialSelectedDateMillis = parseIsoToUtcMillis(initialIso))
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val millis = state.selectedDateMillis
+                    if (millis != null) onConfirm(utcMillisToIso(millis))
+                    onDismiss()
+                },
+                enabled = state.selectedDateMillis != null,
+            ) { Text(stringResource(R.string.action_save)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+        },
+    ) {
+        DatePicker(state = state)
+    }
+}
+
+/** Best-effort UTC-midnight millis for the day of an ISO/EXIF timestamp; null if unparseable. */
+private fun parseIsoToUtcMillis(iso: String?): Long? {
+    if (iso.isNullOrBlank()) return null
+    val date = runCatching { java.time.OffsetDateTime.parse(iso).toLocalDate() }
+        .recoverCatching { java.time.Instant.parse(iso).atZone(java.time.ZoneId.systemDefault()).toLocalDate() }
+        .recoverCatching {
+            val norm = iso.trim().replaceFirst(Regex("^(\\d{4}):(\\d{2}):(\\d{2})"), "$1-$2-$3").take(10)
+            java.time.LocalDate.parse(norm)
+        }
+        .getOrNull() ?: return null
+    return date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+}
+
+/** The M3 date picker returns UTC-midnight millis for the picked day; format it as an
+ *  ISO instant at LOCAL start-of-day so it lands on the intended calendar day. */
+private fun utcMillisToIso(millis: Long): String {
+    val day = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+    return day.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toString()
+}
+
 /** Resolve DISPLAY_NAME from a content URI; falls back to "photo.jpg". */
 private fun queryPhotoName(context: Context, uri: Uri): String {
     context.contentResolver.query(uri, null, null, null, null)?.use { c ->
@@ -746,6 +1069,19 @@ private fun queryPhotoName(context: Context, uri: Uri): String {
         if (ni >= 0 && c.moveToFirst() && !c.isNull(ni)) return c.getString(ni)
     }
     return "photo.jpg"
+}
+
+/** Full-span timeline day header shown above each capture-day group in the grid. */
+@Composable
+private fun DayHeader(label: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 6.dp),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -799,6 +1135,22 @@ internal fun SelectableThumbCell(
                 "▶",
                 modifier = Modifier.align(Alignment.Center),
                 color = MaterialTheme.colorScheme.onSurface,
+            )
+        } else if (photo.motionRef != null) {
+            // Live/motion photo indicator (still image with an embedded motion clip).
+            Icon(
+                Icons.Outlined.MotionPhotosOn,
+                contentDescription = stringResource(R.string.action_play_motion),
+                tint = Color.White,
+                modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(18.dp),
+            )
+        }
+        if (photo.favorite) {
+            Icon(
+                Icons.Filled.Star,
+                contentDescription = stringResource(R.string.action_favorite),
+                tint = Color.White,
+                modifier = Modifier.align(Alignment.BottomStart).padding(4.dp).size(18.dp),
             )
         }
         if (selectionMode && selected) {
