@@ -21,7 +21,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.RotateRight
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,8 +50,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
@@ -80,6 +86,7 @@ fun PhotoViewerScreen(
     var ox by remember { mutableFloatStateOf(0f) }
     var oy by remember { mutableFloatStateOf(0f) }
     var showInfo by remember { mutableStateOf(false) }
+    var viewport by remember { mutableStateOf(IntSize.Zero) }
 
     val isVideo = photo.media_type == "video"
 
@@ -110,6 +117,30 @@ fun PhotoViewerScreen(
                     }
                 },
                 actions = {
+                    // Non-destructive edits apply only to images (video renders a poster).
+                    if (!isVideo) {
+                        IconButton(onClick = { vm.rotatePhoto(photo.id) }) {
+                            Icon(Icons.AutoMirrored.Outlined.RotateRight, contentDescription = stringResource(R.string.action_rotate))
+                        }
+                        IconButton(onClick = { vm.flipHorizontal(photo.id) }) {
+                            Icon(Icons.Outlined.Flip, contentDescription = stringResource(R.string.action_flip_h))
+                        }
+                        IconButton(onClick = { vm.flipVertical(photo.id) }) {
+                            Icon(
+                                Icons.Outlined.Flip,
+                                contentDescription = stringResource(R.string.action_flip_v),
+                                modifier = Modifier.graphicsLayer(rotationZ = 90f),
+                            )
+                        }
+                    }
+                    IconButton(onClick = { vm.toggleFavorite(photo.id) }) {
+                        Icon(
+                            imageVector = if (photo.favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                            contentDescription = stringResource(
+                                if (photo.favorite) R.string.action_unfavorite else R.string.action_favorite
+                            ),
+                        )
+                    }
                     IconButton(onClick = { showInfo = !showInfo }) {
                         Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.info_title))
                     }
@@ -120,31 +151,50 @@ fun PhotoViewerScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(pad),
+                .padding(pad)
+                .onSizeChanged { viewport = it },
             contentAlignment = Alignment.Center,
         ) {
             val b = bmp
             when {
                 isVideo -> VideoPlayer(photo = photo, vm = vm, modifier = Modifier.fillMaxSize())
-                b != null -> Image(
-                    bitmap = b.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(
-                            scaleX = scale,
-                            scaleY = scale,
-                            translationX = ox,
-                            translationY = oy,
-                        )
-                        .pointerInput(Unit) {
-                            detectTransformGestures { _, panChange, zoom, _ ->
-                                scale = (scale * zoom).coerceIn(1f, 5f)
-                                ox += panChange.x
-                                oy += panChange.y
-                            }
-                        },
-                )
+                b != null -> {
+                    // For a 90/270 rotation the image's bounding box swaps W/H, so the
+                    // rotated bitmap (drawn at ContentScale.Fit = 1×) would overflow. Snap
+                    // it to a fit-scale so the rotated content fits inside the viewport
+                    // (mirrors the web's _fitViewer). For 0/180 the Image already fits.
+                    val quarter = photo.rotation % 180 != 0
+                    val fitScale = if (quarter && viewport.width > 0 && viewport.height > 0) {
+                        // The bitmap is laid out to fit the viewport at 0° first; after a
+                        // quarter turn its on-screen extents swap, so fit the swapped box.
+                        val fitted = fitInside(b.width.toFloat(), b.height.toFloat(), viewport.width.toFloat(), viewport.height.toFloat())
+                        minOf(viewport.width / fitted.second, viewport.height / fitted.first)
+                    } else {
+                        1f
+                    }
+                    Image(
+                        bitmap = b.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                // Combine user zoom (scale) with the rotation fit-scale, plus
+                                // the flip sign — never clobber the pan/zoom state.
+                                scaleX = scale * fitScale * (if (photo.flipH) -1f else 1f),
+                                scaleY = scale * fitScale * (if (photo.flipV) -1f else 1f),
+                                rotationZ = photo.rotation.toFloat(),
+                                translationX = ox,
+                                translationY = oy,
+                            )
+                            .pointerInput(Unit) {
+                                detectTransformGestures { _, panChange, zoom, _ ->
+                                    scale = (scale * zoom).coerceIn(1f, 5f)
+                                    ox += panChange.x
+                                    oy += panChange.y
+                                }
+                            },
+                    )
+                }
                 else -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
         }
@@ -338,6 +388,16 @@ private fun PhotoInfoSheet(
             }
         }
     }
+}
+
+/**
+ * The on-screen size of a `srcW × srcH` image scaled with ContentScale.Fit into a
+ * `boxW × boxH` viewport. Returns `(height, width)` of the fitted image.
+ */
+private fun fitInside(srcW: Float, srcH: Float, boxW: Float, boxH: Float): Pair<Float, Float> {
+    if (srcW <= 0f || srcH <= 0f) return boxH to boxW
+    val s = minOf(boxW / srcW, boxH / srcH)
+    return (srcH * s) to (srcW * s)
 }
 
 private fun openInMaps(context: Context, lat: Double, lng: Double) {

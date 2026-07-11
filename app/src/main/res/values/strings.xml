@@ -251,6 +251,12 @@
     <string name="album_add_to">Add to album</string>
     <string name="selection_count">%1$d selected</string>
     <string name="action_delete">Delete</string>
+    <string name="action_rotate">Rotate</string>
+    <string name="action_flip_h">Flip horizontal</string>
+    <string name="action_flip_v">Flip vertical</string>
+    <string name="action_favorite">Favorite</string>
+    <string name="action_unfavorite">Unfavorite</string>
+    <string name="gallery_favorites_only">Favorites</string>
     <string name="selection_delete_confirm">Move %1$d item(s) to trash?</string>
     <string name="albums_empty">No albums yet.</string>
     <string name="album_rename">Rename</string>

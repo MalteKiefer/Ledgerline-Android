@@ -27,6 +27,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
@@ -40,6 +42,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -101,6 +104,7 @@ fun GalleryScreen(
     var showDuplicates by remember { mutableStateOf(false) }
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
+    val favoritesOnly by vm.favoritesOnly.collectAsStateWithLifecycle()
     // Photo/video viewer + camera open state is hoisted here so these full-screen
     // views replace the WHOLE gallery (segmented control included) — otherwise the
     // tabs stayed on top, sliding under the status bar.
@@ -206,6 +210,20 @@ fun GalleryScreen(
                     onClick = { tab = GalleryTab.PEOPLE },
                     shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
                 ) { Text(stringResource(R.string.gallery_tab_people)) }
+            }
+            if (tab == GalleryTab.PHOTOS) {
+                FilterChip(
+                    selected = favoritesOnly,
+                    onClick = { vm.toggleFavoritesOnly() },
+                    label = { Text(stringResource(R.string.gallery_favorites_only)) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (favoritesOnly) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                            contentDescription = null,
+                        )
+                    },
+                    modifier = Modifier.padding(start = 8.dp),
+                )
             }
             Box {
                 IconButton(onClick = { overflowOpen = true }) {
@@ -434,6 +452,13 @@ private fun PhotosTab(
             SelectionBar(
                 count = selected.size,
                 onClose = { exitSelection() },
+                onFavorite = {
+                    // Favorite if any selected photo isn't yet a favorite, else unfavorite all.
+                    val ids = selected.toSet()
+                    val makeFav = ui.photos.any { it.id in ids && !it.favorite }
+                    vm.setFavorite(ids, makeFav)
+                    exitSelection()
+                },
                 onNewAlbum = { showNewAlbum = true },
                 onAddToAlbum = { showAddToAlbum = true },
                 onDelete = { showDeleteConfirm = true },
@@ -500,6 +525,7 @@ private fun PhotosTab(
 private fun SelectionBar(
     count: Int,
     onClose: () -> Unit,
+    onFavorite: () -> Unit,
     onNewAlbum: () -> Unit,
     onAddToAlbum: () -> Unit,
     onDelete: () -> Unit,
@@ -525,6 +551,9 @@ private fun SelectionBar(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(end = 8.dp),
             )
+            IconButton(onClick = onFavorite) {
+                Icon(Icons.Filled.Star, contentDescription = stringResource(R.string.action_favorite))
+            }
             IconButton(onClick = onNewAlbum) {
                 Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = stringResource(R.string.album_new))
             }
@@ -799,6 +828,14 @@ internal fun SelectableThumbCell(
                 "▶",
                 modifier = Modifier.align(Alignment.Center),
                 color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        if (photo.favorite) {
+            Icon(
+                Icons.Filled.Star,
+                contentDescription = stringResource(R.string.action_favorite),
+                tint = Color.White,
+                modifier = Modifier.align(Alignment.BottomStart).padding(4.dp).size(18.dp),
             )
         }
         if (selectionMode && selected) {

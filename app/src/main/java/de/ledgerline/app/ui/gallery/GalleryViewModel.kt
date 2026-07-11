@@ -72,6 +72,41 @@ class GalleryViewModel @Inject constructor(
 
     fun toggleTrash() = setTrash(!_showTrash.value)
 
+    /** When true the Photos grid shows only favorited photos. */
+    private val _favoritesOnly = MutableStateFlow(false)
+    val favoritesOnly: StateFlow<Boolean> = _favoritesOnly
+
+    fun toggleFavoritesOnly() {
+        _favoritesOnly.value = !_favoritesOnly.value
+        recompute()
+    }
+
+    /** Non-destructive rotate: cycle rotation 0→90→180→270→0 on the photo entry. */
+    fun rotatePhoto(id: String) = viewModelScope.launch {
+        mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id == id) it.copy(rotation = (it.rotation + 90) % 360) else it }) }
+    }
+
+    /** Non-destructive horizontal flip toggle on the photo entry. */
+    fun flipHorizontal(id: String) = viewModelScope.launch {
+        mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id == id) it.copy(flipH = !it.flipH) else it }) }
+    }
+
+    /** Non-destructive vertical flip toggle on the photo entry. */
+    fun flipVertical(id: String) = viewModelScope.launch {
+        mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id == id) it.copy(flipV = !it.flipV) else it }) }
+    }
+
+    /** Toggle the favorite flag on a single photo. */
+    fun toggleFavorite(id: String) = viewModelScope.launch {
+        mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id == id) it.copy(favorite = !it.favorite) else it }) }
+    }
+
+    /** Bulk-set the favorite flag on the given photos (selection toolbar). */
+    fun setFavorite(ids: Set<String>, favorite: Boolean) = viewModelScope.launch {
+        if (ids.isEmpty()) return@launch
+        mutate.invoke { m -> m.copy(photos = m.photos.map { if (it.id in ids) it.copy(favorite = favorite) else it }) }
+    }
+
     fun clearMessage() { _message.value = null }
 
     /** Soft-delete (trash) the selected photos — sets `trashed=true` in the gallery
@@ -205,8 +240,10 @@ class GalleryViewModel @Inject constructor(
         val all = cache.value.value?.manifest?.photos.orEmpty()
         _trashCount.value = all.count { it.trashed }
         // Normal grid = untrashed; trash view = only trashed. Both newest-first.
+        // The favorites filter only applies to the normal (non-trash) grid.
         val photos = all
             .filter { it.trashed == _showTrash.value }
+            .filter { !_favoritesOnly.value || _showTrash.value || it.favorite }
             .sortedByDescending { epochOf(it.taken_at ?: it.created) }
         _state.value = GalleryUi(false, false, photos)
     }

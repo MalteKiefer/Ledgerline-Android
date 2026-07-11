@@ -206,6 +206,64 @@ class GalleryViewModelTest {
         assertEquals(setOf("go", "gt"), blobs.deleted.toSet())
     }
 
+    @Test fun rotate_cycles_0_90_180_270_0() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        fun rot() = cache.value.value!!.manifest.photos.first { it.id == "a" }.rotation
+        assertEquals(0, rot())
+        vm.rotatePhoto("a"); assertEquals(90, rot())
+        vm.rotatePhoto("a"); assertEquals(180, rot())
+        vm.rotatePhoto("a"); assertEquals(270, rot())
+        vm.rotatePhoto("a"); assertEquals(0, rot())
+    }
+
+    @Test fun flip_h_and_v_toggle() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        fun p() = cache.value.value!!.manifest.photos.first { it.id == "a" }
+        assertTrue(!p().flipH && !p().flipV)
+        vm.flipHorizontal("a"); assertTrue(p().flipH)
+        vm.flipHorizontal("a"); assertTrue(!p().flipH)
+        vm.flipVertical("a"); assertTrue(p().flipV)
+        vm.flipVertical("a"); assertTrue(!p().flipV)
+    }
+
+    @Test fun toggle_favorite_flips() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        fun fav() = cache.value.value!!.manifest.photos.first { it.id == "a" }.favorite
+        assertTrue(!fav())
+        vm.toggleFavorite("a"); assertTrue(fav())
+        vm.toggleFavorite("a"); assertTrue(!fav())
+    }
+
+    @Test fun favorites_only_filters_grid() = runTest {
+        val cache = GalleryCache().apply {
+            set(Gallery(GalleryManifest(photos = listOf(
+                GalleryPhoto(id = "a", favorite = true, created = "2026-01-01T00:00:00Z"),
+                GalleryPhoto(id = "b", created = "2026-02-01T00:00:00Z"),
+            )), version = 1))
+        }
+        val vm = makeVm(cache)
+        assertEquals(listOf("b", "a"), vm.state.value.photos.map { it.id })
+        vm.toggleFavoritesOnly()
+        assertTrue(vm.favoritesOnly.value)
+        assertEquals(listOf("a"), vm.state.value.photos.map { it.id })
+        vm.toggleFavoritesOnly()
+        assertEquals(listOf("b", "a"), vm.state.value.photos.map { it.id })
+    }
+
+    @Test fun set_favorite_bulk_marks_all() = runTest {
+        val cache = GalleryCache().apply { set(gallery()) }
+        val vm = makeVm(cache)
+        vm.setFavorite(setOf("a", "b"), true)
+        val photos = cache.value.value!!.manifest.photos.associateBy { it.id }
+        assertTrue(photos["a"]!!.favorite)
+        assertTrue(photos["b"]!!.favorite)
+        vm.setFavorite(setOf("a"), false)
+        assertTrue(!cache.value.value!!.manifest.photos.first { it.id == "a" }.favorite)
+    }
+
     /**
      * Verifies the upload queue:
      * 1. A single source is uploaded and appended to the gallery cache.
