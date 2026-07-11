@@ -207,7 +207,7 @@
     <string name="welcome_location_granted">Standort aktiviert</string>
     <string name="gallery_tab_photos">Fotos</string>
     <string name="gallery_tab_albums">Alben</string>
-    <string name="gallery_tab_people">People</string>
+    <string name="gallery_tab_people">Personen</string>
     <string name="duplicates_action">Duplikate suchen</string>
     <string name="duplicates_title">Duplikate</string>
     <string name="duplicates_rescan">Neu scannen</string>
