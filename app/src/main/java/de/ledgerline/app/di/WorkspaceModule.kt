@@ -18,6 +18,7 @@ import de.ledgerline.app.data.MutateGalleryImpl
 import de.ledgerline.app.data.MutateWorkspaceImpl
 import de.ledgerline.app.data.UploadFileImpl
 import de.ledgerline.app.domain.usecase.DownloadFile
+import de.ledgerline.app.domain.usecase.EmbedText
 import de.ledgerline.app.domain.usecase.FileBlobs
 import de.ledgerline.app.domain.usecase.FilesUsage
 import de.ledgerline.app.domain.usecase.ForceLogout
@@ -45,6 +46,7 @@ abstract class WorkspaceModule {
     @Binds abstract fun bindLoadGallery(impl: LoadGalleryImpl): LoadGallery
     @Binds abstract fun bindGalleryBlobs(impl: GalleryBlobRepository): GalleryBlobs
     @Binds abstract fun bindGalleryUploadApi(impl: GalleryBlobRepository): GalleryUploadApi
+    @Binds abstract fun bindEmbedText(impl: GalleryBlobRepository): EmbedText
     @Binds abstract fun bindGalleryUsage(impl: GalleryUsageImpl): GalleryUsage
     @Binds abstract fun bindForceLogout(impl: ForceLogoutImpl): ForceLogout
     @Binds abstract fun bindImportFile(impl: ImportFileImpl): ImportFile

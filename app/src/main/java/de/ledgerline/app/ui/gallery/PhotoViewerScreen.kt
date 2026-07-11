@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
@@ -16,12 +17,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.RotateRight
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.MotionPhotosOn
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -43,14 +53,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.ByteArrayDataSource
 import androidx.media3.datasource.DataSource
@@ -80,8 +94,31 @@ fun PhotoViewerScreen(
     var ox by remember { mutableFloatStateOf(0f) }
     var oy by remember { mutableFloatStateOf(0f) }
     var showInfo by remember { mutableStateOf(false) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showLocationPicker by remember { mutableStateOf(false) }
+    var viewport by remember { mutableStateOf(IntSize.Zero) }
+    var playingMotion by remember { mutableStateOf(false) }
 
     val isVideo = photo.media_type == "video"
+    // A live/motion photo is a still IMAGE that carries an embedded motion clip.
+    val hasMotion = !isVideo && photo.motionRef != null && photo.motionKey != null
+    // Stop any motion playback when navigating to a different photo.
+    LaunchedEffect(photo.id) { playingMotion = false }
+
+    // Location picker is full-screen — replaces the viewer while open.
+    if (showLocationPicker) {
+        LocationPickerScreen(
+            initialLat = photo.lat,
+            initialLng = photo.lng,
+            onPick = { lat, lng ->
+                vm.setLocation(setOf(photo.id), lat, lng)
+                showLocationPicker = false
+            },
+            onBack = { showLocationPicker = false },
+            modifier = modifier,
+        )
+        return
+    }
 
     // Image path: load medium rendition, fall back to thumb bytes if mediumRef is
     // absent. Skipped entirely for videos (handled by VideoPlayer below).
@@ -110,6 +147,30 @@ fun PhotoViewerScreen(
                     }
                 },
                 actions = {
+                    // Non-destructive edits apply only to images (video renders a poster).
+                    if (!isVideo) {
+                        IconButton(onClick = { vm.rotatePhoto(photo.id) }) {
+                            Icon(Icons.AutoMirrored.Outlined.RotateRight, contentDescription = stringResource(R.string.action_rotate))
+                        }
+                        IconButton(onClick = { vm.flipHorizontal(photo.id) }) {
+                            Icon(Icons.Outlined.Flip, contentDescription = stringResource(R.string.action_flip_h))
+                        }
+                        IconButton(onClick = { vm.flipVertical(photo.id) }) {
+                            Icon(
+                                Icons.Outlined.Flip,
+                                contentDescription = stringResource(R.string.action_flip_v),
+                                modifier = Modifier.graphicsLayer(rotationZ = 90f),
+                            )
+                        }
+                    }
+                    IconButton(onClick = { vm.toggleFavorite(photo.id) }) {
+                        Icon(
+                            imageVector = if (photo.favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                            contentDescription = stringResource(
+                                if (photo.favorite) R.string.action_unfavorite else R.string.action_favorite
+                            ),
+                        )
+                    }
                     IconButton(onClick = { showInfo = !showInfo }) {
                         Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.info_title))
                     }
@@ -120,38 +181,100 @@ fun PhotoViewerScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(pad),
+                .padding(pad)
+                .onSizeChanged { viewport = it },
             contentAlignment = Alignment.Center,
         ) {
             val b = bmp
             when {
                 isVideo -> VideoPlayer(photo = photo, vm = vm, modifier = Modifier.fillMaxSize())
-                b != null -> Image(
-                    bitmap = b.asImageBitmap(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer(
-                            scaleX = scale,
-                            scaleY = scale,
-                            translationX = ox,
-                            translationY = oy,
-                        )
-                        .pointerInput(Unit) {
-                            detectTransformGestures { _, panChange, zoom, _ ->
-                                scale = (scale * zoom).coerceIn(1f, 5f)
-                                ox += panChange.x
-                                oy += panChange.y
-                            }
-                        },
-                )
+                b != null -> {
+                    // For a 90/270 rotation the image's bounding box swaps W/H, so the
+                    // rotated bitmap (drawn at ContentScale.Fit = 1×) would overflow. Snap
+                    // it to a fit-scale so the rotated content fits inside the viewport
+                    // (mirrors the web's _fitViewer). For 0/180 the Image already fits.
+                    val quarter = photo.rotation % 180 != 0
+                    val fitScale = if (quarter && viewport.width > 0 && viewport.height > 0) {
+                        // The bitmap is laid out to fit the viewport at 0° first; after a
+                        // quarter turn its on-screen extents swap, so fit the swapped box.
+                        val fitted = fitInside(b.width.toFloat(), b.height.toFloat(), viewport.width.toFloat(), viewport.height.toFloat())
+                        minOf(viewport.width / fitted.second, viewport.height / fitted.first)
+                    } else {
+                        1f
+                    }
+                    Image(
+                        bitmap = b.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                // Combine user zoom (scale) with the rotation fit-scale, plus
+                                // the flip sign — never clobber the pan/zoom state.
+                                scaleX = scale * fitScale * (if (photo.flipH) -1f else 1f),
+                                scaleY = scale * fitScale * (if (photo.flipV) -1f else 1f),
+                                rotationZ = photo.rotation.toFloat(),
+                                translationX = ox,
+                                translationY = oy,
+                            )
+                            .pointerInput(Unit) {
+                                detectTransformGestures { _, panChange, zoom, _ ->
+                                    scale = (scale * zoom).coerceIn(1f, 5f)
+                                    ox += panChange.x
+                                    oy += panChange.y
+                                }
+                            },
+                    )
+                }
                 else -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+
+            // Live/motion photo: overlay the looping clip on top of the still, or
+            // show a tappable motion affordance when idle. Only for image photos
+            // that carry an embedded motion clip.
+            if (hasMotion) {
+                if (playingMotion) {
+                    MotionPlayer(
+                        photo = photo,
+                        vm = vm,
+                        onStop = { playingMotion = false },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else if (b != null) {
+                    IconButton(
+                        onClick = { playingMotion = true },
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(16.dp)
+                            .background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                    ) {
+                        Icon(
+                            Icons.Outlined.MotionPhotosOn,
+                            contentDescription = stringResource(R.string.action_play_motion),
+                            tint = Color.White,
+                        )
+                    }
+                }
             }
         }
 
         if (showInfo) {
-            PhotoInfoSheet(photo = photo, vm = vm, onDismiss = { showInfo = false })
+            PhotoInfoSheet(
+                photo = photo,
+                vm = vm,
+                onDismiss = { showInfo = false },
+                onEditDate = { showInfo = false; showDatePicker = true },
+                onEditLocation = { showInfo = false; showLocationPicker = true },
+            )
         }
+    }
+
+    // Single-photo date edit — day-granularity picker, applies to this photo only.
+    if (showDatePicker) {
+        PhotoDatePickerDialog(
+            initialIso = photo.taken_at ?: photo.created,
+            onConfirm = { iso -> vm.setDate(setOf(photo.id), iso) },
+            onDismiss = { showDatePicker = false },
+        )
     }
 }
 
@@ -177,22 +300,79 @@ private fun VideoPlayer(
     vm: GalleryViewModel,
     modifier: Modifier = Modifier,
 ) {
+    // For videos the ORIGINAL is the playable file; `medium` is a poster image
+    // (an image container ExoPlayer can't play). Use the original video bytes.
+    InMemoryPlayer(
+        vm = vm,
+        key = photo.id,
+        ref = photo.originalRef ?: photo.mediumRef,
+        encKey = photo.originalKey ?: photo.mediumKey,
+        showControls = true,
+        loop = false,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Live/motion-photo playback: the still's embedded motion clip, looped, no controls,
+ * tap anywhere to return to the still. Reuses the same in-memory decrypt+ExoPlayer path
+ * as [VideoPlayer]. If the clip fails to decrypt/play, we return to the still (no crash).
+ */
+@Composable
+private fun MotionPlayer(
+    photo: GalleryPhoto,
+    vm: GalleryViewModel,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    InMemoryPlayer(
+        vm = vm,
+        key = "motion:${photo.id}",
+        ref = photo.motionRef,
+        encKey = photo.motionKey,
+        showControls = false,
+        loop = true,
+        onError = onStop,
+        modifier = modifier.clickable(onClick = onStop),
+    )
+}
+
+/**
+ * In-memory encrypted-video playback shared by full-video and live-motion playback.
+ *
+ * We decrypt the whole blob to a [ByteArray] in RAM (via [GalleryViewModel.downloadBytes],
+ * which runs the secretstream decrypt) and feed those bytes straight into ExoPlayer through a
+ * [ByteArrayDataSource]. Plaintext bytes therefore never touch disk — they live only in memory
+ * while this composable is on screen. The ExoPlayer is released on dispose so it never leaks.
+ *
+ * MVP note: loading the full original into RAM is acceptable for now. A future optimization for
+ * very large originals is a streaming secretstream-backed [DataSource] that decrypts chunk by
+ * chunk on demand instead of materializing the whole file.
+ */
+@OptIn(UnstableApi::class)
+@Composable
+private fun InMemoryPlayer(
+    vm: GalleryViewModel,
+    key: Any,
+    ref: String?,
+    encKey: String?,
+    showControls: Boolean,
+    loop: Boolean,
+    modifier: Modifier = Modifier,
+    onError: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
 
-    // Decrypt the video bytes off the UI, mirroring the photo path's produceState.
-    val bytes by produceState<Outcome<ByteArray>?>(initialValue = null, photo.id) {
-        // For videos the ORIGINAL is the playable file; `medium` is a poster image
-        // (an image container ExoPlayer can't play). Use the original video bytes.
-        val ref = photo.originalRef ?: photo.mediumRef
-        val key = photo.originalKey ?: photo.mediumKey
-        value = if (ref != null && key != null) {
-            vm.downloadBytes(ref, key)
+    // Decrypt the bytes off the UI, mirroring the photo path's produceState.
+    val bytes by produceState<Outcome<ByteArray>?>(initialValue = null, key) {
+        value = if (ref != null && encKey != null) {
+            vm.downloadBytes(ref, encKey)
         } else {
             Outcome.Err(ErrorKind.NOT_CONFIGURED)
         }
     }
 
-    // One ExoPlayer per open viewer; released on dispose so it never leaks.
+    // One ExoPlayer per open player; released on dispose so it never leaks.
     val player = remember { ExoPlayer.Builder(context).build() }
     DisposableEffect(Unit) {
         onDispose { player.release() }
@@ -202,6 +382,7 @@ private fun VideoPlayer(
     val ok = bytes as? Outcome.Ok
     LaunchedEffect(ok) {
         val data = ok?.value ?: return@LaunchedEffect
+        player.repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
         val factory = DataSource.Factory { ByteArrayDataSource(data) }
         val source = ProgressiveMediaSource.Factory(factory)
             .createMediaSource(MediaItem.fromUri(Uri.EMPTY))
@@ -210,18 +391,26 @@ private fun VideoPlayer(
         player.playWhenReady = true
     }
 
+    // A decrypt/setup failure bubbles up so callers (e.g. motion) can drop back to the still.
+    val err = bytes as? Outcome.Err
+    LaunchedEffect(err) {
+        if (err != null) onError?.invoke()
+    }
+
     when (bytes) {
         null -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        is Outcome.Err -> Text(
-            text = stringResource(R.string.video_load_failed),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        is Outcome.Err -> if (onError == null) {
+            Text(
+                text = stringResource(R.string.video_load_failed),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         is Outcome.Ok -> AndroidView(
             modifier = modifier,
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     this.player = player
-                    useController = true
+                    useController = showControls
                 }
             },
         )
@@ -234,6 +423,8 @@ private fun PhotoInfoSheet(
     photo: GalleryPhoto,
     vm: GalleryViewModel,
     onDismiss: () -> Unit,
+    onEditDate: () -> Unit,
+    onEditLocation: () -> Unit,
 ) {
     var place by remember { mutableStateOf<PhotoPlace?>(null) }
     LaunchedEffect(photo.id) {
@@ -336,8 +527,40 @@ private fun PhotoInfoSheet(
             } else {
                 InfoRow(label = stringResource(R.string.info_location), value = locationValue)
             }
+
+            // Edit actions — day-granularity date + map location picker (this photo).
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+            ) {
+                TextButton(onClick = onEditDate, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Outlined.CalendarMonth, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.action_edit_date),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+                TextButton(onClick = onEditLocation, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Outlined.Place, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.action_edit_location),
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
         }
     }
+}
+
+/**
+ * The on-screen size of a `srcW × srcH` image scaled with ContentScale.Fit into a
+ * `boxW × boxH` viewport. Returns `(height, width)` of the fitted image.
+ */
+private fun fitInside(srcW: Float, srcH: Float, boxW: Float, boxH: Float): Pair<Float, Float> {
+    if (srcW <= 0f || srcH <= 0f) return boxH to boxW
+    val s = minOf(boxW / srcW, boxH / srcH)
+    return (srcH * s) to (srcW * s)
 }
 
 private fun openInMaps(context: Context, lat: Double, lng: Double) {

@@ -87,14 +87,10 @@ fun WorkspaceScaffold(
     // single edge-to-edge model: no phantom top gap, content never clipped.
     AppScaffold(
         immersive = chromeHidden,
-        topBar = {
-            if (!chromeHidden) {
-                TopAppBar(
-                    title = { Text(stringResource(tabs[selected].labelRes)) },
-                    colors = TopAppBarDefaults.topAppBarColors(),
-                )
-            }
-        },
+        // No top title bar: the bottom navigation already labels the section, and each
+        // tab owns its own compact header. This reclaims a full app-bar of vertical
+        // space (the gallery in particular was losing ~a third of the screen to chrome).
+        topBar = {},
         bottomBar = {
             if (!chromeHidden) {
                 NavigationBar {
