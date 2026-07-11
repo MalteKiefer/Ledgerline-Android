@@ -9,6 +9,7 @@ import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.core.ops.ServiceController
 import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.data.GalleryUploader
+import de.ledgerline.app.data.ImportPhotosImpl
 import de.ledgerline.app.data.UploadedBlob
 import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.domain.model.Gallery
@@ -17,8 +18,10 @@ import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUploadApi
 import de.ledgerline.app.domain.usecase.GalleryUsage
+import de.ledgerline.app.domain.usecase.ImportPhotos
 import de.ledgerline.app.domain.usecase.LoadGallery
 import de.ledgerline.app.domain.usecase.MutateGallery
+import de.ledgerline.app.domain.usecase.PhotoSource
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -116,6 +119,7 @@ class GalleryViewModelTest {
         },
         uploader: GalleryUploader = fakeUploader(FakeGalleryUploadApi(ProcessResponse())),
         mutate: MutateGallery = FakeMutateGallery(cache),
+        importPhotos: ImportPhotos = ImportPhotosImpl(cache, uploader, mutate),
         operationManager: OperationManager = testOperationManager(),
     ) = GalleryViewModel(
         load = load,
@@ -123,8 +127,7 @@ class GalleryViewModelTest {
         blobs = FakeBlobs(),
         thumbs = ThumbCache(),
         galleryUsage = FakeGalleryUsage(),
-        uploader = uploader,
-        mutate = mutate,
+        importPhotos = importPhotos,
         lockGuard = LockGuard(),
         vaultKeyHolder = de.ledgerline.app.core.security.VaultKeyHolder(),
         operationManager = operationManager,

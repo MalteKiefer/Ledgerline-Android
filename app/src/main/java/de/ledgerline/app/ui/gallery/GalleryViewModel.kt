@@ -11,33 +11,20 @@ import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.ops.OpKind
 import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.core.security.LockGuard
-import de.ledgerline.app.data.GalleryUploader
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.model.PhotoMetaBlob
 import de.ledgerline.app.domain.model.PhotoPlace
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUsage
+import de.ledgerline.app.domain.usecase.ImportPhotos
 import de.ledgerline.app.domain.usecase.LoadGallery
-import de.ledgerline.app.domain.usecase.MutateGallery
+import de.ledgerline.app.domain.usecase.PhotoSource
 import de.ledgerline.app.ui.workspace.files.UsageInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
-
-/**
- * A content source for [GalleryViewModel.uploadAll]: name + mime + lazy byte reader.
- * [lat]/[lng] are optional device coordinates for camera-captured photos (where the
- * EXIF strip has no GPS). Picker photos leave them null — the server reads their EXIF.
- */
-data class PhotoSource(
-    val name: String,
-    val mime: String,
-    val read: () -> ByteArray,
-    val lat: Double? = null,
-    val lng: Double? = null,
-)
 
 data class GalleryUi(
     val loading: Boolean = false,
@@ -52,8 +39,7 @@ class GalleryViewModel @Inject constructor(
     private val blobs: GalleryBlobs,
     private val thumbs: ThumbCache,
     private val galleryUsage: GalleryUsage,
-    private val uploader: GalleryUploader,
-    private val mutate: MutateGallery,
+    private val importPhotos: ImportPhotos,
     private val lockGuard: LockGuard,
     private val vaultKeyHolder: de.ledgerline.app.core.security.VaultKeyHolder,
     private val operationManager: OperationManager,
@@ -111,46 +97,9 @@ class GalleryViewModel @Inject constructor(
      */
     fun uploadAll(sources: List<PhotoSource>) {
         operationManager.run(OpKind.UPLOAD, total = sources.size) { report ->
-            val existing = cache.value.value?.manifest?.photos
-                ?.mapNotNull { it.sig }
-                ?.toMutableSet()
-                ?: mutableSetOf()
-
-            report(0, sources.size)
-            var done = 0
-            var failed = 0
-
-            for (src in sources) {
-                val bytes = try {
-                    src.read()
-                } catch (_: Exception) {
-                    failed++
-                    done++
-                    report(done, sources.size)
-                    continue
-                }
-
-                val sig = fileSig(bytes)
-                if (sig in existing) {
-                    // Dedup: already present in the gallery index.
-                    done++
-                    report(done, sources.size)
-                    continue
-                }
-
-                when (val up = uploader.upload(src.name, src.mime, sig, bytes, nowIso(), src.lat, src.lng)) {
-                    is Outcome.Ok -> {
-                        mutate.invoke { it.copy(photos = it.photos + up.value) }
-                        existing += sig
-                    }
-                    is Outcome.Err -> failed++
-                }
-                done++
-                report(done, sources.size)
-            }
-
+            val result = importPhotos.invoke(sources, report)
             loadUsage()
-            if (failed > 0) _message.value = "upload_failed:$failed"
+            if (result.failed > 0) _message.value = "upload_failed:${result.failed}"
         }
     }
 
@@ -195,19 +144,4 @@ class GalleryViewModel @Inject constructor(
             .sortedByDescending { it.created ?: "" }
         _state.value = GalleryUi(false, false, photos)
     }
-
-    /** Duplicate signature, byte-compatible with the web `_fileSig`:
-     *  "${size}:${hex(sha256(first1MiB ++ last1MiB))}" (tail empty when size <= 1 MiB). */
-    private fun fileSig(bytes: ByteArray): String {
-        val cap = 1024 * 1024
-        val size = bytes.size
-        val md = java.security.MessageDigest.getInstance("SHA-256")
-        md.update(bytes, 0, minOf(cap, size))
-        if (size > cap) md.update(bytes, size - cap, cap)
-        val hex = md.digest().joinToString("") { "%02x".format(it) }
-        return "$size:$hex"
-    }
-
-    private fun nowIso(): String =
-        java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).toString()
 }
