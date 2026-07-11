@@ -1,6 +1,7 @@
 package de.ledgerline.app.domain.workspace
 
 import de.ledgerline.app.domain.model.FileEntry
+import de.ledgerline.app.domain.model.FileVersion
 import de.ledgerline.app.domain.model.WorkspaceManifest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -50,5 +51,40 @@ class FileOpsTest {
     @Test fun removeFile_unknown_id_is_noop() {
         val m = FileOps.removeFile(manifest(), "nope")
         assertEquals(manifest().files, m.files)
+    }
+
+    // ---- prependVersion (in-app editor save history) ----
+
+    private fun ver(blob: String) = FileVersion(id = "v-$blob", blob = blob)
+
+    @Test fun prependVersion_prepends_old_as_newest() {
+        val existing = listOf(ver("b2"), ver("b3"))
+        val r = FileOps.prependVersion(existing, ver("b1"), keep = 20)
+        assertEquals(listOf("b1", "b2", "b3"), r.versions.map { it.blob })
+        assertTrue(r.freedBlobs.isEmpty())
+    }
+
+    @Test fun prependVersion_under_cap_frees_nothing() {
+        val existing = (1..5).map { ver("old$it") }
+        val r = FileOps.prependVersion(existing, ver("new"), keep = 20)
+        assertEquals(6, r.versions.size)
+        assertTrue(r.freedBlobs.isEmpty())
+    }
+
+    @Test fun prependVersion_caps_and_returns_overflow_blobs() {
+        // 20 existing + 1 new = 21; keep=20 → oldest (the last existing) evicted.
+        val existing = (1..20).map { ver("old$it") }
+        val r = FileOps.prependVersion(existing, ver("new"), keep = 20)
+        assertEquals(20, r.versions.size)
+        assertEquals("new", r.versions.first().blob)
+        assertEquals(listOf("old20"), r.freedBlobs)   // oldest overflow freed
+    }
+
+    @Test fun prependVersion_evicts_all_overflow_beyond_cap() {
+        val existing = (1..25).map { ver("old$it") }
+        val r = FileOps.prependVersion(existing, ver("new"), keep = 20)
+        assertEquals(20, r.versions.size)
+        // 26 total → 6 overflow: old20..old25 (order preserved, newest-first prepend)
+        assertEquals(listOf("old20", "old21", "old22", "old23", "old24", "old25"), r.freedBlobs)
     }
 }

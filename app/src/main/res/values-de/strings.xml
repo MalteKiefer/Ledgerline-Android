@@ -124,6 +124,9 @@
     <string name="file_save">Speichern</string>
     <string name="file_saved">Gespeichert</string>
     <string name="file_save_failed">Speichern fehlgeschlagen</string>
+    <string name="file_edit_save">Speichern</string>
+    <string name="file_editor_saving">Speichere…</string>
+    <string name="file_export">Exportieren</string>
     <string name="file_preview_unavailable">Für diesen Dateityp ist keine Vorschau verfügbar.</string>
     <string name="pdf_page">Seite %1$d</string>
     <string name="pdf_render_failed">Seite konnte nicht dargestellt werden.</string>

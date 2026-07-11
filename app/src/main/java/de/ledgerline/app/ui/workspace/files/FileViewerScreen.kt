@@ -16,10 +16,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,11 +41,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.FileEntry
@@ -53,21 +57,35 @@ import kotlinx.coroutines.launch
 
 /**
  * In-app viewer that renders decrypted [bytes] held only in memory.
- * Images decode to a bitmap; text/json/xml render as selectable scrollable text;
- * anything else offers a "Save to device" action (SAF export).
+ * Text/code files ([isTextFile]) open in an editable monospace editor with a
+ * Save action ([onSaveText], re-encrypt + versioned manifest write). Images decode
+ * to a bitmap; PDFs render; anything else offers an Export action ([onExport], SAF).
+ * [onExport] (SAF export to device) is always available in the top bar.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FileViewerScreen(
     file: FileEntry,
     bytes: ByteArray,
+    saving: Boolean,
     onBack: () -> Unit,
-    onSave: () -> Unit,
+    onExport: () -> Unit,
+    onSaveText: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
     val fs = LocalFullscreen.current
     DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
+
+    val editable = remember(file.mime, file.name) { isTextFile(file.mime, file.name) }
+    // Editor buffer, re-seeded whenever the underlying decrypted bytes change
+    // (initial open AND after a successful save re-seeds ViewerState.Ready).
+    var edited by remember(bytes) {
+        mutableStateOf(TextFieldValue(if (editable) String(bytes, Charsets.UTF_8) else ""))
+    }
+    val original = remember(bytes) { if (editable) String(bytes, Charsets.UTF_8) else "" }
+    val dirty = editable && edited.text != original
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -79,8 +97,20 @@ fun FileViewerScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onSave) {
-                        Icon(Icons.Outlined.Save, stringResource(R.string.file_save))
+                    if (editable) {
+                        if (saving) {
+                            CircularProgressIndicator(
+                                Modifier.padding(horizontal = 12.dp).height(24.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            IconButton(onClick = { onSaveText(edited.text) }, enabled = dirty) {
+                                Icon(Icons.Outlined.Save, stringResource(R.string.file_edit_save))
+                            }
+                        }
+                    }
+                    IconButton(onClick = onExport) {
+                        Icon(Icons.Outlined.FileDownload, stringResource(R.string.file_export))
                     }
                 },
             )
@@ -93,8 +123,24 @@ fun FileViewerScreen(
             contentAlignment = Alignment.Center,
         ) {
             when {
+                editable -> {
+                    BasicTextField(
+                        value = edited,
+                        onValueChange = { edited = it },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp)
+                            .verticalScroll(rememberScrollState()),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    )
+                }
+
                 file.mime == "application/pdf" || file.name.endsWith(".pdf", ignoreCase = true) -> {
-                    PdfPreview(bytes = bytes, onSave = onSave)
+                    PdfPreview(bytes = bytes, onSave = onExport)
                 }
 
                 file.mime.startsWith("image/") -> {
@@ -107,27 +153,11 @@ fun FileViewerScreen(
                             contentScale = ContentScale.Fit,
                         )
                     } else {
-                        UnsupportedPreview(onSave)
+                        UnsupportedPreview(onExport)
                     }
                 }
 
-                file.mime.startsWith("text/") ||
-                    file.mime == "application/json" ||
-                    file.mime == "application/xml" -> {
-                    val text = remember(bytes) { String(bytes) }
-                    SelectionContainer(Modifier.fillMaxSize()) {
-                        Text(
-                            text,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp)
-                                .verticalScroll(rememberScrollState()),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-
-                else -> UnsupportedPreview(onSave)
+                else -> UnsupportedPreview(onExport)
             }
         }
     }

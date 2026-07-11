@@ -139,6 +139,9 @@
     <string name="file_save">Save</string>
     <string name="file_saved">Saved</string>
     <string name="file_save_failed">Save failed</string>
+    <string name="file_edit_save">Save</string>
+    <string name="file_editor_saving">Saving…</string>
+    <string name="file_export">Export</string>
     <string name="file_preview_unavailable">Preview not available for this file type.</string>
     <string name="pdf_page">Page %1$d</string>
     <string name="pdf_render_failed">Couldn\'t render this page.</string>

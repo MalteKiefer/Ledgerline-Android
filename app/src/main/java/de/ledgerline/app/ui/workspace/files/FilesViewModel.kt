@@ -12,6 +12,7 @@ import de.ledgerline.app.domain.model.WorkspaceManifest
 import de.ledgerline.app.domain.usecase.FileBlobs
 import de.ledgerline.app.domain.usecase.FilesUsage
 import de.ledgerline.app.domain.usecase.ImportFile
+import de.ledgerline.app.domain.model.FileVersion
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.domain.workspace.FileOps
@@ -19,8 +20,10 @@ import de.ledgerline.app.domain.workspace.WorkspaceSearch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
@@ -81,6 +84,10 @@ class FilesViewModel @Inject constructor(
 
     private val _viewer = MutableStateFlow<ViewerState>(ViewerState.Idle)
     val viewer: StateFlow<ViewerState> = _viewer
+
+    /** True while an in-app editor save (re-encrypt + manifest write) is in flight. */
+    private val _saving = MutableStateFlow(false)
+    val saving: StateFlow<Boolean> = _saving
 
     /** Transient one-shot user message (success/failure); cleared once shown. */
     private val _message = MutableStateFlow<String?>(null)
@@ -228,6 +235,66 @@ class FilesViewModel @Inject constructor(
 
     fun closeViewer() { _viewer.value = ViewerState.Idle }
 
+    /**
+     * Save edited text back into the vault (zero-knowledge, mirrors the web `saveText`):
+     * re-encrypt [content] with a FRESH per-file key as a new blob, snapshot the OLD blob
+     * as the newest [FileVersion] (capped, overflow blobs freed), then persist the mutated
+     * manifest. The old blob is NOT deleted — it lives on as a version. On success the
+     * viewer is re-seeded with the saved bytes so the editor reflects the persisted state.
+     */
+    fun saveText(file: FileEntry, content: String) = viewModelScope.launch {
+        _saving.value = true
+        try {
+            val bytes = content.toByteArray(Charsets.UTF_8)
+            val mime = file.mime.ifBlank { "text/plain" }
+            val uploaded = when (
+                val r = blobRepo.upload(file.name, mime, bytes.size.toLong()) { ByteArrayInputStream(bytes) }
+            ) {
+                is Outcome.Ok -> r.value
+                is Outcome.Err -> { _message.value = SAVE_FAILED; return@launch }
+            }
+
+            val now = Instant.now().toString()
+            val snapshot = FileVersion(
+                id = newId(), blob = file.blob, encFileKey = file.encFileKey,
+                size = file.size, mime = file.mime, name = file.name, created = now,
+            )
+            // Only snapshot when the blob actually changed (defensive; upload always mints a new id).
+            val update = if (uploaded.id != file.blob) {
+                FileOps.prependVersion(file.versions, snapshot)
+            } else {
+                FileOps.VersionUpdate(file.versions, emptyList())
+            }
+
+            val updated = file.copy(
+                blob = uploaded.id,
+                encFileKey = uploaded.encFileKey,
+                size = uploaded.size,
+                mime = mime,
+                versions = update.versions,
+            )
+
+            val res = mutate.invoke { m ->
+                m.copy(files = m.files.map { if (it.id == file.id) updated else it })
+            }
+            when (res) {
+                is Outcome.Ok -> {
+                    if (update.freedBlobs.isNotEmpty()) blobRepo.deleteBlobs(update.freedBlobs)
+                    _viewer.value = ViewerState.Ready(updated, bytes)
+                    _message.value = SAVED
+                    loadUsage()
+                }
+                is Outcome.Err -> {
+                    // Manifest write failed: reclaim the orphan blob we just uploaded.
+                    blobRepo.deleteBlobs(listOf(uploaded.id))
+                    _message.value = SAVE_FAILED
+                }
+            }
+        } finally {
+            _saving.value = false
+        }
+    }
+
     // ---- Export (streamed to a SAF sink) ----
 
     /**
@@ -278,6 +345,12 @@ class FilesViewModel @Inject constructor(
     }
 
     private fun newId(): String = UUID.randomUUID().toString()
+
+    companion object {
+        /** Sentinel messages the UI maps to localized strings (see FilesScreen). */
+        const val SAVED = "msg.saved"
+        const val SAVE_FAILED = "msg.save_failed"
+    }
 
     private fun recompute() {
         val m = cache.value.value?.manifest
