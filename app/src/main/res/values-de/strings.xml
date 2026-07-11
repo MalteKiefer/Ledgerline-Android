@@ -79,6 +79,23 @@
     <string name="note_delete">Notiz löschen</string>
     <string name="note_updated">Aktualisiert %1$s</string>
 
+    <!-- Lesezeichen-CRUD -->
+    <string name="bm_new">Neues Lesezeichen</string>
+    <string name="bm_edit">Lesezeichen bearbeiten</string>
+    <string name="bm_delete">Lesezeichen löschen</string>
+    <string name="bm_url_hint">URL</string>
+    <string name="bm_title_hint">Titel</string>
+    <string name="bm_desc_hint">Beschreibung</string>
+    <string name="bm_folder">Ordner</string>
+    <string name="bm_no_folder">Kein Ordner</string>
+    <string name="bm_new_folder">Neuer Ordner…</string>
+    <string name="bm_favorite">Favorit</string>
+    <string name="bm_read_later">Später lesen</string>
+    <string name="bm_all_folders">Alle</string>
+    <string name="bm_manage_folders">Ordner verwalten</string>
+    <string name="folder_rename">Ordner umbenennen</string>
+    <string name="folder_delete">Ordner löschen</string>
+
     <!-- Datei-Detail -->
     <string name="file_type">Typ</string>
     <string name="file_size">Größe</string>

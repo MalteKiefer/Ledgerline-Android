@@ -79,6 +79,23 @@
     <string name="note_delete">Delete note</string>
     <string name="note_updated">Updated %1$s</string>
 
+    <!-- Bookmark CRUD -->
+    <string name="bm_new">New bookmark</string>
+    <string name="bm_edit">Edit bookmark</string>
+    <string name="bm_delete">Delete bookmark</string>
+    <string name="bm_url_hint">URL</string>
+    <string name="bm_title_hint">Title</string>
+    <string name="bm_desc_hint">Description</string>
+    <string name="bm_folder">Folder</string>
+    <string name="bm_no_folder">No folder</string>
+    <string name="bm_new_folder">New folder…</string>
+    <string name="bm_favorite">Favorite</string>
+    <string name="bm_read_later">Read later</string>
+    <string name="bm_all_folders">All</string>
+    <string name="bm_manage_folders">Manage folders</string>
+    <string name="folder_rename">Rename folder</string>
+    <string name="folder_delete">Delete folder</string>
+
     <!-- File detail -->
     <string name="file_type">Type</string>
     <string name="file_size">Size</string>
