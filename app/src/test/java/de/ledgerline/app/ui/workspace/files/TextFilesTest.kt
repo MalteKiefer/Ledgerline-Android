@@ -59,4 +59,26 @@ class TextFilesTest {
         assertFalse(isTextFile(null, ""))
         assertFalse(isTextFile("", ""))
     }
+
+    @org.junit.Test fun asc_pub_pem_and_extensionless_are_text() {
+        org.junit.Assert.assertTrue(isTextFile(null, "key.asc"))
+        org.junit.Assert.assertTrue(isTextFile(null, "id_rsa.pub"))
+        org.junit.Assert.assertTrue(isTextFile(null, "cert.pem"))
+        org.junit.Assert.assertTrue(isTextFile(null, "LICENSE"))
+        org.junit.Assert.assertTrue(isTextFile(null, "CHANGELOG"))
+    }
+
+    @org.junit.Test fun looksLikeText_accepts_printable_rejects_nul() {
+        org.junit.Assert.assertTrue(looksLikeText("-----BEGIN PGP PUBLIC KEY-----\nabc\n".toByteArray()))
+        org.junit.Assert.assertTrue(looksLikeText(ByteArray(0)))
+        org.junit.Assert.assertFalse(looksLikeText(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x00, 0x0D)))
+    }
+
+    @org.junit.Test fun isEditableText_sniffs_extensionless_text() {
+        // No extension, unknown mime, but printable content → editable.
+        org.junit.Assert.assertTrue(isEditableText("application/octet-stream", "randomfile", "hello world\n".toByteArray()))
+        // Binary (NUL) → not editable.
+        org.junit.Assert.assertFalse(isEditableText("application/octet-stream", "blob", byteArrayOf(1,0,2,0)))
+    }
+
 }

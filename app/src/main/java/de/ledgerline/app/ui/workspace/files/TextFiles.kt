@@ -26,11 +26,21 @@ private val TEXT_EXTENSIONS = setOf(
     "htm", "css", "scss", "sass", "less", "sh", "bash", "zsh", "sql", "swift",
     "m", "mm", "lua", "pl", "r", "dart", "vue", "svelte", "tex", "bib",
     "makefile", "mk", "cmake",
+    // Keys / certs / signatures in ASCII armor / PEM (all plain text).
+    "asc", "pub", "pem", "key", "crt", "cer", "csr", "sig", "gpg",
+    // Misc text formats.
+    "diff", "patch", "rst", "adoc", "asciidoc", "srt", "vtt", "ics", "vcf",
+    "plist", "nix", "proto", "graphql", "gql", "tf", "hcl", "ps1", "psm1",
+    "bat", "cmd", "awk", "sed", "erb", "ejs", "twig", "haml", "sln",
+    "gitattributes", "editorconfig", "npmrc", "eslintrc", "prettierrc",
+    "babelrc", "dockerignore", "readme", "license", "changelog", "authors",
 )
 
 /** Extensionless filenames (matched whole, lowercased) that are text/code. */
 private val TEXT_FILENAMES = setOf(
-    "dockerfile", "makefile", ".gitignore", ".env",
+    "dockerfile", "makefile", ".gitignore", ".env", "license", "readme",
+    "changelog", "authors", "notice", "copying", "install", "todo",
+    ".gitattributes", ".editorconfig", ".npmrc", ".dockerignore",
 )
 
 /**
@@ -58,3 +68,33 @@ fun isTextFile(mime: String?, name: String): Boolean {
     val ext = lower.substringAfterLast('.', missingDelimiterValue = "")
     return ext.isNotEmpty() && ext in TEXT_EXTENSIONS
 }
+
+/**
+ * Content-based text sniff for files the name/MIME allowlist misses (`.asc`, `.pub`,
+ * PEM keys, extensionless configs, unknown types). Heuristic (like git's): a leading
+ * sample with NO NUL byte and a high ratio of printable/whitespace bytes is text.
+ * Binary files (images, PDFs, video, archives) contain NUL bytes → rejected.
+ *
+ * The bytes are already decrypted in memory when viewing, so this is cheap + reliable.
+ */
+fun looksLikeText(bytes: ByteArray): Boolean {
+    if (bytes.isEmpty()) return true // empty file → editable
+    val sample = minOf(bytes.size, 8192)
+    var suspicious = 0
+    for (i in 0 until sample) {
+        val b = bytes[i].toInt() and 0xFF
+        when {
+            b == 0 -> return false // NUL → binary
+            b == 9 || b == 10 || b == 13 -> {} // tab / LF / CR
+            b in 32..126 -> {} // printable ASCII
+            b >= 0x80 -> {} // assume UTF-8 multibyte / extended — allow
+            else -> suspicious++ // other control chars
+        }
+    }
+    // Allow a small fraction of stray control chars (e.g. ANSI escapes in logs).
+    return suspicious * 100 <= sample * 5
+}
+
+/** Editor gate combining the name/MIME allowlist with a content sniff of [bytes]. */
+fun isEditableText(mime: String?, name: String, bytes: ByteArray): Boolean =
+    isTextFile(mime, name) || looksLikeText(bytes)

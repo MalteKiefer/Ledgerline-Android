@@ -82,7 +82,10 @@ fun FileViewerScreen(
     val fs = LocalFullscreen.current
     DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
 
-    val editable = remember(file.mime, file.name) { isTextFile(file.mime, file.name) }
+    // Editor gate: name/MIME allowlist OR a content sniff (covers .asc/.pub/PEM keys,
+    // extensionless configs, and unknown text the allowlist misses; binaries with NUL
+    // bytes stay in the image/pdf/preview branches).
+    val editable = remember(file.mime, file.name, bytes) { isEditableText(file.mime, file.name, bytes) }
     // Editor buffer, re-seeded whenever the underlying decrypted bytes change
     // (initial open AND after a successful save re-seeds ViewerState.Ready).
     var edited by remember(bytes) {
