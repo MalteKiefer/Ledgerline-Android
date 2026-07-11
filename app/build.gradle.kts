@@ -86,6 +86,10 @@ dependencies {
     implementation(libs.camera.camera2)
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
+    // AndroidX Media3 (ExoPlayer) — open-source, no Google Play Services.
+    implementation(libs.media3.exoplayer)
+    implementation(libs.media3.ui)
+    implementation(libs.media3.datasource)
     implementation(libs.zxing.core)
     implementation(libs.biometric)
     implementation(libs.androidx.lifecycle.runtime.compose)

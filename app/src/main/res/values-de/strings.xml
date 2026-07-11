@@ -190,7 +190,7 @@
     <string name="gallery_usage">%1$s belegt</string>
     <string name="gallery_usage_full">%1$s von %2$s belegt</string>
     <string name="photo_original">Original anzeigen</string>
-    <string name="photo_video_soon">Videowiedergabe kommt später.</string>
+    <string name="video_load_failed">Video konnte nicht abgespielt werden</string>
     <string name="info_title">Foto-Info</string>
     <string name="info_file">Datei</string>
     <string name="info_taken">Aufgenommen</string>
