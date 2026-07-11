@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.clip
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Flip
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.MotionPhotosOn
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.TextButton
@@ -50,6 +53,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -60,6 +64,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.ByteArrayDataSource
 import androidx.media3.datasource.DataSource
@@ -92,8 +97,13 @@ fun PhotoViewerScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showLocationPicker by remember { mutableStateOf(false) }
     var viewport by remember { mutableStateOf(IntSize.Zero) }
+    var playingMotion by remember { mutableStateOf(false) }
 
     val isVideo = photo.media_type == "video"
+    // A live/motion photo is a still IMAGE that carries an embedded motion clip.
+    val hasMotion = !isVideo && photo.motionRef != null && photo.motionKey != null
+    // Stop any motion playback when navigating to a different photo.
+    LaunchedEffect(photo.id) { playingMotion = false }
 
     // Location picker is full-screen — replaces the viewer while open.
     if (showLocationPicker) {
@@ -217,6 +227,34 @@ fun PhotoViewerScreen(
                 }
                 else -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
             }
+
+            // Live/motion photo: overlay the looping clip on top of the still, or
+            // show a tappable motion affordance when idle. Only for image photos
+            // that carry an embedded motion clip.
+            if (hasMotion) {
+                if (playingMotion) {
+                    MotionPlayer(
+                        photo = photo,
+                        vm = vm,
+                        onStop = { playingMotion = false },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else if (b != null) {
+                    IconButton(
+                        onClick = { playingMotion = true },
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(16.dp)
+                            .background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                    ) {
+                        Icon(
+                            Icons.Outlined.MotionPhotosOn,
+                            contentDescription = stringResource(R.string.action_play_motion),
+                            tint = Color.White,
+                        )
+                    }
+                }
+            }
         }
 
         if (showInfo) {
@@ -262,22 +300,79 @@ private fun VideoPlayer(
     vm: GalleryViewModel,
     modifier: Modifier = Modifier,
 ) {
+    // For videos the ORIGINAL is the playable file; `medium` is a poster image
+    // (an image container ExoPlayer can't play). Use the original video bytes.
+    InMemoryPlayer(
+        vm = vm,
+        key = photo.id,
+        ref = photo.originalRef ?: photo.mediumRef,
+        encKey = photo.originalKey ?: photo.mediumKey,
+        showControls = true,
+        loop = false,
+        modifier = modifier,
+    )
+}
+
+/**
+ * Live/motion-photo playback: the still's embedded motion clip, looped, no controls,
+ * tap anywhere to return to the still. Reuses the same in-memory decrypt+ExoPlayer path
+ * as [VideoPlayer]. If the clip fails to decrypt/play, we return to the still (no crash).
+ */
+@Composable
+private fun MotionPlayer(
+    photo: GalleryPhoto,
+    vm: GalleryViewModel,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    InMemoryPlayer(
+        vm = vm,
+        key = "motion:${photo.id}",
+        ref = photo.motionRef,
+        encKey = photo.motionKey,
+        showControls = false,
+        loop = true,
+        onError = onStop,
+        modifier = modifier.clickable(onClick = onStop),
+    )
+}
+
+/**
+ * In-memory encrypted-video playback shared by full-video and live-motion playback.
+ *
+ * We decrypt the whole blob to a [ByteArray] in RAM (via [GalleryViewModel.downloadBytes],
+ * which runs the secretstream decrypt) and feed those bytes straight into ExoPlayer through a
+ * [ByteArrayDataSource]. Plaintext bytes therefore never touch disk — they live only in memory
+ * while this composable is on screen. The ExoPlayer is released on dispose so it never leaks.
+ *
+ * MVP note: loading the full original into RAM is acceptable for now. A future optimization for
+ * very large originals is a streaming secretstream-backed [DataSource] that decrypts chunk by
+ * chunk on demand instead of materializing the whole file.
+ */
+@OptIn(UnstableApi::class)
+@Composable
+private fun InMemoryPlayer(
+    vm: GalleryViewModel,
+    key: Any,
+    ref: String?,
+    encKey: String?,
+    showControls: Boolean,
+    loop: Boolean,
+    modifier: Modifier = Modifier,
+    onError: (() -> Unit)? = null,
+) {
     val context = LocalContext.current
 
-    // Decrypt the video bytes off the UI, mirroring the photo path's produceState.
-    val bytes by produceState<Outcome<ByteArray>?>(initialValue = null, photo.id) {
-        // For videos the ORIGINAL is the playable file; `medium` is a poster image
-        // (an image container ExoPlayer can't play). Use the original video bytes.
-        val ref = photo.originalRef ?: photo.mediumRef
-        val key = photo.originalKey ?: photo.mediumKey
-        value = if (ref != null && key != null) {
-            vm.downloadBytes(ref, key)
+    // Decrypt the bytes off the UI, mirroring the photo path's produceState.
+    val bytes by produceState<Outcome<ByteArray>?>(initialValue = null, key) {
+        value = if (ref != null && encKey != null) {
+            vm.downloadBytes(ref, encKey)
         } else {
             Outcome.Err(ErrorKind.NOT_CONFIGURED)
         }
     }
 
-    // One ExoPlayer per open viewer; released on dispose so it never leaks.
+    // One ExoPlayer per open player; released on dispose so it never leaks.
     val player = remember { ExoPlayer.Builder(context).build() }
     DisposableEffect(Unit) {
         onDispose { player.release() }
@@ -287,6 +382,7 @@ private fun VideoPlayer(
     val ok = bytes as? Outcome.Ok
     LaunchedEffect(ok) {
         val data = ok?.value ?: return@LaunchedEffect
+        player.repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
         val factory = DataSource.Factory { ByteArrayDataSource(data) }
         val source = ProgressiveMediaSource.Factory(factory)
             .createMediaSource(MediaItem.fromUri(Uri.EMPTY))
@@ -295,18 +391,26 @@ private fun VideoPlayer(
         player.playWhenReady = true
     }
 
+    // A decrypt/setup failure bubbles up so callers (e.g. motion) can drop back to the still.
+    val err = bytes as? Outcome.Err
+    LaunchedEffect(err) {
+        if (err != null) onError?.invoke()
+    }
+
     when (bytes) {
         null -> CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-        is Outcome.Err -> Text(
-            text = stringResource(R.string.video_load_failed),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        is Outcome.Err -> if (onError == null) {
+            Text(
+                text = stringResource(R.string.video_load_failed),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         is Outcome.Ok -> AndroidView(
             modifier = modifier,
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     this.player = player
-                    useController = true
+                    useController = showControls
                 }
             },
         )

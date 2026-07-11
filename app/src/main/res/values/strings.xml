@@ -265,6 +265,7 @@
     <string name="action_flip_v">Flip vertical</string>
     <string name="action_favorite">Favorite</string>
     <string name="action_unfavorite">Unfavorite</string>
+    <string name="action_play_motion">Play motion</string>
     <string name="gallery_favorites_only">Favorites</string>
     <string name="gallery_search_hint">Search photos</string>
     <string name="gallery_search_results">%1$d results</string>

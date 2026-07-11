@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.MotionPhotosOn
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Search
@@ -1125,6 +1126,14 @@ internal fun SelectableThumbCell(
                 "▶",
                 modifier = Modifier.align(Alignment.Center),
                 color = MaterialTheme.colorScheme.onSurface,
+            )
+        } else if (photo.motionRef != null) {
+            // Live/motion photo indicator (still image with an embedded motion clip).
+            Icon(
+                Icons.Outlined.MotionPhotosOn,
+                contentDescription = stringResource(R.string.action_play_motion),
+                tint = Color.White,
+                modifier = Modifier.align(Alignment.TopStart).padding(4.dp).size(18.dp),
             )
         }
         if (photo.favorite) {
