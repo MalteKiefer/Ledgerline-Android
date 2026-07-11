@@ -69,12 +69,40 @@ class NoteOpsTest {
     }
 
     @Test
+    fun restoreNote_clears_trashed() {
+        val m = manifest(notes = listOf(Note(id = "n1", trashed = true)))
+        assertFalse(NoteOps.restoreNote(m, "n1").notes.first().trashed)
+    }
+
+    @Test
+    fun removeNote_deletes_the_item() {
+        val m = manifest(notes = listOf(Note(id = "n1"), Note(id = "n2")))
+        val out = NoteOps.removeNote(m, "n1")
+        assertEquals(listOf("n2"), out.notes.map { it.id })
+    }
+
+    @Test
+    fun emptyTrashNotes_removes_only_trashed_and_keeps_live() {
+        val m = manifest(
+            notes = listOf(
+                Note(id = "live1"),
+                Note(id = "trash1", trashed = true),
+                Note(id = "live2"),
+                Note(id = "trash2", trashed = true),
+            ),
+        )
+        assertEquals(listOf("live1", "live2"), NoteOps.emptyTrashNotes(m).notes.map { it.id })
+    }
+
+    @Test
     fun unknown_id_is_a_safe_no_op() {
         val m = manifest(notes = listOf(Note(id = "n1", title = "Keep", pinned = true)))
 
         assertEquals(m, NoteOps.updateNote(m, "nope", "X", "Y", "2026-07-11T00:00:00Z", emptyList()))
         assertEquals(m, NoteOps.togglePin(m, "nope"))
         assertEquals(m, NoteOps.trashNote(m, "nope"))
+        assertEquals(m, NoteOps.restoreNote(m, "nope"))
+        assertEquals(m, NoteOps.removeNote(m, "nope"))
     }
 
     @Test

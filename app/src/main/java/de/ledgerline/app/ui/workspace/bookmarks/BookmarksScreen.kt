@@ -17,9 +17,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -59,6 +62,7 @@ import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
 import de.ledgerline.app.ui.workspace.common.TagChips
+import de.ledgerline.app.ui.workspace.common.TrashBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +71,8 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
     val folders by vm.folders.collectAsStateWithLifecycle()
     val activeFolder by vm.activeFolder.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val showTrash by vm.showTrash.collectAsStateWithLifecycle()
+    val trashCount by vm.trashCount.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -74,6 +80,8 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
 
     // The bookmark being edited; null id = create new. Null = editor closed.
     var editorFor by remember { mutableStateOf<EditorTarget?>(null) }
+    var deleteForeverTarget by remember { mutableStateOf<String?>(null) }
+    var confirmEmptyTrash by remember { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
@@ -101,7 +109,7 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
         contentWindowInsets = WindowInsets(0),
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            if (!ui.loading && !ui.error) {
+            if (!ui.loading && !ui.error && !showTrash) {
                 FloatingActionButton(onClick = { editorFor = EditorTarget(null) }) {
                     Icon(Icons.Outlined.Add, stringResource(R.string.bm_new))
                 }
@@ -115,28 +123,47 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
                 else -> Column(Modifier.fillMaxSize()) {
                     // Fixed header above the list — a LazyColumn can't host the chip
                     // row / empty-state as items (they'd be measured with infinite height).
-                    BookmarksToolbar(
-                        folders = folders,
-                        activeFolder = activeFolder,
-                        onSelectFolder = { vm.setActiveFolder(it) },
-                        onAddFolder = { vm.addFolder(it) },
-                        onRenameFolder = { id, name -> vm.renameFolder(id, name) },
-                        onDeleteFolder = { vm.deleteFolder(it) },
-                    )
+                    if (showTrash) {
+                        TrashBar(
+                            onBack = { vm.setTrash(false) },
+                            onEmptyTrash = { confirmEmptyTrash = true },
+                            emptyEnabled = ui.items.isNotEmpty(),
+                        )
+                    } else {
+                        BookmarksToolbar(
+                            folders = folders,
+                            activeFolder = activeFolder,
+                            trashCount = trashCount,
+                            onSelectFolder = { vm.setActiveFolder(it) },
+                            onAddFolder = { vm.addFolder(it) },
+                            onRenameFolder = { id, name -> vm.renameFolder(id, name) },
+                            onDeleteFolder = { vm.deleteFolder(it) },
+                            onOpenTrash = { vm.setTrash(true) },
+                        )
+                    }
+                    val emptyText = if (showTrash) R.string.trash_empty_state else R.string.ws_empty_bookmarks
                     PullToRefreshBox(ui.loading, { vm.refresh() }, Modifier.weight(1f)) {
                         if (ui.items.isEmpty()) {
-                            RefreshableMessage(stringResource(R.string.ws_empty_bookmarks))
+                            RefreshableMessage(stringResource(emptyText))
                         } else {
                             LazyColumn(Modifier.fillMaxSize()) {
                                 items(ui.items, key = { it.id }) { bookmark ->
-                                    BookmarkRow(
-                                        bookmark = bookmark,
-                                        onOpen = { open(bookmark.url) },
-                                        onToggleFavorite = { vm.toggleFavorite(bookmark.id) },
-                                        onToggleReadLater = { vm.toggleReadLater(bookmark.id) },
-                                        onEdit = { editorFor = EditorTarget(bookmark.id) },
-                                        onDelete = { vm.trashBookmark(bookmark.id) },
-                                    )
+                                    if (showTrash) {
+                                        TrashBookmarkRow(
+                                            bookmark = bookmark,
+                                            onRestore = { vm.restore(bookmark.id) },
+                                            onDeleteForever = { deleteForeverTarget = bookmark.id },
+                                        )
+                                    } else {
+                                        BookmarkRow(
+                                            bookmark = bookmark,
+                                            onOpen = { open(bookmark.url) },
+                                            onToggleFavorite = { vm.toggleFavorite(bookmark.id) },
+                                            onToggleReadLater = { vm.toggleReadLater(bookmark.id) },
+                                            onEdit = { editorFor = EditorTarget(bookmark.id) },
+                                            onDelete = { vm.trashBookmark(bookmark.id) },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -144,6 +171,24 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
                 }
             }
         }
+    }
+
+    deleteForeverTarget?.let { id ->
+        ConfirmDialog(
+            message = stringResource(R.string.delete_forever_confirm),
+            confirmLabel = stringResource(R.string.action_delete_forever),
+            onConfirm = { vm.deleteForever(id); deleteForeverTarget = null },
+            onDismiss = { deleteForeverTarget = null },
+        )
+    }
+
+    if (confirmEmptyTrash) {
+        ConfirmDialog(
+            message = stringResource(R.string.trash_empty_confirm),
+            confirmLabel = stringResource(R.string.trash_empty),
+            onConfirm = { vm.emptyTrash(); confirmEmptyTrash = false },
+            onDismiss = { confirmEmptyTrash = false },
+        )
     }
 }
 
@@ -156,10 +201,12 @@ private data class EditorTarget(val id: String?)
 private fun BookmarksToolbar(
     folders: List<NamedFolder>,
     activeFolder: String?,
+    trashCount: Int,
     onSelectFolder: (String?) -> Unit,
     onAddFolder: (String) -> Unit,
     onRenameFolder: (String, String) -> Unit,
     onDeleteFolder: (String) -> Unit,
+    onOpenTrash: () -> Unit,
 ) {
     var manageExpanded by remember { mutableStateOf(false) }
     var showNewFolder by remember { mutableStateOf(false) }
@@ -198,6 +245,12 @@ private fun BookmarksToolbar(
                     text = { Text(stringResource(R.string.bm_new_folder)) },
                     onClick = { manageExpanded = false; showNewFolder = true },
                 )
+                if (trashCount > 0) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.trash_open, trashCount)) },
+                        onClick = { manageExpanded = false; onOpenTrash() },
+                    )
+                }
                 folders.forEach { f ->
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.folder_rename) + ": " + f.name) },
@@ -328,6 +381,40 @@ private fun BookmarkRow(
             onDismiss = { confirmDelete = false },
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrashBookmarkRow(
+    bookmark: Bookmark,
+    onRestore: () -> Unit,
+    onDeleteForever: () -> Unit,
+) {
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        headlineContent = { Text(bookmark.title.ifBlank { bookmark.url }, maxLines = 1) },
+        supportingContent = {
+            Text(
+                hostOf(bookmark.url),
+                maxLines = 1,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onRestore) {
+                    Icon(Icons.Outlined.RestoreFromTrash, stringResource(R.string.action_restore))
+                }
+                IconButton(onClick = onDeleteForever) {
+                    Icon(Icons.Outlined.DeleteOutline, stringResource(R.string.action_delete_forever))
+                }
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+    )
 }
 
 /** Best-effort display host (scheme/path stripped) for a bookmark's url. */

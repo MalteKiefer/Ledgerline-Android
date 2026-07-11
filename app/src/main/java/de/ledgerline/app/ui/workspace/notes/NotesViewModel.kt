@@ -33,6 +33,14 @@ class NotesViewModel @Inject constructor(
     private val _state = MutableStateFlow(NotesUi(loading = true))
     val state: StateFlow<NotesUi> = _state
 
+    /** When true, the list shows only trashed notes (the trash view). */
+    private val _showTrash = MutableStateFlow(false)
+    val showTrash: StateFlow<Boolean> = _showTrash
+
+    /** Number of trashed notes (drives the "Trash (N)" affordance). */
+    private val _trashCount = MutableStateFlow(0)
+    val trashCount: StateFlow<Int> = _trashCount
+
     /** Transient one-shot user message (failure); cleared once shown. */
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
@@ -76,6 +84,19 @@ class NotesViewModel @Inject constructor(
     fun togglePin(id: String) = write { m -> NoteOps.togglePin(m, id) }
     fun trashNote(id: String) = write { m -> NoteOps.trashNote(m, id) }
 
+    // ---- Trash view ----
+
+    fun setTrash(show: Boolean) {
+        _showTrash.value = show
+        recompute()
+    }
+
+    fun toggleTrash() = setTrash(!_showTrash.value)
+
+    fun restore(id: String) = write { m -> NoteOps.restoreNote(m, id) }
+    fun deleteForever(id: String) = write { m -> NoteOps.removeNote(m, id) }
+    fun emptyTrash() = write { m -> NoteOps.emptyTrashNotes(m) }
+
     fun clearMessage() { _message.value = null }
 
     private inline fun write(crossinline mutation: (WorkspaceManifest) -> WorkspaceManifest) =
@@ -88,9 +109,14 @@ class NotesViewModel @Inject constructor(
     private fun nowIso(): String = OffsetDateTime.now(ZoneOffset.UTC).toString()
 
     private fun recompute() {
-        val notes = cache.value.value?.manifest?.notes.orEmpty()
-            .filter { !it.trashed }
-            .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updated ?: "" })
+        val all = cache.value.value?.manifest?.notes.orEmpty()
+        _trashCount.value = all.count { it.trashed }
+        val notes = if (_showTrash.value) {
+            all.filter { it.trashed }.sortedByDescending { it.updated ?: "" }
+        } else {
+            all.filter { !it.trashed }
+                .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updated ?: "" })
+        }
         _state.value = NotesUi(false, false, notes)
     }
 }

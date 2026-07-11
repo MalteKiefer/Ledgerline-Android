@@ -64,6 +64,18 @@ object NoteOps {
     fun trashNote(m: WorkspaceManifest, id: String): WorkspaceManifest =
         update(m, id) { it.copy(trashed = true) }
 
+    /** Move a trashed note back to the active list. */
+    fun restoreNote(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        update(m, id) { it.copy(trashed = false) }
+
+    /** Delete a note forever: remove it from the list entirely. Unknown id = no-op. */
+    fun removeNote(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        m.copy(notes = m.notes.filterNot { it.id == id })
+
+    /** Empty the trash: drop every trashed note (keeps the live ones). */
+    fun emptyTrashNotes(m: WorkspaceManifest): WorkspaceManifest =
+        m.copy(notes = m.notes.filterNot { it.trashed })
+
     private inline fun update(
         m: WorkspaceManifest,
         id: String,

@@ -47,6 +47,14 @@ class BookmarksViewModel @Inject constructor(
     private val _activeFolder = MutableStateFlow<String?>(null)
     val activeFolder: StateFlow<String?> = _activeFolder
 
+    /** When true, the list shows only trashed bookmarks (the trash view). */
+    private val _showTrash = MutableStateFlow(false)
+    val showTrash: StateFlow<Boolean> = _showTrash
+
+    /** Number of trashed bookmarks (drives the "Trash (N)" affordance). */
+    private val _trashCount = MutableStateFlow(0)
+    val trashCount: StateFlow<Int> = _trashCount
+
     /** Transient one-shot user message (failure); cleared once shown. */
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
@@ -86,6 +94,19 @@ class BookmarksViewModel @Inject constructor(
     fun toggleReadLater(id: String) = write { m -> BookmarkOps.toggleReadLater(m, id) }
     fun trashBookmark(id: String) = write { m -> BookmarkOps.trashBookmark(m, id) }
 
+    // ---- Trash view ----
+
+    fun setTrash(show: Boolean) {
+        _showTrash.value = show
+        recompute()
+    }
+
+    fun toggleTrash() = setTrash(!_showTrash.value)
+
+    fun restore(id: String) = write { m -> BookmarkOps.restoreBookmark(m, id) }
+    fun deleteForever(id: String) = write { m -> BookmarkOps.removeBookmark(m, id) }
+    fun emptyTrash() = write { m -> BookmarkOps.emptyTrashBookmarks(m) }
+
     fun addFolder(name: String) = write { m -> BookmarkOps.addFolder(m, newId(), name) }
     fun renameFolder(id: String, name: String) = write { m -> BookmarkOps.renameFolder(m, id, name) }
 
@@ -107,10 +128,16 @@ class BookmarksViewModel @Inject constructor(
     private fun recompute() {
         val m = cache.value.value?.manifest
         _folders.value = m?.bookmarkFolders.orEmpty()
+        val all = m?.bookmarks.orEmpty()
+        _trashCount.value = all.count { it.trashed }
         val filter = _activeFolder.value
-        val items = m?.bookmarks.orEmpty()
-            .filter { !it.trashed && (filter == null || it.folderId == filter) }
-            .sortedBy { it.title.ifBlank { it.url }.lowercase() }
+        val items = if (_showTrash.value) {
+            // Trash shows all trashed bookmarks regardless of the folder filter.
+            all.filter { it.trashed }.sortedBy { it.title.ifBlank { it.url }.lowercase() }
+        } else {
+            all.filter { !it.trashed && (filter == null || it.folderId == filter) }
+                .sortedBy { it.title.ifBlank { it.url }.lowercase() }
+        }
         _state.value = BookmarksUi(false, false, items)
     }
 }

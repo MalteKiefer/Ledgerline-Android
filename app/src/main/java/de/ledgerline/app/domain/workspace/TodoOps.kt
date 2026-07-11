@@ -69,6 +69,18 @@ object TodoOps {
     fun trashTodo(m: WorkspaceManifest, id: String): WorkspaceManifest =
         updateTodo(m, id) { it.copy(trashed = true) }
 
+    /** Move a trashed todo back to the active list. */
+    fun restoreTodo(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        updateTodo(m, id) { it.copy(trashed = false) }
+
+    /** Delete a todo forever: remove it from the list entirely. Unknown id = no-op. */
+    fun removeTodo(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        m.copy(todos = m.todos.filterNot { it.id == id })
+
+    /** Empty the trash: drop every trashed todo (keeps the live ones). */
+    fun emptyTrashTodos(m: WorkspaceManifest): WorkspaceManifest =
+        m.copy(todos = m.todos.filterNot { it.trashed })
+
     fun addList(m: WorkspaceManifest, id: String, name: String): WorkspaceManifest =
         m.copy(todoLists = m.todoLists + TodoList(id = id, name = name.trim()))
 

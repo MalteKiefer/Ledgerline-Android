@@ -46,6 +46,14 @@ class TodosViewModel @Inject constructor(
     private val _activeList = MutableStateFlow<String?>(null)
     val activeList: StateFlow<String?> = _activeList
 
+    /** When true, the list shows only trashed todos (the trash view). */
+    private val _showTrash = MutableStateFlow(false)
+    val showTrash: StateFlow<Boolean> = _showTrash
+
+    /** Number of trashed todos (drives the "Trash (N)" affordance). */
+    private val _trashCount = MutableStateFlow(0)
+    val trashCount: StateFlow<Int> = _trashCount
+
     /** Transient one-shot user message (failure); cleared once shown. */
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
@@ -99,6 +107,19 @@ class TodosViewModel @Inject constructor(
     fun toggleMarked(id: String) = write { m -> TodoOps.toggleMarked(m, id) }
     fun trashTodo(id: String) = write { m -> TodoOps.trashTodo(m, id) }
 
+    // ---- Trash view ----
+
+    fun setTrash(show: Boolean) {
+        _showTrash.value = show
+        recompute()
+    }
+
+    fun toggleTrash() = setTrash(!_showTrash.value)
+
+    fun restore(id: String) = write { m -> TodoOps.restoreTodo(m, id) }
+    fun deleteForever(id: String) = write { m -> TodoOps.removeTodo(m, id) }
+    fun emptyTrash() = write { m -> TodoOps.emptyTrashTodos(m) }
+
     fun addList(name: String) = write { m -> TodoOps.addList(m, newId(), name) }
     fun renameList(id: String, name: String) = write { m -> TodoOps.renameList(m, id, name) }
 
@@ -128,12 +149,19 @@ class TodosViewModel @Inject constructor(
     private fun recompute() {
         val m = cache.value.value?.manifest
         _lists.value = m?.todoLists.orEmpty()
+        val all = m?.todos.orEmpty()
+        _trashCount.value = all.count { it.trashed }
         val filter = _activeList.value
-        val items = m?.todos.orEmpty()
-            .filter { !it.trashed && (filter == null || it.listId == filter) }
-            .sortedWith(
-                compareBy({ it.done }, { priorityRank(it.priority) }, { it.title.lowercase() }),
-            )
+        val items = if (_showTrash.value) {
+            // Trash shows all trashed todos regardless of the list filter.
+            all.filter { it.trashed }
+                .sortedWith(compareBy({ priorityRank(it.priority) }, { it.title.lowercase() }))
+        } else {
+            all.filter { !it.trashed && (filter == null || it.listId == filter) }
+                .sortedWith(
+                    compareBy({ it.done }, { priorityRank(it.priority) }, { it.title.lowercase() }),
+                )
+        }
         _state.value = TodosUi(false, false, items)
     }
 }

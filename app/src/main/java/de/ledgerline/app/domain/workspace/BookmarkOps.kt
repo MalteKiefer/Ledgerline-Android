@@ -61,6 +61,18 @@ object BookmarkOps {
     fun trashBookmark(m: WorkspaceManifest, id: String): WorkspaceManifest =
         updateBookmark(m, id) { it.copy(trashed = true) }
 
+    /** Move a trashed bookmark back to the active list. */
+    fun restoreBookmark(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        updateBookmark(m, id) { it.copy(trashed = false) }
+
+    /** Delete a bookmark forever: remove it from the list entirely. Unknown id = no-op. */
+    fun removeBookmark(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        m.copy(bookmarks = m.bookmarks.filterNot { it.id == id })
+
+    /** Empty the trash: drop every trashed bookmark (keeps the live ones). */
+    fun emptyTrashBookmarks(m: WorkspaceManifest): WorkspaceManifest =
+        m.copy(bookmarks = m.bookmarks.filterNot { it.trashed })
+
     fun addFolder(m: WorkspaceManifest, id: String, name: String): WorkspaceManifest =
         m.copy(bookmarkFolders = m.bookmarkFolders + NamedFolder(id = id, name = name.trim()))
 

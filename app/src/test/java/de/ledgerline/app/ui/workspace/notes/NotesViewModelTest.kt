@@ -109,4 +109,47 @@ class NotesViewModelTest {
         vm.trashNote("a")
         assertTrue(vm.state.value.notes.none { it.id == "a" })
     }
+
+    @Test fun trashCount_reflects_trashed_notes() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        assertEquals(1, vm.trashCount.value)
+        vm.trashNote("a")
+        assertEquals(2, vm.trashCount.value)
+    }
+
+    @Test fun trash_view_shows_only_trashed() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.setTrash(true)
+        assertEquals(listOf("c"), vm.state.value.notes.map { it.id })
+    }
+
+    @Test fun restore_moves_item_back_to_active_view() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.setTrash(true)
+        vm.restore("c")
+        assertTrue(vm.state.value.notes.isEmpty())    // trash now empty
+        vm.setTrash(false)
+        assertTrue(vm.state.value.notes.any { it.id == "c" })
+    }
+
+    @Test fun deleteForever_removes_the_item_entirely() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.deleteForever("c")
+        assertNull(vm.noteById("c"))
+        assertEquals(0, vm.trashCount.value)
+    }
+
+    @Test fun emptyTrash_drops_all_trashed_keeps_live() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        vm.trashNote("a")
+        vm.emptyTrash()
+        assertNull(vm.noteById("a"))
+        assertNull(vm.noteById("c"))
+        assertNotNull(vm.noteById("b"))
+    }
 }

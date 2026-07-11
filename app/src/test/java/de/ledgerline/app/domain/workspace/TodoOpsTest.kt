@@ -88,6 +88,31 @@ class TodoOpsTest {
     }
 
     @Test
+    fun restoreTodo_clears_trashed() {
+        val m = manifest(todos = listOf(TodoItem(id = "t1", trashed = true)))
+        assertFalse(TodoOps.restoreTodo(m, "t1").todos.first().trashed)
+    }
+
+    @Test
+    fun removeTodo_deletes_the_item() {
+        val m = manifest(todos = listOf(TodoItem(id = "t1"), TodoItem(id = "t2")))
+        assertEquals(listOf("t2"), TodoOps.removeTodo(m, "t1").todos.map { it.id })
+    }
+
+    @Test
+    fun emptyTrashTodos_removes_only_trashed_and_keeps_live() {
+        val m = manifest(
+            todos = listOf(
+                TodoItem(id = "live1"),
+                TodoItem(id = "trash1", trashed = true),
+                TodoItem(id = "live2"),
+                TodoItem(id = "trash2", trashed = true),
+            ),
+        )
+        assertEquals(listOf("live1", "live2"), TodoOps.emptyTrashTodos(m).todos.map { it.id })
+    }
+
+    @Test
     fun addList_appends_trimmed_name() {
         val out = TodoOps.addList(manifest(), "l1", "  Home  ")
         assertEquals(listOf("l1"), out.todoLists.map { it.id })
@@ -130,6 +155,8 @@ class TodoOpsTest {
         assertEquals(m.todos, TodoOps.toggleDone(m, "zzz").todos)
         assertEquals(m.todos, TodoOps.toggleMarked(m, "zzz").todos)
         assertEquals(m.todos, TodoOps.trashTodo(m, "zzz").todos)
+        assertEquals(m.todos, TodoOps.restoreTodo(m, "zzz").todos)
+        assertEquals(m.todos, TodoOps.removeTodo(m, "zzz").todos)
         assertEquals(m.todoLists, TodoOps.renameList(m, "zzz", "X").todoLists)
         // deleteList of an unknown id leaves both lists and todos untouched
         assertEquals(m.todoLists, TodoOps.deleteList(m, "zzz").todoLists)

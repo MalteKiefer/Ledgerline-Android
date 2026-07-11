@@ -176,6 +176,16 @@
     <string name="action_settings">Einstellungen</string>
     <string name="action_more">Mehr</string>
 
+    <!-- Papierkorb (Notizen / Lesezeichen / Todos) -->
+    <string name="trash_title">Papierkorb</string>
+    <string name="trash_open">Papierkorb (%1$d)</string>
+    <string name="trash_empty">Papierkorb leeren</string>
+    <string name="trash_empty_confirm">Alle Elemente im Papierkorb endgültig löschen?</string>
+    <string name="action_restore">Wiederherstellen</string>
+    <string name="action_delete_forever">Endgültig löschen</string>
+    <string name="delete_forever_confirm">Dieses Element endgültig löschen?</string>
+    <string name="trash_empty_state">Papierkorb ist leer</string>
+
     <!-- Galerie -->
     <string name="gallery_add">Fotos hinzufügen</string>
     <string name="gallery_upload_photos">Fotos hochladen</string>

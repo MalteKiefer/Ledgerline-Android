@@ -82,6 +82,31 @@ class BookmarkOpsTest {
     }
 
     @Test
+    fun restoreBookmark_clears_trashed() {
+        val m = manifest(bookmarks = listOf(Bookmark(id = "b1", trashed = true)))
+        assertFalse(BookmarkOps.restoreBookmark(m, "b1").bookmarks.first().trashed)
+    }
+
+    @Test
+    fun removeBookmark_deletes_the_item() {
+        val m = manifest(bookmarks = listOf(Bookmark(id = "b1"), Bookmark(id = "b2")))
+        assertEquals(listOf("b2"), BookmarkOps.removeBookmark(m, "b1").bookmarks.map { it.id })
+    }
+
+    @Test
+    fun emptyTrashBookmarks_removes_only_trashed_and_keeps_live() {
+        val m = manifest(
+            bookmarks = listOf(
+                Bookmark(id = "live1"),
+                Bookmark(id = "trash1", trashed = true),
+                Bookmark(id = "live2"),
+                Bookmark(id = "trash2", trashed = true),
+            ),
+        )
+        assertEquals(listOf("live1", "live2"), BookmarkOps.emptyTrashBookmarks(m).bookmarks.map { it.id })
+    }
+
+    @Test
     fun addFolder_appends_trimmed_name() {
         val out = BookmarkOps.addFolder(manifest(), "f1", "  Work  ")
         assertEquals(listOf("f1"), out.bookmarkFolders.map { it.id })
@@ -124,6 +149,8 @@ class BookmarkOpsTest {
         assertEquals(m.bookmarks, BookmarkOps.toggleFavorite(m, "zzz").bookmarks)
         assertEquals(m.bookmarks, BookmarkOps.toggleReadLater(m, "zzz").bookmarks)
         assertEquals(m.bookmarks, BookmarkOps.trashBookmark(m, "zzz").bookmarks)
+        assertEquals(m.bookmarks, BookmarkOps.restoreBookmark(m, "zzz").bookmarks)
+        assertEquals(m.bookmarks, BookmarkOps.removeBookmark(m, "zzz").bookmarks)
         assertEquals(m.bookmarkFolders, BookmarkOps.renameFolder(m, "zzz", "X").bookmarkFolders)
         assertEquals(m.bookmarkFolders, BookmarkOps.deleteFolder(m, "zzz").bookmarkFolders)
         assertEquals(m.bookmarks, BookmarkOps.deleteFolder(m, "zzz").bookmarks)

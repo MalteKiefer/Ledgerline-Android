@@ -96,6 +96,16 @@
     <string name="folder_rename">Rename folder</string>
     <string name="folder_delete">Delete folder</string>
 
+    <!-- Trash (notes / bookmarks / todos) -->
+    <string name="trash_title">Trash</string>
+    <string name="trash_open">Trash (%1$d)</string>
+    <string name="trash_empty">Empty trash</string>
+    <string name="trash_empty_confirm">Permanently delete all trashed items?</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_delete_forever">Delete forever</string>
+    <string name="delete_forever_confirm">Permanently delete this item?</string>
+    <string name="trash_empty_state">Trash is empty</string>
+
     <!-- File detail -->
     <string name="file_type">Type</string>
     <string name="file_size">Size</string>

@@ -96,4 +96,29 @@ class BookmarksViewModelTest {
         assertEquals(null, vm.activeFolder.value)
         assertEquals(null, vm.bookmarkById("1")?.folderId)
     }
+
+    @Test fun trashCount_and_trash_view_ignore_folder_filter() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        assertEquals(1, vm.trashCount.value)
+        vm.setActiveFolder("g1")   // filter that would exclude the (folderless) trashed item
+        vm.setTrash(true)
+        assertEquals(listOf("3"), vm.state.value.items.map { it.id })
+    }
+
+    @Test fun restore_deleteForever_and_emptyTrash() = runTest {
+        val vm = BookmarksViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.restore("3")
+        assertEquals(false, vm.bookmarkById("3")?.trashed)
+        assertEquals(0, vm.trashCount.value)
+
+        vm.trashBookmark("1")
+        vm.deleteForever("1")
+        assertEquals(null, vm.bookmarkById("1"))
+
+        vm.trashBookmark("2")
+        vm.emptyTrash()
+        assertEquals(null, vm.bookmarkById("2"))
+    }
 }

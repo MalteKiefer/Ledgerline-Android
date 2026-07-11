@@ -16,9 +16,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Checkbox
@@ -54,6 +56,7 @@ import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
 import de.ledgerline.app.ui.workspace.common.TagChips
+import de.ledgerline.app.ui.workspace.common.TrashBar
 import de.ledgerline.app.ui.workspace.common.formatDue
 import de.ledgerline.app.ui.common.ConfirmDialog
 import de.ledgerline.app.ui.common.TextInputDialog
@@ -66,12 +69,16 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
     val activeList by vm.activeList.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
+    val showTrash by vm.showTrash.collectAsStateWithLifecycle()
+    val trashCount by vm.trashCount.collectAsStateWithLifecycle()
 
     val snackbar = remember { SnackbarHostState() }
 
     // Navigation-ish local state: which todo is open (detail), and the editor target.
     var openId by remember { mutableStateOf<String?>(null) }
     var editorFor by remember { mutableStateOf<EditorTarget?>(null) }
+    var deleteForeverTarget by remember { mutableStateOf<String?>(null) }
+    var confirmEmptyTrash by remember { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
@@ -121,7 +128,7 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
         contentWindowInsets = WindowInsets(0),
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
-            if (!ui.loading && !ui.error) {
+            if (!ui.loading && !ui.error && !showTrash) {
                 FloatingActionButton(onClick = { editorFor = EditorTarget(null) }) {
                     Icon(Icons.Outlined.Add, stringResource(R.string.todo_new))
                 }
@@ -135,26 +142,45 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
                 else -> Column(Modifier.fillMaxSize()) {
                     // Fixed header above the list — the toolbar/empty-state can't be
                     // LazyColumn items (they'd be measured with infinite height).
-                    TodosToolbar(
-                        lists = lists,
-                        activeList = activeList,
-                        onSelectList = { vm.setActiveList(it) },
-                        onAddList = { vm.addList(it) },
-                        onRenameList = { id, name -> vm.renameList(id, name) },
-                        onDeleteList = { vm.deleteList(it) },
-                    )
+                    if (showTrash) {
+                        TrashBar(
+                            onBack = { vm.setTrash(false) },
+                            onEmptyTrash = { confirmEmptyTrash = true },
+                            emptyEnabled = ui.items.isNotEmpty(),
+                        )
+                    } else {
+                        TodosToolbar(
+                            lists = lists,
+                            activeList = activeList,
+                            trashCount = trashCount,
+                            onSelectList = { vm.setActiveList(it) },
+                            onAddList = { vm.addList(it) },
+                            onRenameList = { id, name -> vm.renameList(id, name) },
+                            onDeleteList = { vm.deleteList(it) },
+                            onOpenTrash = { vm.setTrash(true) },
+                        )
+                    }
+                    val emptyText = if (showTrash) R.string.trash_empty_state else R.string.ws_empty_todos
                     PullToRefreshBox(ui.loading, { vm.refresh() }, Modifier.weight(1f)) {
                         if (ui.items.isEmpty()) {
-                            RefreshableMessage(stringResource(R.string.ws_empty_todos))
+                            RefreshableMessage(stringResource(emptyText))
                         } else {
                             LazyColumn(Modifier.fillMaxSize()) {
                                 items(ui.items, key = { it.id }) { todo ->
-                                    TodoRow(
-                                        todo = todo,
-                                        onToggleDone = { vm.toggleDone(todo.id) },
-                                        onToggleMarked = { vm.toggleMarked(todo.id) },
-                                        onOpen = { openId = todo.id },
-                                    )
+                                    if (showTrash) {
+                                        TrashTodoRow(
+                                            todo = todo,
+                                            onRestore = { vm.restore(todo.id) },
+                                            onDeleteForever = { deleteForeverTarget = todo.id },
+                                        )
+                                    } else {
+                                        TodoRow(
+                                            todo = todo,
+                                            onToggleDone = { vm.toggleDone(todo.id) },
+                                            onToggleMarked = { vm.toggleMarked(todo.id) },
+                                            onOpen = { openId = todo.id },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -162,6 +188,24 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
                 }
             }
         }
+    }
+
+    deleteForeverTarget?.let { id ->
+        ConfirmDialog(
+            message = stringResource(R.string.delete_forever_confirm),
+            confirmLabel = stringResource(R.string.action_delete_forever),
+            onConfirm = { vm.deleteForever(id); deleteForeverTarget = null },
+            onDismiss = { deleteForeverTarget = null },
+        )
+    }
+
+    if (confirmEmptyTrash) {
+        ConfirmDialog(
+            message = stringResource(R.string.trash_empty_confirm),
+            confirmLabel = stringResource(R.string.trash_empty),
+            onConfirm = { vm.emptyTrash(); confirmEmptyTrash = false },
+            onDismiss = { confirmEmptyTrash = false },
+        )
     }
 }
 
@@ -173,10 +217,12 @@ private data class EditorTarget(val id: String?)
 private fun TodosToolbar(
     lists: List<de.ledgerline.app.domain.model.TodoList>,
     activeList: String?,
+    trashCount: Int,
     onSelectList: (String?) -> Unit,
     onAddList: (String) -> Unit,
     onRenameList: (String, String) -> Unit,
     onDeleteList: (String) -> Unit,
+    onOpenTrash: () -> Unit,
 ) {
     var filterExpanded by remember { mutableStateOf(false) }
     var manageExpanded by remember { mutableStateOf(false) }
@@ -219,6 +265,12 @@ private fun TodosToolbar(
                     text = { Text(stringResource(R.string.todo_new_list)) },
                     onClick = { manageExpanded = false; showNewList = true },
                 )
+                if (trashCount > 0) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.trash_open, trashCount)) },
+                        onClick = { manageExpanded = false; onOpenTrash() },
+                    )
+                }
                 lists.forEach { l ->
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.list_rename) + ": " + l.name) },
@@ -346,5 +398,31 @@ private fun TodoRow(
             }
         },
         modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TrashTodoRow(
+    todo: TodoItem,
+    onRestore: () -> Unit,
+    onDeleteForever: () -> Unit,
+) {
+    ListItem(
+        headlineContent = { Text(todo.title) },
+        supportingContent = if (todo.tags.isNotEmpty()) {
+            { TagChips(todo.tags) }
+        } else null,
+        trailingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onRestore) {
+                    Icon(Icons.Outlined.RestoreFromTrash, stringResource(R.string.action_restore))
+                }
+                IconButton(onClick = onDeleteForever) {
+                    Icon(Icons.Outlined.DeleteOutline, stringResource(R.string.action_delete_forever))
+                }
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
     )
 }

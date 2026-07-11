@@ -97,4 +97,30 @@ class TodosViewModelTest {
         assertEquals(null, vm.activeList.value)
         assertEquals(null, vm.todoById("t2")?.listId)
     }
+
+    @Test fun trashCount_and_trash_view_ignore_list_filter() = runTest {
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        assertEquals(1, vm.trashCount.value)
+        vm.setActiveList("l2")   // filter that would exclude the l1-scoped trashed item
+        vm.setTrash(true)
+        assertEquals(listOf("t3"), vm.state.value.items.map { it.id })
+    }
+
+    @Test fun restore_deleteForever_and_emptyTrash() = runTest {
+        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        vm.refresh()
+        vm.restore("t3")
+        assertEquals(false, vm.todoById("t3")?.trashed)
+        assertEquals(0, vm.trashCount.value)
+
+        vm.trashTodo("t1")
+        vm.deleteForever("t1")
+        assertEquals(null, vm.todoById("t1"))
+
+        vm.trashTodo("t2")
+        vm.emptyTrash()
+        assertEquals(null, vm.todoById("t2"))
+        assertEquals(true, vm.todoById("t4") != null)
+    }
 }
