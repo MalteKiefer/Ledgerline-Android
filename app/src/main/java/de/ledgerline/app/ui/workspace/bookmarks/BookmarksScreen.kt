@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -113,30 +114,32 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
             when {
                 ui.loading -> LoadingBox()
                 ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() })
-                else -> PullToRefreshBox(ui.loading, { vm.refresh() }) {
-                    LazyColumn(Modifier.fillMaxSize()) {
-                        item {
-                            BookmarksToolbar(
-                                folders = folders,
-                                activeFolder = activeFolder,
-                                onSelectFolder = { vm.setActiveFolder(it) },
-                                onAddFolder = { vm.addFolder(it) },
-                                onRenameFolder = { id, name -> vm.renameFolder(id, name) },
-                                onDeleteFolder = { vm.deleteFolder(it) },
-                            )
-                        }
+                else -> Column(Modifier.fillMaxSize()) {
+                    // Fixed header above the list — a LazyColumn can't host the chip
+                    // row / empty-state as items (they'd be measured with infinite height).
+                    BookmarksToolbar(
+                        folders = folders,
+                        activeFolder = activeFolder,
+                        onSelectFolder = { vm.setActiveFolder(it) },
+                        onAddFolder = { vm.addFolder(it) },
+                        onRenameFolder = { id, name -> vm.renameFolder(id, name) },
+                        onDeleteFolder = { vm.deleteFolder(it) },
+                    )
+                    PullToRefreshBox(ui.loading, { vm.refresh() }, Modifier.weight(1f)) {
                         if (ui.items.isEmpty()) {
-                            item { RefreshableMessage(stringResource(R.string.ws_empty_bookmarks)) }
+                            RefreshableMessage(stringResource(R.string.ws_empty_bookmarks))
                         } else {
-                            items(ui.items, key = { it.id }) { bookmark ->
-                                BookmarkRow(
-                                    bookmark = bookmark,
-                                    onOpen = { open(bookmark.url) },
-                                    onToggleFavorite = { vm.toggleFavorite(bookmark.id) },
-                                    onToggleReadLater = { vm.toggleReadLater(bookmark.id) },
-                                    onEdit = { editorFor = EditorTarget(bookmark.id) },
-                                    onDelete = { vm.trashBookmark(bookmark.id) },
-                                )
+                            LazyColumn(Modifier.fillMaxSize()) {
+                                items(ui.items, key = { it.id }) { bookmark ->
+                                    BookmarkRow(
+                                        bookmark = bookmark,
+                                        onOpen = { open(bookmark.url) },
+                                        onToggleFavorite = { vm.toggleFavorite(bookmark.id) },
+                                        onToggleReadLater = { vm.toggleReadLater(bookmark.id) },
+                                        onEdit = { editorFor = EditorTarget(bookmark.id) },
+                                        onDelete = { vm.trashBookmark(bookmark.id) },
+                                    )
+                                }
                             }
                         }
                     }

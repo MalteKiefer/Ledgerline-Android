@@ -129,28 +129,30 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
             when {
                 ui.loading -> LoadingBox()
                 ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() })
-                else -> PullToRefreshBox(ui.loading, { vm.refresh() }) {
-                    LazyColumn(Modifier.fillMaxSize()) {
-                        item {
-                            TodosToolbar(
-                                lists = lists,
-                                activeList = activeList,
-                                onSelectList = { vm.setActiveList(it) },
-                                onAddList = { vm.addList(it) },
-                                onRenameList = { id, name -> vm.renameList(id, name) },
-                                onDeleteList = { vm.deleteList(it) },
-                            )
-                        }
+                else -> Column(Modifier.fillMaxSize()) {
+                    // Fixed header above the list — the toolbar/empty-state can't be
+                    // LazyColumn items (they'd be measured with infinite height).
+                    TodosToolbar(
+                        lists = lists,
+                        activeList = activeList,
+                        onSelectList = { vm.setActiveList(it) },
+                        onAddList = { vm.addList(it) },
+                        onRenameList = { id, name -> vm.renameList(id, name) },
+                        onDeleteList = { vm.deleteList(it) },
+                    )
+                    PullToRefreshBox(ui.loading, { vm.refresh() }, Modifier.weight(1f)) {
                         if (ui.items.isEmpty()) {
-                            item { RefreshableMessage(stringResource(R.string.ws_empty_todos)) }
+                            RefreshableMessage(stringResource(R.string.ws_empty_todos))
                         } else {
-                            items(ui.items, key = { it.id }) { todo ->
-                                TodoRow(
-                                    todo = todo,
-                                    onToggleDone = { vm.toggleDone(todo.id) },
-                                    onToggleMarked = { vm.toggleMarked(todo.id) },
-                                    onOpen = { openId = todo.id },
-                                )
+                            LazyColumn(Modifier.fillMaxSize()) {
+                                items(ui.items, key = { it.id }) { todo ->
+                                    TodoRow(
+                                        todo = todo,
+                                        onToggleDone = { vm.toggleDone(todo.id) },
+                                        onToggleMarked = { vm.toggleMarked(todo.id) },
+                                        onOpen = { openId = todo.id },
+                                    )
+                                }
                             }
                         }
                     }
