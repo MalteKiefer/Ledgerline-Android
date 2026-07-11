@@ -33,6 +33,29 @@ object NoteOps {
         it.copy(title = title.trim(), content = content, updated = nowIso)
     }
 
+    /**
+     * Save a note by id: update it if it exists, otherwise append it. Lets the editor
+     * open on a locally-created (not-yet-persisted) note and persist on first save —
+     * so creation doesn't depend on a network round-trip populating the cache first.
+     */
+    fun upsertNote(
+        m: WorkspaceManifest,
+        id: String,
+        title: String,
+        content: String,
+        nowIso: String,
+    ): WorkspaceManifest =
+        if (m.notes.any { it.id == id }) {
+            updateNote(m, id, title, content, nowIso)
+        } else {
+            m.copy(
+                notes = m.notes + Note(
+                    id = id, title = title.trim(), content = content,
+                    pinned = false, trashed = false, updated = nowIso,
+                ),
+            )
+        }
+
     fun togglePin(m: WorkspaceManifest, id: String): WorkspaceManifest =
         update(m, id) { it.copy(pinned = !it.pinned) }
 

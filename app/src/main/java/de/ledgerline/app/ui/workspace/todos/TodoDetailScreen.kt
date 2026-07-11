@@ -22,6 +22,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.TodoItem
+import de.ledgerline.app.ui.workspace.LocalFullscreen
 import de.ledgerline.app.ui.workspace.common.formatDue
 import de.ledgerline.app.ui.workspace.files.ConfirmDialog
 
@@ -48,6 +50,8 @@ fun TodoDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
+    val fs = LocalFullscreen.current
+    DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
     val context = LocalContext.current
     val due = formatDue(todo.due)
     var confirmDelete by remember { mutableStateOf(false) }

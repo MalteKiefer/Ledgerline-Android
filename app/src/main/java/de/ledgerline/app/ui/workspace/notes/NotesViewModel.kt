@@ -57,17 +57,21 @@ class NotesViewModel @Inject constructor(
     // ---- Manifest mutations (the cache-flow collector recomputes the list automatically) ----
 
     /**
-     * Create a new (empty) note and return its id so the caller can immediately open
-     * the editor on it. The id is generated synchronously; the persist runs async.
+     * A fresh, NOT-yet-persisted blank note. The editor opens on it immediately and
+     * persists on first [saveNote] — so creation doesn't wait on a network round-trip
+     * populating the cache (the old flow opened on an id the cache didn't have yet, so
+     * the FAB appeared to do nothing).
      */
-    fun addNote(): String {
-        val id = newId()
-        write { m -> NoteOps.addNote(m, id, nowIso()) }
-        return id
-    }
+    fun newBlankNote(): Note = Note(id = newId(), updated = nowIso())
 
-    fun updateNote(id: String, title: String, content: String) =
-        write { m -> NoteOps.updateNote(m, id, title, content, nowIso()) }
+    /**
+     * Persist an edit: upsert by id (append if new, update if it exists). A note that
+     * is still completely blank is discarded (no empty notes are created).
+     */
+    fun saveNote(id: String, title: String, content: String) {
+        if (title.isBlank() && content.isBlank()) return
+        write { m -> NoteOps.upsertNote(m, id, title, content, nowIso()) }
+    }
 
     fun togglePin(id: String) = write { m -> NoteOps.togglePin(m, id) }
     fun trashNote(id: String) = write { m -> NoteOps.trashNote(m, id) }

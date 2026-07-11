@@ -75,4 +75,18 @@ class NoteOpsTest {
         assertEquals(m, NoteOps.togglePin(m, "nope"))
         assertEquals(m, NoteOps.trashNote(m, "nope"))
     }
+
+    @Test
+    fun upsert_appends_when_absent_and_updates_when_present() {
+        val m = manifest(notes = emptyList())
+        val added = NoteOps.upsertNote(m, "new", "  Title  ", "body", "2026-07-11T00:00:00Z")
+        assertEquals(1, added.notes.size)
+        assertEquals("Title", added.notes.first().title)   // trimmed
+        assertEquals("body", added.notes.first().content)
+
+        val updated = NoteOps.upsertNote(added, "new", "Title2", "body2", "2026-07-11T01:00:00Z")
+        assertEquals(1, updated.notes.size)                // no duplicate
+        assertEquals("Title2", updated.notes.first().title)
+        assertEquals("body2", updated.notes.first().content)
+    }
 }

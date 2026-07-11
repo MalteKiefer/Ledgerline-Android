@@ -50,6 +50,9 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
 
     val snackbar = remember { SnackbarHostState() }
     var openId by remember { mutableStateOf<String?>(null) }
+    // A locally-created blank note being edited before its first save (not yet in the
+    // cache). Kept here so the editor can open on it immediately.
+    var pendingNew by remember { mutableStateOf<Note?>(null) }
     var deleteTarget by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(message) {
@@ -59,19 +62,20 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
     // --- Editor / detail takes over the whole screen ---
     val current = openId
     if (current != null) {
-        val note = vm.noteById(current)
+        val note = vm.noteById(current) ?: pendingNew?.takeIf { it.id == current }
         if (note != null) {
             NoteDetailScreen(
                 note = note,
-                onSave = { title, content -> vm.updateNote(note.id, title, content) },
+                onSave = { title, content -> vm.saveNote(note.id, title, content) },
                 onTogglePin = { vm.togglePin(note.id) },
-                onDelete = { vm.trashNote(note.id); openId = null },
-                onBack = { openId = null },
+                onDelete = { vm.trashNote(note.id); openId = null; pendingNew = null },
+                onBack = { openId = null; pendingNew = null },
                 modifier = modifier,
             )
             return
         } else {
             openId = null
+            pendingNew = null
         }
     }
 
@@ -81,7 +85,7 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             if (!ui.loading && !ui.error) {
-                FloatingActionButton(onClick = { openId = vm.addNote() }) {
+                FloatingActionButton(onClick = { pendingNew = vm.newBlankNote().also { openId = it.id } }) {
                     Icon(Icons.Outlined.Add, stringResource(R.string.note_new))
                 }
             }

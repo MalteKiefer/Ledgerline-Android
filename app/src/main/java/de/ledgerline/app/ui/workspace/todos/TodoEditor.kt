@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.domain.model.TodoList
+import de.ledgerline.app.ui.workspace.LocalFullscreen
 import de.ledgerline.app.ui.workspace.files.TextInputDialog
 
 /** The four supported priority values, highest urgency first. */
@@ -58,6 +60,10 @@ fun TodoEditor(
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
+    // Hide the workspace scaffold chrome (top bar/insets) so the editor is full-screen
+    // and doesn't get pushed down by a leftover top gap.
+    val fs = LocalFullscreen.current
+    DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
     var todoTitle by rememberSaveable { mutableStateOf(initial.title) }
     var listId by rememberSaveable { mutableStateOf(initial.listId) }
     var priority by rememberSaveable { mutableStateOf(initial.priority.ifBlank { "normal" }) }

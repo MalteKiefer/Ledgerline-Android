@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -62,22 +63,35 @@ class NotesViewModelTest {
         assertEquals(listOf("Beta", "Alpha"), vm.state.value.notes.map { it.title })
     }
 
-    @Test fun addNote_returns_id_and_appends_editable_note() = runTest {
+    @Test fun newBlankNote_is_not_persisted_until_saved() = runTest {
         val vm = NotesViewModel(load, cache, mutate)
         vm.refresh()
-        val id = vm.addNote()
-        val created = vm.noteById(id)
-        assertNotNull(created)
-        assertEquals("", created?.title)
-        assertNotNull(created?.updated)
-        assertTrue(vm.state.value.notes.any { it.id == id })
+        val blank = vm.newBlankNote()
+        assertEquals("", blank.title)
+        assertNotNull(blank.updated)
+        // Not in the cache yet (creation persists only on first saveNote).
+        assertNull(vm.noteById(blank.id))
+        // A blank save is discarded (no empty notes created).
+        vm.saveNote(blank.id, "", "")
+        assertNull(vm.noteById(blank.id))
     }
 
-    @Test fun updateNote_sets_title_and_reflows_to_top() = runTest {
+    @Test fun saveNote_appends_a_new_note_then_updates_it() = runTest {
+        val vm = NotesViewModel(load, cache, mutate)
+        vm.refresh()
+        val blank = vm.newBlankNote()
+        vm.saveNote(blank.id, "Fresh", "body")   // upsert → append
+        assertEquals("Fresh", vm.noteById(blank.id)?.title)
+        assertTrue(vm.state.value.notes.any { it.id == blank.id })
+        vm.saveNote(blank.id, "Fresh edited", "body2")  // upsert → update
+        assertEquals("Fresh edited", vm.noteById(blank.id)?.title)
+    }
+
+    @Test fun saveNote_updates_existing_and_reflows_to_top() = runTest {
         val vm = NotesViewModel(load, cache, mutate)
         vm.refresh()
         // Update the older, unpinned note → newest updated, so it sorts above Alpha (but below the pinned Beta).
-        vm.updateNote("a", "Alpha edited", "body")
+        vm.saveNote("a", "Alpha edited", "body")
         assertEquals("Alpha edited", vm.noteById("a")?.title)
         assertEquals(listOf("Beta", "Alpha edited"), vm.state.value.notes.map { it.title })
     }
