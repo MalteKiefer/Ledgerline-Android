@@ -11,11 +11,15 @@ import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.core.backup.GalleryBackupManager
 import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.ContactSort
 import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.data.backup.BackupStateStore
+import de.ledgerline.app.data.backup.DeviceAlbum
+import de.ledgerline.app.data.backup.DeviceAlbums
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
@@ -26,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,6 +49,9 @@ class SettingsViewModel @Inject constructor(
     private val blobCache: BlobDiskCache,
     private val prefetcher: Prefetcher,
     private val accountRepository: AccountRepository,
+    private val backupManager: GalleryBackupManager,
+    private val deviceAlbums: DeviceAlbums,
+    private val backupStateStore: BackupStateStore,
 ) : ViewModel() {
 
     /** Signed-in account (name/email/groups), fetched once from `/api/v1/me`; null while
@@ -54,6 +62,35 @@ class SettingsViewModel @Inject constructor(
     init {
         viewModelScope.launch { _account.value = accountRepository.me() }
     }
+
+    val backupEnabled: StateFlow<Boolean> = settingsStore.backupEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val backupAlbumIds: StateFlow<Set<String>> = settingsStore.backupAlbumIds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    private val _albums = MutableStateFlow<List<DeviceAlbum>>(emptyList())
+    val albums: StateFlow<List<DeviceAlbum>> = _albums.asStateFlow()
+
+    private val _backedUpCount = MutableStateFlow(0)
+    val backedUpCount: StateFlow<Int> = _backedUpCount.asStateFlow()
+
+    fun loadAlbums() = viewModelScope.launch {
+        _albums.value = withContext(Dispatchers.IO) { deviceAlbums.list() }
+        _backedUpCount.value = backupStateStore.backedUpIds().size
+    }
+
+    fun setBackupEnabled(on: Boolean) = viewModelScope.launch {
+        settingsStore.setBackupEnabled(on)
+        if (on) backupManager.maybeRun()
+    }
+
+    fun toggleAlbum(bucketId: String) = viewModelScope.launch {
+        val cur = settingsStore.backupAlbumIds.first().toMutableSet()
+        if (!cur.add(bucketId)) cur.remove(bucketId)
+        settingsStore.setBackupAlbumIds(cur)
+    }
+
+    fun backupNow() = backupManager.maybeRun()
 
     /** Current idle-lock timeout in minutes, backed by the plaintext settings store. */
     val timeoutMinutes: StateFlow<Int> = settingsStore.timeoutMinutes

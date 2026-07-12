@@ -29,10 +29,12 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -67,6 +69,7 @@ import de.ledgerline.app.R
 import de.ledgerline.app.data.ContactSort
 import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.data.backup.DeviceAlbum
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
@@ -79,7 +82,7 @@ import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
 /** Internal Settings destinations — a categorized landing (ROOT) plus one sub-screen per category. */
-private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, OFFLINE, BACKGROUND, ACCOUNT, ABOUT }
+private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, ABOUT }
 
 /**
  * Settings screen — a categorized landing list plus per-category sub-screens, in the
@@ -119,6 +122,10 @@ fun SettingsContent(
     val account by vm.account.collectAsStateWithLifecycle()
     val contactSort by vm.contactSort.collectAsStateWithLifecycle()
     val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
+    val backupEnabled by vm.backupEnabled.collectAsStateWithLifecycle()
+    val backupAlbumIds by vm.backupAlbumIds.collectAsStateWithLifecycle()
+    val albums by vm.albums.collectAsStateWithLifecycle()
+    val backedUpCount by vm.backedUpCount.collectAsStateWithLifecycle()
 
     var route by rememberSaveable { mutableStateOf(SettingsRoute.ROOT) }
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
@@ -143,6 +150,10 @@ fun SettingsContent(
     val notificationsLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    // Result is ignored: backup runs regardless; the permission grant allows reading media.
+    val mediaLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
     // Back: a sub-screen returns to the landing list; the landing list exits Settings.
     BackHandler {
         if (route == SettingsRoute.ROOT) onBack() else route = SettingsRoute.ROOT
@@ -154,6 +165,7 @@ fun SettingsContent(
         SettingsRoute.SECURITY -> stringResource(R.string.settings_cat_security)
         SettingsRoute.OFFLINE -> stringResource(R.string.settings_cat_offline)
         SettingsRoute.BACKGROUND -> stringResource(R.string.settings_cat_background)
+        SettingsRoute.BACKUP -> stringResource(R.string.settings_cat_backup)
         SettingsRoute.ACCOUNT -> stringResource(R.string.settings_cat_account)
         SettingsRoute.ABOUT -> stringResource(R.string.settings_cat_about)
     }
@@ -226,6 +238,23 @@ fun SettingsContent(
                         }
                     },
                     onSetLinkChooser = vm::setLinkChooserEnabled,
+                )
+
+                SettingsRoute.BACKUP -> BackupSettings(
+                    padding = innerPadding,
+                    enabled = backupEnabled,
+                    albums = albums,
+                    selected = backupAlbumIds,
+                    backedUpCount = backedUpCount,
+                    onSetEnabled = { on ->
+                        vm.setBackupEnabled(on)
+                        if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            mediaLauncher.launch(arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO))
+                        }
+                    },
+                    onToggleAlbum = vm::toggleAlbum,
+                    onBackupNow = vm::backupNow,
+                    onLoadAlbums = vm::loadAlbums,
                 )
 
                 SettingsRoute.ACCOUNT -> AccountSettings(
@@ -315,6 +344,11 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             title = stringResource(R.string.settings_cat_background),
             subtitle = stringResource(R.string.settings_cat_background_sub),
         ) { onNavigate(SettingsRoute.BACKGROUND) }
+        CategoryRow(
+            icon = Icons.Outlined.PhotoLibrary,
+            title = stringResource(R.string.settings_cat_backup),
+            subtitle = stringResource(R.string.settings_cat_backup_sub),
+        ) { onNavigate(SettingsRoute.BACKUP) }
         CategoryRow(
             icon = Icons.Outlined.AccountCircle,
             title = stringResource(R.string.settings_cat_account),
@@ -589,6 +623,52 @@ private fun BackgroundSettings(
             checked = linkChooser,
             onCheckedChange = onSetLinkChooser,
         )
+    }
+}
+
+@Composable
+private fun BackupSettings(
+    padding: PaddingValues,
+    enabled: Boolean,
+    albums: List<DeviceAlbum>,
+    selected: Set<String>,
+    backedUpCount: Int,
+    onSetEnabled: (Boolean) -> Unit,
+    onToggleAlbum: (String) -> Unit,
+    onBackupNow: () -> Unit,
+    onLoadAlbums: () -> Unit,
+) {
+    LaunchedEffect(enabled) { if (enabled) onLoadAlbums() }
+    SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_backup_section))
+        SwitchRow(
+            title = stringResource(R.string.settings_backup_title),
+            subtitle = stringResource(R.string.settings_backup_subtitle),
+            checked = enabled,
+            onCheckedChange = onSetEnabled,
+        )
+        if (enabled) {
+            SectionHeader(stringResource(R.string.settings_backup_albums))
+            albums.forEach { a ->
+                ListItem(
+                    headlineContent = { Text(a.name) },
+                    supportingContent = { Text(stringResource(R.string.settings_backup_album_count, a.count)) },
+                    trailingContent = {
+                        Checkbox(checked = a.bucketId in selected, onCheckedChange = { onToggleAlbum(a.bucketId) })
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable { onToggleAlbum(a.bucketId) },
+                )
+            }
+            Text(
+                stringResource(R.string.settings_backup_status, backedUpCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            OutlinedButton(onClick = onBackupNow, modifier = Modifier.padding(16.dp)) {
+                Text(stringResource(R.string.settings_backup_now))
+            }
+        }
     }
 }
 
