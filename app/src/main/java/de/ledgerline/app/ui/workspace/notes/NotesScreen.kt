@@ -64,6 +64,7 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
     val query by vm.query.collectAsStateWithLifecycle()
     val allTags by vm.allTags.collectAsStateWithLifecycle()
     val activeTag by vm.activeTag.collectAsStateWithLifecycle()
+    val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
 
     val snackbar = remember { SnackbarHostState() }
     var openId by remember { mutableStateOf<String?>(null) }
@@ -85,6 +86,7 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
         if (note != null) {
             NoteDetailScreen(
                 note = note,
+                dateFormat = dateFormat,
                 onSave = { title, content, tags -> vm.saveNote(note.id, title, content, tags) },
                 onTogglePin = { vm.togglePin(note.id) },
                 onDelete = { vm.trashNote(note.id); openId = null; pendingNew = null },

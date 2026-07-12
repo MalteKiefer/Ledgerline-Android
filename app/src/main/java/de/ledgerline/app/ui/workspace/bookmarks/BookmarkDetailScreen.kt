@@ -1,5 +1,8 @@
-package de.ledgerline.app.ui.workspace.todos
+package de.ledgerline.app.ui.workspace.bookmarks
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,15 +15,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.List
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Notes
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,10 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import de.ledgerline.app.R
-import de.ledgerline.app.core.Dates
-import de.ledgerline.app.data.DateFormatPref
-import de.ledgerline.app.domain.model.TodoItem
+import de.ledgerline.app.domain.model.Bookmark
 import de.ledgerline.app.ui.common.ConfirmDialog
 import de.ledgerline.app.ui.common.openUrl
 import de.ledgerline.app.ui.workspace.LocalFullscreen
@@ -52,43 +57,52 @@ import de.ledgerline.app.ui.workspace.common.InfoCard
 import de.ledgerline.app.ui.workspace.common.InfoRow
 import de.ledgerline.app.ui.workspace.common.RowDivider
 import de.ledgerline.app.ui.workspace.common.TagChips
-import de.ledgerline.app.ui.workspace.common.isOverdue
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TodoDetailScreen(
-    todo: TodoItem,
-    listName: String?,
+fun BookmarkDetailScreen(
+    bookmark: Bookmark,
+    folderName: String?,
     linkChooser: Boolean,
     onEdit: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onToggleReadLater: () -> Unit,
     onDelete: () -> Unit,
     onBack: () -> Unit,
-    dateFormat: DateFormatPref = DateFormatPref.SYSTEM,
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
     val fs = LocalFullscreen.current
     DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
     val context = LocalContext.current
-    val due = Dates.format(todo.due, dateFormat)
     var confirmDelete by remember { mutableStateOf(false) }
+
+    val url = bookmark.url.trim()
+    val host = runCatching { url.toUri().host }.getOrNull()?.removePrefix("www.").orEmpty()
 
     Scaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.tab_todos)) },
+                title = { Text(stringResource(R.string.menu_bookmarks)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResource(R.string.action_back))
                     }
                 },
                 actions = {
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            if (bookmark.favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder,
+                            stringResource(R.string.bm_favorite),
+                            tint = if (bookmark.favorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     IconButton(onClick = onEdit) {
-                        Icon(Icons.Outlined.Edit, stringResource(R.string.todo_edit))
+                        Icon(Icons.Outlined.Edit, stringResource(R.string.bm_edit))
                     }
                     IconButton(onClick = { confirmDelete = true }) {
-                        Icon(Icons.Outlined.Delete, stringResource(R.string.todo_delete))
+                        Icon(Icons.Outlined.Delete, stringResource(R.string.bm_delete))
                     }
                 },
             )
@@ -102,11 +116,11 @@ fun TodoDetailScreen(
                 .padding(bottom = 28.dp),
         ) {
             DetailHero(
-                title = todo.title.ifBlank { stringResource(R.string.contact_untitled) },
-                subtitle = listName,
+                title = bookmark.title.ifBlank { host.ifBlank { url } },
+                subtitle = host.takeIf { it.isNotBlank() && bookmark.title.isNotBlank() },
                 leading = {
                     Icon(
-                        if (todo.done) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                        Icons.Outlined.Bookmark,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp),
@@ -114,58 +128,50 @@ fun TodoDetailScreen(
                 },
             )
 
-            val url = todo.url.trim()
             if (url.startsWith("http://") || url.startsWith("https://")) {
                 Row(
                     Modifier.fillMaxWidth().padding(vertical = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
                 ) {
-                    DetailQuickAction(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.todo_open_link)) {
+                    DetailQuickAction(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.bm_action_open)) {
                         openUrl(context, url, linkChooser)
                     }
+                    DetailQuickAction(Icons.Outlined.ContentCopy, stringResource(R.string.bm_action_copy)) {
+                        val clip = context.getSystemService(ClipboardManager::class.java)
+                        clip?.setPrimaryClip(ClipData.newPlainText("url", url))
+                    }
+                    DetailQuickAction(Icons.Outlined.Share, stringResource(R.string.bm_action_share)) {
+                        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url)
+                        runCatching { context.startActivity(Intent.createChooser(send, null)) }
+                    }
+                    DetailQuickAction(Icons.Outlined.Schedule, stringResource(R.string.bm_read_later), onToggleReadLater)
                 }
             }
 
             InfoCard {
-                InfoRow(
-                    Icons.Outlined.CheckCircle,
-                    stringResource(if (todo.done) R.string.todo_done else R.string.todo_not_done),
-                    stringResource(R.string.todo_done),
-                )
-                listName?.let {
+                InfoRow(Icons.Outlined.Language, url, "URL") { openUrl(context, url, linkChooser) }
+                if (!folderName.isNullOrBlank()) {
                     RowDivider()
-                    InfoRow(Icons.AutoMirrored.Outlined.List, it, stringResource(R.string.todo_list))
-                }
-                RowDivider()
-                InfoRow(Icons.Outlined.Flag, priorityLabel(todo.priority), stringResource(R.string.todo_priority))
-                if (due.isNotBlank()) {
-                    RowDivider()
-                    val overdue = !todo.done && isOverdue(todo.due)
-                    InfoRow(
-                        Icons.Outlined.Schedule,
-                        due,
-                        stringResource(R.string.todo_due),
-                        valueColor = if (overdue) MaterialTheme.colorScheme.error else null,
-                    )
+                    InfoRow(Icons.Outlined.Folder, folderName, stringResource(R.string.bm_folder))
                 }
             }
 
-            if (todo.description.isNotBlank()) {
+            if (bookmark.description.isNotBlank()) {
                 InfoCard {
-                    InfoRow(Icons.Outlined.Notes, todo.description, null)
+                    InfoRow(Icons.Outlined.Notes, bookmark.description, null)
                 }
             }
 
-            if (todo.tags.isNotEmpty()) {
-                TagChips(todo.tags, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            if (bookmark.tags.isNotEmpty()) {
+                TagChips(bookmark.tags, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
         }
     }
 
     if (confirmDelete) {
         ConfirmDialog(
-            message = stringResource(R.string.todo_delete),
-            confirmLabel = stringResource(R.string.todo_delete),
+            message = stringResource(R.string.bm_delete),
+            confirmLabel = stringResource(R.string.bm_delete),
             onConfirm = { confirmDelete = false; onDelete() },
             onDismiss = { confirmDelete = false },
         )

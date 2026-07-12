@@ -71,6 +71,7 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
     val activeList by vm.activeList.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
+    val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
@@ -117,6 +118,7 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
                 todo = todo,
                 listName = lists.firstOrNull { it.id == todo.listId }?.name,
                 linkChooser = linkChooser,
+                dateFormat = dateFormat,
                 onEdit = { editorFor = EditorTarget(todo.id) },
                 onDelete = { vm.trashTodo(todo.id); openId = null },
                 onBack = { openId = null },

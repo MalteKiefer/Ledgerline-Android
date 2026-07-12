@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.WorkspaceCache
+import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.domain.model.TodoItem
 import de.ledgerline.app.domain.model.TodoList
@@ -40,6 +41,10 @@ class TodosViewModel @Inject constructor(
     /** Whether opening a link shows the app chooser ("ask which browser"); default on. */
     val linkChooserEnabled: StateFlow<Boolean> = settingsStore.linkChooserEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    /** Chosen date display format, for the detail screen's due date. */
+    val dateFormat: StateFlow<DateFormatPref> = settingsStore.dateFormat
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DateFormatPref.SYSTEM)
 
     private val _lists = MutableStateFlow<List<TodoList>>(emptyList())
     val lists: StateFlow<List<TodoList>> = _lists

@@ -43,10 +43,12 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.LaunchedEffect
 import de.ledgerline.app.R
+import de.ledgerline.app.core.Dates
+import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.domain.model.Note
 import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.ui.workspace.LocalFullscreen
-import de.ledgerline.app.ui.workspace.common.formatDue
+import de.ledgerline.app.ui.workspace.common.TagChips
 import de.ledgerline.app.ui.common.ConfirmDialog
 
 /**
@@ -58,6 +60,7 @@ import de.ledgerline.app.ui.common.ConfirmDialog
 @Composable
 fun NoteDetailScreen(
     note: Note,
+    dateFormat: DateFormatPref = DateFormatPref.SYSTEM,
     onSave: (title: String, content: String, tags: List<String>) -> Unit,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit,
@@ -148,6 +151,9 @@ fun NoteDetailScreen(
                         color = MaterialTheme.colorScheme.onBackground,
                     )
                 }
+                if (note.tags.isNotEmpty()) {
+                    TagChips(note.tags)
+                }
                 MarkdownText(content, modifier = Modifier.fillMaxWidth())
             } else {
                 OutlinedTextField(
@@ -178,7 +184,7 @@ fun NoteDetailScreen(
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            val updated = note.updated?.let { formatDue(it) }.orEmpty()
+            val updated = note.updated?.let { Dates.format(it, dateFormat) }.orEmpty()
             if (updated.isNotBlank()) {
                 Text(
                     stringResource(R.string.note_updated, updated),

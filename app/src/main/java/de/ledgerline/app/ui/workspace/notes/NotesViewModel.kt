@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.WorkspaceCache
+import de.ledgerline.app.data.DateFormatPref
+import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.domain.model.Note
 import de.ledgerline.app.domain.model.WorkspaceManifest
 import de.ledgerline.app.domain.usecase.LoadWorkspace
@@ -13,7 +15,9 @@ import de.ledgerline.app.domain.workspace.NoteOps
 import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.domain.workspace.WorkspaceSearch
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -31,9 +35,14 @@ class NotesViewModel @Inject constructor(
     private val load: LoadWorkspace,
     private val cache: WorkspaceCache,
     private val mutate: MutateWorkspace,
+    settingsStore: SettingsStore,
 ) : ViewModel() {
     private val _state = MutableStateFlow(NotesUi(loading = true))
     val state: StateFlow<NotesUi> = _state
+
+    /** Chosen date display format, for the detail screen's "updated" timestamp. */
+    val dateFormat: StateFlow<DateFormatPref> = settingsStore.dateFormat
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DateFormatPref.SYSTEM)
 
     /** When true, the list shows only trashed notes (the trash view). */
     private val _showTrash = MutableStateFlow(false)

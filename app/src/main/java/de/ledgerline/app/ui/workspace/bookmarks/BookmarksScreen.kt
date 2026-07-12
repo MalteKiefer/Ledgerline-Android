@@ -86,6 +86,7 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
 
     // The bookmark being edited; null id = create new. Null = editor closed.
     var editorFor by remember { mutableStateOf<EditorTarget?>(null) }
+    var detailFor by remember { mutableStateOf<String?>(null) }
     var deleteForeverTarget by remember { mutableStateOf<String?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
 
@@ -94,6 +95,38 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
     }
 
     fun open(url: String) = openUrl(context, url, linkChooser)
+
+    // A tapped bookmark opens the full-screen read detail; the editor dialog still
+    // handles create/edit, reached from the detail's or row's edit action.
+    val detail = detailFor?.let { vm.bookmarkById(it) }
+    if (detail != null) {
+        BookmarkDetailScreen(
+            bookmark = detail,
+            folderName = folders.firstOrNull { it.id == detail.folderId }?.name,
+            linkChooser = linkChooser,
+            onEdit = { editorFor = EditorTarget(detail.id) },
+            onToggleFavorite = { vm.toggleFavorite(detail.id) },
+            onToggleReadLater = { vm.toggleReadLater(detail.id) },
+            onDelete = { vm.trashBookmark(detail.id); detailFor = null },
+            onBack = { detailFor = null },
+            modifier = modifier,
+        )
+        editorFor?.let { target ->
+            val existing = target.id?.let { vm.bookmarkById(it) }
+            BookmarkEditorDialog(
+                initial = existing ?: Bookmark(folderId = activeFolder),
+                folders = folders,
+                onSave = { url, title, description, folderId, tags ->
+                    if (target.id == null) vm.addBookmark(url, title, description, folderId, tags)
+                    else vm.editBookmark(target.id, url, title, description, folderId, tags)
+                    editorFor = null
+                },
+                onCreateFolder = { vm.addFolder(it) },
+                onDismiss = { editorFor = null },
+            )
+        }
+        return
+    }
 
     editorFor?.let { target ->
         val existing = target.id?.let { vm.bookmarkById(it) }
@@ -177,7 +210,7 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
                                     } else {
                                         BookmarkRow(
                                             bookmark = bookmark,
-                                            onOpen = { open(bookmark.url) },
+                                            onOpen = { detailFor = bookmark.id },
                                             onToggleFavorite = { vm.toggleFavorite(bookmark.id) },
                                             onToggleReadLater = { vm.toggleReadLater(bookmark.id) },
                                             onEdit = { editorFor = EditorTarget(bookmark.id) },

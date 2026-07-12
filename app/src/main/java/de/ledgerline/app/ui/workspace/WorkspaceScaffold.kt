@@ -116,13 +116,17 @@ fun WorkspaceScaffold(
     ) { innerPadding ->
         CompositionLocalProvider(LocalFullscreen provides fullscreen) {
             when (overflow) {
+                // When Bookmarks opens a full-screen detail (it sets LocalFullscreen), drop
+                // this wrapper's bar + insets so the detail owns the screen — otherwise the
+                // detail's own top bar stacks under this one (double chrome).
                 Overflow.Bookmarks -> AppScaffold(
-                    topBar = { AppTopBar(stringResource(R.string.menu_bookmarks), onBack = { overflow = null }) },
+                    immersive = fullscreen.value,
+                    topBar = { if (!fullscreen.value) AppTopBar(stringResource(R.string.menu_bookmarks), onBack = { overflow = null }) },
                 ) { p -> BookmarksScreen(Modifier.padding(p)) }
 
-                Overflow.Contacts -> AppScaffold(
-                    topBar = { AppTopBar(stringResource(R.string.menu_contacts), onBack = { overflow = null }) },
-                ) { p -> ContactsScreen(Modifier.padding(p)) }
+                // Contacts owns its own top bar (so the full-screen contact detail can
+                // replace it cleanly — no double back arrow). onExit closes the overflow.
+                Overflow.Contacts -> ContactsScreen(onExit = { overflow = null })
 
                 Overflow.Settings -> SettingsContent(
                     onLockNow = onLockNow,
