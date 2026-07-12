@@ -86,9 +86,12 @@ class GalleryBackupManager @VisibleForTesting internal constructor(
             if (candidates.isEmpty()) return
 
             val sources = candidates.map { it.toSource() }
+            // OperationManager.run is fire-and-forget (returns a Job); join it so we only
+            // mark AFTER ImportPhotos has actually finished — otherwise a failed upload
+            // would still be recorded as backed up and never retried.
             operationManager.run(OpKind.BACKUP, total = sources.size) { report ->
                 importPhotos.invoke(sources, report)
-            }
+            }.join()
             // Mark every candidate handed to ImportPhotos (done or deduped both count as
             // backed up; a genuine failure is retried next run — ImportPhotos persists no
             // partial state and the sig-dedup makes a retry idempotent).
