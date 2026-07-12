@@ -14,6 +14,7 @@ import de.ledgerline.app.data.backup.BackupItem
 import de.ledgerline.app.data.backup.BackupScanner
 import de.ledgerline.app.data.backup.BackupStateStore
 import de.ledgerline.app.domain.usecase.ImportPhotos
+import de.ledgerline.app.domain.usecase.ImportResult
 import de.ledgerline.app.domain.usecase.PhotoSource
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -86,16 +87,19 @@ class GalleryBackupManager @VisibleForTesting internal constructor(
             if (candidates.isEmpty()) return
 
             val sources = candidates.map { it.toSource() }
-            // OperationManager.run is fire-and-forget (returns a Job); join it so we only
-            // mark AFTER ImportPhotos has actually finished — otherwise a failed upload
-            // would still be recorded as backed up and never retried.
+            // OperationManager.run is fire-and-forget (returns a Job); join it so we read
+            // the result only AFTER ImportPhotos has actually finished.
+            var result: ImportResult? = null
             operationManager.run(OpKind.BACKUP, total = sources.size) { report ->
-                importPhotos.invoke(sources, report)
+                result = importPhotos.invoke(sources, report)
             }.join()
-            // Mark every candidate handed to ImportPhotos (done or deduped both count as
-            // backed up; a genuine failure is retried next run — ImportPhotos persists no
-            // partial state and the sig-dedup makes a retry idempotent).
-            state.mark(candidates.map { it.mediaStoreId }.toSet())
+            // Mark this batch backed-up ONLY when every item succeeded or deduped
+            // (failed == 0). ImportResult reports counts, not which ids failed, so if any
+            // item failed we mark nothing and retry the whole batch next run — the ones
+            // that already uploaded dedup instantly by sig, so only the failures re-run.
+            if (result?.failed == 0) {
+                state.mark(candidates.map { it.mediaStoreId }.toSet())
+            }
         } finally {
             running.set(false)
         }
@@ -104,6 +108,9 @@ class GalleryBackupManager @VisibleForTesting internal constructor(
     private fun BackupItem.toSource() = PhotoSource(
         name = name,
         mime = mime,
-        read = { resolver.openInputStream(uri)?.use { it.readBytes() } ?: ByteArray(0) },
+        // Throw (not empty bytes) on an unreadable/deleted item so ImportPhotos records it
+        // as a failure — which keeps the batch unmarked and retried, never uploads a 0-byte
+        // "photo".
+        read = { resolver.openInputStream(uri)?.use { it.readBytes() } ?: error("cannot open $uri") },
     )
 }
