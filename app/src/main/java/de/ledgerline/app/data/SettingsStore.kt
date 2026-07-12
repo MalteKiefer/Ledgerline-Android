@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
@@ -33,6 +34,8 @@ class SettingsStore(private val context: Context) {
     private val linkChooserKey = booleanPreferencesKey("link_chooser_enabled")
     private val contactSortKey = stringPreferencesKey("contact_sort")
     private val dateFormatKey = stringPreferencesKey("date_format")
+    private val backupEnabledKey = booleanPreferencesKey("backup_enabled")
+    private val backupAlbumsKey = stringSetPreferencesKey("backup_album_ids")
 
     // Legacy 5a boolean keys, retained only so a stored value migrates into the new
     // enum policies when the new key is absent (§C1).
@@ -157,6 +160,22 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setDateFormat(fmt: DateFormatPref) {
         context.settingsDataStore.edit { it[dateFormatKey] = fmt.name }
+    }
+
+    /** Master camera-backup switch. Defaults to OFF (opt-in). */
+    val backupEnabled: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[backupEnabledKey] ?: false }
+
+    suspend fun setBackupEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[backupEnabledKey] = enabled }
+    }
+
+    /** MediaStore bucket ids selected for backup. */
+    val backupAlbumIds: Flow<Set<String>> =
+        context.settingsDataStore.data.map { it[backupAlbumsKey].orEmpty() }
+
+    suspend fun setBackupAlbumIds(ids: Set<String>) {
+        context.settingsDataStore.edit { it[backupAlbumsKey] = ids }
     }
 
     companion object {
