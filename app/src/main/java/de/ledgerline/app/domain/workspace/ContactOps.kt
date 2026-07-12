@@ -39,6 +39,29 @@ object ContactOps {
             )
         }
 
+    /**
+     * Normalize a freshly-built contact (e.g. imported from the device address book):
+     * assign [id], derive `fn` from first/last when blank, and canonicalize every TYPE
+     * label — the same rules [updateContact] applies to an edited record.
+     */
+    fun normalize(c: Contact, id: String, nowIso: String): Contact {
+        val fn = c.fn.trim().ifBlank { "${c.first.trim()} ${c.last.trim()}".trim() }
+        return c.copy(
+            id = id,
+            fn = fn,
+            emails = c.emails.map { it.copy(type = normType(it.type, "home")) },
+            phones = c.phones.map { it.copy(type = normType(it.type, "cell")) },
+            impp = c.impp.map { it.copy(type = normType(it.type, "home")) },
+            urls = c.urls.map { it.copy(type = normType(it.type, "home")) },
+            addresses = c.addresses.map { it.copy(type = normType(it.type, "home")) },
+            updated = nowIso,
+        )
+    }
+
+    /** Append many already-normalized contacts in one shot (device import). */
+    fun addContacts(m: WorkspaceManifest, contacts: List<Contact>): WorkspaceManifest =
+        m.copy(contacts = m.contacts + contacts)
+
     fun toggleFavorite(m: WorkspaceManifest, id: String): WorkspaceManifest =
         update(m, id) { it.copy(favorite = !it.favorite) }
 

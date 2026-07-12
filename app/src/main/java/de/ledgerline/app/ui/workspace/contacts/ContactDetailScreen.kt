@@ -1,29 +1,47 @@
 package de.ledgerline.app.ui.workspace.contacts
 
+import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Message
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Cake
+import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,19 +65,29 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import de.ledgerline.app.R
+import de.ledgerline.app.core.Dates
+import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.domain.model.Contact
 import de.ledgerline.app.domain.model.LabeledValue
 import de.ledgerline.app.domain.model.PostalAddress
 import de.ledgerline.app.domain.workspace.Tags
 import de.ledgerline.app.ui.common.ConfirmDialog
+import de.ledgerline.app.ui.common.openUrl
 import de.ledgerline.app.ui.workspace.LocalFullscreen
+import de.ledgerline.app.ui.workspace.common.DetailQuickAction
+import de.ledgerline.app.ui.workspace.common.InfoCard
+import de.ledgerline.app.ui.workspace.common.InfoRow
+import de.ledgerline.app.ui.workspace.common.RowDivider
 import kotlinx.coroutines.launch
 
 /**
@@ -79,13 +107,27 @@ fun ContactDetailScreen(
     onPickAvatar: (ByteArray) -> Unit,
     onRemoveAvatar: () -> Unit,
     onBack: () -> Unit,
+    dateFormat: DateFormatPref = DateFormatPref.SYSTEM,
+    linkChooser: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val fs = LocalFullscreen.current
     DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
+    val ctx = LocalContext.current
 
     var editing by remember(contact.id) { mutableStateOf(isNew) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var showCamera by remember { mutableStateOf(false) }
+
+    // Take an avatar photo in-app (in-memory JPEG, no disk).
+    if (showCamera) {
+        BackHandler { showCamera = false }
+        de.ledgerline.app.ui.gallery.CameraCaptureScreen(
+            onCaptured = { bytes, _, _ -> onPickAvatar(bytes); showCamera = false },
+            onBack = { showCamera = false },
+        )
+        return
+    }
 
     if (editing) {
         ContactEditor(
@@ -94,12 +136,16 @@ fun ContactDetailScreen(
             onSave = { updated -> onSave(updated); editing = false },
             onCancel = { if (isNew) onBack() else editing = false },
             onPickAvatar = onPickAvatar,
+            onTakePhoto = { showCamera = true },
             onRemoveAvatar = onRemoveAvatar,
             onBack = onBack,
             modifier = modifier,
         )
         return
     }
+
+    // System back closes the detail (returns to the list), not the whole module.
+    BackHandler { onBack() }
 
     Scaffold(
         modifier = modifier,
@@ -130,39 +176,152 @@ fun ContactDetailScreen(
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 28.dp),
         ) {
-            ContactAvatar(contact, loadAvatar, 96.dp)
-            Text(
-                contactDisplayName(contact).ifBlank { stringResource(R.string.contact_untitled) },
-                style = MaterialTheme.typography.headlineSmall,
-            )
-            val subtitle = listOf(contact.title, contact.org).filter { it.isNotBlank() }.joinToString(" · ")
-            if (subtitle.isNotBlank()) {
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // --- Hero ---
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                    .padding(top = 12.dp, bottom = 20.dp)
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                ContactAvatar(contact, loadAvatar, 112.dp)
+                Text(
+                    contactDisplayName(contact).ifBlank { stringResource(R.string.contact_untitled) },
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center,
+                )
+                val subtitle = listOf(contact.title, contact.org).filter { it.isNotBlank() }.joinToString(" · ")
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                if (contact.nickname.isNotBlank()) {
+                    Text(
+                        "“${contact.nickname}”",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                contact.emails.filter { it.value.isNotBlank() }.forEach {
-                    DetailLine(stringResource(R.string.contact_email), it.value, it.type)
+
+            // --- Quick actions ---
+            val firstPhone = contact.phones.firstOrNull { it.value.isNotBlank() }?.value?.trim()
+            val firstEmail = contact.emails.firstOrNull { it.value.isNotBlank() }?.value?.trim()
+            val firstUrl = contact.urls.firstOrNull { it.value.isNotBlank() }?.value?.trim()
+            val firstAddr = contact.addresses.firstOrNull { a -> !addressQuery(a).isBlank() }
+            if (firstPhone != null || firstEmail != null || firstUrl != null || firstAddr != null) {
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+                ) {
+                    if (firstPhone != null) {
+                        DetailQuickAction(Icons.Outlined.Call, stringResource(R.string.contact_action_call)) {
+                            ctx.launch(Intent(Intent.ACTION_DIAL, "tel:$firstPhone".toUri()))
+                        }
+                        DetailQuickAction(Icons.AutoMirrored.Outlined.Message, stringResource(R.string.contact_action_message)) {
+                            ctx.launch(Intent(Intent.ACTION_SENDTO, "smsto:$firstPhone".toUri()))
+                        }
+                    }
+                    if (firstEmail != null) {
+                        DetailQuickAction(Icons.Outlined.Email, stringResource(R.string.contact_action_mail)) {
+                            ctx.launch(Intent(Intent.ACTION_SENDTO, "mailto:$firstEmail".toUri()))
+                        }
+                    }
+                    if (firstUrl != null) {
+                        DetailQuickAction(Icons.Outlined.Language, stringResource(R.string.contact_action_web)) {
+                            openUrl(ctx, normalizeUrl(firstUrl), linkChooser)
+                        }
+                    }
+                    if (firstAddr != null) {
+                        DetailQuickAction(Icons.Outlined.Place, stringResource(R.string.contact_action_navigate)) {
+                            ctx.launch(Intent(Intent.ACTION_VIEW, "geo:0,0?q=${Uri.encode(addressQuery(firstAddr))}".toUri()))
+                        }
+                    }
                 }
-                contact.phones.filter { it.value.isNotBlank() }.forEach {
-                    DetailLine(stringResource(R.string.contact_phone), it.value, it.type)
+            }
+
+            // --- Grouped info cards ---
+            val phones = contact.phones.filter { it.value.isNotBlank() }
+            if (phones.isNotEmpty()) InfoCard {
+                phones.forEachIndexed { i, p ->
+                    if (i > 0) RowDivider()
+                    InfoRow(Icons.Outlined.Call, p.value, typeLabel(p.type)) {
+                        ctx.launch(Intent(Intent.ACTION_DIAL, "tel:${p.value.trim()}".toUri()))
+                    }
                 }
-                contact.impp.filter { it.value.isNotBlank() }.forEach { DetailLine("IM", it.value, it.type) }
-                contact.urls.filter { it.value.isNotBlank() }.forEach { DetailLine("URL", it.value, it.type) }
-                contact.addresses.forEach { a ->
+            }
+            val emails = contact.emails.filter { it.value.isNotBlank() }
+            if (emails.isNotEmpty()) InfoCard {
+                emails.forEachIndexed { i, e ->
+                    if (i > 0) RowDivider()
+                    InfoRow(Icons.Outlined.Email, e.value, typeLabel(e.type)) {
+                        ctx.launch(Intent(Intent.ACTION_SENDTO, "mailto:${e.value.trim()}".toUri()))
+                    }
+                }
+            }
+            val addresses = contact.addresses.filter { a -> !addressQuery(a).isBlank() }
+            if (addresses.isNotEmpty()) InfoCard {
+                addresses.forEachIndexed { i, a ->
+                    if (i > 0) RowDivider()
                     val lines = listOf(
                         a.street,
                         listOf(a.zip, a.city).filter { it.isNotBlank() }.joinToString(" "),
                         a.region, a.country,
                     ).filter { it.isNotBlank() }
-                    if (lines.isNotEmpty()) DetailLine(stringResource(R.string.contact_address), lines.joinToString("\n"), a.type)
+                    InfoRow(Icons.Outlined.Place, lines.joinToString("\n"), typeLabel(a.type)) {
+                        ctx.launch(Intent(Intent.ACTION_VIEW, "geo:0,0?q=${Uri.encode(addressQuery(a))}".toUri()))
+                    }
                 }
-                if (contact.bday.isNotBlank()) DetailLine(stringResource(R.string.contact_bday), contact.bday, null)
-                if (contact.note.isNotBlank()) DetailLine(stringResource(R.string.contact_note), contact.note, null)
-                if (contact.categories.isNotEmpty()) DetailLine(stringResource(R.string.tags_hint), contact.categories.joinToString(", "), null)
+            }
+            val web = contact.urls.filter { it.value.isNotBlank() }
+            val ims = contact.impp.filter { it.value.isNotBlank() }
+            if (web.isNotEmpty() || ims.isNotEmpty()) InfoCard {
+                web.forEachIndexed { i, u ->
+                    if (i > 0) RowDivider()
+                    InfoRow(Icons.Outlined.Language, u.value, "URL") { openUrl(ctx, normalizeUrl(u.value.trim()), linkChooser) }
+                }
+                ims.forEachIndexed { i, m ->
+                    if (i > 0 || web.isNotEmpty()) RowDivider()
+                    InfoRow(Icons.AutoMirrored.Outlined.Message, m.value, "IM")
+                }
+            }
+            val hasInfo = contact.bday.isNotBlank() || contact.anniversary.isNotBlank() || contact.note.isNotBlank()
+            if (hasInfo) InfoCard {
+                var shown = false
+                if (contact.bday.isNotBlank()) {
+                    InfoRow(Icons.Outlined.Cake, Dates.format(contact.bday, dateFormat), stringResource(R.string.contact_bday))
+                    shown = true
+                }
+                if (contact.anniversary.isNotBlank()) {
+                    if (shown) RowDivider()
+                    InfoRow(Icons.Outlined.Favorite, Dates.format(contact.anniversary, dateFormat), stringResource(R.string.contact_anniversary))
+                    shown = true
+                }
+                if (contact.note.isNotBlank()) {
+                    if (shown) RowDivider()
+                    InfoRow(Icons.Outlined.Notes, contact.note, stringResource(R.string.contact_note))
+                }
+            }
+            if (contact.categories.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    contact.categories.forEach { AssistChip(onClick = {}, label = { Text(it) }) }
+                }
             }
         }
     }
@@ -177,14 +336,17 @@ fun ContactDetailScreen(
     }
 }
 
-@Composable
-private fun DetailLine(label: String, value: String, type: String?) {
-    Column(Modifier.fillMaxWidth()) {
-        val head = if (type.isNullOrBlank()) label else "$label · ${typeLabel(type)}"
-        Text(head, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyLarge)
-    }
+/** Fire an intent, swallowing failures so a missing handler never crashes the screen. */
+private fun Context.launch(intent: Intent) {
+    runCatching { startActivity(intent) }
 }
+
+/** Prefix a bare host with https:// so it opens as a web link. */
+private fun normalizeUrl(u: String): String = if (u.contains("://")) u else "https://$u"
+
+/** Flatten a postal address into a single geo-query string. */
+private fun addressQuery(a: PostalAddress): String =
+    listOf(a.street, a.zip, a.city, a.region, a.country).filter { it.isNotBlank() }.joinToString(", ")
 
 @Composable
 private fun typeLabel(type: String): String = when (type) {
@@ -202,12 +364,15 @@ private fun ContactEditor(
     onSave: (Contact) -> Unit,
     onCancel: () -> Unit,
     onPickAvatar: (ByteArray) -> Unit,
+    onTakePhoto: () -> Unit,
     onRemoveAvatar: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    BackHandler { onCancel() }
 
     var first by remember(contact.id) { mutableStateOf(contact.first) }
     var last by remember(contact.id) { mutableStateOf(contact.last) }
@@ -278,6 +443,7 @@ private fun ContactEditor(
                     OutlinedButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
                         Text(stringResource(R.string.contact_avatar_pick))
                     }
+                    TextButton(onClick = onTakePhoto) { Text(stringResource(R.string.contact_avatar_camera)) }
                     if (contact.avatarRef != null) {
                         TextButton(onClick = onRemoveAvatar) { Text(stringResource(R.string.contact_avatar_remove)) }
                     }

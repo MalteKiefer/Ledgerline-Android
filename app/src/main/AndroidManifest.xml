@@ -9,6 +9,10 @@
          exclusively to geotag the shot. Never used for background tracking. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Optional: sync the encrypted address book with the device contacts app.
+         Read/write only the local "Ledgerline" account; never uploaded anywhere. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
     <!-- Foreground service keeps long ops (scans/uploads) alive when backgrounded,
          behind a visible notification. Data-sync type; AOSP only, no Google. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

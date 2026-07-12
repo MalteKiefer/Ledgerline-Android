@@ -1,5 +1,9 @@
 package de.ledgerline.app.ui.workspace.contacts
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,10 +20,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.ImportExport
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -44,9 +52,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
@@ -59,9 +69,13 @@ import de.ledgerline.app.ui.workspace.common.SearchField
 import de.ledgerline.app.ui.workspace.common.TagFilterRow
 import de.ledgerline.app.ui.workspace.common.TrashBar
 
-/** The display name shown in list rows / detail. */
-internal fun contactDisplayName(c: Contact): String =
-    c.fn.ifBlank { "${c.first} ${c.last}".trim() }.ifBlank { c.org }
+/** The display name shown in list rows / detail — always "Last, First" when both exist. */
+internal fun contactDisplayName(c: Contact): String = when {
+    c.last.isNotBlank() && c.first.isNotBlank() -> "${c.last}, ${c.first}"
+    c.last.isNotBlank() -> c.last
+    c.first.isNotBlank() -> c.first
+    else -> c.fn.ifBlank { c.org }
+}
 
 /** Up to two initials from the display name, for the avatar placeholder. */
 internal fun contactInitials(c: Contact): String {
@@ -76,7 +90,11 @@ internal fun contactInitials(c: Contact): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ContactsScreen(modifier: Modifier = Modifier, vm: ContactsViewModel = hiltViewModel()) {
+fun ContactsScreen(
+    modifier: Modifier = Modifier,
+    onExit: () -> Unit = {},
+    vm: ContactsViewModel = hiltViewModel(),
+) {
     val ui by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
@@ -85,16 +103,43 @@ fun ContactsScreen(modifier: Modifier = Modifier, vm: ContactsViewModel = hiltVi
     val favoritesOnly by vm.favoritesOnly.collectAsStateWithLifecycle()
     val categories by vm.allCategories.collectAsStateWithLifecycle()
     val activeCategory by vm.activeCategory.collectAsStateWithLifecycle()
+    val syncing by vm.syncing.collectAsStateWithLifecycle()
+    val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
+    val linkChooser by vm.linkChooser.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     var openId by remember { mutableStateOf<String?>(null) }
     var pendingNew by remember { mutableStateOf<Contact?>(null) }
     var deleteForeverTarget by remember { mutableStateOf<String?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
+    var syncMenuOpen by remember { mutableStateOf(false) }
+
+    // Contacts permission is requested lazily on first export/import (also offered on
+    // the welcome screen). The pending action runs once the grant comes back.
+    var pendingSync by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val contactsPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
+        val action = pendingSync
+        pendingSync = null
+        if (res.values.any { it }) action?.invoke()
+    }
+    fun withContactsPermission(action: () -> Unit) {
+        val ok = ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CONTACTS) == PackageManager.PERMISSION_GRANTED
+        if (ok) action()
+        else {
+            pendingSync = action
+            contactsPermLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS))
+        }
+    }
 
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
     }
+
+    // Pull fresh contacts on every entry (mirrors the gallery tab) so edits made
+    // elsewhere — e.g. a changed avatar on the web — appear without a manual refresh.
+    LaunchedEffect(Unit) { vm.refresh() }
 
     // Detail/editor takes over the whole screen.
     val current = openId
@@ -111,6 +156,8 @@ fun ContactsScreen(modifier: Modifier = Modifier, vm: ContactsViewModel = hiltVi
                 onPickAvatar = { bytes -> vm.pickAvatar(contact.id, bytes) },
                 onRemoveAvatar = { vm.removeAvatar(contact.id) },
                 onBack = { openId = null; pendingNew = null },
+                dateFormat = dateFormat,
+                linkChooser = linkChooser,
                 modifier = modifier,
             )
             return
@@ -122,7 +169,30 @@ fun ContactsScreen(modifier: Modifier = Modifier, vm: ContactsViewModel = hiltVi
 
     Scaffold(
         modifier = modifier,
-        contentWindowInsets = WindowInsets(0),
+        topBar = {
+            de.ledgerline.app.ui.common.AppTopBar(
+                stringResource(R.string.menu_contacts),
+                onBack = onExit,
+                actions = {
+                    if (syncing) {
+                        CircularProgressIndicator(Modifier.size(24.dp).padding(end = 8.dp), strokeWidth = 2.dp)
+                    }
+                    IconButton(onClick = { syncMenuOpen = true }, enabled = !syncing) {
+                        Icon(Icons.Outlined.ImportExport, stringResource(R.string.contacts_sync))
+                    }
+                    DropdownMenu(expanded = syncMenuOpen, onDismissRequest = { syncMenuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.contacts_export_device)) },
+                            onClick = { syncMenuOpen = false; withContactsPermission { vm.exportToDevice() } },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.contacts_import_device)) },
+                            onClick = { syncMenuOpen = false; withContactsPermission { vm.importFromDevice() } },
+                        )
+                    }
+                },
+            )
+        },
         snackbarHost = { SnackbarHost(snackbar) },
         floatingActionButton = {
             if (!ui.loading && !ui.error && !showTrash) {
