@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.WorkspaceCache
+import de.ledgerline.app.core.backup.GalleryBackupManager
 import de.ledgerline.app.core.offline.Prefetcher
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import kotlinx.coroutines.launch
@@ -17,6 +18,7 @@ class WorkspaceViewModel @Inject constructor(
     private val load: LoadWorkspace,
     private val cache: WorkspaceCache,
     private val prefetcher: Prefetcher,
+    private val backupManager: GalleryBackupManager,
 ) : ViewModel() {
     /**
      * Loads the workspace if the cache is empty, then kicks off auto-prefetch on unlock.
@@ -27,6 +29,7 @@ class WorkspaceViewModel @Inject constructor(
         viewModelScope.launch {
             if (cache.value.value == null) load.invoke()
             prefetcher.maybePrefetchOnUnlock()
+            backupManager.maybeRun()
         }
     }
 }
