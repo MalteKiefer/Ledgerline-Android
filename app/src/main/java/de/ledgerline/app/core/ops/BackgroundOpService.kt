@@ -94,6 +94,7 @@ class BackgroundOpService : Service() {
         OpKind.UPLOAD -> R.string.ops_kind_upload
         OpKind.BLOB_CLEANUP -> R.string.ops_kind_blob_cleanup
         OpKind.PREFETCH -> R.string.ops_kind_prefetch
+        OpKind.BACKUP -> R.string.ops_kind_backup
     }
 
     private fun ensureChannel() {

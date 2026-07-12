@@ -209,6 +209,7 @@
     <string name="ops_kind_upload">Upload</string>
     <string name="ops_kind_blob_cleanup">Aufräumen</string>
     <string name="ops_kind_prefetch">Vorladen</string>
+    <string name="ops_kind_backup">Fotos sichern</string>
     <string name="settings_disconnect">Dieses Gerät trennen</string>
     <string name="settings_disconnect_confirm">Dieses Gerät trennen? Du musst dich erneut koppeln, indem du einen neuen QR-Code scannst.</string>
     <string name="settings_about">Über</string>
