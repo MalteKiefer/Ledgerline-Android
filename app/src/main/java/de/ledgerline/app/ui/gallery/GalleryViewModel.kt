@@ -302,7 +302,13 @@ class GalleryViewModel @Inject constructor(
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = false)
-        if (load.invoke() is Outcome.Err) _state.value = _state.value.copy(loading = false, error = true)
+        // Clear the spinner explicitly on success too: GalleryCache holds a data-class
+        // Gallery, so a reload of unchanged data is value-equal and the StateFlow does NOT
+        // re-emit — the cache collector would never fire and `loading` would stick forever.
+        when (load.invoke()) {
+            is Outcome.Err -> _state.value = _state.value.copy(loading = false, error = true)
+            is Outcome.Ok -> recompute()
+        }
         loadUsage()
     }
 

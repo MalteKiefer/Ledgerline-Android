@@ -86,3 +86,25 @@ data class GalleryManifest(
 
 /** Decrypted gallery index + server version (for later 4b writes). */
 data class Gallery(val manifest: GalleryManifest, val version: Int)
+
+/**
+ * A photo-shard descriptor in the v2 sealed gallery root. Each shard is a separate
+ * encrypted blob (`/gallery/raw/{ref}`, decrypted with the wrapped key [key]) holding up
+ * to 1000 photo records. Introduced server-side to keep the root manifest small.
+ */
+@Serializable
+data class GalleryShard(val ref: String = "", val key: String = "", val hash: String? = null, val count: Int = 0)
+
+/**
+ * The raw `/gallery/store` root manifest. v2 lists photo [shards] (fetched + decrypted +
+ * concatenated into the full photo list); v1 (legacy) inlines [photos]. Albums/people are
+ * always inline. Decode-only DTO — the in-memory model is the assembled [GalleryManifest].
+ */
+@Serializable
+data class GalleryRoot(
+    val v: Int = 1,
+    val shards: List<GalleryShard> = emptyList(),
+    val photos: List<GalleryPhoto> = emptyList(),
+    val albums: List<GalleryAlbum> = emptyList(),
+    val people: List<GalleryPerson> = emptyList(),
+)
