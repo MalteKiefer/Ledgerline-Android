@@ -116,6 +116,27 @@ class WorkspaceRepository(
     }
 
     /**
+     * Token-only refresh of the offline cache: fetch the sealed `/store` envelope and
+     * write its ciphertext to disk WITHOUT decrypting (no VK needed). Lets a background
+     * sync keep the offline copy current even while the vault is locked — the ciphertext
+     * is opaque, so nothing sensitive is exposed. No-op when offline caching is off, there
+     * is no session, or the fetch fails.
+     */
+    suspend fun refreshStoreCache(): Boolean {
+        if (!offlineFlags.enabled()) return false
+        val session = sessionHolder.get() ?: return false
+        return try {
+            val res = apiProvider(session).store()
+            if (!res.isSuccessful) return false
+            val body = res.body() ?: return false
+            storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * Optimistic write: apply [mutate] to the current manifest, PUT it; on 409 reload
      * the server manifest, re-apply [mutate], and retry (bounded to 4 attempts).
      * Updates the cache on success.

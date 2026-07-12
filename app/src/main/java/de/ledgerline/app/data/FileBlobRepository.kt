@@ -129,8 +129,19 @@ class FileBlobRepository(
         encFileKey: String,
         consume: (ByteArray) -> Unit,
     ): Outcome<Unit> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+        // Cache-first: file content blobs are content-addressed and immutable, so a cache
+        // hit is always current — decrypt from disk and skip the network entirely.
+        if (cachingEnabled()) {
+            blobCache.get(blob)?.let { cached ->
+                val plain = runCatching { BlobDownloader.decrypt(cached, encFileKey, vk, crypto) }.getOrNull()
+                if (plain != null) {
+                    consume(plain)
+                    return Outcome.Ok(Unit)
+                }
+            }
+        }
+        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
         return try {
             val res = apiProvider(session).rawFile(blob)
             // Non-2xx (except the 401 auth path) may fall back to the ciphertext cache.
@@ -217,6 +228,7 @@ class FileBlobRepository(
             override fun enabled() = false
             override fun filesPolicy() = FileBlobPolicy.OFF
             override fun photosPolicy() = de.ledgerline.app.data.offline.PhotoBlobPolicy.OFF
+            override fun contactsPolicy() = de.ledgerline.app.data.offline.ContactBlobPolicy.OFF
             override fun maxBytes() = 0L
             override fun wifiOnly() = false
             override fun chargingOnly() = false

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import kotlinx.coroutines.flow.Flow
@@ -25,10 +26,13 @@ class SettingsStore(private val context: Context) {
     private val offlineKey = booleanPreferencesKey("offline_cache_enabled")
     private val filesPolicyKey = stringPreferencesKey("offline_files_policy")
     private val photosPolicyKey = stringPreferencesKey("offline_photos_policy")
+    private val contactsPolicyKey = stringPreferencesKey("offline_contacts_policy")
     private val cacheMaxMbKey = intPreferencesKey("offline_cache_max_mb")
     private val prefetchWifiOnlyKey = booleanPreferencesKey("prefetch_wifi_only")
     private val prefetchChargingOnlyKey = booleanPreferencesKey("prefetch_charging_only")
     private val linkChooserKey = booleanPreferencesKey("link_chooser_enabled")
+    private val contactSortKey = stringPreferencesKey("contact_sort")
+    private val dateFormatKey = stringPreferencesKey("date_format")
 
     // Legacy 5a boolean keys, retained only so a stored value migrates into the new
     // enum policies when the new key is absent (§C1).
@@ -90,6 +94,16 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[photosPolicyKey] = p.name }
     }
 
+    /** Contact-avatar blob caching policy. Defaults to [ContactBlobPolicy.ON_DEMAND]. */
+    val contactsPolicy: Flow<ContactBlobPolicy> =
+        context.settingsDataStore.data.map {
+            runCatching { ContactBlobPolicy.valueOf(it[contactsPolicyKey] ?: "") }.getOrDefault(ContactBlobPolicy.ON_DEMAND)
+        }
+
+    suspend fun setContactsPolicy(p: ContactBlobPolicy) {
+        context.settingsDataStore.edit { it[contactsPolicyKey] = p.name }
+    }
+
     /** Cache size limit in MB (`0` = unlimited). Defaults to [DEFAULT_CACHE_MAX_MB]. */
     val cacheMaxMb: Flow<Int> =
         context.settingsDataStore.data.map { it[cacheMaxMbKey] ?: DEFAULT_CACHE_MAX_MB }
@@ -123,6 +137,26 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setLinkChooserEnabled(enabled: Boolean) {
         context.settingsDataStore.edit { it[linkChooserKey] = enabled }
+    }
+
+    /** Contact-list sort order. Defaults to [ContactSort.FIRST]. */
+    val contactSort: Flow<ContactSort> =
+        context.settingsDataStore.data.map {
+            runCatching { ContactSort.valueOf(it[contactSortKey] ?: "") }.getOrDefault(ContactSort.FIRST)
+        }
+
+    suspend fun setContactSort(sort: ContactSort) {
+        context.settingsDataStore.edit { it[contactSortKey] = sort.name }
+    }
+
+    /** Date display format. Defaults to [DateFormatPref.SYSTEM] (device locale). */
+    val dateFormat: Flow<DateFormatPref> =
+        context.settingsDataStore.data.map {
+            runCatching { DateFormatPref.valueOf(it[dateFormatKey] ?: "") }.getOrDefault(DateFormatPref.SYSTEM)
+        }
+
+    suspend fun setDateFormat(fmt: DateFormatPref) {
+        context.settingsDataStore.edit { it[dateFormatKey] = fmt.name }
     }
 
     companion object {

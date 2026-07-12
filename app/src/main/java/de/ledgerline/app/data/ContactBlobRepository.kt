@@ -4,6 +4,9 @@ import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
+import de.ledgerline.app.core.offline.BlobDiskCache
+import de.ledgerline.app.core.offline.OfflineFlags
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
@@ -30,13 +33,37 @@ class ContactBlobRepository private constructor(
     private val sessionHolder: SessionHolder,
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
+    private val blobCache: BlobDiskCache,
+    private val offlineFlags: OfflineFlags,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
     @Inject constructor(
         sessionHolder: SessionHolder,
         vaultKeyHolder: VaultKeyHolder,
         crypto: Crypto,
-    ) : this(sessionHolder, vaultKeyHolder, crypto, { s -> NetworkFactory.create(s.baseUrl, { s.token }, s.spkiPin) })
+        blobCache: BlobDiskCache,
+        offlineFlags: OfflineFlags,
+    ) : this(sessionHolder, vaultKeyHolder, crypto, blobCache, offlineFlags, { s -> NetworkFactory.create(s.baseUrl, { s.token }, s.spkiPin) })
+
+    /** Cache avatars unless the contacts offline policy is OFF (master switch also required). */
+    private fun cachingEnabled() =
+        offlineFlags.enabled() && offlineFlags.contactsPolicy() != ContactBlobPolicy.OFF
+
+    /**
+     * Fetch an avatar blob's ciphertext into the cache. No decryption, no VK — used by the
+     * prefetch engine to pre-populate avatars offline (contacts policy = ALL). Idempotent;
+     * skips an already-cached ref.
+     */
+    suspend fun prefetch(ref: String): Boolean = withContext(Dispatchers.IO) {
+        if (blobCache.has(ref)) return@withContext true
+        val session = sessionHolder.get() ?: return@withContext false
+        try {
+            val res = apiProvider(session).contactsRaw(ref)
+            if (!res.isSuccessful) return@withContext false
+            blobCache.put(ref, res.body()!!.bytes())
+            true
+        } catch (_: Exception) { false }
+    }
 
     /** Encrypt [bytes] with a fresh per-blob key, Padmé-pad, and upload the avatar. */
     suspend fun uploadAvatar(bytes: ByteArray): Outcome<UploadedBlob> = withContext(Dispatchers.IO) {
@@ -52,15 +79,29 @@ class ContactBlobRepository private constructor(
         } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
     }
 
-    /** Fetch + frame-decrypt an avatar blob fully into memory. */
+    /**
+     * Fetch + frame-decrypt an avatar blob fully into memory. When offline caching is on,
+     * the sealed ciphertext is cached to disk and served from there if the network fails —
+     * so avatars stay visible offline (§11). Plaintext never touches disk.
+     */
     suspend fun download(ref: String, key: String): Outcome<ByteArray> = withContext(Dispatchers.IO) {
-        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        // Cache-first: avatar blobs are content-addressed and immutable, so a cache hit is
+        // always current — serve it instantly and skip the network entirely.
+        if (cachingEnabled()) {
+            blobCache.get(ref)?.let { cipher ->
+                runCatching { BlobDownloader.decrypt(cipher, key, vk, crypto) }.getOrNull()
+                    ?.let { return@withContext Outcome.Ok(it) }
+            }
+        }
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         try {
             val res = apiProvider(session).contactsRaw(ref)
             if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
-            Outcome.Ok(BlobDownloader.decrypt(res.body()!!.bytes(), key, vk, crypto))
-        } catch (e: Exception) { Outcome.Err(ErrorKind.DECRYPT, e) }
+            val cipher = res.body()!!.bytes()
+            if (cachingEnabled()) blobCache.put(ref, cipher)
+            Outcome.Ok(BlobDownloader.decrypt(cipher, key, vk, crypto))
+        } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
     }
 
     /**
@@ -71,6 +112,7 @@ class ContactBlobRepository private constructor(
         val session = sessionHolder.get() ?: return@withContext
         val api = apiProvider(session)
         for (ref in refs.filter { it.isNotBlank() }.distinct()) {
+            blobCache.remove(ref)
             var attempt = 0
             while (attempt < 3) {
                 val res = try { api.deleteContactBlob(ref) } catch (_: Exception) { break }
@@ -112,8 +154,10 @@ class ContactBlobRepository private constructor(
             sessionHolder: SessionHolder,
             vaultKeyHolder: VaultKeyHolder,
             crypto: Crypto,
+            blobCache: BlobDiskCache,
+            offlineFlags: OfflineFlags,
             api: LedgerlineApi,
         ): ContactBlobRepository =
-            ContactBlobRepository(sessionHolder, vaultKeyHolder, crypto, { api })
+            ContactBlobRepository(sessionHolder, vaultKeyHolder, crypto, blobCache, offlineFlags, { api })
     }
 }

@@ -12,8 +12,11 @@ import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.AccountRepository
+import de.ledgerline.app.data.ContactSort
+import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.NetworkFactory
@@ -69,6 +72,22 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setBackgroundOpsEnabled(enabled) }
     }
 
+    /** Contact-list sort order. */
+    val contactSort: StateFlow<ContactSort> = settingsStore.contactSort
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ContactSort.FIRST)
+
+    fun setContactSort(sort: ContactSort) {
+        viewModelScope.launch { settingsStore.setContactSort(sort) }
+    }
+
+    /** Date display format. */
+    val dateFormat: StateFlow<DateFormatPref> = settingsStore.dateFormat
+        .stateIn(viewModelScope, SharingStarted.Eagerly, DateFormatPref.SYSTEM)
+
+    fun setDateFormat(fmt: DateFormatPref) {
+        viewModelScope.launch { settingsStore.setDateFormat(fmt) }
+    }
+
     /** Master offline-cache switch; when off the per-module blob toggles are disabled. */
     val offlineEnabled: StateFlow<Boolean> = settingsStore.offlineEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
@@ -91,6 +110,14 @@ class SettingsViewModel @Inject constructor(
 
     fun setPhotosPolicy(p: PhotoBlobPolicy) {
         viewModelScope.launch { settingsStore.setPhotosPolicy(p) }
+    }
+
+    /** Contact-avatar blob caching policy (Off / On demand / All). */
+    val contactsPolicy: StateFlow<ContactBlobPolicy> = settingsStore.contactsPolicy
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ContactBlobPolicy.ON_DEMAND)
+
+    fun setContactsPolicy(p: ContactBlobPolicy) {
+        viewModelScope.launch { settingsStore.setContactsPolicy(p) }
     }
 
     /** Cache size limit in MB (`0` = unlimited). */

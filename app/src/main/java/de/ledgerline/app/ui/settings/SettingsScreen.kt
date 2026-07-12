@@ -64,7 +64,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.BuildConfig
 import de.ledgerline.app.R
+import de.ledgerline.app.data.ContactSort
+import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.dto.MeUser
@@ -107,12 +110,15 @@ fun SettingsContent(
     val offlineEnabled by vm.offlineEnabled.collectAsStateWithLifecycle()
     val filesPolicy by vm.filesPolicy.collectAsStateWithLifecycle()
     val photosPolicy by vm.photosPolicy.collectAsStateWithLifecycle()
+    val contactsPolicy by vm.contactsPolicy.collectAsStateWithLifecycle()
     val cacheMaxMb by vm.cacheMaxMb.collectAsStateWithLifecycle()
     val prefetchWifiOnly by vm.prefetchWifiOnly.collectAsStateWithLifecycle()
     val prefetchChargingOnly by vm.prefetchChargingOnly.collectAsStateWithLifecycle()
     val prefetchMessage by vm.prefetchMessage.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSizeBytes.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
+    val contactSort by vm.contactSort.collectAsStateWithLifecycle()
+    val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
 
     var route by rememberSaveable { mutableStateOf(SettingsRoute.ROOT) }
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
@@ -169,6 +175,10 @@ fun SettingsContent(
                     padding = innerPadding,
                     currentLang = currentLang,
                     onSelectLang = { tag -> applyLanguage(context, tag); currentLang = tag },
+                    contactSort = contactSort,
+                    onSelectContactSort = vm::setContactSort,
+                    dateFormat = dateFormat,
+                    onSelectDateFormat = vm::setDateFormat,
                 )
 
                 SettingsRoute.SECURITY -> SecuritySettings(
@@ -183,6 +193,7 @@ fun SettingsContent(
                     offlineEnabled = offlineEnabled,
                     filesPolicy = filesPolicy,
                     photosPolicy = photosPolicy,
+                    contactsPolicy = contactsPolicy,
                     cacheMaxMb = cacheMaxMb,
                     prefetchWifiOnly = prefetchWifiOnly,
                     prefetchChargingOnly = prefetchChargingOnly,
@@ -190,6 +201,7 @@ fun SettingsContent(
                     onSetOffline = vm::setOfflineEnabled,
                     onSetFilesPolicy = vm::setFilesPolicy,
                     onSetPhotosPolicy = vm::setPhotosPolicy,
+                    onSetContactsPolicy = vm::setContactsPolicy,
                     onSetCacheMaxMb = vm::setCacheMaxMb,
                     onSetWifiOnly = vm::setPrefetchWifiOnly,
                     onSetChargingOnly = vm::setPrefetchChargingOnly,
@@ -339,6 +351,10 @@ private fun AppearanceSettings(
     padding: PaddingValues,
     currentLang: String,
     onSelectLang: (String) -> Unit,
+    contactSort: ContactSort,
+    onSelectContactSort: (ContactSort) -> Unit,
+    dateFormat: DateFormatPref,
+    onSelectDateFormat: (DateFormatPref) -> Unit,
 ) {
     SubScreen(padding) {
         SectionHeader(stringResource(R.string.settings_language))
@@ -351,6 +367,35 @@ private fun AppearanceSettings(
             }
             RadioRow(stringResource(R.string.settings_language_en), currentLang == "en") {
                 onSelectLang("en")
+            }
+        }
+
+        SectionHeader(stringResource(R.string.settings_contact_sort))
+        Column(Modifier.selectableGroup()) {
+            RadioRow(stringResource(R.string.settings_contact_sort_first), contactSort == ContactSort.FIRST) {
+                onSelectContactSort(ContactSort.FIRST)
+            }
+            RadioRow(stringResource(R.string.settings_contact_sort_last), contactSort == ContactSort.LAST) {
+                onSelectContactSort(ContactSort.LAST)
+            }
+            RadioRow(stringResource(R.string.settings_contact_sort_display), contactSort == ContactSort.DISPLAY) {
+                onSelectContactSort(ContactSort.DISPLAY)
+            }
+        }
+
+        SectionHeader(stringResource(R.string.settings_date_format))
+        Column(Modifier.selectableGroup()) {
+            RadioRow(stringResource(R.string.settings_date_format_system), dateFormat == DateFormatPref.SYSTEM) {
+                onSelectDateFormat(DateFormatPref.SYSTEM)
+            }
+            RadioRow(stringResource(R.string.settings_date_format_dmy), dateFormat == DateFormatPref.DMY) {
+                onSelectDateFormat(DateFormatPref.DMY)
+            }
+            RadioRow(stringResource(R.string.settings_date_format_ymd), dateFormat == DateFormatPref.YMD) {
+                onSelectDateFormat(DateFormatPref.YMD)
+            }
+            RadioRow(stringResource(R.string.settings_date_format_mdy), dateFormat == DateFormatPref.MDY) {
+                onSelectDateFormat(DateFormatPref.MDY)
             }
         }
     }
@@ -396,6 +441,7 @@ private fun OfflineSettings(
     offlineEnabled: Boolean,
     filesPolicy: FileBlobPolicy,
     photosPolicy: PhotoBlobPolicy,
+    contactsPolicy: ContactBlobPolicy,
     cacheMaxMb: Int,
     prefetchWifiOnly: Boolean,
     prefetchChargingOnly: Boolean,
@@ -403,6 +449,7 @@ private fun OfflineSettings(
     onSetOffline: (Boolean) -> Unit,
     onSetFilesPolicy: (FileBlobPolicy) -> Unit,
     onSetPhotosPolicy: (PhotoBlobPolicy) -> Unit,
+    onSetContactsPolicy: (ContactBlobPolicy) -> Unit,
     onSetCacheMaxMb: (Int) -> Unit,
     onSetWifiOnly: (Boolean) -> Unit,
     onSetChargingOnly: (Boolean) -> Unit,
@@ -451,6 +498,30 @@ private fun OfflineSettings(
                 onSetPhotosPolicy(PhotoBlobPolicy.ALL)
             }
         }
+
+        // Contact avatars policy: Off / On demand / All.
+        SelectorGroup(
+            title = stringResource(R.string.settings_contacts_policy),
+            enabled = offlineEnabled,
+        ) {
+            RadioRow(stringResource(R.string.policy_off), contactsPolicy == ContactBlobPolicy.OFF, offlineEnabled) {
+                onSetContactsPolicy(ContactBlobPolicy.OFF)
+            }
+            RadioRow(stringResource(R.string.policy_on_demand), contactsPolicy == ContactBlobPolicy.ON_DEMAND, offlineEnabled) {
+                onSetContactsPolicy(ContactBlobPolicy.ON_DEMAND)
+            }
+            RadioRow(stringResource(R.string.policy_all), contactsPolicy == ContactBlobPolicy.ALL, offlineEnabled) {
+                onSetContactsPolicy(ContactBlobPolicy.ALL)
+            }
+        }
+
+        // Notes/todos/bookmarks/contacts records ride the sealed manifest (master switch).
+        Text(
+            stringResource(R.string.settings_offline_manifest_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
 
         // Cache size limit: 512 MB / 1 GB / 2 GB / Unlimited.
         SelectorGroup(

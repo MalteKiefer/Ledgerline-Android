@@ -4,6 +4,7 @@ import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.offline.StoreDiskCache
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
@@ -31,6 +32,7 @@ class FakeOfflineFlags(
     private val enabled: Boolean = true,
     private val filesPolicy: FileBlobPolicy = FileBlobPolicy.ON_DEMAND,
     private val photosPolicy: PhotoBlobPolicy = PhotoBlobPolicy.ON_DEMAND,
+    private val contactsPolicy: ContactBlobPolicy = ContactBlobPolicy.ON_DEMAND,
     private val maxBytes: Long = 0L,
     private val wifiOnly: Boolean = false,
     private val chargingOnly: Boolean = false,
@@ -38,6 +40,7 @@ class FakeOfflineFlags(
     override fun enabled() = enabled
     override fun filesPolicy() = filesPolicy
     override fun photosPolicy() = photosPolicy
+    override fun contactsPolicy() = contactsPolicy
     override fun maxBytes() = maxBytes
     override fun wifiOnly() = wifiOnly
     override fun chargingOnly() = chargingOnly

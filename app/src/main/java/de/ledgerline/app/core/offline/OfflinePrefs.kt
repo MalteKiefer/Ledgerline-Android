@@ -1,6 +1,7 @@
 package de.ledgerline.app.core.offline
 
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +27,9 @@ interface OfflineFlags {
 
     /** Latest photo blob caching policy. */
     fun photosPolicy(): PhotoBlobPolicy
+
+    /** Latest contact-avatar blob caching policy. */
+    fun contactsPolicy(): ContactBlobPolicy
 
     /** Cache size limit in bytes (`0` = unlimited). */
     fun maxBytes(): Long
@@ -59,6 +63,9 @@ class OfflinePrefs @Inject constructor(settings: SettingsStore) : OfflineFlags {
     private var photosPolicy: PhotoBlobPolicy = runBlocking { settings.photosPolicy.first() }
 
     @Volatile
+    private var contactsPolicy: ContactBlobPolicy = runBlocking { settings.contactsPolicy.first() }
+
+    @Volatile
     private var cacheMaxMb: Int = runBlocking { settings.cacheMaxMb.first() }
 
     @Volatile
@@ -71,6 +78,7 @@ class OfflinePrefs @Inject constructor(settings: SettingsStore) : OfflineFlags {
         scope.launch { settings.offlineEnabled.collect { enabled = it } }
         scope.launch { settings.filesPolicy.collect { filesPolicy = it } }
         scope.launch { settings.photosPolicy.collect { photosPolicy = it } }
+        scope.launch { settings.contactsPolicy.collect { contactsPolicy = it } }
         scope.launch { settings.cacheMaxMb.collect { cacheMaxMb = it } }
         scope.launch { settings.prefetchWifiOnly.collect { wifiOnly = it } }
         scope.launch { settings.prefetchChargingOnly.collect { chargingOnly = it } }
@@ -81,6 +89,8 @@ class OfflinePrefs @Inject constructor(settings: SettingsStore) : OfflineFlags {
     override fun filesPolicy(): FileBlobPolicy = filesPolicy
 
     override fun photosPolicy(): PhotoBlobPolicy = photosPolicy
+
+    override fun contactsPolicy(): ContactBlobPolicy = contactsPolicy
 
     override fun maxBytes(): Long = cacheMaxMb.toLong() * 1024L * 1024L
 

@@ -4,8 +4,10 @@ import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.core.ops.OpKind
 import de.ledgerline.app.core.ops.OperationManager
+import de.ledgerline.app.data.ContactBlobRepository
 import de.ledgerline.app.data.FileBlobRepository
 import de.ledgerline.app.data.GalleryBlobRepository
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,13 +31,16 @@ class Prefetcher @Inject constructor(
     private val workspaceCache: WorkspaceCache,
     private val galleryRepo: GalleryBlobRepository,
     private val fileRepo: FileBlobRepository,
+    private val contactRepo: ContactBlobRepository,
     private val blobCache: BlobDiskCache,
     private val offlineFlags: OfflineFlags,
     private val constraints: Constraints,
     private val operationManager: OperationManager,
 ) {
+    private enum class Kind { FILE, GALLERY, CONTACT }
+
     /** A blob ref plus which store it belongs to (routes to the right repo). */
-    private data class Ref(val id: String, val isGallery: Boolean)
+    private data class Ref(val id: String, val kind: Kind)
 
     private val _message = MutableStateFlow<String?>(null)
 
@@ -55,12 +60,14 @@ class Prefetcher @Inject constructor(
 
         val photosPolicy = offlineFlags.photosPolicy()
         val filesPolicy = offlineFlags.filesPolicy()
+        val contactsPolicy = offlineFlags.contactsPolicy()
 
         val photosIsPrefetch = photosPolicy == PhotoBlobPolicy.THUMBS || photosPolicy == PhotoBlobPolicy.ALL
         val filesIsPrefetch = filesPolicy == FileBlobPolicy.ALL
+        val contactsIsPrefetch = contactsPolicy == ContactBlobPolicy.ALL
 
         // Nothing caches anything → no-op on both paths (auto and manual).
-        if (!photosIsPrefetch && !filesIsPrefetch) return
+        if (!photosIsPrefetch && !filesIsPrefetch && !contactsIsPrefetch) return
 
         // Don't stack: a PREFETCH op is already running.
         if (operationManager.active.value.any { it.kind == OpKind.PREFETCH }) return
@@ -84,14 +91,21 @@ class Prefetcher @Inject constructor(
                         p.thumbRef, p.mediumRef, p.originalRef, p.motionRef, p.metaRef,
                     ) + p.faceCropRefs
                     else -> emptyList()
-                }.forEach { refs.add(Ref(it, isGallery = true)) }
+                }.forEach { refs.add(Ref(it, Kind.GALLERY)) }
             }
         }
 
         if (filesIsPrefetch) {
             val files = workspaceCache.value.value?.manifest?.files.orEmpty().filter { !it.trashed }
             for (f in files) {
-                if (f.blob.isNotEmpty()) refs.add(Ref(f.blob, isGallery = false))
+                if (f.blob.isNotEmpty()) refs.add(Ref(f.blob, Kind.FILE))
+            }
+        }
+
+        if (contactsIsPrefetch) {
+            val contacts = workspaceCache.value.value?.manifest?.contacts.orEmpty().filter { !it.trashed }
+            for (c in contacts) {
+                c.avatarRef?.takeIf { it.isNotEmpty() }?.let { refs.add(Ref(it, Kind.CONTACT)) }
             }
         }
 
@@ -102,7 +116,11 @@ class Prefetcher @Inject constructor(
         operationManager.run(OpKind.PREFETCH, total = pending.size) { report ->
             var done = 0
             for (ref in pending) {
-                if (ref.isGallery) galleryRepo.prefetch(ref.id) else fileRepo.prefetch(ref.id)
+                when (ref.kind) {
+                    Kind.GALLERY -> galleryRepo.prefetch(ref.id)
+                    Kind.FILE -> fileRepo.prefetch(ref.id)
+                    Kind.CONTACT -> contactRepo.prefetch(ref.id)
+                }
                 report(++done, pending.size)
             }
         }

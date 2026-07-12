@@ -1,0 +1,73 @@
+package de.ledgerline.app.core.offline
+
+import de.ledgerline.app.core.SessionHolder
+import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.WorkspaceRepository
+import de.ledgerline.app.domain.usecase.LoadWorkspace
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Keeps the offline cache fresh in the background, within the zero-knowledge model.
+ *
+ * The Sanctum token is sealed behind a biometric-gated Keystore key, so a truly
+ * app-*closed* WorkManager job can never authenticate — that would need the user present.
+ * What we CAN do while the process is alive:
+ *  - **Unlocked** (VK in memory): a full [LoadWorkspace] refresh (decrypts, updates the UI
+ *    cache + disk cache) plus a policy-driven blob [Prefetcher] pass.
+ *  - **Locked but alive** (VK wiped, session token still held): a token-only refresh of the
+ *    sealed `/store` ciphertext into the disk cache ([WorkspaceRepository.refreshStoreCache]).
+ *    The ciphertext is opaque, so nothing sensitive is exposed without the VK.
+ *
+ * Runs on a periodic tick; a killed process simply stops syncing (nothing persisted).
+ */
+@Singleton
+class BackgroundSync @Inject constructor(
+    private val load: LoadWorkspace,
+    private val workspaceRepo: WorkspaceRepository,
+    private val sessionHolder: SessionHolder,
+    private val vaultKeyHolder: VaultKeyHolder,
+    private val offlineFlags: OfflineFlags,
+    private val connectivity: Connectivity,
+    private val prefetcher: Prefetcher,
+) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    @Volatile
+    private var started = false
+
+    /** Start the periodic sync loop. Idempotent — safe to call once from the Application. */
+    fun start() {
+        if (started) return
+        started = true
+        scope.launch {
+            delay(INITIAL_DELAY_MS)
+            while (true) {
+                runCatching { syncOnce() }
+                delay(INTERVAL_MS)
+            }
+        }
+    }
+
+    private suspend fun syncOnce() {
+        if (!offlineFlags.enabled()) return
+        if (sessionHolder.get() == null) return
+        if (!connectivity.isOnline()) return
+        if (vaultKeyHolder.get() != null) {
+            load.invoke()
+            prefetcher.maybePrefetchOnUnlock()
+        } else {
+            workspaceRepo.refreshStoreCache()
+        }
+    }
+
+    private companion object {
+        const val INITIAL_DELAY_MS = 20_000L
+        const val INTERVAL_MS = 15 * 60_000L
+    }
+}
