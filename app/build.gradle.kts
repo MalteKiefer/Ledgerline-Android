@@ -46,7 +46,11 @@ android {
         }
     }
     testOptions {
-        unitTests.isIncludeAndroidResources = true
+        // NOTE: isIncludeAndroidResources cannot be true when minSdk >= 36 because
+        // Robolectric (max SDK 35) rejects the binary-XML manifest that AGP injects.
+        // No existing unit test needs merged Android resources; Robolectric tests use
+        // @Config(sdk=[35]) + the synthetic Robolectric application context.
+        unitTests.isIncludeAndroidResources = false
         // The unit-test suite grew large; give the forked test JVM enough heap so the
         // MockWebServer/OkHttp-based repo tests don't OutOfMemoryError.
         unitTests.all { it.maxHeapSize = "1536m" }
@@ -114,6 +118,7 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.okhttp.tls)
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
 }

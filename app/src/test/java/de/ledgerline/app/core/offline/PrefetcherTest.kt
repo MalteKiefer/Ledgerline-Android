@@ -7,6 +7,7 @@ import de.ledgerline.app.core.ops.BackgroundOpsSetting
 import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.core.ops.ServiceController
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.ContactBlobRepository
 import de.ledgerline.app.data.FakeOfflineFlags
 import de.ledgerline.app.data.FileBlobRepository
 import de.ledgerline.app.data.GalleryBlobRepository
@@ -89,7 +90,10 @@ class PrefetcherTest {
     ): Prefetcher {
         val gc = GalleryCache().apply { gallery?.let { set(it) } }
         val wc = WorkspaceCache().apply { workspace?.let { set(it) } }
-        return Prefetcher(gc, wc, galleryRepo(api, cache), fileRepo(api, cache), cache, flags, constraints, opManager())
+        val sh = SessionHolder().apply { set(Session("https://x", "tok", "", null)) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val contactRepo = ContactBlobRepository.forTest(sh, vh, SealTagCrypto(), cache, FakeOfflineFlags(), api)
+        return Prefetcher(gc, wc, galleryRepo(api, cache), fileRepo(api, cache), contactRepo, cache, flags, constraints, opManager())
     }
 
     private fun awaitIdle() = Thread.sleep(200)

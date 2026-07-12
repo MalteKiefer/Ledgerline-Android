@@ -78,6 +78,11 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun galleryStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun deleteGalleryBlob(blob: String): Response<Unit> = throw NotImplementedError()
     override suspend fun embedText(body: de.ledgerline.app.data.remote.dto.EmbedTextRequest): Response<de.ledgerline.app.data.remote.dto.EmbedTextResponse> = throw NotImplementedError()
+    override suspend fun contactsUsage(): Response<UsageResponse> = throw NotImplementedError()
+    override suspend fun contactsReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
+    override suspend fun contactsUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
+    override suspend fun contactsRaw(blob: String): Response<ResponseBody> = throw NotImplementedError()
+    override suspend fun deleteContactBlob(blob: String): Response<Unit> = throw NotImplementedError()
 }
 
 /**
