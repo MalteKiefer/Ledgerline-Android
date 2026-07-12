@@ -282,6 +282,10 @@
     <string name="welcome_contacts_body">Optional: sync your encrypted address book with the device contacts app. Uses a local Ledgerline account only — nothing is sent to Google or anyone else.</string>
     <string name="welcome_contacts_allow">Allow contacts</string>
     <string name="welcome_contacts_granted">Contacts enabled</string>
+    <string name="welcome_media_title">Photo backup</string>
+    <string name="welcome_media_body">Optional: back up your camera roll into the encrypted gallery. Photos are read only to encrypt and upload them — nothing leaves the app in the clear.</string>
+    <string name="welcome_media_allow">Allow photo access</string>
+    <string name="welcome_media_granted">Photo access enabled</string>
     <string name="gallery_tab_photos">Photos</string>
     <string name="gallery_tab_albums">Albums</string>
     <string name="gallery_tab_people">People</string>

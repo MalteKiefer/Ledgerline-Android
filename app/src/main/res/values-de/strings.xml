@@ -280,6 +280,10 @@
     <string name="welcome_contacts_body">Optional: gleiche dein verschlüsseltes Adressbuch mit der Geräte-Kontakte-App ab. Nutzt nur ein lokales Ledgerline-Konto — nichts geht an Google oder Dritte.</string>
     <string name="welcome_contacts_allow">Kontakte erlauben</string>
     <string name="welcome_contacts_granted">Kontakte aktiviert</string>
+    <string name="welcome_media_title">Foto-Backup</string>
+    <string name="welcome_media_body">Optional: sichere deine Kamerarolle in die verschlüsselte Galerie. Fotos werden nur zum Verschlüsseln und Hochladen gelesen — nichts verlässt die App im Klartext.</string>
+    <string name="welcome_media_allow">Fotozugriff erlauben</string>
+    <string name="welcome_media_granted">Fotozugriff aktiviert</string>
     <string name="gallery_tab_photos">Fotos</string>
     <string name="gallery_tab_albums">Alben</string>
     <string name="gallery_tab_people">Personen</string>
