@@ -97,7 +97,7 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_TIMEOUT_MINUTES)
 
     fun setTimeoutMinutes(minutes: Int) {
-        idleLocker.timeoutMs = minutes * 60_000L
+        idleLocker.setTimeoutMs(minutes * 60_000L)
         viewModelScope.launch { settingsStore.setTimeoutMinutes(minutes) }
     }
 

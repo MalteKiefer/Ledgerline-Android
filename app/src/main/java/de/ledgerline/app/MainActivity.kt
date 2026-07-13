@@ -23,8 +23,9 @@ import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.ui.nav.AppNav
 import de.ledgerline.app.ui.theme.LedgerlineTheme
 import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -57,8 +58,12 @@ class MainActivity : FragmentActivity() {
             navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
 
-        // Apply the persisted idle-lock timeout before any unlock can happen.
-        idleLocker.timeoutMs = runBlocking { settingsStore.timeoutMinutes.first() } * 60_000L
+        // Apply the persisted idle-lock timeout asynchronously (never block the main
+        // thread on DataStore I/O). Until it loads, IdleLocker's safe default applies, and
+        // no unlock can complete before onCreate returns anyway.
+        lifecycleScope.launch {
+            idleLocker.setTimeoutMs(settingsStore.timeoutMinutes.first() * 60_000L)
+        }
 
         // Cold-start: accept a validated pairing deep link from the launch intent.
         pairLink.value = extractPairLink(intent)

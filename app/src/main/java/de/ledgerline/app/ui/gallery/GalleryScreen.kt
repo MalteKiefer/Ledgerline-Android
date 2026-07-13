@@ -432,7 +432,7 @@ private fun PhotosTab(
                 PhotoSource(
                     name = queryPhotoName(context, uri),
                     mime = context.contentResolver.getType(uri) ?: "image/jpeg",
-                    read = { context.contentResolver.openInputStream(uri)!!.use { it.readBytes() } },
+                    read = { (context.contentResolver.openInputStream(uri) ?: error("cannot open $uri")).use { it.readBytes() } },
                 )
             }
             vm.uploadAll(sources)

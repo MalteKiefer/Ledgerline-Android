@@ -66,8 +66,8 @@ class SodiumCrypto @Inject constructor() : Crypto {
     override fun openManifest(ciphertext: String, vk: ByteArray): String? {
         return try {
             val env = lenientJson.parseToJsonElement(ciphertext) as JsonObject
-            val c = env["c"]!!.jsonPrimitive.content
-            val n = env["n"]!!.jsonPrimitive.content
+            val c = (env["c"] ?: return null).jsonPrimitive.content
+            val n = (env["n"] ?: return null).jsonPrimitive.content
             val plain = secretBoxOpen(b64decode(c), b64decode(n), vk) ?: return null
             String(plain, Charsets.UTF_8)
         } catch (_: Exception) {
@@ -138,8 +138,8 @@ class SodiumCrypto @Inject constructor() : Crypto {
 
     override fun contentDecryptor(encFileKey: String, vk: ByteArray): Crypto.ContentDecryptor {
         val env = lenientJson.parseToJsonElement(encFileKey) as JsonObject
-        val c = env["c"]!!.jsonPrimitive.content
-        val n = env["n"]!!.jsonPrimitive.content
+        val c = (env["c"] ?: error("encFileKey missing 'c'")).jsonPrimitive.content
+        val n = (env["n"] ?: error("encFileKey missing 'n'")).jsonPrimitive.content
         val fk = secretBoxOpen(b64decode(c), b64decode(n), vk) ?: error("file key unwrap failed")
         val state = SecretStream.State.ByReference()
         return object : Crypto.ContentDecryptor {

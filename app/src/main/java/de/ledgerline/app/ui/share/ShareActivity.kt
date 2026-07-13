@@ -30,7 +30,8 @@ import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.ui.theme.LedgerlineTheme
 import de.ledgerline.app.ui.unlock.UnlockScreen
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
@@ -65,8 +66,10 @@ class ShareActivity : FragmentActivity() {
             navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
 
-        // Apply the persisted idle-lock timeout before any unlock can happen.
-        idleLocker.timeoutMs = runBlocking { settingsStore.timeoutMinutes.first() } * 60_000L
+        // Apply the persisted idle-lock timeout asynchronously (no main-thread DataStore I/O).
+        lifecycleScope.launch {
+            idleLocker.setTimeoutMs(settingsStore.timeoutMinutes.first() * 60_000L)
+        }
 
         items = parseIntent(intent)
         if (items.isEmpty()) {

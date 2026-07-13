@@ -494,17 +494,14 @@ private fun PhotoInfoSheet(
             InfoRow(label = stringResource(R.string.info_resolution), value = resValue)
 
             // Location — show coords immediately, replace with readable place when loaded
+            val p = place
             val locationValue = when {
-                place != null -> {
-                    val display = place!!.display?.takeIf { it.isNotBlank() }
-                    if (display != null) {
-                        display
-                    } else {
-                        listOfNotNull(place!!.city, place!!.state, place!!.country)
-                            .filter { it.isNotBlank() }
-                            .joinToString(", ")
-                            .ifBlank { unknown }
-                    }
+                p != null -> {
+                    val display = p.display?.takeIf { it.isNotBlank() }
+                    display ?: listOfNotNull(p.city, p.state, p.country)
+                        .filter { it.isNotBlank() }
+                        .joinToString(", ")
+                        .ifBlank { unknown }
                 }
                 photo.lat != null && photo.lng != null ->
                     "%.5f, %.5f".format(photo.lat, photo.lng)
