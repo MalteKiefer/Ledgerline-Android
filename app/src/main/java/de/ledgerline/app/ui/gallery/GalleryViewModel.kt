@@ -338,7 +338,13 @@ class GalleryViewModel @Inject constructor(
         val ref = photo.thumbRef ?: return null
         val key = photo.thumbKey ?: return null
         return when (val r = blobs.download(ref, key)) {
-            is Outcome.Ok -> BitmapFactory.decodeByteArray(r.value, 0, r.value.size)?.also { thumbs.put(photo.id, it) }
+            // Decode off the caller's dispatcher (produceState composes on Main) and as
+            // RGB_565 — photo thumbnails need no alpha, so this halves the bitmap memory and
+            // lets a larger in-memory cache fit without OOM risk.
+            is Outcome.Ok -> withContext(ioDispatcher) {
+                val opts = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 }
+                BitmapFactory.decodeByteArray(r.value, 0, r.value.size, opts)
+            }?.also { thumbs.put(photo.id, it) }
             is Outcome.Err -> null
         }
     }

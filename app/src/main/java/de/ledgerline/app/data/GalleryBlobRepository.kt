@@ -47,8 +47,18 @@ class GalleryBlobRepository @VisibleForTesting internal constructor(
         offlineFlags.enabled() && offlineFlags.photosPolicy() != PhotoBlobPolicy.OFF
 
     override suspend fun download(ref: String, key: String): Outcome<ByteArray> = withContext(Dispatchers.IO) {
-        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        // Cache-first: gallery content blobs are content-addressed and immutable, so a cache
+        // hit is always current — decrypt from disk and skip the network entirely. This makes
+        // scroll-back and repeat opens instant instead of re-fetching every thumb (the per-blob
+        // throttle otherwise serialises thousands of thumbs into minutes).
+        if (cachingEnabled()) {
+            blobCache.get(ref)?.let { cached ->
+                runCatching { BlobDownloader.decrypt(cached, key, vk, crypto) }.getOrNull()
+                    ?.let { return@withContext Outcome.Ok(it) }
+            }
+        }
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         try {
             val res = apiProvider(session).galleryRaw(ref)
             // Non-2xx (except the 401 auth path) may fall back to the ciphertext cache.

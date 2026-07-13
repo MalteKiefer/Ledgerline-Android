@@ -98,10 +98,23 @@ class OfflineBlobDownloadTest {
         assertArrayEquals(plaintext, (second as Outcome.Ok).value)
     }
 
-    @Test fun gallery_401_never_falls_back() = runBlocking {
+    @Test fun gallery_uncached_401_returns_error() = runBlocking {
+        // No cache entry → cache-first misses → the 401 surfaces as an error (no network-
+        // error cache fallback for an uncached blob). The token-revocation → forced-logout
+        // path is driven by the manifest load, which stays network-first.
+        val repo = galleryRepo(GalleryRawApi(null, code = 401), tmpBlobCache(), FakeOfflineFlags())
+        assertTrue(repo.download("ref-2", "encKey") is Outcome.Err)
+    }
+
+    @Test fun gallery_cached_blob_is_served_offline_first() = runBlocking {
+        // Content blobs are content-addressed + immutable, so a cached copy (already
+        // authorized when fetched) is served without the network — a later 401 does not
+        // block it; ForceLogout wipes the cache when the revocation is detected.
         val blobCache = tmpBlobCache()
         blobCache.put("ref-2", cipher)
         val repo = galleryRepo(GalleryRawApi(null, code = 401), blobCache, FakeOfflineFlags())
-        assertTrue(repo.download("ref-2", "encKey") is Outcome.Err)
+        val out = repo.download("ref-2", "encKey")
+        assertTrue(out is Outcome.Ok)
+        assertArrayEquals(plaintext, (out as Outcome.Ok).value)
     }
 }
