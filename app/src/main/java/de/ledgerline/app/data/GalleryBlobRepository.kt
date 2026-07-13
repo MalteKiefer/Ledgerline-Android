@@ -6,6 +6,7 @@ import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
+import androidx.annotation.VisibleForTesting
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
@@ -25,7 +26,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class GalleryBlobRepository private constructor(
+class GalleryBlobRepository @VisibleForTesting internal constructor(
     private val sessionHolder: SessionHolder,
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
@@ -139,16 +140,4 @@ class GalleryBlobRepository private constructor(
         } catch (_: Exception) { null }
     }
 
-    companion object {
-        /** Test factory exposing the api-provider seam (the `@Inject` ctor wires the real network). */
-        internal fun forTest(
-            sessionHolder: SessionHolder,
-            vaultKeyHolder: VaultKeyHolder,
-            crypto: Crypto,
-            blobCache: BlobDiskCache,
-            offlineFlags: OfflineFlags,
-            api: LedgerlineApi,
-        ): GalleryBlobRepository =
-            GalleryBlobRepository(sessionHolder, vaultKeyHolder, crypto, blobCache, offlineFlags, { api })
-    }
 }

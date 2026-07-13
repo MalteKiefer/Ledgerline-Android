@@ -1,13 +1,17 @@
 package de.ledgerline.app.data
 
+import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.offline.StoreDiskCache
+import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
+import de.ledgerline.app.data.remote.cleartextApi
+import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
@@ -49,6 +53,45 @@ class FakeOfflineFlags(
 /** A [StoreDiskCache] rooted at a fresh temp dir (auto-unique per call). */
 fun tmpStoreCache(): StoreDiskCache =
     StoreDiskCache(File(System.getProperty("java.io.tmpdir"), "t-store-" + System.nanoTime()))
+
+// ---- Blob-repo test factories (were `Repo.forTest` in main) ----------------------
+
+/**
+ * A [FileBlobRepository] wired to a cleartext api provider so a plain-HTTP MockWebServer
+ * can be driven from JVM unit tests. [FileBlobRepository.deleteBlobs] never touches
+ * crypto, so the non-throwing [SealTagCrypto] stub is fine (no native libsodium needed);
+ * offline flags are off so caching stays inert.
+ */
+fun fileBlobRepoForTest(baseUrl: String): FileBlobRepository = FileBlobRepository(
+    sessionHolder = SessionHolder().apply { set(Session(baseUrl, "tok", "", null)) },
+    vaultKeyHolder = VaultKeyHolder().apply { set(ByteArray(32)) },
+    crypto = SealTagCrypto(),
+    blobCache = tmpBlobCache(),
+    offlineFlags = FakeOfflineFlags(enabled = false),
+    apiProvider = { s -> cleartextApi(s.baseUrl, tokenProvider = { s.token }) },
+)
+
+/** A [GalleryBlobRepository] bound to a fixed fake [api] (the api-provider seam). */
+fun galleryBlobRepoForTest(
+    sessionHolder: SessionHolder,
+    vaultKeyHolder: VaultKeyHolder,
+    crypto: Crypto,
+    blobCache: BlobDiskCache,
+    offlineFlags: OfflineFlags,
+    api: LedgerlineApi,
+): GalleryBlobRepository =
+    GalleryBlobRepository(sessionHolder, vaultKeyHolder, crypto, blobCache, offlineFlags) { api }
+
+/** A [ContactBlobRepository] bound to a fixed fake [api] (the api-provider seam). */
+fun contactBlobRepoForTest(
+    sessionHolder: SessionHolder,
+    vaultKeyHolder: VaultKeyHolder,
+    crypto: Crypto,
+    blobCache: BlobDiskCache,
+    offlineFlags: OfflineFlags,
+    api: LedgerlineApi,
+): ContactBlobRepository =
+    ContactBlobRepository(sessionHolder, vaultKeyHolder, crypto, blobCache, offlineFlags) { api }
 
 /** A [BlobDiskCache] rooted at a fresh temp dir (auto-unique per call). */
 fun tmpBlobCache(): BlobDiskCache =

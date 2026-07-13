@@ -25,9 +25,8 @@ class GalleryUploaderTest {
     }
 
     /** Off-device the android.util.Base64 stub throws, so decode via java.util.Base64. */
-    private fun uploader(api: GalleryUploadApi) = object : GalleryUploader(api) {
-        override fun decodeBase64(s: String): ByteArray = java.util.Base64.getDecoder().decode(s)
-    }
+    private fun uploader(api: GalleryUploadApi) =
+        GalleryUploader(api) { s -> java.util.Base64.getDecoder().decode(s) }
 
     @Test
     fun uploads_photo_and_builds_entry() = runBlocking {

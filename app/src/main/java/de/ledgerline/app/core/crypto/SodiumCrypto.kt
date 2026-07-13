@@ -159,11 +159,4 @@ class SodiumCrypto @Inject constructor() : Crypto {
             }
         }
     }
-
-    /** Test-only helper to build a secretbox ciphertext fixture. */
-    internal fun secretBoxSealForTest(message: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray {
-        val out = ByteArray(message.size + SecretBox.MACBYTES)
-        check(ls.cryptoSecretBoxEasy(out, message, message.size.toLong(), nonce, key)) { "seal failed" }
-        return out
-    }
 }

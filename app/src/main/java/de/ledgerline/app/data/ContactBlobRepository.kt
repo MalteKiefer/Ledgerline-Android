@@ -6,6 +6,7 @@ import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
+import androidx.annotation.VisibleForTesting
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
@@ -28,7 +29,7 @@ data class ContactUsage(val used: Long, val quota: Long)
  * frame-decrypt on download, 429-aware bulk delete.
  */
 @Singleton
-class ContactBlobRepository private constructor(
+class ContactBlobRepository @VisibleForTesting internal constructor(
     private val sessionHolder: SessionHolder,
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
@@ -135,15 +136,4 @@ class ContactBlobRepository private constructor(
         } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
     }
 
-    companion object {
-        internal fun forTest(
-            sessionHolder: SessionHolder,
-            vaultKeyHolder: VaultKeyHolder,
-            crypto: Crypto,
-            blobCache: BlobDiskCache,
-            offlineFlags: OfflineFlags,
-            api: LedgerlineApi,
-        ): ContactBlobRepository =
-            ContactBlobRepository(sessionHolder, vaultKeyHolder, crypto, blobCache, offlineFlags, { api })
-    }
 }

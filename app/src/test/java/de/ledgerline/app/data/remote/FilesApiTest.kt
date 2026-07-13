@@ -18,7 +18,7 @@ class FilesApiTest {
     @Before fun setUp() { server = MockWebServer(); server.start() }
     @After fun tearDown() { server.shutdown() }
 
-    private fun api() = NetworkFactory.create(server.url("/").toString(), { "tok" }, null, allowCleartext = true)
+    private fun api() = cleartextApi(server.url("/").toString(), { "tok" })
 
     @Test fun upload_returns_id() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(201).setBody("""{"id":"blob-1"}""").addHeader("Content-Type", "application/json"))

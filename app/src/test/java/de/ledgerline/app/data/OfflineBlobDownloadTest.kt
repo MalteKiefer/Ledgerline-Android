@@ -78,7 +78,7 @@ class OfflineBlobDownloadTest {
     }
 
     private fun galleryRepo(api: NotImplementedApi, blobCache: de.ledgerline.app.core.offline.BlobDiskCache, flags: FakeOfflineFlags): GalleryBlobRepository =
-        GalleryBlobRepository.forTest(
+        galleryBlobRepoForTest(
             SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) },
             VaultKeyHolder().apply { set(vk) },
             crypto, blobCache, flags, api,

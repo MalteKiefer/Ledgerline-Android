@@ -6,6 +6,7 @@ import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
+import androidx.annotation.VisibleForTesting
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
@@ -15,7 +16,6 @@ import de.ledgerline.app.domain.usecase.FileBlobs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MultipartBody
-import java.io.File
 import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,7 +32,7 @@ data class UploadedBlob(val id: String, val encFileKey: String, val size: Long)
  * The manifest write lives in [WorkspaceRepository.save]; this repo only moves blobs.
  */
 @Singleton
-class FileBlobRepository(
+class FileBlobRepository @VisibleForTesting internal constructor(
     private val sessionHolder: SessionHolder,
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
@@ -191,52 +191,5 @@ class FileBlobRepository(
         val session = sessionHolder.get() ?: return@withContext
         val api = apiProvider(session)
         deleteBlobsWithBackoff(blobs) { api.deleteBlob(it) }
-    }
-
-    companion object {
-        /**
-         * Test factory: wires a cleartext api provider so a plain-HTTP MockWebServer
-         * can be driven from JVM unit tests. [deleteBlobs] never touches crypto, so a
-         * throwing [Crypto] stub is used (avoids loading the native libsodium library,
-         * which isn't available off-device).
-         */
-        internal fun forTest(baseUrl: String): FileBlobRepository = FileBlobRepository(
-            sessionHolder = SessionHolder().apply { set(Session(baseUrl, "tok", "", null)) },
-            vaultKeyHolder = VaultKeyHolder().apply { set(ByteArray(32)) },
-            crypto = UnusedCrypto,
-            blobCache = BlobDiskCache(File(System.getProperty("java.io.tmpdir"), "t-blob-" + System.nanoTime())),
-            offlineFlags = NoOfflineFlags,
-            apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = null, allowCleartext = true) },
-        )
-
-        /** Offline flags stub used where caching must stay inert (all toggles off). */
-        private val NoOfflineFlags = object : OfflineFlags {
-            override fun enabled() = false
-            override fun filesPolicy() = FileBlobPolicy.OFF
-            override fun photosPolicy() = de.ledgerline.app.data.offline.PhotoBlobPolicy.OFF
-            override fun contactsPolicy() = de.ledgerline.app.data.offline.ContactBlobPolicy.OFF
-            override fun maxBytes() = 0L
-            override fun wifiOnly() = false
-            override fun chargingOnly() = false
-        }
-
-        /** A [Crypto] that throws on every call; only used where crypto is never invoked. */
-        private val UnusedCrypto = object : Crypto {
-            override fun deriveKek(passphrase: ByteArray, salt: ByteArray, opsLimit: Long, memLimit: Long) =
-                throw NotImplementedError()
-            override fun secretBoxOpen(cipher: ByteArray, nonce: ByteArray, key: ByteArray) =
-                throw NotImplementedError()
-            override fun genericHash32(input: ByteArray) = throw NotImplementedError()
-            override fun b64decode(s: String) = throw NotImplementedError()
-            override fun b64encode(b: ByteArray) = throw NotImplementedError()
-            override fun fromHex(s: String) = throw NotImplementedError()
-            override fun openManifest(ciphertext: String, vk: ByteArray) = throw NotImplementedError()
-            override fun sealManifest(json: String, vk: ByteArray) = throw NotImplementedError()
-            override val contentChunkSize get() = throw NotImplementedError()
-            override fun newContentEncryptor(vk: ByteArray) = throw NotImplementedError()
-            override fun contentDecryptor(encFileKey: String, vk: ByteArray) = throw NotImplementedError()
-            override fun u32le(n: Int) = throw NotImplementedError()
-            override fun readU32le(bytes: ByteArray, off: Int) = throw NotImplementedError()
-        }
     }
 }

@@ -18,7 +18,7 @@ class DeleteThrottleTest {
         server.enqueue(MockResponse().setResponseCode(429).addHeader("Retry-After", "0"))
         server.enqueue(MockResponse().setResponseCode(200))
 
-        val repo = FileBlobRepository.forTest(server.url("/").toString())
+        val repo = fileBlobRepoForTest(server.url("/").toString())
         repo.deleteBlobs(listOf("blob-x"))
 
         assertEquals(2, server.requestCount)

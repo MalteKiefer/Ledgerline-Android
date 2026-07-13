@@ -1,6 +1,7 @@
 package de.ledgerline.app.data
 
 import android.util.Base64
+import androidx.annotation.VisibleForTesting
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.usecase.GalleryUploadApi
@@ -24,14 +25,16 @@ import javax.inject.Singleton
  * the entry with all refs/keys plus denormalised exif fields.
  */
 @Singleton
-open class GalleryUploader @Inject constructor(private val blobs: GalleryUploadApi) {
-    private val json = Json { encodeDefaults = true }
+class GalleryUploader @VisibleForTesting internal constructor(
+    private val blobs: GalleryUploadApi,
+    /** Base64 decoder for the process response's renditions; injected so JVM tests can
+     *  swap in `java.util.Base64` (the Android `android.util.Base64` stub throws off-device). */
+    private val decodeBase64: (String) -> ByteArray,
+) {
+    /** Production constructor: `android.util.Base64` decodes the server's standard (padded) base64. */
+    @Inject constructor(blobs: GalleryUploadApi) : this(blobs, { s -> Base64.decode(s, Base64.NO_WRAP) })
 
-    /** Base64 decoder for the process response's renditions. `android.util.Base64`
-     *  with [Base64.DEFAULT] decodes the server's standard (padded) base64. Marked
-     *  internal + open so JVM tests can swap in `java.util.Base64` (the Android stub
-     *  throws off-device). */
-    internal open fun decodeBase64(s: String): ByteArray = Base64.decode(s, Base64.NO_WRAP)
+    private val json = Json { encodeDefaults = true }
 
     suspend fun upload(
         name: String,
