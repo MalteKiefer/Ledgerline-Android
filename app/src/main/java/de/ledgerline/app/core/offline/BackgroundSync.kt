@@ -4,10 +4,9 @@ import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.WorkspaceRepository
+import de.ledgerline.app.di.ApplicationScope
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -37,9 +36,8 @@ class BackgroundSync @Inject constructor(
     private val connectivity: Connectivity,
     private val prefetcher: Prefetcher,
     private val accountRepository: AccountRepository,
+    @ApplicationScope private val scope: CoroutineScope,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
     @Volatile
     private var started = false
 

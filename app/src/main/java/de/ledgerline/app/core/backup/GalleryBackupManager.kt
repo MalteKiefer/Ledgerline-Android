@@ -17,9 +17,9 @@ import de.ledgerline.app.domain.usecase.ImportPhotos
 import de.ledgerline.app.domain.usecase.ImportResult
 import de.ledgerline.app.domain.usecase.PhotoSource
 import kotlinx.coroutines.CoroutineDispatcher
+import de.ledgerline.app.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -44,6 +44,7 @@ class GalleryBackupManager @VisibleForTesting internal constructor(
     private val operationManager: OperationManager,
     private val resolver: ContentResolver,
     private val ioDispatcher: CoroutineDispatcher,
+    private val scope: CoroutineScope,
 ) {
     @Inject constructor(
         scanner: BackupScanner,
@@ -55,12 +56,12 @@ class GalleryBackupManager @VisibleForTesting internal constructor(
         constraints: ConstraintChecker,
         operationManager: OperationManager,
         @ApplicationContext context: Context,
+        @ApplicationScope scope: CoroutineScope,
     ) : this(
         scanner, importPhotos, state, settings, sessionHolder, vaultKeyHolder, constraints,
-        operationManager, context.contentResolver, Dispatchers.IO,
+        operationManager, context.contentResolver, Dispatchers.IO, scope,
     )
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val running = AtomicBoolean(false)
 
     /** Fire-and-forget trigger — safe to call on unlock and from a button. */

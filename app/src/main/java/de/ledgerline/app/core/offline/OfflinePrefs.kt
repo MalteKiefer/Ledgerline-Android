@@ -4,9 +4,8 @@ import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
+import de.ledgerline.app.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -49,9 +48,10 @@ interface OfflineFlags {
  * its background-ops flag.
  */
 @Singleton
-class OfflinePrefs @Inject constructor(settings: SettingsStore) : OfflineFlags {
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+class OfflinePrefs @Inject constructor(
+    settings: SettingsStore,
+    @ApplicationScope private val scope: CoroutineScope,
+) : OfflineFlags {
 
     @Volatile
     private var enabled: Boolean = runBlocking { settings.offlineEnabled.first() }

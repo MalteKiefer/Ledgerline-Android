@@ -18,6 +18,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -58,6 +59,7 @@ class GalleryBackupManagerTest {
         return GalleryBackupManager(
             scanner, importPhotos, state, settings, sessions, vkHolder, constraints, ops, resolver,
             ioDispatcher = Dispatchers.Unconfined,
+            scope = CoroutineScope(Dispatchers.Unconfined),
         )
     }
 
