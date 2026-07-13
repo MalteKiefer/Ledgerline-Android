@@ -75,6 +75,9 @@ data class GalleryPerson(
     val id: String = "", val name: String = "", val hidden: Boolean = false,
     val centroid: List<Double> = emptyList(),
     val faces: List<PersonFace> = emptyList(),
+    // Link to a workspace Contact (bidirectional; the contact stores personId back).
+    val contactId: String? = null,
+    val contactName: String? = null,
 )
 
 @Serializable

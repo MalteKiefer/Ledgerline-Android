@@ -71,6 +71,7 @@ fun PeopleScreen(
     var scanMenu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<GalleryPerson?>(null) }
     var merging by remember { mutableStateOf<GalleryPerson?>(null) }
+    var linking by remember { mutableStateOf<GalleryPerson?>(null) }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -106,6 +107,8 @@ fun PeopleScreen(
                             onRename = { renaming = person },
                             onHide = { peopleVm.hide(person) },
                             onMerge = { merging = person },
+                            onLink = { linking = person },
+                            onUnlink = { peopleVm.unlinkContact(person) },
                         )
                     }
                 }
@@ -141,6 +144,40 @@ fun PeopleScreen(
             )
         }
 
+        // Link this person to a workspace contact (contact picker).
+        linking?.let { p ->
+            val contacts = remember(people) { peopleVm.contacts() }
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { linking = null },
+                title = { Text(stringResource(R.string.person_link_contact)) },
+                text = {
+                    if (contacts.isEmpty()) {
+                        Text(stringResource(R.string.contacts_empty_link))
+                    } else {
+                        Column(Modifier.verticalScroll(rememberScrollState())) {
+                            contacts.forEach { c ->
+                                val label = c.fn.ifBlank { listOf(c.first, c.last).filter { it.isNotBlank() }.joinToString(" ") }
+                                Text(
+                                    text = label.ifBlank { stringResource(R.string.person_unnamed) },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { peopleVm.linkToContact(p, c); linking = null }
+                                        .padding(vertical = 12.dp, horizontal = 4.dp),
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { linking = null }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                },
+            )
+        }
+
         // Merge this person into another (target picker).
         merging?.let { src ->
             PersonPickerDialog(
@@ -165,6 +202,8 @@ private fun PersonCard(
     onRename: () -> Unit,
     onHide: () -> Unit,
     onMerge: () -> Unit,
+    onLink: () -> Unit,
+    onUnlink: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     val cover = peopleVm.personCover(person)
@@ -222,6 +261,17 @@ private fun PersonCard(
                         text = { Text(stringResource(R.string.person_merge)) },
                         onClick = { menu = false; onMerge() },
                     )
+                    if (person.contactId == null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.person_link_contact)) },
+                            onClick = { menu = false; onLink() },
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.person_unlink_contact)) },
+                            onClick = { menu = false; onUnlink() },
+                        )
+                    }
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.person_hide)) },
                         onClick = { menu = false; onHide() },

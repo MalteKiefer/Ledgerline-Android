@@ -105,6 +105,9 @@ data class Contact(
     @Serializable(with = FlexibleTrashedSerializer::class) val trashed: Boolean = false,
     val avatarRef: String? = null, val avatarKey: String? = null,
     val bdayNotified: Int? = null, val annivNotified: Int? = null,
+    // Link to a gallery Person (bidirectional; the person stores contactId back).
+    val personId: String? = null,
+    val personName: String? = null,
     val _x: List<JsonElement> = emptyList(),  // preserve unknown vCard props round-trip
     val updated: String? = null,
 )

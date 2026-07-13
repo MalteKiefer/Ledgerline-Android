@@ -9,6 +9,9 @@ import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.ThumbCache
+import de.ledgerline.app.core.WorkspaceCache
+import de.ledgerline.app.domain.model.Contact
+import de.ledgerline.app.domain.usecase.MutateWorkspace
 import de.ledgerline.app.core.ops.OpKind
 import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.domain.gallery.FaceClusterer
@@ -44,6 +47,8 @@ class PeopleViewModel @Inject constructor(
     private val blobs: GalleryBlobs,
     private val mutate: MutateGallery,
     private val operationManager: OperationManager,
+    private val workspaceCache: WorkspaceCache,
+    private val mutateWorkspace: MutateWorkspace,
 ) : ViewModel() {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -138,6 +143,48 @@ class PeopleViewModel @Inject constructor(
             m.copy(people = m.people.mapNotNull { if (it.id == source.id) null else if (it.id == targetId) merged else it })
         }
     }
+
+    /** Non-trashed workspace contacts, for the link picker. */
+    fun contacts(): List<Contact> =
+        workspaceCache.value.value?.manifest?.contacts.orEmpty().filter { !it.trashed }
+
+    private fun contactDisplayName(c: Contact): String =
+        c.fn.ifBlank { listOf(c.first, c.last).filter { it.isNotBlank() }.joinToString(" ") }
+
+    /**
+     * Bidirectionally link [person] to [contact]: the person adopts the contact's name and
+     * stores contactId; the contact stores personId + a name snapshot. Writes BOTH the
+     * gallery store (person side) and the workspace store (contact side).
+     */
+    fun linkToContact(person: GalleryPerson, contact: Contact) = viewModelScope.launch {
+        val cname = contactDisplayName(contact)
+        mutate.invoke { m ->
+            m.copy(people = m.people.map {
+                if (it.id == person.id) it.copy(contactId = contact.id, contactName = cname, name = cname.ifBlank { it.name }) else it
+            })
+        }
+        mutateWorkspace.invoke { w ->
+            w.copy(contacts = w.contacts.map {
+                if (it.id == contact.id) it.copy(personId = person.id, personName = cname, updated = nowIso()) else it
+            })
+        }
+    }
+
+    /** Break the person↔contact link on both sides. */
+    fun unlinkContact(person: GalleryPerson) = viewModelScope.launch {
+        val cid = person.contactId
+        mutate.invoke { m ->
+            m.copy(people = m.people.map { if (it.id == person.id) it.copy(contactId = null, contactName = null) else it })
+        }
+        if (cid != null) mutateWorkspace.invoke { w ->
+            w.copy(contacts = w.contacts.map {
+                if (it.id == cid) it.copy(personId = null, personName = null, updated = nowIso()) else it
+            })
+        }
+    }
+
+    private fun nowIso(): String =
+        java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC).toString()
 
     /** Element-wise size-weighted mean of two centroids; falls back to whichever is non-empty. */
     private fun weightedMean(a: List<Double>, na: Int, b: List<Double>, nb: Int): List<Double> {

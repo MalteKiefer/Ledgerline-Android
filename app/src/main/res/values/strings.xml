@@ -433,4 +433,7 @@
     <string name="person_none_other">No other people</string>
     <string name="export_done">Exported %1$d</string>
     <string name="gallery_upload_retry">Retry</string>
+    <string name="person_link_contact">Link to contact</string>
+    <string name="person_unlink_contact">Unlink contact</string>
+    <string name="contacts_empty_link">No contacts to link</string>
 </resources>
