@@ -431,4 +431,5 @@
     <string name="person_merge">Merge</string>
     <string name="person_merge_into">Merge into…</string>
     <string name="person_none_other">No other people</string>
+    <string name="export_done">Exported %1$d</string>
 </resources>

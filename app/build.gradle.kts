@@ -120,6 +120,7 @@ dependencies {
     implementation(libs.okhttp.logging)
 
     implementation(libs.datastore.preferences)
+    implementation(libs.androidx.documentfile)
     implementation(libs.coroutines.android)
 
     implementation(libs.camera.camera2)

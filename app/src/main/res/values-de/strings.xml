@@ -429,4 +429,5 @@
     <string name="person_merge">Zusammenführen</string>
     <string name="person_merge_into">Zusammenführen mit…</string>
     <string name="person_none_other">Keine anderen Personen</string>
+    <string name="export_done">%1$d exportiert</string>
 </resources>

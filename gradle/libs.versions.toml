@@ -25,6 +25,7 @@ androidxTestRunner = "1.6.2"
 androidxTestCore = "1.7.0"
 robolectric = "4.16.1"
 pdfbox = "2.0.27.0"
+documentfile = "1.1.0"
 # Force the BouncyCastle that pdfbox-android drags in (1.72) up to a patched release:
 # clears CVE-2023-33201 (LDAP injection), CVE-2023-33202 (PEM DoS) + the 2024 BC CVEs.
 bouncycastle = "1.78.1"
@@ -77,6 +78,7 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfbox" }
+androidx-documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk15to18", version.ref = "bouncycastle" }
 bouncycastle-bcpkix = { module = "org.bouncycastle:bcpkix-jdk15to18", version.ref = "bouncycastle" }
 bouncycastle-bcutil = { module = "org.bouncycastle:bcutil-jdk15to18", version.ref = "bouncycastle" }

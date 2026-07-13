@@ -38,6 +38,7 @@ import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Deselect
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MotionPhotosOn
@@ -426,6 +427,33 @@ private fun PhotosTab(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    // Bulk export: pick a destination folder, then decrypt each selected original and write
+    // it there (off the main thread). Plaintext lands only in the user-chosen SAF tree.
+    val exportLauncher = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+    ) { treeUri ->
+        if (treeUri != null) {
+            val ids = selected.toList()
+            val tree = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
+            scope.launch {
+                var ok = 0
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    ids.forEach { id ->
+                        val photo = ui.photos.firstOrNull { it.id == id } ?: return@forEach
+                        val bytes = vm.originalBytes(photo) ?: return@forEach
+                        val doc = tree?.createFile(
+                            photo.mime ?: "application/octet-stream",
+                            photo.name?.takeIf { it.isNotBlank() } ?: "photo.jpg",
+                        )
+                        doc?.uri?.let { u -> context.contentResolver.openOutputStream(u)?.use { it.write(bytes); ok++ } }
+                    }
+                }
+                snackbarHostState.showSnackbar(context.getString(R.string.export_done, ok))
+                exitSelection()
+            }
+        }
+    }
+
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(maxItems = 30)
     ) { uris ->
@@ -618,6 +646,7 @@ private fun PhotosTab(
                 onDelete = { showDeleteConfirm = true },
                 onSetDate = { showDatePicker = true },
                 onSetLocation = { showLocationPicker = true },
+                onExport = { exportLauncher.launch(null) },
                 allSelected = ui.photos.isNotEmpty() && ui.photos.all { it.id in selected },
                 onSelectAll = {
                     if (ui.photos.all { it.id in selected }) selected.clear()
@@ -770,6 +799,7 @@ private fun SelectionBar(
     onDelete: () -> Unit,
     onSetDate: () -> Unit,
     onSetLocation: () -> Unit,
+    onExport: () -> Unit,
     allSelected: Boolean,
     onSelectAll: () -> Unit,
     modifier: Modifier = Modifier,
@@ -823,6 +853,11 @@ private fun SelectionBar(
                             )
                         },
                         onClick = { overflow = false; onSelectAll() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_download)) },
+                        leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+                        onClick = { overflow = false; onExport() },
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.action_set_date)) },
