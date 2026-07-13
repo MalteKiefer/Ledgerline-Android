@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -23,12 +25,33 @@ android {
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 
+    // Release signing from environment (CI secrets) or a gitignored keystore.properties —
+    // never hardcode credentials. Absent → release stays unsigned (local dev / CI without
+    // secrets) rather than silently signing with the debug key.
+    val keystoreProps = rootProject.file("keystore.properties")
+    val signingEnabled = System.getenv("LL_KEYSTORE_FILE") != null || keystoreProps.exists()
+    signingConfigs {
+        if (signingEnabled) {
+            create("release") {
+                val props = Properties().apply {
+                    if (keystoreProps.exists()) keystoreProps.inputStream().use { load(it) }
+                }
+                fun cfg(env: String, key: String): String? = System.getenv(env) ?: props.getProperty(key)
+                storeFile = cfg("LL_KEYSTORE_FILE", "storeFile")?.let { file(it) }
+                storePassword = cfg("LL_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = cfg("LL_KEY_ALIAS", "keyAlias")
+                keyPassword = cfg("LL_KEY_PASSWORD", "keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug { isMinifyEnabled = false }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (signingEnabled) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

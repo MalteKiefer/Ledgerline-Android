@@ -16,3 +16,6 @@ local.properties
 .kotlin/
 # Local agent/session state
 .claude/
+
+# Local release signing (never commit)
+keystore.properties
