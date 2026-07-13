@@ -1,8 +1,8 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
@@ -11,7 +11,9 @@ plugins {
 
 android {
     namespace = "de.ledgerline.app"
-    compileSdk = 36
+    // AGP 9.2 + the AndroidX bumps (core 1.19, lifecycle 2.11, hilt-nav 1.4) require
+    // compiling against API 37. targetSdk/minSdk stay at 36 (runtime behavior unchanged).
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "de.ledgerline.app"
@@ -58,7 +60,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -86,6 +87,12 @@ android {
         // lint/AGP bug, not a code issue — disable the single offending check so the
         // release lint-vital pass runs. Revisit when AGP/lint ships a compatible build.
         disable += "NullSafeMutableLiveData"
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
