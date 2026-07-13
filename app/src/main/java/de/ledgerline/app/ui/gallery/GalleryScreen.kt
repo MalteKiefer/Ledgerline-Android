@@ -37,6 +37,8 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Deselect
+import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MotionPhotosOn
 import androidx.compose.material.icons.outlined.Place
@@ -514,7 +516,18 @@ private fun PhotosTab(
                             span = { GridItemSpan(maxLineSpan) },
                             key = "day-${group.dayKey}",
                         ) {
-                            DayHeader(group.label)
+                            DayHeader(
+                                label = group.label,
+                                selectionMode = selectionMode,
+                                checked = group.photos.isNotEmpty() && group.photos.all { it.id in selected },
+                                onToggle = {
+                                    if (group.photos.all { it.id in selected }) {
+                                        selected.removeAll(group.photos.map { it.id })
+                                    } else {
+                                        group.photos.forEach { if (it.id !in selected) selected.add(it.id) }
+                                    }
+                                },
+                            )
                         }
                         items(group.photos, key = { it.id }) { photo ->
                             SelectableThumbCell(
@@ -605,6 +618,11 @@ private fun PhotosTab(
                 onDelete = { showDeleteConfirm = true },
                 onSetDate = { showDatePicker = true },
                 onSetLocation = { showLocationPicker = true },
+                allSelected = ui.photos.isNotEmpty() && ui.photos.all { it.id in selected },
+                onSelectAll = {
+                    if (ui.photos.all { it.id in selected }) selected.clear()
+                    else ui.photos.forEach { if (it.id !in selected) selected.add(it.id) }
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp),
@@ -752,6 +770,8 @@ private fun SelectionBar(
     onDelete: () -> Unit,
     onSetDate: () -> Unit,
     onSetLocation: () -> Unit,
+    allSelected: Boolean,
+    onSelectAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var overflow by remember { mutableStateOf(false) }
@@ -792,6 +812,18 @@ private fun SelectionBar(
                     Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more))
                 }
                 DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(stringResource(if (allSelected) R.string.selection_clear else R.string.selection_select_all))
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (allSelected) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = { overflow = false; onSelectAll() },
+                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.action_set_date)) },
                         leadingIcon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
@@ -1073,27 +1105,40 @@ private fun queryPhotoName(context: Context, uri: Uri): String {
 
 /** Full-span timeline day header shown above each capture-day group in the grid. */
 @Composable
-private fun DayHeader(label: String) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun DayHeader(
+    label: String,
+    selectionMode: Boolean = false,
+    checked: Boolean = false,
+    onToggle: () -> Unit = {},
+) {
+    androidx.compose.foundation.layout.Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 6.dp),
-    )
+            .padding(start = 12.dp, end = 4.dp, top = 16.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        if (selectionMode) {
+            androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onClick: () -> Unit) {
+internal fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onLongClick: () -> Unit = {}, onClick: () -> Unit) {
     SelectableThumbCell(
         photo = photo,
         vm = vm,
         selectionMode = false,
         selected = false,
         onClick = onClick,
-        onLongClick = {},
+        onLongClick = onLongClick,
     )
 }
 

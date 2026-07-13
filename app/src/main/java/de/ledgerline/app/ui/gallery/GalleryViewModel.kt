@@ -351,6 +351,13 @@ class GalleryViewModel @Inject constructor(
 
     suspend fun downloadBytes(ref: String, key: String): Outcome<ByteArray> = blobs.download(ref, key)
 
+    /** Decrypt a photo's ORIGINAL blob fully into memory (for export via SAF). Null on failure. */
+    suspend fun originalBytes(photo: GalleryPhoto): ByteArray? {
+        val ref = photo.originalRef ?: return null
+        val key = photo.originalKey ?: return null
+        return (blobs.download(ref, key) as? Outcome.Ok)?.value
+    }
+
     /**
      * Resolve a photo's place for the viewer. First the sealed meta blob (populated at
      * upload only when the server has geocode-on-upload enabled); when that has no place,

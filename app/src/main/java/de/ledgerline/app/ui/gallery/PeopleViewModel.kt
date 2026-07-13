@@ -98,6 +98,19 @@ class PeopleViewModel @Inject constructor(
         }
     }
 
+    /** Make [photoId]'s face the person's cover by moving it to the front of the face list. */
+    fun setCover(pp: GalleryPerson, photoId: String) = viewModelScope.launch {
+        mutate.invoke { m ->
+            m.copy(people = m.people.map { p ->
+                if (p.id != pp.id) p
+                else {
+                    val (match, rest) = p.faces.partition { it.photoId == photoId }
+                    if (match.isEmpty()) p else p.copy(faces = match + rest)
+                }
+            })
+        }
+    }
+
     /**
      * Scan faces and (re)cluster people. [scanLimit] > 0 = incremental scan over the
      * [scanLimit] most-recent photos (seeds existing people, appends unmatched);

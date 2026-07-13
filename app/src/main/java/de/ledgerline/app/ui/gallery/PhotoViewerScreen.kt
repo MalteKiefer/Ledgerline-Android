@@ -5,6 +5,11 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -100,6 +105,21 @@ fun PhotoViewerScreen(
     var showLocationPicker by remember { mutableStateOf(false) }
     var viewport by remember { mutableStateOf(IntSize.Zero) }
     var playingMotion by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // SAF export of the decrypted original. The chosen document is opened and the plaintext
+    // bytes are written off the main thread; nothing plaintext is left elsewhere on disk.
+    val saveLauncher = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument(photo.mime ?: "application/octet-stream"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            val bytes = vm.originalBytes(photo)
+            if (bytes != null) withContext(kotlinx.coroutines.Dispatchers.IO) {
+                context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+            }
+        }
+    }
 
     val isVideo = photo.media_type == "video"
     // A live/motion photo is a still IMAGE that carries an embedded motion clip.
@@ -266,6 +286,9 @@ fun PhotoViewerScreen(
                         stringResource(if (photo.favorite) R.string.action_unfavorite else R.string.action_favorite),
                         tint = if (photo.favorite) MaterialTheme.colorScheme.primary else Color.White,
                     )
+                }
+                IconButton(onClick = { saveLauncher.launch(photo.name?.takeIf { it.isNotBlank() } ?: "photo.jpg") }) {
+                    Icon(Icons.Outlined.Download, stringResource(R.string.action_download), tint = Color.White)
                 }
                 IconButton(onClick = { showInfo = !showInfo }) {
                     Icon(Icons.Outlined.Info, stringResource(R.string.info_title), tint = Color.White)

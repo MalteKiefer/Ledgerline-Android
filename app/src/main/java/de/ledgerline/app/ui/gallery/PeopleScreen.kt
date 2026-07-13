@@ -280,7 +280,16 @@ fun PersonDetailScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
             items(photos, key = { it.id }) { photo ->
-                ThumbCell(photo, galleryVm) { openId = photo.id }
+                var cellMenu by remember { mutableStateOf(false) }
+                Box {
+                    ThumbCell(photo, galleryVm, onLongClick = { cellMenu = true }) { openId = photo.id }
+                    DropdownMenu(expanded = cellMenu, onDismissRequest = { cellMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.person_set_cover)) },
+                            onClick = { cellMenu = false; peopleVm.setCover(person, photo.id) },
+                        )
+                    }
+                }
             }
         }
     }
