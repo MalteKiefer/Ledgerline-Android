@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.AuthEventBus
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.domain.usecase.ForceLogout
 import de.ledgerline.app.ui.onboarding.WelcomeScreen
@@ -34,6 +35,7 @@ class RootViewModel @Inject constructor(
     private val vaultKeyHolder: VaultKeyHolder,
     private val authEventBus: AuthEventBus,
     private val forceLogout: ForceLogout,
+    private val accountRepository: AccountRepository,
 ) : ViewModel() {
     private val _dest = MutableStateFlow(Destination.LOADING)
     val dest: StateFlow<Destination> = _dest
@@ -70,11 +72,23 @@ class RootViewModel @Inject constructor(
                 _dest.value = Destination.WELCOME
             }
         }
+        // Remote kill switch: the owner flagged this device to wipe from the web
+        // (`GET /me` → `wipe:true`). Same outcome as a 401 — erase all local state + re-pair.
+        viewModelScope.launch {
+            authEventBus.wipe.collect {
+                forceLogout.invoke()
+                _dest.value = Destination.WELCOME
+            }
+        }
     }
 
     fun toPairing() { _dest.value = Destination.PAIRING }
     fun toUnlock() { _dest.value = Destination.UNLOCK }
-    fun toHome() { _dest.value = Destination.HOME }
+    fun toHome() {
+        _dest.value = Destination.HOME
+        // Check the kill switch right after unlock (me() fires the wipe event on wipe:true).
+        viewModelScope.launch { accountRepository.me() }
+    }
     fun toWelcome() { _dest.value = Destination.WELCOME }
 }
 

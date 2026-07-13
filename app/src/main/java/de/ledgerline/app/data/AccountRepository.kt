@@ -1,5 +1,6 @@
 package de.ledgerline.app.data
 
+import de.ledgerline.app.core.AuthEventBus
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
@@ -12,20 +13,28 @@ import javax.inject.Singleton
 @Singleton
 class AccountRepository(
     private val sessionHolder: SessionHolder,
+    private val authEventBus: AuthEventBus,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
-    @Inject constructor(sessionHolder: SessionHolder) : this(
+    @Inject constructor(sessionHolder: SessionHolder, authEventBus: AuthEventBus) : this(
         sessionHolder,
+        authEventBus,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
-    /** Current account (name/email/groups). Null on no session, network error, or failure. */
+    /**
+     * Current account (name/email/groups). Null on no session, network error, or failure.
+     * Also carries the remote kill switch: when the response's `wipe` flag is set, fire the
+     * wipe event so the app erases all local state and re-pairs.
+     */
     suspend fun me(): MeUser? {
         val session = sessionHolder.get() ?: return null
         return try {
             val res = apiProvider(session).me()
             if (!res.isSuccessful) return null
-            res.body()?.user
+            val body = res.body()
+            if (body?.wipe == true) authEventBus.emitWipe()
+            body?.user
         } catch (_: Exception) {
             null
         }

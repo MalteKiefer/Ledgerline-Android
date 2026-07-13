@@ -16,6 +16,12 @@ class AuthEventBus @Inject constructor() {
     private val _unauthorized = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val unauthorized: SharedFlow<Unit> = _unauthorized
 
+    /** Remote kill switch: the owner flagged this device to wipe (via `GET /me` → `wipe:true`). */
+    private val _wipe = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val wipe: SharedFlow<Unit> = _wipe
+
+    fun emitWipe() { _wipe.tryEmit(Unit) }
+
     init {
         AuthNotifier.onUnauthorized = { _unauthorized.tryEmit(Unit) }
     }

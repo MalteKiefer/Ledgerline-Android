@@ -2,6 +2,7 @@ package de.ledgerline.app.core.offline
 
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.WorkspaceRepository
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +36,7 @@ class BackgroundSync @Inject constructor(
     private val offlineFlags: OfflineFlags,
     private val connectivity: Connectivity,
     private val prefetcher: Prefetcher,
+    private val accountRepository: AccountRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -55,9 +57,12 @@ class BackgroundSync @Inject constructor(
     }
 
     private suspend fun syncOnce() {
-        if (!offlineFlags.enabled()) return
         if (sessionHolder.get() == null) return
         if (!connectivity.isOnline()) return
+        // Remote kill switch first, ungated by the offline setting — me() fires the wipe
+        // event on wipe:true. Works even while locked (token only, no VK needed).
+        accountRepository.me()
+        if (!offlineFlags.enabled()) return
         if (vaultKeyHolder.get() != null) {
             load.invoke()
             prefetcher.maybePrefetchOnUnlock()

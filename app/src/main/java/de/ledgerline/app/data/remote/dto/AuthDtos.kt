@@ -22,6 +22,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class MeResponse(
     val user: MeUser,
     val usage: MeUsage? = null,
+    /** Remote kill switch: the owner flagged this device to wipe its local state. */
+    val wipe: Boolean = false,
 )
 
 @Serializable data class MeUser(

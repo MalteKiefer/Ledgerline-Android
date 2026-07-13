@@ -9,6 +9,7 @@ import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.backup.BackupStateStore
 import de.ledgerline.app.domain.usecase.ForceLogout
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,6 +32,7 @@ class ForceLogoutImpl @Inject constructor(
     private val metaCache: MetaCache,
     private val storeCache: StoreDiskCache,
     private val blobCache: BlobDiskCache,
+    private val backupStateStore: BackupStateStore,
 ) : ForceLogout {
     override suspend fun invoke() {
         // In-memory first (secrets + decrypted caches).
@@ -40,11 +42,12 @@ class ForceLogoutImpl @Inject constructor(
         galleryCache.clear()
         thumbCache.clear()
         metaCache.clear()
-        // Persisted last: drop the sealed session, the offline ciphertext caches, and
-        // delete the keystore key so a re-pair is required. (A normal lock keeps the
-        // disk cache — only this forced-logout path wipes it, §11.)
+        // Persisted last: drop the sealed session, the offline ciphertext caches, the
+        // backup bookkeeping, and delete the keystore key so a re-pair is required. (A
+        // normal lock keeps the disk cache — only this forced-logout path wipes it, §11.)
         storeCache.clear()
         blobCache.clear()
+        backupStateStore.clear()
         sessionStore.clear()
         keystoreSealer.clear()
     }

@@ -10,6 +10,7 @@ import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.offline.StoreEnvelope
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.backup.BackupStateStore
 import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.model.Workspace
 import de.ledgerline.app.domain.model.WorkspaceManifest
@@ -48,8 +49,10 @@ class ForceLogoutImplTest {
         // assert their clear() is invoked as part of the wipe.
         val sessionStore = mockk<SessionStore>(relaxed = true)
         val keystoreSealer = mockk<KeystoreSealer>(relaxed = true)
+        val backupStateStore = mockk<BackupStateStore>(relaxed = true)
         coEvery { sessionStore.clear() } returns Unit
         every { keystoreSealer.clear() } returns Unit
+        coEvery { backupStateStore.clear() } returns Unit
 
         // Real disk caches over temp dirs, pre-populated; assert they end up empty.
         val storeCache = StoreDiskCache(tmp.newFolder("storecache")).apply {
@@ -70,6 +73,7 @@ class ForceLogoutImplTest {
             metaCache = metaCache,
             storeCache = storeCache,
             blobCache = blobCache,
+            backupStateStore = backupStateStore,
         )
 
         forceLogout.invoke()
