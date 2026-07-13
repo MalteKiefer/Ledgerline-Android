@@ -96,6 +96,7 @@ interface LedgerlineApi {
     @GET("api/v1/contacts/usage")
     suspend fun contactsUsage(): Response<UsageResponse>
 
+    // Deferred: orphaned-blob garbage-collection not yet wired (CLAUDE.md §6).
     @POST("api/v1/contacts/blobs/reconcile")
     suspend fun contactsReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
 

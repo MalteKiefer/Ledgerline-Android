@@ -13,7 +13,6 @@ import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.data.remote.dto.ReconcileRequest
 import de.ledgerline.app.domain.model.Session
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MultipartBody
 import javax.inject.Inject
@@ -111,21 +110,7 @@ class ContactBlobRepository private constructor(
     suspend fun deleteBlobs(refs: List<String>) = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext
         val api = apiProvider(session)
-        for (ref in refs.filter { it.isNotBlank() }.distinct()) {
-            blobCache.remove(ref)
-            var attempt = 0
-            while (attempt < 3) {
-                val res = try { api.deleteContactBlob(ref) } catch (_: Exception) { break }
-                if (res.code() == 429) {
-                    val retryAfterMs = res.headers()["Retry-After"]?.toLongOrNull()?.times(1000)
-                        ?: (1000L shl attempt)
-                    delay(minOf(retryAfterMs, 30_000L))
-                    attempt++
-                } else {
-                    break
-                }
-            }
-        }
+        deleteBlobsWithBackoff(refs, onRemoveCache = { blobCache.remove(it) }) { api.deleteContactBlob(it) }
     }
 
     suspend fun usage(): Outcome<ContactUsage> = withContext(Dispatchers.IO) {
@@ -139,6 +124,7 @@ class ContactBlobRepository private constructor(
     }
 
     /** Free contact blobs not in [referenced] (all avatar refs the manifest still points at). */
+    // Deferred: orphaned-blob garbage-collection not yet wired (CLAUDE.md §6).
     suspend fun reconcile(referenced: List<String>): Outcome<ContactUsage> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         try {

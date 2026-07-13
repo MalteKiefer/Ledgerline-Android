@@ -13,7 +13,6 @@ import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.usecase.FileBlobs
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MultipartBody
 import java.io.File
@@ -191,20 +190,7 @@ class FileBlobRepository(
     override suspend fun deleteBlobs(blobs: List<String>) = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext
         val api = apiProvider(session)
-        for (id in blobs) {
-            var attempt = 0
-            while (attempt < 3) {
-                val res = try { api.deleteBlob(id) } catch (_: Exception) { break }
-                if (res.code() == 429) {
-                    val retryAfterMs = res.headers()["Retry-After"]?.toLongOrNull()?.times(1000)
-                        ?: (1000L shl attempt)
-                    delay(minOf(retryAfterMs, 30_000L))
-                    attempt++
-                } else {
-                    break
-                }
-            }
-        }
+        deleteBlobsWithBackoff(blobs) { api.deleteBlob(it) }
     }
 
     companion object {

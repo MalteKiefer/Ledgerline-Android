@@ -11,7 +11,6 @@ import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
-import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.model.Workspace
 import de.ledgerline.app.domain.model.WorkspaceManifest
@@ -101,19 +100,16 @@ class WorkspaceRepository(
      * on-disk sealed envelope and decrypt it in-memory with [vk]. Returns [err]
      * unchanged if offline caching is off, no entry exists, or decryption fails.
      */
-    private fun cachedOr(err: Outcome<Workspace>, vk: ByteArray): Outcome<Workspace> {
-        if (!offlineFlags.enabled()) return err
-        val env = storeCache.get(KEY) ?: return err
-        return try {
-            val manifest = env.ciphertext?.let { ct ->
-                val plain = crypto.openManifest(ct, vk) ?: return err
-                json.decodeFromString<WorkspaceManifest>(plain)
-            } ?: WorkspaceManifest()
-            Outcome.Ok(Workspace(manifest, env.version))
-        } catch (_: Exception) {
-            err
-        }
-    }
+    private fun cachedOr(err: Outcome<Workspace>, vk: ByteArray): Outcome<Workspace> =
+        cachedOrStore(
+            cachingEnabled = offlineFlags.enabled(),
+            envelope = storeCache.get(KEY),
+            err = err,
+            open = { ct -> crypto.openManifest(ct, vk) },
+            decode = { plain -> json.decodeFromString<WorkspaceManifest>(plain) },
+            empty = { WorkspaceManifest() },
+            wrap = { m, v -> Workspace(m, v) },
+        )
 
     /**
      * Token-only refresh of the offline cache: fetch the sealed `/store` envelope and
@@ -145,59 +141,20 @@ class WorkspaceRepository(
         val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
+        val current = cache.value.value
 
-        var base: WorkspaceManifest? = cache.value.value?.manifest
-        var version: Int? = cache.value.value?.version
-
-        repeat(4) {
-            if (base == null || version == null) {
-                val res = api.store()
-                if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
-                val body = res.body()!!
-                base = body.ciphertext?.let {
-                    json.decodeFromString<WorkspaceManifest>(
-                        crypto.openManifest(it, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
-                    )
-                } ?: WorkspaceManifest()
-                version = body.version
-            }
-
-            val next = mutate(base!!)
-            val ciphertext = crypto.sealManifest(
-                jsonEncoder.encodeToString(WorkspaceManifest.serializer(), next),
-                vk,
-            )
-            val put = try {
-                api.putStore(StorePutRequest(ciphertext, version!!))
-            } catch (e: Exception) {
-                return Outcome.Err(ErrorKind.NETWORK, e)
-            }
-
-            when {
-                put.isSuccessful -> {
-                    val newVersion = put.body()?.version ?: (version!! + 1)
-                    val ws = Workspace(next, newVersion)
-                    cache.set(ws)
-                    if (offlineFlags.enabled()) {
-                        storeCache.put(KEY, StoreEnvelope(ciphertext, newVersion))
-                    }
-                    return Outcome.Ok(ws)
-                }
-                put.code() == 409 -> {
-                    // Reload fresh server state, then loop to re-apply mutate.
-                    val res = api.store()
-                    if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
-                    val body = res.body()!!
-                    base = body.ciphertext?.let {
-                        json.decodeFromString<WorkspaceManifest>(
-                            crypto.openManifest(it, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
-                        )
-                    } ?: WorkspaceManifest()
-                    version = body.version
-                }
-                else -> return Outcome.Err(ErrorKind.HTTP)
-            }
-        }
-        return Outcome.Err(ErrorKind.HTTP) // gave up after retries
+        return optimisticSave(
+            cached = current?.let { it.manifest to it.version },
+            mutate = mutate,
+            fetch = { api.store() },
+            put = { api.putStore(it) },
+            seal = { m -> crypto.sealManifest(jsonEncoder.encodeToString(WorkspaceManifest.serializer(), m), vk) },
+            open = { ct -> crypto.openManifest(ct, vk) },
+            decode = { plain -> json.decodeFromString<WorkspaceManifest>(plain) },
+            empty = { WorkspaceManifest() },
+            wrap = { m, v -> Workspace(m, v) },
+            onSaved = { cache.set(it) },
+            onEnvelope = { env -> if (offlineFlags.enabled()) storeCache.put(KEY, env) },
+        )
     }
 }
