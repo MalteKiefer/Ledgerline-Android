@@ -16,6 +16,11 @@ import de.ledgerline.app.domain.model.GalleryManifest
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.domain.model.GalleryRoot
 import de.ledgerline.app.domain.model.Session
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
 import javax.inject.Inject
@@ -52,7 +57,10 @@ class GalleryRepository(
         const val KEY = "gallery"
     }
 
-    private val json = Json { ignoreUnknownKeys = true }
+    // coerceInputValues: the sharded gallery root writes `"photos": null` alongside the
+    // shard list; coercing a JSON null on a non-null defaulted field (photos/albums/people)
+    // to its default keeps decode robust instead of throwing JsonDecodingException.
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
     private val jsonEncoder = Json { encodeDefaults = true }
 
     /** Gallery blob storage usage: (used bytes, quota bytes). Null on any failure. */
@@ -68,10 +76,13 @@ class GalleryRepository(
         }
     }
 
-    suspend fun load(): Outcome<Gallery> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
-        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
-        return try {
+    // Runs on Dispatchers.IO: the sharded gallery pulls + decrypts + JSON-decodes thousands
+    // of photo records (seconds of CPU), which must never touch the main thread (the caller
+    // launches on viewModelScope = Main) — otherwise the load ANRs.
+    suspend fun load(): Outcome<Gallery> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        try {
             val res = apiProvider(session).galleryStore()
             when {
                 // 401 stays an auth failure → forced-logout path; never fall back to cache.
@@ -80,7 +91,7 @@ class GalleryRepository(
                 else -> {
                     val body = res.body()!!
                     val manifest = body.ciphertext?.let { ct ->
-                        val plain = crypto.openManifest(ct, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
+                        val plain = crypto.openManifest(ct, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
                         assembleManifest(json.decodeFromString<GalleryRoot>(plain), session, vk)
                     } ?: GalleryManifest()
                     if (offlineFlags.enabled()) {
@@ -103,11 +114,18 @@ class GalleryRepository(
     private suspend fun assembleManifest(root: GalleryRoot, session: Session, vk: ByteArray): GalleryManifest {
         val photos = if (root.v >= 2 && root.shards.isNotEmpty()) {
             val api = apiProvider(session)
-            root.shards.flatMap { s ->
-                val r = api.galleryRaw(s.ref)
-                check(r.isSuccessful) { "gallery shard ${s.ref}: http ${r.code()}" }
-                val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), s.key, vk, crypto)
-                json.decodeFromString<List<GalleryPhoto>>(bytes.decodeToString())
+            // Fetch + decrypt + decode all shards concurrently (was sequential → latency
+            // stacked per shard). Order is preserved by awaitAll; a failing shard still
+            // throws (mirrors the web client — never silently drop photos).
+            coroutineScope {
+                root.shards.map { s ->
+                    async(Dispatchers.IO) {
+                        val r = api.galleryRaw(s.ref)
+                        check(r.isSuccessful) { "gallery shard ${s.ref}: http ${r.code()}" }
+                        val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), s.key, vk, crypto)
+                        json.decodeFromString<List<GalleryPhoto>>(bytes.decodeToString())
+                    }
+                }.awaitAll().flatten()
             }
         } else {
             root.photos
