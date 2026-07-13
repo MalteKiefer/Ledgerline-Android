@@ -128,6 +128,13 @@ Owner-scoped: ein Token sieht nur die eigenen Daten (fremder Blob → `404`).
   CLIP-Embedding/pHash/Gesichter.
 - `POST /gallery/embed-text` `{ q }` → `{ embedding }` (CLIP-Text-Embedding für die
   semantische Suche; Cosinus gegen die gecachten Foto-Embeddings).
+- `GET /gallery/reverse?lat=&lng=` → `{ place, address:{…} }` (Reverse-Geocoding eines
+  Foto-Standorts für die Viewer-Anzeige). Server nutzt self-hosted Photon zuerst
+  (ZK-in-boundary), Fallback auf konfigurierten Nominatim; Koordinate wird vor Egress
+  grob gerastert und **nie server-seitig gecacht**. Die App cached das Ergebnis lokal
+  **verschlüsselt** (VK-versiegelt, Coarse-Grid). Nur genutzt, wenn das Foto keinen
+  `place` im Meta-Blob hat (Server geocodet beim Upload nur bei aktivem
+  `GALLERY_GEOCODE_ON_UPLOAD`, Default aus).
 
 Pro-Route-Throttles sind gesetzt (Upload/Chunk großzügig, Blob-Delete 3000/min).
 Bei `429` → Backoff/Retry. **Bulk-Delete/Reconcile client-seitig throtteln** (4

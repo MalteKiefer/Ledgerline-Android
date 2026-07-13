@@ -9,6 +9,7 @@ import de.ledgerline.app.data.remote.dto.PairPollResponse
 import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.data.remote.dto.ReconcileRequest
 import de.ledgerline.app.data.remote.dto.ReconcileResponse
+import de.ledgerline.app.data.remote.dto.ReverseResponse
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
 import de.ledgerline.app.data.remote.dto.UploadResponse
@@ -90,6 +91,12 @@ interface LedgerlineApi {
 
     @POST("api/v1/gallery/embed-text")
     suspend fun embedText(@Body body: EmbedTextRequest): Response<EmbedTextResponse>
+
+    @GET("api/v1/gallery/reverse")
+    suspend fun galleryReverse(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+    ): Response<ReverseResponse>
 
     // --- Contacts avatar blobs (records themselves live in the /store manifest) ---
 

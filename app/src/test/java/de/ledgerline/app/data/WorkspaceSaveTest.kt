@@ -48,6 +48,8 @@ class WorkspaceSaveTest {
     private class FakeApi(val manifestJson: String) : LedgerlineApi {
         var puts = 0
 
+        override suspend fun galleryReverse(lat: Double, lng: Double): Response<de.ledgerline.app.data.remote.dto.ReverseResponse> = throw NotImplementedError()
+
         override suspend fun store(): Response<StoreResponse> =
             Response.success(StoreResponse("SEALED:$manifestJson", 5))
 

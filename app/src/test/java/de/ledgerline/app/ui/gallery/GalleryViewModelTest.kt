@@ -147,6 +147,7 @@ class GalleryViewModelTest {
         operationManager = operationManager,
         embedText = embedText,
         metaCache = MetaCache(),
+        places = io.mockk.mockk(relaxed = true),
     ).apply { ioDispatcher = UnconfinedTestDispatcher() }
 
     /**

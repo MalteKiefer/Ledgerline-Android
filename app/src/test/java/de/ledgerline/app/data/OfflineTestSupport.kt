@@ -126,6 +126,7 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun contactsUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
     override suspend fun contactsRaw(blob: String): Response<ResponseBody> = throw NotImplementedError()
     override suspend fun deleteContactBlob(blob: String): Response<Unit> = throw NotImplementedError()
+    override suspend fun galleryReverse(lat: Double, lng: Double): Response<de.ledgerline.app.data.remote.dto.ReverseResponse> = throw NotImplementedError()
 }
 
 /**

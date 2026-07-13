@@ -27,6 +27,13 @@ data class ProcessFace(
     val crop: String? = null,
 )
 
+/** `GET /gallery/reverse` response: a resolved place display + structured address parts. */
+@Serializable
+data class ReverseResponse(
+    val place: String? = null,
+    val address: Map<String, String> = emptyMap(),
+)
+
 /** `POST /gallery/embed-text` request: the free-text query to embed. */
 @Serializable
 data class EmbedTextRequest(val q: String)

@@ -33,6 +33,8 @@ class ForceLogoutImpl @Inject constructor(
     private val storeCache: StoreDiskCache,
     private val blobCache: BlobDiskCache,
     private val backupStateStore: BackupStateStore,
+    private val rememberedVault: RememberedVaultStore,
+    private val placeRepository: PlaceRepository,
 ) : ForceLogout {
     override suspend fun invoke() {
         // In-memory first (secrets + decrypted caches).
@@ -48,6 +50,8 @@ class ForceLogoutImpl @Inject constructor(
         storeCache.clear()
         blobCache.clear()
         backupStateStore.clear()
+        rememberedVault.clear()
+        placeRepository.clear()
         sessionStore.clear()
         keystoreSealer.clear()
     }

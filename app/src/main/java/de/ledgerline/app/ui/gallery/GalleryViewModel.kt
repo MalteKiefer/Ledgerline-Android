@@ -62,6 +62,7 @@ class GalleryViewModel @Inject constructor(
     private val operationManager: OperationManager,
     private val embedText: EmbedText,
     private val metaCache: MetaCache,
+    private val places: de.ledgerline.app.data.PlaceRepository,
 ) : ViewModel() {
 
     /** IO dispatcher for meta-blob downloads during search — overridable in tests so
@@ -344,21 +345,32 @@ class GalleryViewModel @Inject constructor(
 
     suspend fun downloadBytes(ref: String, key: String): Outcome<ByteArray> = blobs.download(ref, key)
 
-    /** Lazily loads and decodes the encrypted meta blob's place. Cached per photo id. Returns null on any failure. */
+    /**
+     * Resolve a photo's place for the viewer. First the sealed meta blob (populated at
+     * upload only when the server has geocode-on-upload enabled); when that has no place,
+     * fall back to an on-demand reverse-geocode of the coordinate (ZK: server-proxied
+     * self-hosted geocoder + an encrypted, coarse-grid on-device cache). Cached per photo
+     * id in memory. Returns null on any failure / no coordinate.
+     */
     suspend fun loadPlace(photo: GalleryPhoto): PhotoPlace? {
         if (placeCache.containsKey(photo.id)) return placeCache[photo.id]
-        val ref = photo.metaRef ?: return null
-        val key = photo.metaKey ?: return null
-        val place = try {
-            when (val r = blobs.download(ref, key)) {
-                is Outcome.Ok -> {
-                    val metaJson = Json { ignoreUnknownKeys = true }
-                    metaJson.decodeFromString<PhotoMetaBlob>(String(r.value)).place
+        val fromMeta = photo.metaRef?.let { ref ->
+            photo.metaKey?.let { key ->
+                try {
+                    when (val r = blobs.download(ref, key)) {
+                        is Outcome.Ok ->
+                            Json { ignoreUnknownKeys = true }.decodeFromString<PhotoMetaBlob>(String(r.value)).place
+                        is Outcome.Err -> null
+                    }
+                } catch (_: Exception) {
+                    null
                 }
-                is Outcome.Err -> null
             }
-        } catch (_: Exception) {
-            null
+        }
+        val place = fromMeta ?: run {
+            val lat = photo.lat
+            val lng = photo.lng
+            if (lat != null && lng != null) places.resolve(lat, lng) else null
         }
         placeCache[photo.id] = place
         return place
