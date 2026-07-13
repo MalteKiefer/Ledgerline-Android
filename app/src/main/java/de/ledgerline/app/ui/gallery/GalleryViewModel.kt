@@ -25,11 +25,18 @@ import de.ledgerline.app.domain.usecase.LoadGallery
 import de.ledgerline.app.domain.usecase.PhotoSource
 import de.ledgerline.app.ui.workspace.files.UsageInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 import javax.inject.Inject
 
 data class GalleryUi(
@@ -396,6 +403,46 @@ class GalleryViewModel @Inject constructor(
     fun geotaggedPhotos(): List<GalleryPhoto> =
         cache.value.value?.manifest?.photos.orEmpty()
             .filter { !it.trashed && it.lat != null && it.lng != null }
+
+    // Cached (sourceList identity → result) so the backfill decrypt pass runs once per manifest.
+    private var geoCache: Pair<List<GalleryPhoto>, List<GalleryPhoto>>? = null
+
+    /**
+     * Map set with a lazy geo-backfill: photos with a record geotag, PLUS older photos that
+     * lack one but carry lat/lon in their sealed meta blob's exif (decrypted + read on demand;
+     * cheap on repeat opens thanks to the cache-first blob cache). Result is memoised per
+     * manifest instance so the decrypt pass runs once.
+     */
+    suspend fun geotaggedWithBackfill(): List<GalleryPhoto> {
+        val all = cache.value.value?.manifest?.photos.orEmpty()
+        geoCache?.let { if (it.first === all) return it.second }
+        val result = withContext(ioDispatcher) {
+            val live = all.filter { !it.trashed }
+            val (has, missing) = live.partition { it.lat != null && it.lng != null }
+            val candidates = missing.filter { it.metaRef != null && it.metaKey != null }
+            val json = Json { ignoreUnknownKeys = true }
+            val sem = Semaphore(8)
+            val backfilled = coroutineScope {
+                candidates.map { p ->
+                    async {
+                        sem.withPermit {
+                            runCatching {
+                                val r = blobs.download(p.metaRef!!, p.metaKey!!)
+                                val ex = (r as? Outcome.Ok)
+                                    ?.let { json.decodeFromString<PhotoMetaBlob>(String(it.value)) }?.exif
+                                val lat = (ex?.get("lat") as? JsonPrimitive)?.doubleOrNull
+                                val lng = (ex?.get("lon") as? JsonPrimitive)?.doubleOrNull
+                                if (lat != null && lng != null) p.copy(lat = lat, lng = lng) else null
+                            }.getOrNull()
+                        }
+                    }
+                }.awaitAll().filterNotNull()
+            }
+            has + backfilled
+        }
+        geoCache = all to result
+        return result
+    }
 
     private fun recompute() {
         // Sort by capture date (EXIF taken_at), falling back to upload time — matches

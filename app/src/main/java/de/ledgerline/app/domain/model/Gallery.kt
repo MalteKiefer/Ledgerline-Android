@@ -53,6 +53,7 @@ data class PhotoMetaBlob(
     val embedding: List<Double> = emptyList(),
     val faces: List<MetaFace> = emptyList(),
     val phash: Long? = null,
+    val exif: kotlinx.serialization.json.JsonObject? = null,
 )
 
 @Serializable

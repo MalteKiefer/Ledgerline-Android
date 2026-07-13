@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -53,8 +54,11 @@ fun GalleryMapScreen(
     DisposableEffect(Unit) { fs.value = true; onDispose { fs.value = false } }
 
     val context = LocalContext.current
-    // Snapshot the geotagged set once — the map is built imperatively on create.
-    val photos = remember { vm.geotaggedPhotos() }
+    // Geotagged set, with a lazy backfill of coordinates from older photos' meta blobs.
+    // Starts with the record-geotagged set immediately, then expands once the backfill runs.
+    val photos by androidx.compose.runtime.produceState(initialValue = vm.geotaggedPhotos()) {
+        value = vm.geotaggedWithBackfill()
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -79,21 +83,24 @@ fun GalleryMapScreen(
                 // Gate tile fetches for the user's private photo coordinates behind opt-in (M3):
                 // when disabled the MapView below is never built, so no request is sent.
                 MapTilesGate(Modifier.fillMaxSize()) {
-                    val mapView = remember { buildMap(context, photos, onOpenPhoto) }
-                    // Drive the GL lifecycle so the map renders (no lifecycle → blank map).
-                    DisposableEffect(Unit) {
-                        mapView.onStart()
-                        mapView.onResume()
-                        onDispose {
-                            mapView.onPause()
-                            mapView.onStop()
-                            mapView.onDestroy()
+                    // Rebuild once if the backfill expands the geotagged set (key on the list).
+                    androidx.compose.runtime.key(photos) {
+                        val mapView = remember { buildMap(context, photos, onOpenPhoto) }
+                        // Drive the GL lifecycle so the map renders (no lifecycle → blank map).
+                        DisposableEffect(mapView) {
+                            mapView.onStart()
+                            mapView.onResume()
+                            onDispose {
+                                mapView.onPause()
+                                mapView.onStop()
+                                mapView.onDestroy()
+                            }
                         }
+                        AndroidView(
+                            modifier = Modifier.fillMaxSize(),
+                            factory = { mapView },
+                        )
                     }
-                    AndroidView(
-                        modifier = Modifier.fillMaxSize(),
-                        factory = { mapView },
-                    )
                 }
             }
         }
