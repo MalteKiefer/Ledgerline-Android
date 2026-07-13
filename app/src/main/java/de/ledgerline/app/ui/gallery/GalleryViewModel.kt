@@ -334,12 +334,15 @@ class GalleryViewModel @Inject constructor(
     // Sources that failed in the last import, retryable within the session (their content
     // Uris are still readable). Not persisted — an app restart drops them.
     private var lastFailedImports: List<PhotoSource> = emptyList()
+    private val _failedImportCount = MutableStateFlow(0)
+    val failedImportCount: StateFlow<Int> = _failedImportCount
 
     fun uploadAll(sources: List<PhotoSource>) {
         operationManager.run(OpKind.UPLOAD, total = sources.size) { report ->
             val result = importPhotos.invoke(sources, report)
             loadUsage()
             lastFailedImports = result.failedSources
+            _failedImportCount.value = result.failedSources.size
             if (result.failed > 0) _message.value = "upload_failed:${result.failed}"
         }
     }
@@ -348,6 +351,7 @@ class GalleryViewModel @Inject constructor(
     fun retryFailedImports() {
         val retry = lastFailedImports
         lastFailedImports = emptyList()
+        _failedImportCount.value = 0
         if (retry.isNotEmpty()) uploadAll(retry)
     }
 
@@ -406,6 +410,16 @@ class GalleryViewModel @Inject constructor(
         }
         placeCache[photo.id] = place
         return place
+    }
+
+    /** Library counts for the Jobs/diagnostics sheet (non-trashed). */
+    fun diagnostics(): Triple<Int, Int, Int> {
+        val all = cache.value.value?.manifest?.photos.orEmpty().filter { !it.trashed }
+        return Triple(
+            all.count { it.media_type != "video" },
+            all.count { it.media_type == "video" },
+            all.count { it.lat != null && it.lng != null },
+        )
     }
 
     fun photoById(id: String) = cache.value.value?.manifest?.photos?.firstOrNull { it.id == id }

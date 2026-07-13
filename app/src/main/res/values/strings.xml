@@ -436,4 +436,12 @@
     <string name="person_link_contact">Link to contact</string>
     <string name="person_unlink_contact">Unlink contact</string>
     <string name="contacts_empty_link">No contacts to link</string>
+    <string name="jobs_action">Jobs &amp; diagnostics</string>
+    <string name="jobs_photos">Photos</string>
+    <string name="jobs_videos">Videos</string>
+    <string name="jobs_geotagged">With location</string>
+    <string name="jobs_people">People</string>
+    <string name="jobs_faces">Faces</string>
+    <string name="jobs_failed">Failed uploads</string>
+    <string name="jobs_run_all">Run all</string>
 </resources>
