@@ -331,12 +331,24 @@ class GalleryViewModel @Inject constructor(
      * and surfaced as `"upload_failed:N"` in [message]. [loadUsage] is called when the
      * queue drains.
      */
+    // Sources that failed in the last import, retryable within the session (their content
+    // Uris are still readable). Not persisted — an app restart drops them.
+    private var lastFailedImports: List<PhotoSource> = emptyList()
+
     fun uploadAll(sources: List<PhotoSource>) {
         operationManager.run(OpKind.UPLOAD, total = sources.size) { report ->
             val result = importPhotos.invoke(sources, report)
             loadUsage()
+            lastFailedImports = result.failedSources
             if (result.failed > 0) _message.value = "upload_failed:${result.failed}"
         }
+    }
+
+    /** Re-run the import for the sources that failed in the last upload batch. */
+    fun retryFailedImports() {
+        val retry = lastFailedImports
+        lastFailedImports = emptyList()
+        if (retry.isNotEmpty()) uploadAll(retry)
     }
 
     /** Returns a cached thumbnail bitmap or downloads+decodes it (cached). Null on failure. */

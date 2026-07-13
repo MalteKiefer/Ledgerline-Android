@@ -476,9 +476,12 @@ private fun PhotosTab(
         if (msg.startsWith(failedPrefix)) {
             val count = msg.removePrefix(failedPrefix).toIntOrNull() ?: 1
             scope.launch {
-                snackbarHostState.showSnackbar(
-                    context.resources.getString(R.string.gallery_upload_failed, count)
+                val res = snackbarHostState.showSnackbar(
+                    message = context.resources.getString(R.string.gallery_upload_failed, count),
+                    actionLabel = context.resources.getString(R.string.gallery_upload_retry),
+                    duration = androidx.compose.material3.SnackbarDuration.Long,
                 )
+                if (res == androidx.compose.material3.SnackbarResult.ActionPerformed) vm.retryFailedImports()
             }
             vm.clearMessage()
         }
