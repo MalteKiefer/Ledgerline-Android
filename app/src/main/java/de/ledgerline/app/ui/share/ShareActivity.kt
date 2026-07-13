@@ -8,7 +8,6 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.biometric.BiometricPrompt
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.IntentCompat
@@ -20,8 +19,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import de.ledgerline.app.R
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.ops.OperationManager
-import de.ledgerline.app.core.security.AppLock
-import de.ledgerline.app.core.security.CryptoAuth
+import de.ledgerline.app.core.security.VaultAuthorizers
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.core.security.VaultKeyHolder
@@ -53,7 +51,6 @@ class ShareActivity : FragmentActivity() {
     @Inject lateinit var lockGuard: LockGuard
     @Inject lateinit var operationManager: OperationManager
     @Inject lateinit var settingsStore: SettingsStore
-    private val appLock = AppLock()
 
     private var items: List<SharedItem> = emptyList()
 
@@ -104,25 +101,18 @@ class ShareActivity : FragmentActivity() {
 
         setContent {
             LedgerlineTheme {
-                val lockTitle = stringResource(R.string.lock_title)
-                val lockSubtitle = stringResource(R.string.lock_subtitle)
-                // Runs ONE CryptoObject-bound biometric on the keystore cipher and
-                // returns the authorised cipher (or null on cancel/failure).
-                val authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher? = { cipher ->
-                    idleLocker.touch()
-                    when (
-                        val r = appLock.authenticate(
-                            this@ShareActivity, lockTitle, lockSubtitle, BiometricPrompt.CryptoObject(cipher),
-                        )
-                    ) {
-                        is CryptoAuth.Success -> r.cipher
-                        else -> null
-                    }
-                }
+                val auth = VaultAuthorizers(
+                    activity = this@ShareActivity,
+                    idleLocker = idleLocker,
+                    lockTitle = stringResource(R.string.lock_title),
+                    lockSubtitle = stringResource(R.string.lock_subtitle),
+                    rememberSubtitle = stringResource(R.string.lock_remember_subtitle),
+                    cancelText = stringResource(R.string.action_cancel),
+                )
 
                 val unlocked by vaultKeyHolder.unlocked.collectAsStateWithLifecycle()
                 if (!unlocked) {
-                    UnlockScreen(authorize = authorize, onUnlocked = {})
+                    UnlockScreen(authorize = auth.authorize, strongAuthorize = auth.strongAuthorize, onUnlocked = {})
                 } else {
                     val shareVm: ShareViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
                     // Surface the import summary (imported/failed counts) as a Toast that
@@ -155,9 +145,14 @@ class ShareActivity : FragmentActivity() {
                     ?: emptyList()
             else -> emptyList()
         }
-        return uris.map { uri ->
-            val mime = contentResolver.getType(uri) ?: intent.type ?: "application/octet-stream"
-            SharedItem(uri = uri, mime = mime, name = displayName(uri), target = classify(mime))
+        // Only accept content:// URIs (a shared item is always a ContentProvider stream);
+        // reject file://, android.resource://, or any other scheme a rogue sender could use
+        // to point us at arbitrary local paths (L4). getType is wrapped defensively.
+        return uris.filter { it.scheme == "content" }.mapNotNull { uri ->
+            runCatching {
+                val mime = contentResolver.getType(uri) ?: intent.type ?: "application/octet-stream"
+                SharedItem(uri = uri, mime = mime, name = displayName(uri), target = classify(mime))
+            }.getOrNull()
         }
     }
 

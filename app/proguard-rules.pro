@@ -18,6 +18,9 @@
 -dontwarn org.apache.fontbox.**
 -dontwarn javax.imageio.**
 
-# osmdroid (pure Java OSM map tiles, Apache-2, no native .so).
--keep class org.osmdroid.** { *; }
--dontwarn org.osmdroid.**
+# MapLibre GL Android (BSD, libre OSM raster map renderer). The AAR ships consumer
+# ProGuard rules, but keep the SDK + annotation-plugin + gestures classes (all under
+# org.maplibre.android.**) and native JNI entry points to be safe, and silence
+# optional-API warnings.
+-keep class org.maplibre.android.** { *; }
+-dontwarn org.maplibre.android.**

@@ -1,0 +1,19 @@
+<!-- Map marker pin for MapLibre SymbolManager symbols (replaces osmdroid's default
+     Marker icon). The tip is at the horizontal center / vertical bottom, so symbols are
+     placed with iconAnchor = BOTTOM to point at the exact geo coordinate. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="36dp"
+    android:height="48dp"
+    android:viewportWidth="36"
+    android:viewportHeight="48">
+    <!-- Teardrop body -->
+    <path
+        android:fillColor="#D32F2F"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M18,2 C9.716,2 3,8.716 3,17 C3,28.25 18,46 18,46 C18,46 33,28.25 33,17 C33,8.716 26.284,2 18,2 Z" />
+    <!-- White center dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18,10.5 m-5.5,0 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0" />
+</vector>

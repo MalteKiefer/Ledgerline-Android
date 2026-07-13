@@ -8,6 +8,7 @@ import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.Prefetcher
 import de.ledgerline.app.core.offline.StoreDiskCache
+import de.ledgerline.app.core.security.BiometricAvailability
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
@@ -15,6 +16,7 @@ import de.ledgerline.app.core.backup.GalleryBackupManager
 import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.ContactSort
 import de.ledgerline.app.data.DateFormatPref
+import de.ledgerline.app.data.RememberedVaultStore
 import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.data.backup.BackupStateStore
@@ -52,7 +54,12 @@ class SettingsViewModel @Inject constructor(
     private val backupManager: GalleryBackupManager,
     private val deviceAlbums: DeviceAlbums,
     private val backupStateStore: BackupStateStore,
+    private val rememberedVault: RememberedVaultStore,
+    private val biometric: BiometricAvailability,
 ) : ViewModel() {
+
+    /** STRONG biometrics enrolled — gates whether the "remember unlock" toggle is usable. */
+    val strongBiometricAvailable: Boolean = biometric.strongEnrolled()
 
     /** Signed-in account (name/email/groups), fetched once from `/api/v1/me`; null while
      *  loading, offline, or on failure — the Account screen degrades gracefully. */
@@ -99,6 +106,50 @@ class SettingsViewModel @Inject constructor(
     fun setTimeoutMinutes(minutes: Int) {
         idleLocker.setTimeoutMs(minutes * 60_000L)
         viewModelScope.launch { settingsStore.setTimeoutMinutes(minutes) }
+    }
+
+    /** Whether the Vault Key may be biometric-persisted so unlock skips the passphrase. */
+    val rememberVaultEnabled: StateFlow<Boolean> = settingsStore.rememberVaultEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setRememberVaultEnabled(on: Boolean) {
+        viewModelScope.launch {
+            settingsStore.setRememberVaultEnabled(on)
+            // Disarm immediately when turned off: drop the sealed blob + the Keystore key.
+            if (!on) rememberedVault.clear()
+        }
+    }
+
+    /** After how many days since the last passphrase entry the passphrase is required again. */
+    val rememberVaultDays: StateFlow<Int> = settingsStore.rememberVaultDays
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_REMEMBER_VAULT_DAYS)
+
+    fun setRememberVaultDays(days: Int) {
+        viewModelScope.launch { settingsStore.setRememberVaultDays(days) }
+    }
+
+    /** Whether map tiles may be fetched from OpenStreetMap (privacy; default off). */
+    val mapTilesEnabled: StateFlow<Boolean> = settingsStore.mapTilesEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setMapTilesEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setMapTilesEnabled(enabled) }
+    }
+
+    /** Whether the screen is kept awake while the app is in the foreground (display-only). */
+    val keepScreenOn: StateFlow<Boolean> = settingsStore.keepScreenOn
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setKeepScreenOn(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setKeepScreenOn(enabled) }
+    }
+
+    /** How long the screen stays awake after the last interaction (`0` = unlimited). */
+    val keepScreenOnMinutes: StateFlow<Int> = settingsStore.keepScreenOnMinutes
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_KEEP_SCREEN_ON_MINUTES)
+
+    fun setKeepScreenOnMinutes(minutes: Int) {
+        viewModelScope.launch { settingsStore.setKeepScreenOnMinutes(minutes) }
     }
 
     /** Whether background operations may keep running after the app is backgrounded. */
@@ -242,6 +293,7 @@ class SettingsViewModel @Inject constructor(
         }
         runCatching { sessionStore.clear() }
         runCatching { keystoreSealer.clear() }
+        runCatching { rememberedVault.clear() }
         vaultKeyHolder.wipe()
         sessionHolder.clear()
         workspaceCache.clear()

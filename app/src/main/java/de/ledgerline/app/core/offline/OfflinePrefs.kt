@@ -4,11 +4,10 @@ import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
+import de.ledgerline.app.data.SettingsStore.Companion.DEFAULT_CACHE_MAX_MB
 import de.ledgerline.app.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,10 +41,11 @@ interface OfflineFlags {
 
 /**
  * Synchronous, always-current view of the offline settings so repositories can read
- * them without suspending on every request. Seeds each value synchronously at
- * construction (`runBlocking { first() }`) then keeps them live via collectors on an
- * internal scope — mirrors how [de.ledgerline.app.core.ops.OperationManager] caches
- * its background-ops flag.
+ * them without suspending on every request. Seeds each value with the SettingsStore
+ * default (NOT a blocking DataStore read — that would risk an ANR when this @Singleton
+ * is first injected on the main thread), then keeps them live via collectors on an
+ * internal scope. The first collector emission (the real stored value) lands within
+ * milliseconds; until then the defaults — identical to the store defaults — apply.
  */
 @Singleton
 class OfflinePrefs @Inject constructor(
@@ -54,25 +54,25 @@ class OfflinePrefs @Inject constructor(
 ) : OfflineFlags {
 
     @Volatile
-    private var enabled: Boolean = runBlocking { settings.offlineEnabled.first() }
+    private var enabled: Boolean = true
 
     @Volatile
-    private var filesPolicy: FileBlobPolicy = runBlocking { settings.filesPolicy.first() }
+    private var filesPolicy: FileBlobPolicy = FileBlobPolicy.ON_DEMAND
 
     @Volatile
-    private var photosPolicy: PhotoBlobPolicy = runBlocking { settings.photosPolicy.first() }
+    private var photosPolicy: PhotoBlobPolicy = PhotoBlobPolicy.ON_DEMAND
 
     @Volatile
-    private var contactsPolicy: ContactBlobPolicy = runBlocking { settings.contactsPolicy.first() }
+    private var contactsPolicy: ContactBlobPolicy = ContactBlobPolicy.ON_DEMAND
 
     @Volatile
-    private var cacheMaxMb: Int = runBlocking { settings.cacheMaxMb.first() }
+    private var cacheMaxMb: Int = DEFAULT_CACHE_MAX_MB
 
     @Volatile
-    private var wifiOnly: Boolean = runBlocking { settings.prefetchWifiOnly.first() }
+    private var wifiOnly: Boolean = true
 
     @Volatile
-    private var chargingOnly: Boolean = runBlocking { settings.prefetchChargingOnly.first() }
+    private var chargingOnly: Boolean = true
 
     init {
         scope.launch { settings.offlineEnabled.collect { enabled = it } }

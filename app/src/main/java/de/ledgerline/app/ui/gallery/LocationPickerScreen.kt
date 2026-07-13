@@ -40,22 +40,27 @@ import de.ledgerline.app.R
 import de.ledgerline.app.data.remote.Geocoder
 import de.ledgerline.app.ui.workspace.LocalFullscreen
 import kotlinx.coroutines.launch
-import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.MapEventsOverlay
-import org.osmdroid.views.overlay.Marker
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.plugins.annotation.Symbol
+import org.maplibre.android.plugins.annotation.SymbolManager
+import org.maplibre.android.plugins.annotation.SymbolOptions
 
 /** Berlin — a sensible default center when the target photo has no coordinates. */
 private const val DEFAULT_LAT = 52.520008
 private const val DEFAULT_LNG = 13.404954
 
 /**
- * Full-screen location picker: a tappable osmdroid map that drops/moves a marker,
- * plus a Nominatim address search that recenters the map + moves the marker. The
- * confirm FAB returns the marker's lat/lng. Mirrors the web `openLocPicker`/`geoSearch`
- * (single-photo and bulk share this screen).
+ * Full-screen location picker: a tappable MapLibre map that drops/moves a marker, plus a
+ * Nominatim address search that recenters the map + moves the marker. The confirm FAB
+ * returns the marker's lat/lng. Mirrors the web `openLocPicker`/`geoSearch` (single-photo
+ * and bulk share this screen). MapLibre port of the old osmdroid MapEventsOverlay setup:
+ * `map.addOnMapClickListener` replaces MapEventsReceiver; a single SymbolManager symbol
+ * replaces the osmdroid Marker.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,45 +91,71 @@ fun LocationPickerScreen(
     var searching by rememberSaveable { mutableStateOf(false) }
     var notFound by rememberSaveable { mutableStateOf(false) }
 
-    val marker = remember { mutableStateOf<Marker?>(null) }
+    // The live map + its single marker, wired once the style loads (see factory below).
+    val mapRef = remember { mutableStateOf<MapLibreMap?>(null) }
+    val symbolManagerRef = remember { mutableStateOf<SymbolManager?>(null) }
+    val markerRef = remember { mutableStateOf<Symbol?>(null) }
 
-    fun moveMarker(map: MapView, lat: Double, lng: Double, recenter: Boolean) {
+    fun moveMarker(lat: Double, lng: Double, recenter: Boolean) {
         pickedLat = lat
         pickedLng = lng
-        val point = GeoPoint(lat, lng)
-        marker.value?.apply {
-            position = point
+        val point = LatLng(lat, lng)
+        val mgr = symbolManagerRef.value
+        markerRef.value?.let { sym ->
+            sym.latLng = point
+            mgr?.update(sym)
         }
-        if (recenter) map.controller.animateTo(point)
-        map.invalidate()
+        if (recenter) {
+            mapRef.value?.animateCamera(CameraUpdateFactory.newLatLng(point))
+        }
     }
 
     val mapView = remember {
         MapView(context).apply {
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            isTilesScaledToDpi = true
-            controller.setZoom(15.0)
-            controller.setCenter(GeoPoint(startLat, startLng))
-            val m = Marker(this).apply {
-                position = GeoPoint(startLat, startLng)
-                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            }
-            marker.value = m
-            overlays.add(m)
-            // Tap the map → move the marker to the tapped geo point.
-            val events = MapEventsOverlay(object : MapEventsReceiver {
-                override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
-                    if (p != null) moveMarker(this@apply, p.latitude, p.longitude, recenter = false)
-                    return true
+            onCreate(null)
+            getMapAsync { map ->
+                mapRef.value = map
+                map.uiSettings.apply {
+                    isLogoEnabled = false
+                    isAttributionEnabled = true
                 }
-                override fun longPressHelper(p: GeoPoint?): Boolean = false
-            })
-            overlays.add(0, events)
+                map.cameraPosition = CameraPosition.Builder()
+                    .target(LatLng(startLat, startLng))
+                    .zoom(14.0)
+                    .build()
+                map.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE_JSON)) { style ->
+                    style.addMarkerIcon(context)
+                    val mgr = SymbolManager(this, map, style).apply {
+                        iconAllowOverlap = true
+                        iconIgnorePlacement = true
+                    }
+                    symbolManagerRef.value = mgr
+                    markerRef.value = mgr.create(
+                        SymbolOptions()
+                            .withLatLng(LatLng(startLat, startLng))
+                            .withIconImage(MARKER_ICON_ID)
+                            .withIconAnchor("bottom"),
+                    )
+                }
+                // Tap the map → move the marker to the tapped geo point.
+                map.addOnMapClickListener { point ->
+                    moveMarker(point.latitude, point.longitude, recenter = false)
+                    true
+                }
+            }
         }
     }
 
-    DisposableEffect(Unit) { onDispose { mapView.onDetach() } }
+    // Drive the GL lifecycle so the map renders (no lifecycle → blank map).
+    DisposableEffect(Unit) {
+        mapView.onStart()
+        mapView.onResume()
+        onDispose {
+            mapView.onPause()
+            mapView.onStop()
+            mapView.onDestroy()
+        }
+    }
 
     fun doSearch() {
         val q = query.trim()
@@ -139,7 +170,7 @@ fun LocationPickerScreen(
                 notFound = true
             } else {
                 notFound = false
-                moveMarker(mapView, hit.first, hit.second, recenter = true)
+                moveMarker(hit.first, hit.second, recenter = true)
             }
         }
     }

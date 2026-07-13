@@ -23,18 +23,20 @@ import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.GalleryPhoto
 import de.ledgerline.app.ui.workspace.LocalFullscreen
 import de.ledgerline.app.ui.workspace.common.CenteredMessage
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.BoundingBox
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.FolderOverlay
-import org.osmdroid.views.overlay.Marker
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
+import org.maplibre.android.plugins.annotation.SymbolManager
+import org.maplibre.android.plugins.annotation.SymbolOptions
 
 /**
- * Full-gallery map: every non-trashed geotagged photo gets a marker on one osmdroid
- * map (mirrors the web `renderMap`). On create the markers are added in a single pass
- * onto one [FolderOverlay] and the camera fits the bounds of all of them (with padding);
- * a single photo centers on it. Tapping a marker opens that photo via [onOpenPhoto].
+ * Full-gallery map: every non-trashed geotagged photo gets a marker on one MapLibre
+ * map (mirrors the web `renderMap`). On style-load the markers are added in a single
+ * pass through one [SymbolManager] and the camera fits the bounds of all of them (with
+ * padding); a single photo centers on it. Tapping a marker opens that photo via
+ * [onOpenPhoto] (MapLibre port of the old osmdroid FolderOverlay + Marker setup).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,62 +76,79 @@ fun GalleryMapScreen(
             if (photos.isEmpty()) {
                 CenteredMessage(stringResource(R.string.gallery_map_empty))
             } else {
-                val mapView = remember { buildMap(context, photos, onOpenPhoto) }
-                DisposableEffect(Unit) { onDispose { mapView.onDetach() } }
-                AndroidView(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = { mapView },
-                )
+                // Gate tile fetches for the user's private photo coordinates behind opt-in (M3):
+                // when disabled the MapView below is never built, so no request is sent.
+                MapTilesGate(Modifier.fillMaxSize()) {
+                    val mapView = remember { buildMap(context, photos, onOpenPhoto) }
+                    // Drive the GL lifecycle so the map renders (no lifecycle → blank map).
+                    DisposableEffect(Unit) {
+                        mapView.onStart()
+                        mapView.onResume()
+                        onDispose {
+                            mapView.onPause()
+                            mapView.onStop()
+                            mapView.onDestroy()
+                        }
+                    }
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { mapView },
+                    )
+                }
             }
         }
     }
 }
 
-/** Build the osmdroid [MapView] with one marker per photo on a single overlay and
+/** Build the MapLibre [MapView] with one marker per photo on a single SymbolManager and
  *  fit the camera to all markers. [photos] is guaranteed non-empty and geotagged. */
 private fun buildMap(
     context: android.content.Context,
     photos: List<GalleryPhoto>,
     onOpenPhoto: (String) -> Unit,
 ): MapView = MapView(context).apply {
-    setTileSource(TileSourceFactory.MAPNIK)
-    setMultiTouchControls(true)
-    isTilesScaledToDpi = true
-
-    // Add all markers in one pass onto a single folder overlay (cheap for 300+).
-    val folder = FolderOverlay()
-    for (photo in photos) {
-        val point = GeoPoint(photo.lat!!, photo.lng!!)
-        val marker = Marker(this).apply {
-            position = point
-            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-            title = photo.name
-            setOnMarkerClickListener { _, _ -> onOpenPhoto(photo.id); true }
+    onCreate(null)
+    getMapAsync { map ->
+        map.uiSettings.apply {
+            isLogoEnabled = false
+            isAttributionEnabled = true
         }
-        folder.add(marker)
-    }
-    overlays.add(folder)
+        map.setStyle(Style.Builder().fromJson(OSM_RASTER_STYLE_JSON)) { style ->
+            style.addMarkerIcon(context)
 
-    if (photos.size == 1) {
-        controller.setZoom(15.0)
-        controller.setCenter(GeoPoint(photos[0].lat!!, photos[0].lng!!))
-    } else {
-        var north = -90.0
-        var south = 90.0
-        var east = -180.0
-        var west = 180.0
-        for (photo in photos) {
-            val lat = photo.lat!!
-            val lng = photo.lng!!
-            if (lat > north) north = lat
-            if (lat < south) south = lat
-            if (lng > east) east = lng
-            if (lng < west) west = lng
+            // Add all markers in one pass through a single SymbolManager (cheap for 300+).
+            // Map each symbol id back to a photo id so a marker tap opens that photo.
+            val symbolManager = SymbolManager(this, map, style).apply {
+                iconAllowOverlap = true
+                iconIgnorePlacement = true
+            }
+            val photoIdBySymbol = HashMap<Long, String>(photos.size)
+            for (photo in photos) {
+                val symbol = symbolManager.create(
+                    SymbolOptions()
+                        .withLatLng(LatLng(photo.lat!!, photo.lng!!))
+                        .withIconImage(MARKER_ICON_ID)
+                        .withIconAnchor("bottom"),
+                )
+                photoIdBySymbol[symbol.id] = photo.id
+            }
+            symbolManager.addClickListener { symbol ->
+                photoIdBySymbol[symbol.id]?.let(onOpenPhoto) != null
+            }
         }
-        // zoomToBoundingBox needs a laid-out view; defer until the map has a size.
-        val box = BoundingBox(north, east, south, west)
-        addOnFirstLayoutListener { _, _, _, _, _ ->
-            zoomToBoundingBox(box, false, 64)
+
+        // Camera fit: single photo → center+zoom; multiple → fit bounds with padding.
+        // Deferred inside getMapAsync so the map is laid out before the camera moves.
+        val distinct = photos.map { LatLng(it.lat!!, it.lng!!) }
+            .distinctBy { it.latitude to it.longitude }
+        if (distinct.size == 1) {
+            // Single point (or all photos share one coordinate) → center + fixed zoom.
+            // LatLngBounds can't be built from a degenerate box, so guard it here.
+            map.moveCamera(CameraUpdateFactory.newLatLngZoom(distinct[0], 14.0))
+        } else {
+            val boundsBuilder = LatLngBounds.Builder()
+            for (p in distinct) boundsBuilder.include(p)
+            map.moveCamera(CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 96))
         }
     }
 }

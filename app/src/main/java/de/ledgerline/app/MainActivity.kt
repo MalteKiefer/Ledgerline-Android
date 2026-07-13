@@ -12,10 +12,8 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.biometric.BiometricPrompt
-import de.ledgerline.app.core.security.AppLock
-import de.ledgerline.app.core.security.CryptoAuth
 import de.ledgerline.app.core.security.IdleLocker
+import de.ledgerline.app.core.security.VaultAuthorizers
 import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.core.security.VaultLocker
@@ -24,6 +22,9 @@ import de.ledgerline.app.ui.nav.AppNav
 import de.ledgerline.app.ui.theme.LedgerlineTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -41,7 +42,37 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var settingsStore: SettingsStore
     @Inject lateinit var lockGuard: LockGuard
     @Inject lateinit var operationManager: OperationManager
-    private val appLock = AppLock()
+
+    // Keep-screen-on state (display-only; independent of the idle auto-lock). The flag
+    // is (re)armed on each user interaction; if a finite duration is set, a timer clears
+    // it after that many minutes of inactivity so the screen can finally sleep.
+    private var keepScreenOn = false
+    private var keepScreenOnMinutes = SettingsStore.DEFAULT_KEEP_SCREEN_ON_MINUTES
+    private var keepScreenReleaseJob: Job? = null
+
+    /** Apply FLAG_KEEP_SCREEN_ON per the current setting, arming the release timer. */
+    private fun armKeepScreen() {
+        keepScreenReleaseJob?.cancel()
+        keepScreenReleaseJob = null
+        if (!keepScreenOn) {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            return
+        }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (keepScreenOnMinutes > 0) {
+            keepScreenReleaseJob = lifecycleScope.launch {
+                delay(keepScreenOnMinutes * 60_000L)
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+    }
+
+    // Reset the keep-awake timer on any touch/key so "keep awake for N minutes" counts
+    // from the last interaction, not from when the screen was opened.
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        if (keepScreenOn && keepScreenOnMinutes > 0) armKeepScreen()
+    }
 
     // Emits the latest validated pairing deep link. singleTask means a link
     // delivered while running arrives via onNewIntent, not a fresh onCreate.
@@ -63,6 +94,17 @@ class MainActivity : FragmentActivity() {
         // no unlock can complete before onCreate returns anyway.
         lifecycleScope.launch {
             idleLocker.setTimeoutMs(settingsStore.timeoutMinutes.first() * 60_000L)
+        }
+
+        // Track the keep-screen-on preference and (re)apply the window flag on change.
+        lifecycleScope.launch {
+            settingsStore.keepScreenOn
+                .combine(settingsStore.keepScreenOnMinutes) { on, min -> on to min }
+                .collect { (on, min) ->
+                    keepScreenOn = on
+                    keepScreenOnMinutes = min
+                    armKeepScreen()
+                }
         }
 
         // Cold-start: accept a validated pairing deep link from the launch intent.
@@ -91,6 +133,9 @@ class MainActivity : FragmentActivity() {
                 if (idleLocker.isExpired() && !operationManager.hasActive()) {
                     locker.lock()
                 } else idleLocker.touch()
+                // Re-arm keep-screen-on: a release timer may have cleared the flag while
+                // the app was away, and returning should honor the setting again.
+                armKeepScreen()
                 // Defensive: if a picker returned via a dialog path without onStop,
                 // don't leave a stale skip armed for the next real background.
                 lockGuard.clear()
@@ -99,25 +144,19 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             LedgerlineTheme {
-                val lockTitle = stringResource(R.string.lock_title)
-                val lockSubtitle = stringResource(R.string.lock_subtitle)
                 val link by pairLink.collectAsState()
-                // Runs ONE CryptoObject-bound biometric on the keystore cipher and
-                // returns the authorised cipher (or null on cancel/failure). Threaded
-                // into SessionStore.save/load via the screens.
-                val authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher? = { cipher ->
-                    idleLocker.touch()
-                    when (
-                        val r = appLock.authenticate(
-                            this@MainActivity, lockTitle, lockSubtitle, BiometricPrompt.CryptoObject(cipher),
-                        )
-                    ) {
-                        is CryptoAuth.Success -> r.cipher
-                        else -> null
-                    }
-                }
+                // One shared factory for both CryptoObject-bound biometric authorizers.
+                val auth = VaultAuthorizers(
+                    activity = this@MainActivity,
+                    idleLocker = idleLocker,
+                    lockTitle = stringResource(R.string.lock_title),
+                    lockSubtitle = stringResource(R.string.lock_subtitle),
+                    rememberSubtitle = stringResource(R.string.lock_remember_subtitle),
+                    cancelText = stringResource(R.string.action_cancel),
+                )
                 AppNav(
-                    authorize = authorize,
+                    authorize = auth.authorize,
+                    strongAuthorize = auth.strongAuthorize,
                     initialPairLink = link,
                 )
             }

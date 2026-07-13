@@ -138,9 +138,21 @@ dependencies {
 
     // Pure-Java/Kotlin PDF rendering (Apache-2, no native .so).
     implementation(libs.pdfbox.android)
+    // pdfbox-android 2.0.27.0 transitively pulls BouncyCastle 1.72 (CVE-2023-33201/33202 +
+    // 2024 CVEs). Force the patched line even though PDFBox uses only the render paths.
+    constraints {
+        implementation(libs.bouncycastle.bcprov) { because("CVE-2023-33201/33202 patched in >=1.74") }
+        implementation(libs.bouncycastle.bcpkix) { because("CVE-2023-33201/33202 patched in >=1.74") }
+        implementation(libs.bouncycastle.bcutil) { because("align BouncyCastle modules") }
+    }
 
-    // Pure-Java OSM map tiles (Apache-2, no native .so).
-    implementation(libs.osmdroid)
+    // MapLibre GL Android — BSD-licensed, libre map renderer (no Google, no Mapbox,
+    // no API key, no telemetry). Renders OpenStreetMap RASTER tiles via a custom
+    // raster style JSON (same tile source as the old osmdroid setup). The annotation
+    // plugin (SymbolManager) provides marker pins. UA + tile HTTP client wired in
+    // LedgerlineApp. android-sdk 13.x defaults to the Vulkan backend (fine at minSdk 36).
+    implementation(libs.maplibre)
+    implementation(libs.maplibre.annotation)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

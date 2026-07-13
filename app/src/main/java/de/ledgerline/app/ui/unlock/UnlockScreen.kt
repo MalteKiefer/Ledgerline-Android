@@ -47,9 +47,11 @@ import kotlinx.coroutines.launch
 fun UnlockScreen(
     vm: UnlockViewModel = hiltViewModel(),
     authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
+    strongAuthorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
     onUnlocked: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val canQuickUnlock by vm.canQuickUnlock.collectAsStateWithLifecycle()
     var passphrase by remember { mutableStateOf("") }
     var recoveryCode by remember { mutableStateOf("") }
     var recoveryMode by remember { mutableStateOf(false) }
@@ -58,7 +60,7 @@ fun UnlockScreen(
     LaunchedEffect(state) { if (state is UnlockUiState.Unlocked) onUnlocked() }
     // Drop any stale error/not-configured message left from a previous attempt or a
     // forced logout when this screen is (re-)entered.
-    LaunchedEffect(Unit) { vm.reset() }
+    LaunchedEffect(Unit) { vm.onShown() }
 
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -95,6 +97,28 @@ fun UnlockScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (!recoveryMode) {
+                    if (canQuickUnlock) {
+                        // One STRONG biometric opens the remembered session + VK — no passphrase.
+                        Button(
+                            onClick = { scope.launch { vm.quickUnlock(strongAuthorize) } },
+                            enabled = state != UnlockUiState.Working,
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Text(
+                                stringResource(R.string.unlock_biometric_button),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            stringResource(R.string.unlock_or_passphrase),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
                     OutlinedTextField(
                         value = passphrase,
                         onValueChange = { passphrase = it; vm.reset() },
@@ -109,7 +133,7 @@ fun UnlockScreen(
                             val entered = passphrase.toCharArray()
                             passphrase = ""
                             // Exactly one biometric, triggered inside load() via authorize.
-                            scope.launch { vm.unlock(entered, authorize) }
+                            scope.launch { vm.unlock(entered, authorize, strongAuthorize) }
                         },
                         enabled = state != UnlockUiState.Working,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
@@ -137,7 +161,7 @@ fun UnlockScreen(
                         onClick = {
                             val entered = recoveryCode
                             recoveryCode = ""
-                            scope.launch { vm.unlockWithRecovery(entered, authorize) }
+                            scope.launch { vm.unlockWithRecovery(entered, authorize, strongAuthorize) }
                         },
                         enabled = state != UnlockUiState.Working,
                         modifier = Modifier.fillMaxWidth().height(52.dp),

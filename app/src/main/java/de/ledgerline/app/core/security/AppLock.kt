@@ -23,9 +23,13 @@ sealed interface CryptoAuth {
  * CryptoObject-bound biometric authorizes the keystore decrypt, and the passphrase
  * derives the Vault Key — no separate plain biometric.
  */
-class AppLock {
-    private val authenticators =
-        BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+class AppLock(
+    private val authenticators: Int =
+        BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL,
+) {
+    /** True when no device-credential fallback is allowed (STRONG-biometric-only prompt). */
+    private val biometricOnly =
+        authenticators and BiometricManager.Authenticators.DEVICE_CREDENTIAL == 0
 
     fun canAuthenticate(activity: FragmentActivity): Boolean =
         BiometricManager.from(activity).canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
@@ -33,13 +37,15 @@ class AppLock {
     /**
      * Prompt biometric/device-credential bound to [cryptoObject]. On success the
      * returned cipher is authorised for one keystore operation. DEVICE_CREDENTIAL
-     * works with a CryptoObject on API 30+ (minSdk here). Resumes when resolved.
+     * works with a CryptoObject on API 30+ (minSdk here). A biometric-only prompt
+     * requires an explicit negative button ([negativeButtonText]). Resumes when resolved.
      */
     suspend fun authenticate(
         activity: FragmentActivity,
         title: String,
         subtitle: String,
         cryptoObject: BiometricPrompt.CryptoObject,
+        negativeButtonText: String? = null,
     ): CryptoAuth =
         suspendCancellableCoroutine { cont ->
             if (!canAuthenticate(activity)) {
@@ -64,6 +70,11 @@ class AppLock {
                 .setTitle(title)
                 .setSubtitle(subtitle)
                 .setAllowedAuthenticators(authenticators)
+                .apply {
+                    // BiometricPrompt mandates a negative button when no device-credential
+                    // fallback is offered; DEVICE_CREDENTIAL supplies its own and forbids it.
+                    if (biometricOnly) setNegativeButtonText(negativeButtonText ?: "Cancel")
+                }
                 .build()
             prompt.authenticate(info, cryptoObject)
         }

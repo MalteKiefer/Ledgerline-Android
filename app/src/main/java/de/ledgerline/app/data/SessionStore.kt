@@ -43,7 +43,9 @@ class SessionStore(private val context: Context, private val sealer: KeystoreSea
         val blob = context.dataStore.data.first()[key] ?: return null
         val cipher = sealer.decryptCipher(blob)
         val authed = authorize(cipher) ?: return null // ONE biometric happens here
-        val plain = String(sealer.finishOpen(authed, blob))
+        val plainBytes = sealer.finishOpen(authed, blob)
+        val plain = String(plainBytes, Charsets.UTF_8)
+        plainBytes.fill(0) // wipe the decrypted token bytes once parsed (M2)
         val s = json.decodeFromString<SealedSession>(plain)
         return Session(s.baseUrl, s.token, s.spkiPin, s.userName)
     }

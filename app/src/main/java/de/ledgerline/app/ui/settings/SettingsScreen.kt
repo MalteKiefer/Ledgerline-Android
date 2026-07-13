@@ -108,6 +108,11 @@ fun SettingsContent(
     // Collect every flow the sub-screens need here in the parent, then pass state +
     // callbacks down. Wiring to SettingsViewModel is unchanged — only the layout moves.
     val timeout by vm.timeoutMinutes.collectAsStateWithLifecycle()
+    val keepScreenOn by vm.keepScreenOn.collectAsStateWithLifecycle()
+    val keepScreenOnMinutes by vm.keepScreenOnMinutes.collectAsStateWithLifecycle()
+    val rememberVault by vm.rememberVaultEnabled.collectAsStateWithLifecycle()
+    val rememberVaultDays by vm.rememberVaultDays.collectAsStateWithLifecycle()
+    val mapTiles by vm.mapTilesEnabled.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
     val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
     val offlineEnabled by vm.offlineEnabled.collectAsStateWithLifecycle()
@@ -197,6 +202,17 @@ fun SettingsContent(
                     padding = innerPadding,
                     timeout = timeout,
                     onSetTimeout = vm::setTimeoutMinutes,
+                    keepScreenOn = keepScreenOn,
+                    keepScreenOnMinutes = keepScreenOnMinutes,
+                    onSetKeepScreenOn = vm::setKeepScreenOn,
+                    onSetKeepScreenOnMinutes = vm::setKeepScreenOnMinutes,
+                    rememberVault = rememberVault,
+                    rememberVaultDays = rememberVaultDays,
+                    biometricAvailable = vm.strongBiometricAvailable,
+                    onSetRememberVault = vm::setRememberVaultEnabled,
+                    onSetRememberVaultDays = vm::setRememberVaultDays,
+                    mapTiles = mapTiles,
+                    onSetMapTiles = vm::setMapTilesEnabled,
                     onLockNow = onLockNow,
                 )
 
@@ -440,6 +456,17 @@ private fun SecuritySettings(
     padding: PaddingValues,
     timeout: Int,
     onSetTimeout: (Int) -> Unit,
+    keepScreenOn: Boolean,
+    keepScreenOnMinutes: Int,
+    onSetKeepScreenOn: (Boolean) -> Unit,
+    onSetKeepScreenOnMinutes: (Int) -> Unit,
+    rememberVault: Boolean,
+    rememberVaultDays: Int,
+    biometricAvailable: Boolean,
+    onSetRememberVault: (Boolean) -> Unit,
+    onSetRememberVaultDays: (Int) -> Unit,
+    mapTiles: Boolean,
+    onSetMapTiles: (Boolean) -> Unit,
     onLockNow: () -> Unit,
 ) {
     SubScreen(padding) {
@@ -454,6 +481,49 @@ private fun SecuritySettings(
                 RadioRow(timeoutLabel(minutes), timeout == minutes) { onSetTimeout(minutes) }
             }
         }
+        SwitchRow(
+            title = stringResource(R.string.settings_keep_screen_on),
+            subtitle = stringResource(R.string.settings_keep_screen_on_note),
+            checked = keepScreenOn,
+            onCheckedChange = onSetKeepScreenOn,
+        )
+        SelectorGroup(stringResource(R.string.settings_keep_screen_on_duration), enabled = keepScreenOn) {
+            SettingsStore.KEEP_SCREEN_ON_OPTIONS.forEach { minutes ->
+                RadioRow(
+                    keepScreenOnLabel(minutes),
+                    keepScreenOnMinutes == minutes,
+                    enabled = keepScreenOn,
+                ) { onSetKeepScreenOnMinutes(minutes) }
+            }
+        }
+        SwitchRow(
+            title = stringResource(R.string.settings_remember_vault),
+            subtitle = stringResource(
+                if (biometricAvailable) R.string.settings_remember_vault_note
+                else R.string.settings_remember_vault_needs_biometric,
+            ),
+            checked = rememberVault && biometricAvailable,
+            onCheckedChange = onSetRememberVault,
+            enabled = biometricAvailable,
+        )
+        SelectorGroup(
+            stringResource(R.string.settings_remember_vault_interval),
+            enabled = rememberVault && biometricAvailable,
+        ) {
+            SettingsStore.REMEMBER_VAULT_DAYS_OPTIONS.forEach { days ->
+                RadioRow(
+                    daysLabel(days),
+                    rememberVaultDays == days,
+                    enabled = rememberVault && biometricAvailable,
+                ) { onSetRememberVaultDays(days) }
+            }
+        }
+        SwitchRow(
+            title = stringResource(R.string.settings_map_tiles),
+            subtitle = stringResource(R.string.settings_map_tiles_note),
+            checked = mapTiles,
+            onCheckedChange = onSetMapTiles,
+        )
         OutlinedButton(
             onClick = onLockNow,
             modifier = Modifier
@@ -842,6 +912,24 @@ private fun timeoutLabel(minutes: Int): String = when (minutes) {
     10 -> stringResource(R.string.minutes_10)
     30 -> stringResource(R.string.minutes_30)
     else -> minutes.toString()
+}
+
+@Composable
+private fun keepScreenOnLabel(minutes: Int): String = when (minutes) {
+    0 -> stringResource(R.string.settings_keep_screen_on_unlimited)
+    5 -> stringResource(R.string.minutes_5)
+    15 -> stringResource(R.string.minutes_15)
+    30 -> stringResource(R.string.minutes_30)
+    else -> minutes.toString()
+}
+
+@Composable
+private fun daysLabel(days: Int): String = when (days) {
+    1 -> stringResource(R.string.days_1)
+    7 -> stringResource(R.string.days_7)
+    14 -> stringResource(R.string.days_14)
+    30 -> stringResource(R.string.days_30)
+    else -> days.toString()
 }
 
 /** Reads the current app locale tag ("" = system default) via the AOSP LocaleManager. */

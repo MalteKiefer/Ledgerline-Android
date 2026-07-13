@@ -25,7 +25,14 @@ androidxTestRunner = "1.6.2"
 androidxTestCore = "1.7.0"
 robolectric = "4.16.1"
 pdfbox = "2.0.27.0"
-osmdroid = "6.1.20"
+# Force the BouncyCastle that pdfbox-android drags in (1.72) up to a patched release:
+# clears CVE-2023-33201 (LDAP injection), CVE-2023-33202 (PEM DoS) + the 2024 BC CVEs.
+bouncycastle = "1.78.1"
+# MapLibre GL Android (BSD-2/3, libre — no Google, no Mapbox, no API key, no telemetry).
+# 13.3.1 is the current stable release (Maven Central, 2026-06). minSdk here is 36, so
+# MapLibre 12's minSdk 21→23 bump is a non-issue. Annotation plugin (SymbolManager) 3.0.2.
+maplibre = "13.3.1"
+maplibreAnnotation = "3.0.2"
 
 [libraries]
 androidx-core = { module = "androidx.core:core-ktx", version = "1.19.0" }
@@ -70,7 +77,11 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 pdfbox-android = { module = "com.tom-roush:pdfbox-android", version.ref = "pdfbox" }
-osmdroid = { module = "org.osmdroid:osmdroid-android", version.ref = "osmdroid" }
+bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk15to18", version.ref = "bouncycastle" }
+bouncycastle-bcpkix = { module = "org.bouncycastle:bcpkix-jdk15to18", version.ref = "bouncycastle" }
+bouncycastle-bcutil = { module = "org.bouncycastle:bcutil-jdk15to18", version.ref = "bouncycastle" }
+maplibre = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
+maplibre-annotation = { module = "org.maplibre.gl:android-plugin-annotation-v9", version.ref = "maplibreAnnotation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

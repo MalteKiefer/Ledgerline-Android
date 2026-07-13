@@ -101,6 +101,7 @@ class RootViewModel @Inject constructor(
 @Composable
 fun AppNav(
     authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
+    strongAuthorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
     initialPairLink: String? = null,
     vm: RootViewModel = hiltViewModel(),
 ) {
@@ -119,7 +120,7 @@ fun AppNav(
         Destination.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         Destination.WELCOME -> WelcomeScreen(onGetStarted = { vm.toPairing() })
         Destination.PAIRING -> PairingScreen(authorize = authorize, initialPairLink = initialPairLink, onPaired = { vm.toUnlock() })
-        Destination.UNLOCK -> UnlockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
+        Destination.UNLOCK -> UnlockScreen(authorize = authorize, strongAuthorize = strongAuthorize, onUnlocked = { vm.toHome() })
         Destination.HOME -> {
             val unlocked by vm.unlocked.collectAsStateWithLifecycle()
             if (unlocked) {
@@ -128,7 +129,7 @@ fun AppNav(
                     onDisconnected = { vm.toWelcome() },
                 )
             } else {
-                UnlockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
+                UnlockScreen(authorize = authorize, strongAuthorize = strongAuthorize, onUnlocked = { vm.toHome() })
             }
         }
     }
