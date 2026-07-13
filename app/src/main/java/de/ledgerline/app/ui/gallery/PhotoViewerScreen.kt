@@ -11,7 +11,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -146,35 +148,7 @@ fun PhotoViewerScreen(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
-                actions = {
-                    // Non-destructive edits apply only to images (video renders a poster).
-                    if (!isVideo) {
-                        IconButton(onClick = { vm.rotatePhoto(photo.id) }) {
-                            Icon(Icons.AutoMirrored.Outlined.RotateRight, contentDescription = stringResource(R.string.action_rotate))
-                        }
-                        IconButton(onClick = { vm.flipHorizontal(photo.id) }) {
-                            Icon(Icons.Outlined.Flip, contentDescription = stringResource(R.string.action_flip_h))
-                        }
-                        IconButton(onClick = { vm.flipVertical(photo.id) }) {
-                            Icon(
-                                Icons.Outlined.Flip,
-                                contentDescription = stringResource(R.string.action_flip_v),
-                                modifier = Modifier.graphicsLayer(rotationZ = 90f),
-                            )
-                        }
-                    }
-                    IconButton(onClick = { vm.toggleFavorite(photo.id) }) {
-                        Icon(
-                            imageVector = if (photo.favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                            contentDescription = stringResource(
-                                if (photo.favorite) R.string.action_unfavorite else R.string.action_favorite
-                            ),
-                        )
-                    }
-                    IconButton(onClick = { showInfo = !showInfo }) {
-                        Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.info_title))
-                    }
-                },
+                // Actions moved to the floating bottom bar (see below).
             )
         },
     ) { pad ->
@@ -253,6 +227,48 @@ fun PhotoViewerScreen(
                             tint = Color.White,
                         )
                     }
+                }
+            }
+
+            // Floating action bar — the photo actions live here (moved off the top bar):
+            // rotate / flip (images only), favorite, info. Dark scrim + white icons to stay
+            // legible over any photo; sits above the navigation-bar inset.
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 20.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (!isVideo) {
+                    IconButton(onClick = { vm.rotatePhoto(photo.id) }) {
+                        Icon(Icons.AutoMirrored.Outlined.RotateRight, stringResource(R.string.action_rotate), tint = Color.White)
+                    }
+                    IconButton(onClick = { vm.flipHorizontal(photo.id) }) {
+                        Icon(Icons.Outlined.Flip, stringResource(R.string.action_flip_h), tint = Color.White)
+                    }
+                    IconButton(onClick = { vm.flipVertical(photo.id) }) {
+                        Icon(
+                            Icons.Outlined.Flip,
+                            stringResource(R.string.action_flip_v),
+                            modifier = Modifier.graphicsLayer(rotationZ = 90f),
+                            tint = Color.White,
+                        )
+                    }
+                }
+                IconButton(onClick = { vm.toggleFavorite(photo.id) }) {
+                    Icon(
+                        if (photo.favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        stringResource(if (photo.favorite) R.string.action_unfavorite else R.string.action_favorite),
+                        tint = if (photo.favorite) MaterialTheme.colorScheme.primary else Color.White,
+                    )
+                }
+                IconButton(onClick = { showInfo = !showInfo }) {
+                    Icon(Icons.Outlined.Info, stringResource(R.string.info_title), tint = Color.White)
                 }
             }
         }
