@@ -426,4 +426,9 @@
     <string name="type_work">Work</string>
     <string name="type_cell">Mobile</string>
     <string name="type_other">Other</string>
+    <string name="person_remove_face">Not this person</string>
+    <string name="person_reassign_face">Move to another person</string>
+    <string name="person_merge">Merge</string>
+    <string name="person_merge_into">Merge into…</string>
+    <string name="person_none_other">No other people</string>
 </resources>

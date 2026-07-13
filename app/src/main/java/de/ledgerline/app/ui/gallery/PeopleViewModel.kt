@@ -98,6 +98,55 @@ class PeopleViewModel @Inject constructor(
         }
     }
 
+    /** "Not this person": drop all of [photoId]'s faces from [pp]; drop the person if empty. */
+    fun removeFromPerson(pp: GalleryPerson, photoId: String) = viewModelScope.launch {
+        mutate.invoke { m ->
+            val updated = m.people
+                .map { p -> if (p.id == pp.id) p.copy(faces = p.faces.filterNot { it.photoId == photoId }) else p }
+                .filter { it.faces.isNotEmpty() }
+            m.copy(people = updated)
+        }
+    }
+
+    /** Move [photoId]'s faces from [from] to person [toId]; drop [from] if it ends up empty. */
+    fun reassignFace(from: GalleryPerson, toId: String, photoId: String) = viewModelScope.launch {
+        mutate.invoke { m ->
+            val moving = m.people.firstOrNull { it.id == from.id }?.faces?.filter { it.photoId == photoId }.orEmpty()
+            if (moving.isEmpty()) return@invoke m
+            val updated = m.people.map { p ->
+                when (p.id) {
+                    from.id -> p.copy(faces = p.faces.filterNot { it.photoId == photoId })
+                    toId -> p.copy(faces = (p.faces + moving).distinctBy { it.photoId to it.idx })
+                    else -> p
+                }
+            }.filter { it.faces.isNotEmpty() }
+            m.copy(people = updated)
+        }
+    }
+
+    /** Merge [source] into [target]: union+dedup faces, size-weighted centroid, keep a name. */
+    fun merge(source: GalleryPerson, targetId: String) = viewModelScope.launch {
+        mutate.invoke { m ->
+            val src = m.people.firstOrNull { it.id == source.id }
+            val tgt = m.people.firstOrNull { it.id == targetId }
+            if (src == null || tgt == null || src.id == tgt.id) return@invoke m
+            val merged = tgt.copy(
+                faces = (tgt.faces + src.faces).distinctBy { it.photoId to it.idx },
+                centroid = weightedMean(tgt.centroid, tgt.faces.size, src.centroid, src.faces.size),
+                name = tgt.name.ifBlank { src.name },
+            )
+            m.copy(people = m.people.mapNotNull { if (it.id == source.id) null else if (it.id == targetId) merged else it })
+        }
+    }
+
+    /** Element-wise size-weighted mean of two centroids; falls back to whichever is non-empty. */
+    private fun weightedMean(a: List<Double>, na: Int, b: List<Double>, nb: Int): List<Double> {
+        if (a.isEmpty()) return b
+        if (b.isEmpty() || a.size != b.size) return a
+        val total = (na + nb).coerceAtLeast(1)
+        return a.indices.map { (a[it] * na + b[it] * nb) / total }
+    }
+
     /** Make [photoId]'s face the person's cover by moving it to the front of the face list. */
     fun setCover(pp: GalleryPerson, photoId: String) = viewModelScope.launch {
         mutate.invoke { m ->
