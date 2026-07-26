@@ -120,6 +120,12 @@ fun UnlockScreen(
                         onValueChange = { passphrase = it; vm.reset() },
                         label = { Text(stringResource(R.string.unlock_passphrase)) },
                         visualTransformation = PasswordVisualTransformation(),
+                        // IME hardening: Password input type excludes the field from keyboard
+                        // learning/autocorrect/suggestions so the master passphrase can't leak.
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                            autoCorrectEnabled = false,
+                        ),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -147,6 +153,10 @@ fun UnlockScreen(
                         onValueChange = { recoveryCode = it; vm.reset() },
                         label = { Text(stringResource(R.string.unlock_recovery_hint)) },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Password,
+                            autoCorrectEnabled = false,
+                        ),
                         singleLine = false,
                         modifier = Modifier.fillMaxWidth(),
                     )

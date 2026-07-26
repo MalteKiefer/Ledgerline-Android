@@ -17,7 +17,11 @@ import java.net.URLEncoder
  * [Dispatchers.IO] and never throw (any failure → null).
  */
 class Geocoder(
-    private val client: OkHttpClient = OkHttpClient(),
+    // Third-party (Nominatim) → no SPKI pin, but enforce TLS 1.2+/strong ciphers (RESTRICTED_TLS)
+    // so the coarse reverse-geocode never downgrades to a weak transport.
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectionSpecs(listOf(okhttp3.ConnectionSpec.RESTRICTED_TLS))
+        .build(),
 ) {
     /** Returns the first match's `(lat, lng)` for the query, or null on empty/failure. */
     suspend fun search(q: String): Pair<Double, Double>? = withContext(Dispatchers.IO) {

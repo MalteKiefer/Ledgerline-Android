@@ -389,7 +389,7 @@ private fun PwEdit(item: SecretItem, onCancel: () -> Unit, onSave: (SecretItem) 
                             label = { Text(fieldLabel(key)) },
                             singleLine = key != "note",
                             visualTransformation = if (secret) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
-                            keyboardOptions = if (secret) KeyboardOptions(keyboardType = KeyboardType.Password) else KeyboardOptions.Default,
+                            keyboardOptions = if (secret) KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false) else KeyboardOptions.Default,
                             trailingIcon = if (key == "password") {
                                 { IconButton(onClick = { genSheet = true }) { Icon(Icons.Outlined.Refresh, contentDescription = "Generate") } }
                             } else null,

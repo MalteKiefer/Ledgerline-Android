@@ -72,8 +72,29 @@ instead of a time-bound window.
 
 ## Permissions
 
-Minimal: `INTERNET`, `USE_BIOMETRIC`, `CAMERA` (pairing scan only, requested in
-context). No storage or location permissions in Phase 1.
+Every permission is justified and — where dangerous — requested at runtime, in context,
+and optional. The app uses **no** Google Play Services and performs **no** analytics or
+telemetry.
+
+- `INTERNET`, `ACCESS_NETWORK_STATE` — talk to your self-hosted server (HTTPS-only, SPKI-pinned).
+- `USE_BIOMETRIC` — biometric-gated unlock / Keystore key use.
+- `CAMERA` — QR pairing scan only (runtime-requested at pairing; ZXing decodes on-device, nothing recorded/uploaded).
+- `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` — **optional**, requested only when you take a photo, solely to geotag that shot. Never used for background tracking.
+- `READ_CONTACTS`, `WRITE_CONTACTS` — **optional**, only to sync the encrypted address book with a local "Ledgerline" device account you explicitly enable. Nothing is uploaded anywhere.
+- `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO` — **optional**, only for camera-roll backup into the gallery.
+- `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` — keep long uploads/scans alive behind a visible notification (AOSP data-sync type; no Google).
+- `POST_NOTIFICATIONS` — the foreground-service notification (Android 13+).
+
+## Current security posture
+
+Beyond the zero-knowledge core: Argon2id KDF with server-supplied bounds; libsodium
+secretbox/secretstream; **suite-tagged, canonical-JSON, Padmé-padded** sealed manifests
+(fail-closed on an unknown crypto suite); post-quantum hybrid KEM (X25519 + ML-KEM-768,
+byte-verified) for sharing crypto; per-use `CryptoObject`-bound biometric Keystore keys
+(StrongBox where available); an unlock throttle, always-on duress auto-wipe, monotonic
+idle-lock, clock-rollback guard, and an encrypted local security audit log; `FLAG_SECURE`
+app-wide; remote-wipe kill switch. The Vault Key lives in memory only and is zeroed on
+background/idle and when replaced.
 
 ## Revocation
 
