@@ -77,6 +77,7 @@ object GalleryRecordCodec {
         out["name"] = JsonPrimitive(a.name)
         out["photoIds"] = JsonArray(a.photoIds.map { JsonPrimitive(it) })
         a.cover?.let { out["cover"] = JsonPrimitive(it) }
+        FileRecordCodec.applyShare(out, a.share, raw["share"])
         return JsonObject(out)
     }
 

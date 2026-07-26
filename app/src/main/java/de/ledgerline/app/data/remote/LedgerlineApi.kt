@@ -122,6 +122,25 @@ interface LedgerlineApi {
     @PUT("api/v1/files/store")
     suspend fun filesStorePut(@Body body: StorePutRequest): Response<StoreResponse>
 
+    // Public share links (owner CRUD). The share key lives only in the link fragment.
+    @POST("api/v1/files/shares")
+    suspend fun createFileShare(@Body body: de.ledgerline.app.data.remote.dto.ShareCreateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse>
+
+    @PUT("api/v1/files/shares/{token}")
+    suspend fun updateFileShare(@Path("token") token: String, @Body body: de.ledgerline.app.data.remote.dto.ShareUpdateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse>
+
+    @DELETE("api/v1/files/shares/{token}")
+    suspend fun deleteFileShare(@Path("token") token: String): Response<Unit>
+
+    @POST("api/v1/gallery/shares")
+    suspend fun createGalleryShare(@Body body: de.ledgerline.app.data.remote.dto.ShareCreateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse>
+
+    @PUT("api/v1/gallery/shares/{token}")
+    suspend fun updateGalleryShare(@Path("token") token: String, @Body body: de.ledgerline.app.data.remote.dto.ShareUpdateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse>
+
+    @DELETE("api/v1/gallery/shares/{token}")
+    suspend fun deleteGalleryShare(@Path("token") token: String): Response<Unit>
+
     @PUT("api/v1/store")
     suspend fun putStore(@Body body: StorePutRequest): Response<StoreResponse>
 

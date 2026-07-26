@@ -74,8 +74,45 @@ class FilesViewModel @Inject constructor(
     private val filesUsage: FilesUsage,
     private val lockGuard: LockGuard,
     private val importFile: ImportFile,
+    private val shareRepo: de.ledgerline.app.data.FileSharing,
     degradedState: de.ledgerline.app.core.offline.DegradedState,
 ) : ViewModel() {
+
+    // ---- Public share links ----------------------------------------------------
+    private val _shareSheet = MutableStateFlow<de.ledgerline.app.ui.common.ShareSheetState?>(null)
+    val shareSheet: StateFlow<de.ledgerline.app.ui.common.ShareSheetState?> = _shareSheet
+
+    /** Open the share sheet for a file or folder; shows the existing link if already shared. */
+    fun openShare(id: String, isFolder: Boolean, name: String, existing: de.ledgerline.app.domain.model.ShareInfo?) {
+        _shareSheet.value = de.ledgerline.app.ui.common.ShareSheetState(
+            id = id, isFolder = isFolder, name = name,
+            shared = existing != null, link = shareRepo.existingLink(existing),
+        )
+    }
+
+    fun closeShare() { _shareSheet.value = null }
+
+    fun createShare(opts: de.ledgerline.app.data.ShareOptions) {
+        val target = _shareSheet.value ?: return
+        _shareSheet.value = target.copy(busy = true, error = false)
+        viewModelScope.launch {
+            when (val r = shareRepo.createFileShare(target.id, target.isFolder, opts)) {
+                is de.ledgerline.app.core.Outcome.Ok ->
+                    _shareSheet.value = _shareSheet.value?.copy(busy = false, shared = true, link = r.value.link)
+                is de.ledgerline.app.core.Outcome.Err ->
+                    _shareSheet.value = _shareSheet.value?.copy(busy = false, error = true)
+            }
+        }
+    }
+
+    fun revokeShare() {
+        val target = _shareSheet.value ?: return
+        _shareSheet.value = target.copy(busy = true)
+        viewModelScope.launch {
+            shareRepo.revokeFileShare(target.id, target.isFolder)
+            _shareSheet.value = null
+        }
+    }
 
     /** True when the files store is degraded (a shard blob is missing); writes are frozen. */
     val degraded: StateFlow<Boolean> = degradedState.files

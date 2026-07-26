@@ -139,6 +139,12 @@ open class NotImplementedApi : LedgerlineApi {
     // resolves to an empty list in fakes that don't exercise files. Override where needed.
     override suspend fun filesStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
     override suspend fun filesStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
+    override suspend fun createFileShare(body: de.ledgerline.app.data.remote.dto.ShareCreateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse> = throw NotImplementedError()
+    override suspend fun updateFileShare(token: String, body: de.ledgerline.app.data.remote.dto.ShareUpdateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse> = throw NotImplementedError()
+    override suspend fun deleteFileShare(token: String): Response<Unit> = throw NotImplementedError()
+    override suspend fun createGalleryShare(body: de.ledgerline.app.data.remote.dto.ShareCreateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse> = throw NotImplementedError()
+    override suspend fun updateGalleryShare(token: String, body: de.ledgerline.app.data.remote.dto.ShareUpdateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse> = throw NotImplementedError()
+    override suspend fun deleteGalleryShare(token: String): Response<Unit> = throw NotImplementedError()
     override suspend fun putStore(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun filesUsage(): Response<UsageResponse> = throw NotImplementedError()
     override suspend fun galleryStore(): Response<StoreResponse> = throw NotImplementedError()

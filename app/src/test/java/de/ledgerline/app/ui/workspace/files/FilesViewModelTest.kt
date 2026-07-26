@@ -81,9 +81,16 @@ class FilesViewModelTest {
         override suspend fun invoke(): Pair<Long, Long> = 1024L to 10240L
     }
 
+    private val sharing = object : de.ledgerline.app.data.FileSharing {
+        override fun existingLink(share: de.ledgerline.app.domain.model.ShareInfo?): String? = null
+        override suspend fun createFileShare(id: String, isFolder: Boolean, opts: de.ledgerline.app.data.ShareOptions) =
+            Outcome.Ok(de.ledgerline.app.data.ShareResult("t", "k", "https://h/s/t#s:k"))
+        override suspend fun revokeFileShare(id: String, isFolder: Boolean) = Outcome.Ok(Unit)
+    }
+
     private fun vm() = FilesViewModel(
         load, cache, mutate, blobs, usage, de.ledgerline.app.core.security.LockGuard(),
-        ImportFileImpl(blobs, mutate), de.ledgerline.app.core.offline.DegradedState(),
+        ImportFileImpl(blobs, mutate), sharing, de.ledgerline.app.core.offline.DegradedState(),
     )
 
     @Test fun root_shows_folders_then_files_excluding_trashed() = runTest {

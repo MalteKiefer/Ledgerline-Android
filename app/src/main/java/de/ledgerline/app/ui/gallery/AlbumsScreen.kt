@@ -75,6 +75,7 @@ fun AlbumsScreen(
                         onClick = { onOpenAlbum(album.id) },
                         onRename = { renameTarget = album },
                         onDelete = { deleteTarget = album },
+                        onShare = { albumsVm.openShare(album) },
                     )
                 }
             }
@@ -112,6 +113,19 @@ fun AlbumsScreen(
             },
         )
     }
+
+    val shareSheet by albumsVm.shareSheet.collectAsStateWithLifecycle()
+    val shareContext = androidx.compose.ui.platform.LocalContext.current
+    shareSheet?.let { st ->
+        de.ledgerline.app.ui.common.ShareLinkSheet(
+            state = st,
+            onCreate = { albumsVm.createShare(it) },
+            onRevoke = { albumsVm.revokeShare() },
+            onCopy = { link -> de.ledgerline.app.ui.common.copyToClipboard(shareContext, link) },
+            onShareIntent = { link -> shareContext.startActivity(de.ledgerline.app.ui.common.shareTextChooser(shareContext, link)) },
+            onDismiss = { albumsVm.closeShare() },
+        )
+    }
 }
 
 @Composable
@@ -122,6 +136,7 @@ private fun AlbumCard(
     onClick: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onShare: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val cover = remember(album) { albumsVm.coverPhoto(album) }
@@ -162,6 +177,10 @@ private fun AlbumCard(
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.album_rename)) },
                         onClick = { menuOpen = false; onRename() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.share_action)) },
+                        onClick = { menuOpen = false; onShare() },
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.album_delete)) },

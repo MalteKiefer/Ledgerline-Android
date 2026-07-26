@@ -61,6 +61,8 @@ data class PhotoMetaBlob(
 data class GalleryAlbum(
     val id: String = "", val name: String = "", val photoIds: List<String> = emptyList(),
     val cover: String? = null, val created: String? = null,
+    /** Public share-link state (owner-side); null = not shared. Byte-shape = web `al.share`. */
+    val share: de.ledgerline.app.domain.model.ShareInfo? = null,
 )
 
 @Serializable

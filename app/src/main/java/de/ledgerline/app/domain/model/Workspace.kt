@@ -52,6 +52,8 @@ data class Bookmark(
 data class NamedFolder(
     val id: String = "", val name: String = "", val parent: String? = null,
     val color: String = "", val icon: String = "",
+    /** Public share-link state (owner-side, folder shares); null = not shared. */
+    val share: ShareInfo? = null,
     @Transient val raw: JsonObject = JsonObject(emptyMap()),
 )
 
@@ -80,6 +82,25 @@ data class FileEntry(
     val favorite: Boolean = false,
     val tags: List<String> = emptyList(),
     val versions: List<FileVersion> = emptyList(),
+    /** Public share-link state (owner-side); null = not shared. Byte-shape = web `src.share`. */
+    val share: ShareInfo? = null,
+)
+
+/**
+ * Owner-side public-share record persisted in the sealed store (byte-compatible with the
+ * web client's `src.share` / `al.share`): the share [token] and the 32-byte share key [sk]
+ * (base64) so the link can be re-copied/revoked. `sk` NEVER leaves the device except in the
+ * link fragment. [kind] is files-only (`"file"|"folder"`); [allowDownload] is gallery-only.
+ */
+@Serializable
+data class ShareInfo(
+    val token: String = "",
+    val sk: String = "",
+    val kind: String? = null,
+    val allowDownload: Boolean? = null,
+    val hasPassword: Boolean = false,
+    val expiresAt: String? = null,
+    val created: String? = null,
 )
 
 @Serializable
