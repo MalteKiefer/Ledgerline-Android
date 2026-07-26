@@ -136,9 +136,17 @@ Identisches Muster je Prefix (`files`, `gallery`, `contacts`, `explore`, `vaults
   nie server-gecacht; App cached lokal **VK-verschlüsselt**, Coarse-Grid).
 - `GET /gallery/geocode?q=` → Vorwärts-Geocode (Ort → Koordinate).
 
-### Öffentliche Share-Links (**noch nicht in Android**)
+### Öffentliche Share-Links (**Android: create/revoke erledigt 2026-07-27; update deferred**)
 - Files/Ordner: `POST /files/shares` · `PUT/DELETE /files/shares/{token}`
 - Gallery-Alben: `POST /gallery/shares` · `PUT/DELETE /gallery/shares/{token}`
+- Android: `ShareRepository` (create/revoke Files+Ordner+Alben) + `ShareManifests` (byte-exakte
+  sealed-manifest-Builder: file `{kind,name,files:[{name,mime,size,path,ref,key}]}`, gallery
+  `{name,allowDownload,photos:[{id,t,at,w,h,cap,tR,tK,…}]}`; SK nur im `#s:`-Fragment, per-blob-key
+  re-wrap unter SK). Link = `{baseUrl}/s/{token}#s:{sk}`. `share`-Feld typisiert auf FileEntry/
+  NamedFolder/GalleryAlbum, presence-aware Codec-Overlay (kein Datenverlust). UI: Overflow „Link
+  teilen" → `ShareLinkSheet` (Passwort/Ablauf/Download-Toggle, Copy/Send/Revoke). Interfaces
+  `FileSharing`/`AlbumSharing` (Hilt) für Testbarkeit. Tests `ShareManifestsTest`+`ShareCodecTest`.
+  **Offen:** `updateShare` (Re-Push nach Änderung; iOS-Gallery fehlt es auch), `raw-batch`-Fetch.
 - Sealed Manifest + `blob_refs` + optional Passwort/Ablauf/Download; Share-Key nur im
   URL-Fragment (`#s:`), verlässt den Server nie.
 

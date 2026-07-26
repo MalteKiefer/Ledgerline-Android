@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.Star
@@ -72,6 +73,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.FileEntry
 import de.ledgerline.app.domain.model.NamedFolder
+import de.ledgerline.app.ui.common.copyToClipboard
+import de.ledgerline.app.ui.common.shareTextChooser
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
@@ -281,6 +284,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                             RowOverflow(
                                                 onRename = { renameFolder = f.id to f.name },
                                                 onDelete = { deleteFolderId = f.id },
+                                                onShare = { vm.openShare(f.id, isFolder = true, f.name, f.share) },
                                             )
                                         },
                                         modifier = Modifier.fillMaxWidth().clickable { vm.open(f.id) },
@@ -300,6 +304,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                                 onMove = { moveTarget = file },
                                                 onVersions = { versionsTarget = file },
                                                 onTags = { tagsTarget = file },
+                                                onShare = { vm.openShare(file.id, isFolder = false, file.name, file.share) },
                                             )
                                         },
                                         modifier = Modifier.fillMaxWidth().clickable { vm.openFile(file) },
@@ -402,6 +407,21 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
             onDismiss = { tagsTarget = null },
         )
     }
+
+    val shareSheet by vm.shareSheet.collectAsStateWithLifecycle()
+    shareSheet?.let { st ->
+        de.ledgerline.app.ui.common.ShareLinkSheet(
+            state = st,
+            onCreate = { vm.createShare(it) },
+            onRevoke = { vm.revokeShare() },
+            onCopy = { link ->
+                copyToClipboard(context, link)
+                scope.launch { snackbar.showSnackbar(context.getString(R.string.share_copied)) }
+            },
+            onShareIntent = { link -> context.startActivity(shareTextChooser(context, link)) },
+            onDismiss = { vm.closeShare() },
+        )
+    }
     if (confirmEmptyTrash) {
         ConfirmDialog(
             message = stringResource(R.string.trash_empty_confirm),
@@ -436,12 +456,13 @@ private fun FilesFab(onUpload: () -> Unit, onNewFolder: () -> Unit) {
 
 /** Overflow for a folder row: rename + delete. */
 @Composable
-private fun RowOverflow(onRename: () -> Unit, onDelete: () -> Unit) {
+private fun RowOverflow(onRename: () -> Unit, onDelete: () -> Unit, onShare: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more)) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text(stringResource(R.string.file_rename)) }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { expanded = false; onRename() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.share_action)) }, leadingIcon = { Icon(Icons.Outlined.Link, null) }, onClick = { expanded = false; onShare() })
             DropdownMenuItem(text = { Text(stringResource(R.string.file_delete)) }, leadingIcon = { Icon(Icons.Outlined.Delete, null) }, onClick = { expanded = false; onDelete() })
         }
     }
@@ -457,6 +478,7 @@ private fun FileRowOverflow(
     onMove: () -> Unit,
     onVersions: () -> Unit,
     onTags: () -> Unit,
+    onShare: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -464,6 +486,11 @@ private fun FileRowOverflow(
             Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.share_action)) },
+                leadingIcon = { Icon(Icons.Outlined.Link, null) },
+                onClick = { expanded = false; onShare() },
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(if (file.favorite) R.string.file_unfavorite else R.string.file_favorite)) },
                 leadingIcon = { Icon(if (file.favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, null) },

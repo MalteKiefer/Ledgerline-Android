@@ -43,6 +43,7 @@ object FileRecordCodec {
             out["versions"] = JsonArray(f.versions.map { recordJson.encodeToJsonElement(de.ledgerline.app.domain.model.FileVersion.serializer(), it) })
         }
         applyTrashed(out, f.trashed, raw["trashed"], nowIso)
+        applyShare(out, f.share, raw["share"])
         return JsonObject(out)
     }
 
@@ -65,6 +66,7 @@ object FileRecordCodec {
         // color/icon are Android-only extras; only emit when set (web folders lack them).
         if (raw.containsKey("color") || folder.color.isNotEmpty()) out["color"] = JsonPrimitive(folder.color)
         if (raw.containsKey("icon") || folder.icon.isNotEmpty()) out["icon"] = JsonPrimitive(folder.icon)
+        applyShare(out, folder.share, raw["share"])
         return JsonObject(out)
     }
 
@@ -78,6 +80,22 @@ object FileRecordCodec {
 
     private fun setOrRemove(out: MutableMap<String, JsonElement>, key: String, value: String?) {
         if (value != null) out[key] = JsonPrimitive(value) else out.remove(key)
+    }
+
+    /**
+     * Overlay the owner-side `share` object presence-aware: unchanged (equals the raw's decoded
+     * form) → keep the raw token verbatim (no loss of any web subkey); created/changed → emit the
+     * web-shaped [de.ledgerline.app.domain.model.ShareInfo]; cleared → remove the key.
+     */
+    fun applyShare(out: MutableMap<String, JsonElement>, share: de.ledgerline.app.domain.model.ShareInfo?, rawShare: JsonElement?) {
+        val decodedRaw = (rawShare as? JsonObject)?.let {
+            runCatching { recordJson.decodeFromJsonElement(de.ledgerline.app.domain.model.ShareInfo.serializer(), it) }.getOrNull()
+        }
+        when {
+            share == null -> out.remove("share")
+            share == decodedRaw -> Unit // unchanged → keep raw verbatim
+            else -> out["share"] = recordJson.encodeToJsonElement(de.ledgerline.app.domain.model.ShareInfo.serializer(), share)
+        }
     }
 
     private fun truthy(el: JsonElement?): Boolean =

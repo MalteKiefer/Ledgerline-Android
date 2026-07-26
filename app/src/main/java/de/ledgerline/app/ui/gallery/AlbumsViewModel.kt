@@ -21,7 +21,43 @@ import javax.inject.Inject
 class AlbumsViewModel @Inject constructor(
     private val cache: GalleryCache,
     private val mutate: MutateGallery,
+    private val sharing: de.ledgerline.app.data.AlbumSharing,
 ) : ViewModel() {
+
+    // ---- Public album share links ----------------------------------------------
+    private val _shareSheet = kotlinx.coroutines.flow.MutableStateFlow<de.ledgerline.app.ui.common.ShareSheetState?>(null)
+    val shareSheet: StateFlow<de.ledgerline.app.ui.common.ShareSheetState?> = _shareSheet
+
+    fun openShare(album: GalleryAlbum) {
+        _shareSheet.value = de.ledgerline.app.ui.common.ShareSheetState(
+            id = album.id, name = album.name, showDownloadToggle = true,
+            shared = album.share != null, link = sharing.existingLink(album.share),
+        )
+    }
+
+    fun closeShare() { _shareSheet.value = null }
+
+    fun createShare(opts: de.ledgerline.app.data.ShareOptions) {
+        val target = _shareSheet.value ?: return
+        _shareSheet.value = target.copy(busy = true, error = false)
+        viewModelScope.launch {
+            when (val r = sharing.createAlbumShare(target.id, opts)) {
+                is de.ledgerline.app.core.Outcome.Ok ->
+                    _shareSheet.value = _shareSheet.value?.copy(busy = false, shared = true, link = r.value.link)
+                is de.ledgerline.app.core.Outcome.Err ->
+                    _shareSheet.value = _shareSheet.value?.copy(busy = false, error = true)
+            }
+        }
+    }
+
+    fun revokeShare() {
+        val target = _shareSheet.value ?: return
+        _shareSheet.value = target.copy(busy = true)
+        viewModelScope.launch {
+            sharing.revokeAlbumShare(target.id)
+            _shareSheet.value = null
+        }
+    }
 
     /** Albums from the cache, sorted case-insensitively by name. */
     val albums: StateFlow<List<GalleryAlbum>> = cache.value

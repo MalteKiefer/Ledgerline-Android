@@ -51,4 +51,6 @@ abstract class WorkspaceModule {
     @Binds abstract fun bindForceLogout(impl: ForceLogoutImpl): ForceLogout
     @Binds abstract fun bindImportFile(impl: ImportFileImpl): ImportFile
     @Binds abstract fun bindImportPhotos(impl: ImportPhotosImpl): ImportPhotos
+    @Binds abstract fun bindFileSharing(impl: de.ledgerline.app.data.ShareRepository): de.ledgerline.app.data.FileSharing
+    @Binds abstract fun bindAlbumSharing(impl: de.ledgerline.app.data.ShareRepository): de.ledgerline.app.data.AlbumSharing
 }
