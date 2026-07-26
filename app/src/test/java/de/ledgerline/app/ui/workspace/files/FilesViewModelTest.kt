@@ -81,13 +81,16 @@ class FilesViewModelTest {
         override suspend fun invoke(): Pair<Long, Long> = 1024L to 10240L
     }
 
+    private val revoked = mutableListOf<Pair<String, Boolean>>()
     private val sharing = object : de.ledgerline.app.data.FileSharing {
         override fun existingLink(share: de.ledgerline.app.domain.model.ShareInfo?): String? = null
         override suspend fun createFileShare(id: String, isFolder: Boolean, opts: de.ledgerline.app.data.ShareOptions) =
             Outcome.Ok(de.ledgerline.app.data.ShareResult("t", "k", "https://h/s/t#s:k"))
         override suspend fun updateFileShare(id: String, isFolder: Boolean, opts: de.ledgerline.app.data.ShareOptions) =
             Outcome.Ok(de.ledgerline.app.data.ShareResult("t", "k", "https://h/s/t#s:k"))
-        override suspend fun revokeFileShare(id: String, isFolder: Boolean) = Outcome.Ok(Unit)
+        override suspend fun revokeFileShare(id: String, isFolder: Boolean): Outcome<Unit> {
+            revoked.add(id to isFolder); return Outcome.Ok(Unit)
+        }
     }
 
     private fun vm() = FilesViewModel(
@@ -133,6 +136,21 @@ class FilesViewModelTest {
         vm.setQuery("")
         assertEquals(listOf("Docs"), vm.state.value.folders.map { it.name })
         assertEquals(listOf("root.txt"), vm.state.value.files.map { it.name })
+    }
+
+    @Test fun deleteForever_revokes_a_live_share_first() = runTest {
+        val shared = FileEntry(id = "s1", name = "shared.txt", blob = "b", trashed = true,
+            share = de.ledgerline.app.domain.model.ShareInfo(token = "tok", sk = "sk"))
+        cache.set(Workspace(WorkspaceManifest(files = listOf(shared)), version = 1))
+        val vm = vm(); vm.refresh()
+        vm.deleteForever(shared)
+        assertEquals(listOf("s1" to false), revoked)
+    }
+
+    @Test fun deleteForever_without_share_does_not_revoke() = runTest {
+        val vm = vm(); vm.refresh()
+        vm.deleteForever(FileEntry(id = "f1", name = "root.txt", blob = "b"))
+        assertTrue(revoked.isEmpty())
     }
 
     @Test fun setQuery_does_not_affect_trash_view() = runTest {
