@@ -673,7 +673,13 @@ Prüfung (Maven-Central + Google-Maven-Metadata, Prereleases ausschließen):
 # je Artefakt letzte <version> ohne alpha|beta|rc|dev|snapshot|M|eap nehmen.
 ```
 Nach jedem Bump: `:app:testDebugUnitTest` + `:app:assembleDebug` grün, Krypto-Interop-
-Tests grün (`PQKEMKatTest` on-JVM, `*InstrumentedTest` on-device).
+Tests grün (`PQKEMKatTest` on-JVM, `*InstrumentedTest` + **`CryptoKatTest`** on-device).
+
+> **Interop-KATs (Phase 8, 2026-07-27):** `CryptoKatTest` (androidTest) prüft **byte-exakt** gegen
+> eine **unabhängige** libsodium (PyNaCl, andere Bindung an dieselbe C-Lib): Argon2id-VK-Derivation,
+> secretbox seal+open, secretstream-Decrypt+Framing. Fixtures `androidTest/assets/crypto_kat.json`,
+> reproduzierbar via `tools/gen_crypto_kat.py`. sealManifest-Byte-Exaktheit = CanonicalJson
+> (`CanonicalJsonTest`) + secretbox (KAT) + Padmé (`PadmeTest`), Envelope-Roundtrip im KAT geprüft.
 
 **Bewusst zurückgehalten (dokumentiert, bei jeder Prüfung neu bewerten):**
 - **BouncyCastle 1.84** (statt 1.85/1.85.1): ab 1.85 sind bcutil-Klassen in bcprov
