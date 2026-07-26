@@ -302,7 +302,37 @@ private fun PwDetail(item: SecretItem, vm: PasswordsViewModel, onBack: () -> Uni
             item.custom.forEach { c -> FieldRow(c.label.ifBlank { "Field" }, c.value, secret = c.kind == "secret", context) }
             vm.tfaSetupUrl(item)?.let { url -> TfaOfferRow(url, context) }
             if (SecretFields.str(item, "password").isNotBlank()) BreachRow(item, vm)
+            PasskeysSection(item, vm)
             if (item.versions.isNotEmpty()) VersionHistory(item, vm)
+        }
+    }
+}
+
+/**
+ * In-app passkey management for a login: lists the passkeys embedded in this item
+ * (rpId + userName) with a per-entry delete. Standalone `passkey` items are managed as
+ * ordinary secrets (list/detail/trash); this surfaces the embedded ones the detail otherwise hides.
+ */
+@Composable
+private fun PasskeysSection(item: SecretItem, vm: PasswordsViewModel) {
+    val passkeys = remember(item) { de.ledgerline.app.core.passkey.PasskeyStore.embedded(item) }
+    if (passkeys.isEmpty()) return
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        Text(
+            stringResource(de.ledgerline.app.R.string.pw_passkeys),
+            style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+        )
+        passkeys.forEach { pk ->
+            ListItem(
+                headlineContent = { Text(pk.userName.ifBlank { pk.rpId }) },
+                supportingContent = { Text(pk.rpId) },
+                leadingContent = { Icon(Icons.Outlined.Fingerprint, contentDescription = null) },
+                trailingContent = {
+                    IconButton(onClick = { vm.deleteEmbeddedPasskey(item.id, pk.credentialIdB64) }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = stringResource(de.ledgerline.app.R.string.action_delete))
+                    }
+                },
+            )
         }
     }
 }

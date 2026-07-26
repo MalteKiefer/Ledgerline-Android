@@ -528,9 +528,14 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   `LedgerlinePasskeyService` (BeginCreate→CreateEntry, BeginGet→**AuthenticationAction** da locked)
   + `PasskeyProviderActivity` (unlock-gated wie Autofill/Share; CREATE→generieren+speichern,
   GET→entsperren+Kandidaten enumerieren, ASSERT→signieren). Manifest `BIND_CREDENTIAL_PROVIDER_SERVICE`
-  + `xml/passkey_provider`; aktivieren via Settings→Passkeys. **Offen/best-effort:** clientDataJSON-
-  Origin für App-Caller (Browser liefern `clientDataHash`, korrekt behandelt; App-Caller-Origin
-  `https://<rpId>` provisorisch), on-device-Ceremony-Verifikation.
+  + `xml/passkey_provider`; aktivieren via Settings→Passkeys. **In-App-Verwaltung (2026-07-27):**
+  standalone `passkey`-Items werden als normale Secrets gelistet/angezeigt/gelöscht; in Login-Items
+  **eingebettete** Passkeys (`fields["passkeys"]`) erscheinen jetzt im Login-Detail (`PasskeysSection`:
+  rpId+userName + Löschen je Eintrag) via `PasskeyStore.embedded`/`detach` (+ `PasswordsViewModel.
+  deleteEmbeddedPasskey`; Test `PasskeyManagementTest`). Create/Get-Flows sind FLAG_SECURE + unlock-gated
+  (verifiziert: `PasskeyProviderActivity` setzt FLAG_SECURE). **Offen/best-effort:** clientDataJSON-Origin
+  für App-Caller (Browser liefern `clientDataHash`, korrekt behandelt; App-Caller-Origin `https://<rpId>`
+  provisorisch), **on-device-Ceremony-Verifikation gegen echte RP** (nur am Gerät möglich).
   **Offen:** geteilte Passwort-Vaults (PQ-Sharing, §S3), Inline-Autofill-Presentations
   (Menu-Presentation, `Dataset.Builder(RemoteViews)` deprecated aber funktional), volle
   RU-Übersetzung der übrigen Passwort-UI-Strings.

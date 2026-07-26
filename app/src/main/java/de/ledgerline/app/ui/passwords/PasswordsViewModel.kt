@@ -201,6 +201,11 @@ class PasswordsViewModel @Inject constructor(
 
     fun deleteForever(id: String) = mutate("delete") { secrets -> secrets.filterNot { it.id == id } }
 
+    /** Remove a passkey embedded in a login item (in-app passkey management). */
+    fun deleteEmbeddedPasskey(loginId: String, credentialIdB64: String) = mutate("passkey-detach") { secrets ->
+        de.ledgerline.app.core.passkey.PasskeyStore.detach(loginId, credentialIdB64, secrets, Instant.now().toString())
+    }
+
     /** Insert or update [item], snapshotting the previous version when its content changed. */
     fun upsert(item: SecretItem, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch {

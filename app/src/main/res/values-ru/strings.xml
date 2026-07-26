@@ -66,6 +66,7 @@
     <string name="pw_breach_clear">В известных утечках не найдено</string>
     <string name="pw_breach_found">Найдено в %1$d утечках — смените пароль</string>
     <string name="pw_breach_error">Проверка утечек недоступна</string>
+        <string name="pw_passkeys">Passkey-Ключи</string>
     <string name="pw_version_history">История версий</string>
     <string name="pw_version_restore">Восстановить</string>
     <string name="pw_folder">Папка</string>
