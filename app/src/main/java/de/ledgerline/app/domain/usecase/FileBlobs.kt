@@ -16,4 +16,11 @@ interface FileBlobs {
     suspend fun downloadToBytes(blob: String, encFileKey: String): Outcome<ByteArray>
     suspend fun downloadTo(blob: String, encFileKey: String, write: (ByteArray) -> Unit): Outcome<Unit>
     suspend fun deleteBlobs(blobs: List<String>)
+
+    /**
+     * Living-set reconcile: hand the server EVERY blob id still referenced by the files manifest so
+     * it reclaims orphans a failed eager DELETE left behind (24 h grace). Best-effort; ignores
+     * failures. [livingSet] must be the COMPLETE referenced set — a missing id would free live data.
+     */
+    suspend fun reconcile(livingSet: List<String>)
 }

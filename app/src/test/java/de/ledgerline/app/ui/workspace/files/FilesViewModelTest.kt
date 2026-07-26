@@ -72,6 +72,8 @@ class FilesViewModelTest {
             return Outcome.Ok(Unit)
         }
         override suspend fun deleteBlobs(blobs: List<String>) { deleted += blobs }
+        val reconciled = mutableListOf<List<String>>()
+        override suspend fun reconcile(livingSet: List<String>) { reconciled += livingSet }
     }
 
     // Stub usage: returns a fixed used/quota.

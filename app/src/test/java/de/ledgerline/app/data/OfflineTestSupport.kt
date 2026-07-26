@@ -133,6 +133,7 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun galleryUploadComplete(body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse> = throw NotImplementedError()
     override suspend fun galleryUploadAbort(body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
     override suspend fun deleteBlob(blob: String): Response<Unit> = throw NotImplementedError()
+    override suspend fun filesReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
     // Default to an empty sharded files store so WorkspaceRepository.load()'s files slice
     // resolves to an empty list in fakes that don't exercise files. Override where needed.
     override suspend fun filesStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))

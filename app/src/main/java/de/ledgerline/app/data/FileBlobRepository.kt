@@ -210,4 +210,13 @@ class FileBlobRepository @VisibleForTesting internal constructor(
         val api = apiProvider(session)
         deleteBlobsWithBackoff(blobs) { api.deleteBlob(it) }
     }
+
+    override suspend fun reconcile(livingSet: List<String>) {
+        withContext(Dispatchers.IO) {
+            val session = sessionHolder.get() ?: return@withContext
+            runCatching {
+                apiProvider(session).filesReconcile(de.ledgerline.app.data.remote.dto.ReconcileRequest(livingSet.distinct()))
+            }
+        }
+    }
 }

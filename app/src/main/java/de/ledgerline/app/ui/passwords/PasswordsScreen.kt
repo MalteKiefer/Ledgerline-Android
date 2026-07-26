@@ -363,7 +363,11 @@ private fun PwEdit(item: SecretItem, onCancel: () -> Unit, onSave: (SecretItem) 
         topBar = {
             AppTopBar(if (item.title.isBlank()) "New ${typeLabel(item.type)}" else "Edit", onBack = onCancel, actions = {
                 TextButton(onClick = {
-                    val fields = SecretFields.build(item.fields, item.type, values.mapValues { it.value.value }, listOf(url))
+                    // Normalise a pasted otpauth:// TOTP URI to the bare base32 secret we store.
+                    val normalized = values.mapValues { (k, st) ->
+                        if (k == "totp") de.ledgerline.app.core.passwords.Totp.normalizeSecret(st.value) else st.value
+                    }
+                    val fields = SecretFields.build(item.fields, item.type, normalized, listOf(url))
                     onSave(item.copy(title = title.ifBlank { typeLabel(item.type) }, fields = fields))
                 }) { Text("Save") }
             })

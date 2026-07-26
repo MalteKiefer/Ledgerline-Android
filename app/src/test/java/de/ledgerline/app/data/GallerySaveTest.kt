@@ -79,6 +79,7 @@ class GallerySaveTest {
         override suspend fun store(): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun moduleStore(module: String): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
+        override suspend fun filesReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
         override suspend fun filesStore(): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun filesStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun putStore(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()

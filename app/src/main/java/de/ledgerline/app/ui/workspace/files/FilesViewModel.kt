@@ -179,6 +179,7 @@ class FilesViewModel @Inject constructor(
         val res = mutate.invoke { FileOps.removeFile(it, file.id) }
         if (res is Outcome.Ok) {
             blobRepo.deleteBlobs(listOf(file.blob) + file.versions.map { it.blob })
+            reconcileLivingSet()
             loadUsage()
         }
     }
@@ -190,8 +191,21 @@ class FilesViewModel @Inject constructor(
         val res = mutate.invoke { FileOps.emptyTrashFiles(it) }
         if (res is Outcome.Ok) {
             blobRepo.deleteBlobs(freedBlobs)
+            reconcileLivingSet()
             loadUsage()
         }
+    }
+
+    /**
+     * Best-effort living-set reconcile: hand the server every blob still referenced by the current
+     * manifest so a blob orphaned by a failed eager DELETE is reclaimed after the 24 h grace. Must
+     * run only after a successful manifest save (the cache reflects the post-delete state).
+     */
+    private suspend fun reconcileLivingSet() {
+        val living = cache.value.value?.manifest?.files
+            ?.flatMap { listOf(it.blob) + it.versions.map { v -> v.blob } }
+            ?.filter { it.isNotBlank() } ?: return
+        blobRepo.reconcile(living)
     }
 
     fun deleteFolder(folderId: String) = viewModelScope.launch {
@@ -206,6 +220,7 @@ class FilesViewModel @Inject constructor(
         }
         if (res is Outcome.Ok) {
             blobRepo.deleteBlobs(freedBlobs)
+            reconcileLivingSet()
             loadUsage()
         }
     }

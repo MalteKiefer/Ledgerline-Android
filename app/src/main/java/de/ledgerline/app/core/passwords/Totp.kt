@@ -12,6 +12,20 @@ object Totp {
     private const val PERIOD = 30
     private const val DIGITS = 6
 
+    /**
+     * Normalise a user-entered TOTP value to the bare base32 secret we store, matching the web
+     * `totpSecret()` (`passwords-util.js`): a pasted `otpauth://…?secret=XXX` URI yields its
+     * `secret` query param; a plain base32 secret is returned trimmed. This keeps the stored value
+     * cross-client-identical and lets `code()` (which expects bare base32) produce live digits.
+     */
+    fun normalizeSecret(value: String): String {
+        val v = value.trim()
+        if (v.isEmpty()) return ""
+        if (!v.startsWith("otpauth://", ignoreCase = true)) return v
+        val m = Regex("[?&]secret=([^&]+)", RegexOption.IGNORE_CASE).find(v) ?: return ""
+        return runCatching { java.net.URLDecoder.decode(m.groupValues[1], "UTF-8") }.getOrDefault(m.groupValues[1])
+    }
+
     /** The current 6-digit code for [base32Secret], or null if the secret is not valid base32. */
     fun code(base32Secret: String, nowSeconds: Long = System.currentTimeMillis() / 1000): String? {
         val key = base32Decode(base32Secret) ?: return null

@@ -144,13 +144,19 @@ class ContactsViewModel @Inject constructor(
         val freed = cache.value.value?.manifest?.contacts.orEmpty()
             .filter { it.trashed }.mapNotNull { it.avatarRef }
         write { m -> ContactOps.emptyTrash(m) }
-        if (freed.isNotEmpty()) viewModelScope.launch { blobs.deleteBlobs(freed) }
+        if (freed.isNotEmpty()) viewModelScope.launch { blobs.deleteBlobs(freed); reconcileAvatars() }
     }
 
     fun deleteForever(id: String) {
         val ref = contactById(id)?.avatarRef
         write { m -> ContactOps.removeContact(m, id) }
-        if (!ref.isNullOrBlank()) viewModelScope.launch { blobs.deleteBlobs(listOf(ref)) }
+        if (!ref.isNullOrBlank()) viewModelScope.launch { blobs.deleteBlobs(listOf(ref)); reconcileAvatars() }
+    }
+
+    /** Best-effort living-set reconcile of contact avatar blobs (reclaims failed eager deletes). */
+    private suspend fun reconcileAvatars() {
+        val living = cache.value.value?.manifest?.contacts.orEmpty().mapNotNull { it.avatarRef }.filter { it.isNotBlank() }
+        blobs.reconcile(living)
     }
 
     // ---- Avatar ----
