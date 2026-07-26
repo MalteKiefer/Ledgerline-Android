@@ -1,38 +1,51 @@
+# DEPENDENCY POLICY: every version here MUST be the latest stable release. Verified
+# before every build/release (see CLAUDE.md §17 "Dependency currency"). Last checked
+# against Maven Central + Google Maven metadata: 2026-07-25.
 [versions]
-agp = "9.2.0"
-kotlin = "2.4.0"
+agp = "9.3.1"
+kotlin = "2.4.10"
 ksp = "2.3.10"
 hilt = "2.60.1"
 composeBom = "2026.06.01"
-lifecycle = "2.10.0"
+lifecycle = "2.11.0"
 navigation = "2.9.8"
+# HELD (2026-07-25): retrofit 3.0.0 + okhttp 5.4.0 broke QR pairing on-device (claim/poll
+# caught as NETWORK, though the server received the claim). Unit tests pass — they use fakes +
+# a CLEARTEXT MockWebServer, so the real-TLS path was never exercised; the likely cause is
+# OkHttp 5's RESTRICTED_TLS cipher/handshake change vs the self-hosted server (and/or the
+# Retrofit-2 jakewharton kotlinx converter under Retrofit 3). Reverted BOTH to the proven pair.
+# Re-adopt only after: first-party retrofit3 converter, OkHttp-5 TLS review, and on-device
+# pairing verification (dependency-currency policy §16).
 retrofit = "2.11.0"
 okhttp = "4.12.0"
 kotlinxSerialization = "1.11.0"
 retrofitSerialization = "1.0.0"
 datastore = "1.2.1"
-camerax = "1.6.0"
+camerax = "1.6.1"
 media3 = "1.10.1"
-zxing = "3.5.3"
+zxing = "3.5.4"
 biometric = "1.1.0"
 lazysodium = "5.2.0"
-jna = "5.19.0"
+jna = "5.19.1"
 coroutines = "1.11.0"
 junit = "4.13.2"
-mockk = "1.14.3"
+mockk = "1.14.11"
 androidxTestJunit = "1.3.0"
-androidxTestRunner = "1.6.2"
+androidxTestRunner = "1.7.0"
 androidxTestCore = "1.7.0"
 robolectric = "4.16.1"
 pdfbox = "2.0.27.0"
 documentfile = "1.1.0"
 # Force the BouncyCastle that pdfbox-android drags in (1.72) up to a patched release:
 # clears CVE-2023-33201 (LDAP injection), CVE-2023-33202 (PEM DoS) + the 2024 BC CVEs.
-bouncycastle = "1.78.1"
+# 1.80+ brings FIPS-203 ML-KEM (org.bouncycastle.pqc.crypto.mlkem) for the
+# post-quantum hybrid KEM (PQKEM) — byte-exact to web/iOS, verified by the NIST KAT.
+# HELD at 1.84 (newest clean): 1.85/1.85.1 merged bcutil's classes into bcprov, which
+# duplicate-clashes with the transitive bcutil on the classpath. Re-evaluate when BC
+# fixes the packaging (tracked, dependency-currency policy §17).
+bouncycastle = "1.84"
 # MapLibre GL Android (BSD-2/3, libre — no Google, no Mapbox, no API key, no telemetry).
-# 13.3.1 is the current stable release (Maven Central, 2026-06). minSdk here is 36, so
-# MapLibre 12's minSdk 21→23 bump is a non-issue. Annotation plugin (SymbolManager) 3.0.2.
-maplibre = "13.3.1"
+maplibre = "13.4.1"
 maplibreAnnotation = "3.0.2"
 
 [libraries]

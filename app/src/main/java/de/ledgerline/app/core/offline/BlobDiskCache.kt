@@ -74,6 +74,9 @@ class BlobDiskCache(
         enforceLimit(offlineFlags.maxBytes(), protect = blobId)
     }
 
+    /** A scratch directory (under the cache root) for transient encrypt-to-disk uploads. */
+    fun tempDir(): File = File(root, "tmp").apply { mkdirs() }
+
     /** True if a cached blob exists for [blobId]. */
     fun has(blobId: String): Boolean = safe(blobId) && File(root, blobId).exists()
 

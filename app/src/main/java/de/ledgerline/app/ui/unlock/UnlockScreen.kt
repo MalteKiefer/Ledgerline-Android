@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
+import de.ledgerline.app.ui.theme.PrimaryGradientButton
 import kotlinx.coroutines.launch
 
 /**
@@ -99,17 +100,12 @@ fun UnlockScreen(
                 if (!recoveryMode) {
                     if (canQuickUnlock) {
                         // One STRONG biometric opens the remembered session + VK — no passphrase.
-                        Button(
+                        PrimaryGradientButton(
+                            text = stringResource(R.string.unlock_biometric_button),
                             onClick = { scope.launch { vm.quickUnlock(strongAuthorize) } },
                             enabled = state != UnlockUiState.Working,
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape = RoundedCornerShape(16.dp),
-                        ) {
-                            Text(
-                                stringResource(R.string.unlock_biometric_button),
-                                style = MaterialTheme.typography.labelLarge,
-                            )
-                        }
+                            modifier = Modifier.height(52.dp),
+                        )
                         Spacer(Modifier.height(16.dp))
                         Text(
                             stringResource(R.string.unlock_or_passphrase),
@@ -128,7 +124,8 @@ fun UnlockScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(16.dp))
-                    Button(
+                    PrimaryGradientButton(
+                        text = stringResource(R.string.unlock_button),
                         onClick = {
                             val entered = passphrase.toCharArray()
                             passphrase = ""
@@ -136,11 +133,8 @@ fun UnlockScreen(
                             scope.launch { vm.unlock(entered, authorize, strongAuthorize) }
                         },
                         enabled = state != UnlockUiState.Working,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Text(stringResource(R.string.unlock_button), style = MaterialTheme.typography.labelLarge)
-                    }
+                        modifier = Modifier.height(52.dp),
+                    )
                     TextButton(
                         onClick = { recoveryMode = true; vm.reset() },
                         enabled = state != UnlockUiState.Working,
@@ -157,18 +151,16 @@ fun UnlockScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(16.dp))
-                    Button(
+                    PrimaryGradientButton(
+                        text = stringResource(R.string.unlock_recovery_button),
                         onClick = {
                             val entered = recoveryCode
                             recoveryCode = ""
                             scope.launch { vm.unlockWithRecovery(entered, authorize, strongAuthorize) }
                         },
                         enabled = state != UnlockUiState.Working,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Text(stringResource(R.string.unlock_recovery_button), style = MaterialTheme.typography.labelLarge)
-                    }
+                        modifier = Modifier.height(52.dp),
+                    )
                     TextButton(
                         onClick = { recoveryMode = false; recoveryCode = ""; vm.reset() },
                         enabled = state != UnlockUiState.Working,
@@ -193,6 +185,14 @@ fun UnlockScreen(
                         Spacer(Modifier.height(12.dp))
                         Text(
                             stringResource(R.string.unlock_error),
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    is UnlockUiState.LockedOut -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            stringResource(R.string.unlock_locked_out, (state as UnlockUiState.LockedOut).seconds),
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center,
                         )

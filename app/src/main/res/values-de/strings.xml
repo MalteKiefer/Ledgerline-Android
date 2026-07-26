@@ -4,6 +4,8 @@
     <!-- Onboarding / Willkommen -->
     <string name="welcome_tagline">Deine private Zero-Knowledge-Cloud</string>
     <string name="welcome_get_started">Los geht\'s</string>
+    <string name="welcome_next">Weiter</string>
+    <string name="welcome_skip">Überspringen</string>
     <string name="welcome_step_connect">Dieses Gerät verbinden</string>
     <string name="welcome_step_unlock">Tresor entsperren</string>
 
@@ -23,6 +25,24 @@
     <string name="unlock_button">Entsperren</string>
     <string name="unlock_not_configured">Noch kein Tresor. Bitte zuerst in der Web-App einrichten.</string>
     <string name="unlock_error">Falsche Passphrase oder Entsperren nicht möglich.</string>
+    <string name="unlock_locked_out">Zu viele Versuche. Erneut in %1$d s.</string>
+    <!-- Security: Audit-Log + Duress -->
+    <string name="security_section">Sicherheit</string>
+    <string name="security_log_title">Sicherheitsprotokoll</string>
+    <string name="security_log_open">Sicherheitsprotokoll anzeigen</string>
+    <string name="security_log_empty">Noch keine Sicherheitsereignisse.</string>
+    <string name="security_log_clear">Protokoll löschen</string>
+    <string name="security_duress_title">Duress-Auto-Löschung</string>
+    <string name="security_duress_body">Nach so vielen falschen Passphrasen werden alle lokalen Daten gelöscht und das Gerät muss neu gekoppelt werden. Dieser Schutz ist immer aktiv.</string>
+    <string name="security_duress_threshold">Fehlversuche bis zur Löschung: %1$d</string>
+    <string name="sec_event_PAIRED">Gerät gekoppelt</string>
+    <string name="sec_event_UNLOCK_SUCCESS">Tresor entsperrt</string>
+    <string name="sec_event_UNLOCK_FAILED">Fehlgeschlagener Entsperrversuch</string>
+    <string name="sec_event_RECOVERY_UNLOCK">Mit Wiederherstellungscode entsperrt</string>
+    <string name="sec_event_THROTTLE_LOCKOUT">Gesperrt (zu viele Versuche)</string>
+    <string name="sec_event_DURESS_WIPE">Duress-Löschung ausgelöst</string>
+    <string name="sec_event_REMOTE_WIPE">Remote-Löschung</string>
+    <string name="sec_event_LOGOUT">Abgemeldet</string>
     <string name="unlock_use_recovery">Wiederherstellungscode verwenden</string>
     <string name="unlock_recovery_hint">Wiederherstellungscode</string>
     <string name="unlock_recovery_button">Entsperren</string>
@@ -33,6 +53,7 @@
     <string name="tab_files">Dateien</string>
     <string name="tab_gallery">Galerie</string>
     <string name="tab_notes">Notizen</string>
+    <string name="tab_passwords">Passwörter</string>
     <string name="tab_bookmarks">Lesezeichen</string>
     <string name="tab_todos">Todos</string>
     <string name="ws_empty_files">Noch keine Dateien.</string>
@@ -155,6 +176,18 @@
     <string name="settings_cat_backup_sub">Kamerarolle automatisch in die Galerie sichern</string>
     <string name="settings_cat_account">Konto</string>
     <string name="settings_cat_account_sub">Dieses Gerät trennen</string>
+    <!-- Autofill -->
+    <string name="autofill_unlock_and_fill">Ledgerline — entsperren &amp; ausfüllen</string>
+    <string name="autofill_pick_title">Login auswählen</string>
+    <string name="autofill_no_matches">Keine passenden Logins</string>
+    <string name="autofill_saved">In Ledgerline gespeichert</string>
+    <string name="autofill_save_failed">Konnte nicht gespeichert werden</string>
+    <string name="settings_cat_autofill">Autofill</string>
+    <string name="settings_cat_autofill_sub">Passwörter in anderen Apps &amp; im Browser ausfüllen</string>
+    <string name="autofill_enable_action">Ledgerline-Autofill aktivieren</string>
+    <string name="autofill_status_enabled">Ledgerline ist dein Autofill-Dienst</string>
+    <string name="autofill_status_disabled">Ein anderer Dienst (oder keiner) ist aktiv</string>
+    <string name="autofill_unsupported">Autofill ist auf diesem Gerät nicht verfügbar</string>
     <string name="settings_cat_about">Über</string>
     <string name="settings_cat_about_sub">Version, Zero-Knowledge</string>
     <string name="settings_backup_section">Kamera-Backup</string>

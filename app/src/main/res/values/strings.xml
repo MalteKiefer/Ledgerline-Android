@@ -4,6 +4,8 @@
     <!-- Onboarding / welcome -->
     <string name="welcome_tagline">Your private, zero-knowledge cloud</string>
     <string name="welcome_get_started">Get started</string>
+    <string name="welcome_next">Next</string>
+    <string name="welcome_skip">Skip</string>
     <string name="welcome_step_connect">Connect this device</string>
     <string name="welcome_step_unlock">Unlock your vault</string>
 
@@ -23,6 +25,24 @@
     <string name="unlock_button">Unlock</string>
     <string name="unlock_not_configured">No vault yet. Set it up in the web app first.</string>
     <string name="unlock_error">Wrong passphrase or unable to unlock.</string>
+    <string name="unlock_locked_out">Too many attempts. Try again in %1$d s.</string>
+    <!-- Security: audit log + duress -->
+    <string name="security_section">Security</string>
+    <string name="security_log_title">Security log</string>
+    <string name="security_log_open">View security log</string>
+    <string name="security_log_empty">No security events recorded yet.</string>
+    <string name="security_log_clear">Clear log</string>
+    <string name="security_duress_title">Duress auto-wipe</string>
+    <string name="security_duress_body">After this many wrong passphrases, all local data is erased and the device must be re-paired. This protection is always on.</string>
+    <string name="security_duress_threshold">Wrong attempts before wipe: %1$d</string>
+    <string name="sec_event_PAIRED">Device paired</string>
+    <string name="sec_event_UNLOCK_SUCCESS">Vault unlocked</string>
+    <string name="sec_event_UNLOCK_FAILED">Failed unlock attempt</string>
+    <string name="sec_event_RECOVERY_UNLOCK">Unlocked with recovery code</string>
+    <string name="sec_event_THROTTLE_LOCKOUT">Locked out (too many attempts)</string>
+    <string name="sec_event_DURESS_WIPE">Duress wipe triggered</string>
+    <string name="sec_event_REMOTE_WIPE">Remote wipe</string>
+    <string name="sec_event_LOGOUT">Signed out</string>
     <string name="unlock_use_recovery">Use recovery code</string>
     <string name="unlock_recovery_hint">Recovery code</string>
     <string name="unlock_recovery_button">Unlock</string>
@@ -33,6 +53,7 @@
     <string name="tab_files">Files</string>
     <string name="tab_gallery">Gallery</string>
     <string name="tab_notes">Notes</string>
+    <string name="tab_passwords">Passwords</string>
     <string name="tab_bookmarks">Bookmarks</string>
     <string name="tab_todos">Todos</string>
     <string name="ws_empty_files">No files yet.</string>
@@ -170,6 +191,18 @@
     <string name="settings_cat_backup_sub">Auto-back-up your camera roll to the gallery</string>
     <string name="settings_cat_account">Account</string>
     <string name="settings_cat_account_sub">Disconnect this device</string>
+    <!-- Autofill -->
+    <string name="autofill_unlock_and_fill">Ledgerline — unlock &amp; fill</string>
+    <string name="autofill_pick_title">Choose a login</string>
+    <string name="autofill_no_matches">No matching logins</string>
+    <string name="autofill_saved">Saved to Ledgerline</string>
+    <string name="autofill_save_failed">Couldn\'t save</string>
+    <string name="settings_cat_autofill">Autofill</string>
+    <string name="settings_cat_autofill_sub">Fill passwords in other apps &amp; the browser</string>
+    <string name="autofill_enable_action">Enable Ledgerline autofill</string>
+    <string name="autofill_status_enabled">Ledgerline is your autofill service</string>
+    <string name="autofill_status_disabled">Another service (or none) is active</string>
+    <string name="autofill_unsupported">Autofill isn\'t available on this device</string>
     <string name="settings_cat_about">About</string>
     <string name="settings_cat_about_sub">Version, zero-knowledge</string>
     <string name="settings_backup_section">Camera backup</string>

@@ -87,6 +87,36 @@ class SodiumCrypto @Inject constructor() : Crypto {
         return """{"c":"${b64encode(cipher)}","n":"${b64encode(nonce)}"}"""
     }
 
+    override fun sealValue(data: ByteArray, key: ByteArray): String {
+        val nonce = ByteArray(SecretBox.NONCEBYTES)
+        randomBytes(nonce)
+        val cipher = ByteArray(data.size + SecretBox.MACBYTES)
+        check(ls.cryptoSecretBoxEasy(cipher, data, data.size.toLong(), nonce, key)) { "seal failed" }
+        return """{"c":"${b64encode(cipher)}","n":"${b64encode(nonce)}"}"""
+    }
+
+    override fun openValue(cn: String, key: ByteArray): ByteArray? = try {
+        val env = lenientJson.parseToJsonElement(cn) as JsonObject
+        val c = (env["c"] ?: return null).jsonPrimitive.content
+        val n = (env["n"] ?: return null).jsonPrimitive.content
+        secretBoxOpen(b64decode(c), b64decode(n), key)
+    } catch (_: Exception) {
+        null
+    }
+
+    override fun genericHash(input: ByteArray, outLen: Int): ByteArray {
+        val out = ByteArray(outLen)
+        check(ls.cryptoGenericHash(out, out.size, input, input.size.toLong())) { "generichash failed" }
+        return out
+    }
+
+    /** Test-only: secretbox-seal [plaintext] with an explicit [nonce] (byte-parity fixtures). */
+    fun secretBoxSealForTest(plaintext: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray {
+        val cipher = ByteArray(plaintext.size + SecretBox.MACBYTES)
+        check(ls.cryptoSecretBoxEasy(cipher, plaintext, plaintext.size.toLong(), nonce, key)) { "seal failed" }
+        return cipher
+    }
+
     private fun randomBytes(out: ByteArray) {
         java.security.SecureRandom().nextBytes(out)
     }

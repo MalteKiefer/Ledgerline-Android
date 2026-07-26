@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ledgerline_background">#0E1513</color>
-    <color name="ledgerline_accent">#4FD8C4</color>
+    <!-- Light window background + brand accent (indigo). The dark values live in
+         values-night/colors.xml so the pre-Compose window flash matches the theme. -->
+    <color name="ledgerline_background">#FDFBFF</color>
+    <color name="ledgerline_accent">#7066F5</color>
 </resources>

@@ -4,6 +4,9 @@ import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
+import de.ledgerline.app.data.remote.dto.UploadAbortRequest
+import de.ledgerline.app.data.remote.dto.UploadCompleteRequest
+import de.ledgerline.app.data.remote.dto.UploadInitRequest
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
 import androidx.annotation.VisibleForTesting
@@ -74,10 +77,25 @@ class FileBlobRepository @VisibleForTesting internal constructor(
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val enc = crypto.newContentEncryptor(vk)
+        val api = apiProvider(session)
+
+        // Large files/videos go via the S3-multipart chunked path (constant memory); smaller
+        // ones stream single-shot below.
+        if (size >= ChunkedUpload.THRESHOLD) {
+            return@withContext ChunkedUpload.upload(
+                encryptor = enc, chunkSize = crypto.contentChunkSize, size = size, openInput = openInput,
+                tempDir = blobCache.tempDir(),
+                init = { encSize -> api.filesUploadInit(UploadInitRequest(encSize)).bodyOrNull() },
+                part = { token, num, chunk -> api.filesUploadPart(token.textPart(), num.toString().textPart(), chunk.chunkPart(num)).bodyOrNull() },
+                complete = { token, parts -> api.filesUploadComplete(UploadCompleteRequest(token, parts)).bodyOrNull()?.id },
+                abort = { token -> runCatching { api.filesUploadAbort(UploadAbortRequest(token)) } },
+            )
+        }
+
         val body = EncryptedUpload.body(enc, crypto.contentChunkSize, size, openInput)
         try {
             val part = MultipartBody.Part.createFormData("file", name, body)
-            val res = apiProvider(session).uploadFile(part)
+            val res = api.uploadFile(part)
             if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
             Outcome.Ok(UploadedBlob(res.body()!!.id, enc.sealKey(), size))
         } catch (e: Exception) {

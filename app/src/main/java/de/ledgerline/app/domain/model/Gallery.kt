@@ -13,7 +13,8 @@ data class GalleryPhoto(
     val metaRef: String? = null, val metaKey: String? = null,
     val faceCropRefs: List<String> = emptyList(),
     val sig: String? = null,
-    val lat: Double? = null, val lng: Double? = null,
+    @Serializable(with = FlexibleDoubleSerializer::class) val lat: Double? = null,
+    @Serializable(with = FlexibleDoubleSerializer::class) val lng: Double? = null,
     val width: Int? = null, val height: Int? = null, val duration: Double? = null,
     val created: String? = null,
     @Serializable(with = FlexibleTrashedSerializer::class) val trashed: Boolean = false,
@@ -68,6 +69,7 @@ data class PersonFace(
     val idx: Int = 0,
     val cropRef: String? = null,
     val cropKey: String? = null,
+    val manual: Boolean = false, // a manually-tagged face (web `manual:true`)
 )
 
 @Serializable
@@ -97,7 +99,13 @@ data class Gallery(val manifest: GalleryManifest, val version: Int)
  * to 1000 photo records. Introduced server-side to keep the root manifest small.
  */
 @Serializable
-data class GalleryShard(val ref: String = "", val key: String = "", val hash: String? = null, val count: Int = 0)
+data class GalleryShard(
+    val ref: String = "",
+    val key: String = "",
+    val hash: String? = null,
+    val count: Int = 0,
+    val bucket: Int = 0,
+)
 
 /**
  * The raw `/gallery/store` root manifest. v2 lists photo [shards] (fetched + decrypted +
@@ -107,8 +115,14 @@ data class GalleryShard(val ref: String = "", val key: String = "", val hash: St
 @Serializable
 data class GalleryRoot(
     val v: Int = 1,
+    val suite: Int = 1,
+    val shardBits: Int = 0,
     val shards: List<GalleryShard> = emptyList(),
     val photos: List<GalleryPhoto> = emptyList(),
+    // v3: albums/people live in content-addressed collection blobs (refs below); v1/v2
+    // inline them in these fields. The loader prefers the refs when present.
     val albums: List<GalleryAlbum> = emptyList(),
     val people: List<GalleryPerson> = emptyList(),
+    val albumsRef: String? = null, val albumsKey: String? = null, val albumsHash: String? = null,
+    val peopleRef: String? = null, val peopleKey: String? = null, val peopleHash: String? = null,
 )

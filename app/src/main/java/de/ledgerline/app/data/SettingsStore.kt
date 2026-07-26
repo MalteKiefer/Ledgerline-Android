@@ -41,6 +41,7 @@ class SettingsStore(private val context: Context) {
     private val rememberVaultKey = booleanPreferencesKey("remember_vault")
     private val rememberVaultDaysKey = intPreferencesKey("remember_vault_days")
     private val mapTilesKey = booleanPreferencesKey("map_tiles_enabled")
+    private val duressThresholdKey = intPreferencesKey("duress_threshold")
 
     // Legacy 5a boolean keys, retained only so a stored value migrates into the new
     // enum policies when the new key is absent (§C1).
@@ -118,6 +119,19 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setCacheMaxMb(mb: Int) {
         context.settingsDataStore.edit { it[cacheMaxMbKey] = mb }
+    }
+
+    /**
+     * Duress auto-wipe threshold (consecutive wrong passphrases → wipe). Always active;
+     * any out-of-range value resolves to [WipePolicy.defaultThreshold]. Defaults to 10.
+     */
+    val duressThreshold: Flow<Int> =
+        context.settingsDataStore.data.map {
+            de.ledgerline.app.core.security.WipePolicy.effectiveThreshold(it[duressThresholdKey] ?: de.ledgerline.app.core.security.WipePolicy.defaultThreshold)
+        }
+
+    suspend fun setDuressThreshold(n: Int) {
+        context.settingsDataStore.edit { it[duressThresholdKey] = de.ledgerline.app.core.security.WipePolicy.effectiveThreshold(n) }
     }
 
     /** Whether prefetch is restricted to unmetered (Wi-Fi) networks. Defaults to ON. */

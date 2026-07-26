@@ -82,12 +82,18 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         // MASVS-STORAGE: block screenshots, screen recording, recents preview.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
-        // The app is always dark; force light (dark-style) system bar icons so the
-        // clock/notification icons stay visible on the transparent dark bars.
-        enableEdgeToEdge(
-            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-        )
+        // The app follows the system light/dark setting; pick the system-bar icon
+        // style to match so the clock/notification icons stay legible on the
+        // transparent bars in both modes.
+        val isDark = (resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+        val barStyle = if (isDark) {
+            androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        } else {
+            androidx.activity.SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+        }
+        enableEdgeToEdge(statusBarStyle = barStyle, navigationBarStyle = barStyle)
 
         // Apply the persisted idle-lock timeout asynchronously (never block the main
         // thread on DataStore I/O). Until it loads, IdleLocker's safe default applies, and
@@ -162,9 +168,10 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        // Belt-and-suspenders: force light status bar icons for the dark UI.
+        // Belt-and-suspenders: match the status-bar icon style to the active
+        // light/dark scheme (light background → dark icons, and vice-versa).
         androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-            .isAppearanceLightStatusBars = false
+            .isAppearanceLightStatusBars = !isDark
     }
 
     // singleTask: a pairing link delivered while the activity is alive comes here.

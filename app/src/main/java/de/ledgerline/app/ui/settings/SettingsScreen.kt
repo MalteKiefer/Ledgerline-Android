@@ -3,9 +3,13 @@ package de.ledgerline.app.ui.settings
 import android.Manifest
 import android.app.LocaleManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
+import android.provider.Settings
+import android.view.autofill.AutofillManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,6 +33,7 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
@@ -112,6 +117,8 @@ fun SettingsContent(
     val keepScreenOnMinutes by vm.keepScreenOnMinutes.collectAsStateWithLifecycle()
     val rememberVault by vm.rememberVaultEnabled.collectAsStateWithLifecycle()
     val rememberVaultDays by vm.rememberVaultDays.collectAsStateWithLifecycle()
+    val duressThreshold by vm.duressThreshold.collectAsStateWithLifecycle()
+    val securityEvents by vm.securityEvents.collectAsStateWithLifecycle()
     val mapTiles by vm.mapTilesEnabled.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
     val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
@@ -214,6 +221,10 @@ fun SettingsContent(
                     mapTiles = mapTiles,
                     onSetMapTiles = vm::setMapTilesEnabled,
                     onLockNow = onLockNow,
+                    duressThreshold = duressThreshold,
+                    onSetDuressThreshold = vm::setDuressThreshold,
+                    securityEvents = securityEvents,
+                    onClearSecurityLog = vm::clearSecurityLog,
                 )
 
                 SettingsRoute.OFFLINE -> OfflineSettings(
@@ -350,6 +361,12 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             title = stringResource(R.string.settings_cat_security),
             subtitle = stringResource(R.string.settings_cat_security_sub),
         ) { onNavigate(SettingsRoute.SECURITY) }
+        val autofillContext = LocalContext.current
+        CategoryRow(
+            icon = Icons.Outlined.Password,
+            title = stringResource(R.string.settings_cat_autofill),
+            subtitle = stringResource(R.string.settings_cat_autofill_sub),
+        ) { launchAutofillSettings(autofillContext) }
         CategoryRow(
             icon = Icons.Outlined.CloudOff,
             title = stringResource(R.string.settings_cat_offline),
@@ -378,6 +395,23 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
     }
 }
 
+/**
+ * Opens the system dialog to set Ledgerline as the device autofill service. Uses
+ * ACTION_REQUEST_SET_AUTOFILL_SERVICE targeted at our package when autofill is supported and we
+ * are not already the provider; otherwise falls back to the general autofill settings so the user
+ * can switch away. Best-effort — swallows the (rare) ActivityNotFound on stripped-down ROMs.
+ */
+private fun launchAutofillSettings(context: Context) {
+    val am = context.getSystemService(AutofillManager::class.java)
+    val intent = if (am != null && am.isAutofillSupported && !am.hasEnabledAutofillServices()) {
+        Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE)
+            .setData(Uri.parse("package:${context.packageName}"))
+    } else {
+        Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE)
+    }
+    runCatching { context.startActivity(intent) }
+}
+
 /** A single tappable category row on a tonal surface: leading icon + title + short subtitle. */
 @Composable
 private fun CategoryRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
@@ -396,6 +430,17 @@ private fun CategoryRow(icon: ImageVector, title: String, subtitle: String, onCl
 
 /* --------------------------- Category sub-screens --------------------------- */
 
+/**
+ * App languages offered in Settings, as (BCP-47 tag → native display name). Kept in
+ * sync with res/xml/locales_config.xml and the values-<tag>/strings.xml translations.
+ * "System default" is a separate localized row.
+ */
+private val SUPPORTED_LANGUAGES = listOf(
+    "en" to "English",
+    "de" to "Deutsch",
+    "ru" to "Русский",
+)
+
 @Composable
 private fun AppearanceSettings(
     padding: PaddingValues,
@@ -412,11 +457,10 @@ private fun AppearanceSettings(
             RadioRow(stringResource(R.string.settings_language_system), currentLang == "") {
                 onSelectLang("")
             }
-            RadioRow(stringResource(R.string.settings_language_de), currentLang == "de") {
-                onSelectLang("de")
-            }
-            RadioRow(stringResource(R.string.settings_language_en), currentLang == "en") {
-                onSelectLang("en")
+            // Supported languages, shown by their native (locale-invariant) names. Keep in
+            // sync with res/xml/locales_config.xml and the values-<tag>/strings.xml files.
+            SUPPORTED_LANGUAGES.forEach { (tag, nativeName) ->
+                RadioRow(nativeName, currentLang == tag) { onSelectLang(tag) }
             }
         }
 
@@ -468,6 +512,10 @@ private fun SecuritySettings(
     mapTiles: Boolean,
     onSetMapTiles: (Boolean) -> Unit,
     onLockNow: () -> Unit,
+    duressThreshold: Int,
+    onSetDuressThreshold: (Int) -> Unit,
+    securityEvents: List<de.ledgerline.app.core.security.SecurityLogEntry>,
+    onClearSecurityLog: () -> Unit,
 ) {
     SubScreen(padding) {
         SectionHeader(stringResource(R.string.settings_security))
@@ -536,8 +584,71 @@ private fun SecuritySettings(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
+
+        // Duress auto-wipe — always active; the threshold is one of WipePolicy.options.
+        SectionHeader(stringResource(R.string.security_duress_title))
+        Text(
+            stringResource(R.string.security_duress_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        Column(Modifier.selectableGroup()) {
+            de.ledgerline.app.core.security.WipePolicy.options.forEach { n ->
+                RadioRow(stringResource(R.string.security_duress_threshold, n), duressThreshold == n) {
+                    onSetDuressThreshold(n)
+                }
+            }
+        }
+
+        // Security audit log — newest first.
+        SectionHeader(stringResource(R.string.security_log_title))
+        if (securityEvents.isEmpty()) {
+            Text(
+                stringResource(R.string.security_log_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        } else {
+            securityEvents.asReversed().take(100).forEach { e ->
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Text(securityEventLabel(e.type), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        formatSecTs(e.at),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onClearSecurityLog,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) { Text(stringResource(R.string.security_log_clear)) }
+        }
     }
 }
+
+/** Localised label for a [de.ledgerline.app.core.security.SecurityEventType] name. */
+@Composable
+private fun securityEventLabel(type: String): String = stringResource(
+    when (type) {
+        "PAIRED" -> R.string.sec_event_PAIRED
+        "UNLOCK_SUCCESS" -> R.string.sec_event_UNLOCK_SUCCESS
+        "UNLOCK_FAILED" -> R.string.sec_event_UNLOCK_FAILED
+        "RECOVERY_UNLOCK" -> R.string.sec_event_RECOVERY_UNLOCK
+        "THROTTLE_LOCKOUT" -> R.string.sec_event_THROTTLE_LOCKOUT
+        "DURESS_WIPE" -> R.string.sec_event_DURESS_WIPE
+        "REMOTE_WIPE" -> R.string.sec_event_REMOTE_WIPE
+        "LOGOUT" -> R.string.sec_event_LOGOUT
+        else -> R.string.sec_event_UNLOCK_FAILED
+    },
+)
+
+private fun formatSecTs(millis: Long): String =
+    java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(millis))
 
 @Composable
 private fun OfflineSettings(

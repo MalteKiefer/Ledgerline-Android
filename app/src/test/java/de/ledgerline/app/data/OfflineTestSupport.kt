@@ -101,16 +101,42 @@ fun tmpBlobCache(): BlobDiskCache =
  * A [LedgerlineApi] whose every method throws by default; override just the endpoints
  * a given test exercises. Any accidental call to an un-overridden endpoint is loud.
  */
+/** A [de.ledgerline.app.domain.usecase.GalleryUploadApi] whose methods throw — for
+ *  gallery tests that never upload (load-path tests). */
+object NoGalleryUpload : de.ledgerline.app.domain.usecase.GalleryUploadApi {
+    override suspend fun uploadBytes(bytes: ByteArray, name: String) = throw NotImplementedError()
+    override suspend fun process(bytes: ByteArray, name: String, mime: String) = throw NotImplementedError()
+}
+
 open class NotImplementedApi : LedgerlineApi {
     override suspend fun claimPair(body: PairClaimRequest): Response<PairClaimResponse> = throw NotImplementedError()
-    override suspend fun pollPair(code: String): Response<PairPollResponse> = throw NotImplementedError()
+    override suspend fun pollPair(body: de.ledgerline.app.data.remote.dto.PairCollectRequest): Response<PairPollResponse> = throw NotImplementedError()
     override suspend fun me(): Response<de.ledgerline.app.data.remote.dto.MeResponse> = throw NotImplementedError()
+    override suspend fun passwordsBreach(prefix: String): Response<ResponseBody> = throw NotImplementedError()
+    override suspend fun passwordsIcon(domain: String): Response<de.ledgerline.app.data.remote.dto.IconResponse> = throw NotImplementedError()
+    override suspend fun passwordsTfaDirectory(): Response<de.ledgerline.app.data.remote.dto.TfaDirectoryResponse> = throw NotImplementedError()
     override suspend fun vault(): Response<VaultResponse> = throw NotImplementedError()
+    override suspend fun vaultKeys(): Response<de.ledgerline.app.data.remote.dto.VaultKeysResponse> = throw NotImplementedError()
+    override suspend fun putVaultKeys(body: de.ledgerline.app.data.remote.dto.PublishKeysRequest): Response<Unit> = throw NotImplementedError()
     override suspend fun store(): Response<StoreResponse> = throw NotImplementedError()
+    override suspend fun moduleStore(module: String): Response<StoreResponse> = throw NotImplementedError()
+    override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun deleteSession(): Response<Unit> = throw NotImplementedError()
     override suspend fun rawFile(blob: String): Response<ResponseBody> = throw NotImplementedError()
     override suspend fun uploadFile(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
+    override suspend fun filesUploadInit(body: de.ledgerline.app.data.remote.dto.UploadInitRequest): Response<de.ledgerline.app.data.remote.dto.UploadInitResponse> = throw NotImplementedError()
+    override suspend fun filesUploadPart(token: okhttp3.RequestBody, part: okhttp3.RequestBody, chunk: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadPartResponse> = throw NotImplementedError()
+    override suspend fun filesUploadComplete(body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse> = throw NotImplementedError()
+    override suspend fun filesUploadAbort(body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
+    override suspend fun galleryUploadInit(body: de.ledgerline.app.data.remote.dto.UploadInitRequest): Response<de.ledgerline.app.data.remote.dto.UploadInitResponse> = throw NotImplementedError()
+    override suspend fun galleryUploadPart(token: okhttp3.RequestBody, part: okhttp3.RequestBody, chunk: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadPartResponse> = throw NotImplementedError()
+    override suspend fun galleryUploadComplete(body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse> = throw NotImplementedError()
+    override suspend fun galleryUploadAbort(body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
     override suspend fun deleteBlob(blob: String): Response<Unit> = throw NotImplementedError()
+    // Default to an empty sharded files store so WorkspaceRepository.load()'s files slice
+    // resolves to an empty list in fakes that don't exercise files. Override where needed.
+    override suspend fun filesStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
+    override suspend fun filesStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun putStore(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun filesUsage(): Response<UsageResponse> = throw NotImplementedError()
     override suspend fun galleryStore(): Response<StoreResponse> = throw NotImplementedError()
@@ -137,6 +163,9 @@ open class NotImplementedApi : LedgerlineApi {
 open class SealTagCrypto : Crypto {
     override fun sealManifest(json: String, vk: ByteArray) = "SEALED:$json"
     override fun openManifest(ciphertext: String, vk: ByteArray) = ciphertext.removePrefix("SEALED:")
+    override fun sealValue(data: ByteArray, key: ByteArray) = "V:" + String(data, Charsets.ISO_8859_1)
+    override fun openValue(cn: String, key: ByteArray) = cn.removePrefix("V:").toByteArray(Charsets.ISO_8859_1)
+    override fun genericHash(input: ByteArray, outLen: Int) = ByteArray(outLen)
     override fun deriveKek(passphrase: ByteArray, salt: ByteArray, opsLimit: Long, memLimit: Long) = ByteArray(32)
     override fun secretBoxOpen(cipher: ByteArray, nonce: ByteArray, key: ByteArray) = ByteArray(0)
     override fun genericHash32(input: ByteArray) = ByteArray(32)

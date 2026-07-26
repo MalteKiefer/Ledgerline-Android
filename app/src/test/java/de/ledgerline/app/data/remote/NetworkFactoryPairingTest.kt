@@ -21,8 +21,12 @@ class NetworkFactoryPairingTest {
                 .addHeader("Content-Type", "application/json")
         )
         val api = cleartextApi(server.url("/").toString(), tokenProvider = { null })
-        val res = api.pollPair("abc")
+        val res = api.pollPair(de.ledgerline.app.data.remote.dto.PairCollectRequest("abc"))
         assertEquals(200, res.code())
+        // Verify the app now polls via POST /auth/pair/collect (not the old GET).
+        val recorded = server.takeRequest()
+        assertEquals("POST", recorded.method)
+        assertEquals("/api/v1/auth/pair/collect", recorded.path)
         assertEquals("approved", res.body()!!.status)
         assertEquals("tok123", res.body()!!.token)
     }

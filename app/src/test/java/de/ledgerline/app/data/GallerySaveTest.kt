@@ -31,6 +31,9 @@ class GallerySaveTest {
     private val fakeCrypto = object : Crypto {
         override fun sealManifest(json: String, vk: ByteArray) = "SEALED:$json"
         override fun openManifest(ciphertext: String, vk: ByteArray) = ciphertext.removePrefix("SEALED:")
+        override fun sealValue(data: ByteArray, key: ByteArray) = "V:" + String(data, Charsets.ISO_8859_1)
+        override fun openValue(cn: String, key: ByteArray) = cn.removePrefix("V:").toByteArray(Charsets.ISO_8859_1)
+        override fun genericHash(input: ByteArray, outLen: Int) = ByteArray(outLen)
         override fun deriveKek(passphrase: ByteArray, salt: ByteArray, opsLimit: Long, memLimit: Long) = ByteArray(32)
         override fun secretBoxOpen(cipher: ByteArray, nonce: ByteArray, key: ByteArray) = ByteArray(0)
         override fun genericHash32(input: ByteArray) = ByteArray(32)
@@ -65,10 +68,19 @@ class GallerySaveTest {
 
         // All other endpoints — throw so any accidental call is visible.
         override suspend fun claimPair(b: PairClaimRequest): Response<PairClaimResponse> = throw NotImplementedError()
-        override suspend fun pollPair(c: String): Response<PairPollResponse> = throw NotImplementedError()
+        override suspend fun pollPair(body: de.ledgerline.app.data.remote.dto.PairCollectRequest): Response<PairPollResponse> = throw NotImplementedError()
         override suspend fun me(): Response<de.ledgerline.app.data.remote.dto.MeResponse> = throw NotImplementedError()
+        override suspend fun passwordsBreach(prefix: String): Response<ResponseBody> = throw NotImplementedError()
+        override suspend fun passwordsIcon(domain: String): Response<de.ledgerline.app.data.remote.dto.IconResponse> = throw NotImplementedError()
+        override suspend fun passwordsTfaDirectory(): Response<de.ledgerline.app.data.remote.dto.TfaDirectoryResponse> = throw NotImplementedError()
         override suspend fun vault(): Response<VaultResponse> = throw NotImplementedError()
+        override suspend fun vaultKeys(): Response<de.ledgerline.app.data.remote.dto.VaultKeysResponse> = throw NotImplementedError()
+        override suspend fun putVaultKeys(body: de.ledgerline.app.data.remote.dto.PublishKeysRequest): Response<Unit> = throw NotImplementedError()
         override suspend fun store(): Response<StoreResponse> = throw NotImplementedError()
+        override suspend fun moduleStore(module: String): Response<StoreResponse> = throw NotImplementedError()
+        override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
+        override suspend fun filesStore(): Response<StoreResponse> = throw NotImplementedError()
+        override suspend fun filesStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun putStore(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun deleteSession(): Response<Unit> = throw NotImplementedError()
         override suspend fun rawFile(blob: String): Response<ResponseBody> = throw NotImplementedError()
@@ -80,6 +92,14 @@ class GallerySaveTest {
         override suspend fun galleryRaw(blob: String): Response<ResponseBody> = throw NotImplementedError()
         override suspend fun galleryUsage(): Response<UsageResponse> = throw NotImplementedError()
         override suspend fun galleryUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
+        override suspend fun filesUploadInit(body: de.ledgerline.app.data.remote.dto.UploadInitRequest): Response<de.ledgerline.app.data.remote.dto.UploadInitResponse> = throw NotImplementedError()
+        override suspend fun filesUploadPart(token: okhttp3.RequestBody, part: okhttp3.RequestBody, chunk: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadPartResponse> = throw NotImplementedError()
+        override suspend fun filesUploadComplete(body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse> = throw NotImplementedError()
+        override suspend fun filesUploadAbort(body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
+        override suspend fun galleryUploadInit(body: de.ledgerline.app.data.remote.dto.UploadInitRequest): Response<de.ledgerline.app.data.remote.dto.UploadInitResponse> = throw NotImplementedError()
+        override suspend fun galleryUploadPart(token: okhttp3.RequestBody, part: okhttp3.RequestBody, chunk: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadPartResponse> = throw NotImplementedError()
+        override suspend fun galleryUploadComplete(body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse> = throw NotImplementedError()
+        override suspend fun galleryUploadAbort(body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
         override suspend fun galleryProcess(file: MultipartBody.Part): Response<ProcessResponse> = throw NotImplementedError()
         override suspend fun contactsUsage(): Response<UsageResponse> = throw NotImplementedError()
         override suspend fun contactsReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
@@ -98,7 +118,15 @@ class GallerySaveTest {
         val existingPhotoJson = """{"v":1,"photos":[{"id":"existing"}],"albums":[],"people":[]}"""
         val fakeApi = FakeApi(existingPhotoJson)
 
-        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), apiProvider = { fakeApi })
+        // Fake uploader: the sharded write uploads photo-shard content blobs; return a
+        // deterministic blob id/key so the write can build the v3 root.
+        val fakeUpload = object : de.ledgerline.app.domain.usecase.GalleryUploadApi {
+            override suspend fun uploadBytes(bytes: ByteArray, name: String) =
+                Outcome.Ok(UploadedBlob("shard-blob", "shard-key", bytes.size.toLong()))
+            override suspend fun process(bytes: ByteArray, name: String, mime: String) = throw NotImplementedError()
+        }
+
+        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), fakeUpload, apiProvider = { fakeApi })
 
         val result = repo.save { manifest ->
             manifest.copy(photos = manifest.photos + GalleryPhoto(id = "new"))

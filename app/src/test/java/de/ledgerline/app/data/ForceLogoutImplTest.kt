@@ -80,6 +80,11 @@ class ForceLogoutImplTest {
             backupStateStore = backupStateStore,
             rememberedVault = rememberedVault,
             placeRepository = placeRepository,
+            securityLog = io.mockk.mockk(relaxed = true),
+            duressGuard = io.mockk.mockk(relaxed = true),
+            clockGuard = io.mockk.mockk(relaxed = true),
+            identityRepository = io.mockk.mockk(relaxed = true),
+            passwordsCache = de.ledgerline.app.core.PasswordsCache(),
         )
 
         forceLogout.invoke()

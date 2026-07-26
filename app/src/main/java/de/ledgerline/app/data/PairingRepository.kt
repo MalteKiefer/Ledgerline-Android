@@ -38,7 +38,7 @@ class PairingRepository : PairingGateway {
 
     override suspend fun poll(baseUrl: String, code: String): PollResult {
         return try {
-            val res = api(baseUrl).pollPair(code)
+            val res = api(baseUrl).pollPair(de.ledgerline.app.data.remote.dto.PairCollectRequest(code))
             when {
                 res.code() == HttpURLConnection.HTTP_GONE -> PollResult.Gone
                 res.code() == 429 -> PollResult.RateLimited

@@ -88,5 +88,29 @@
             android:name=".core.ops.BackgroundOpService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />
+
+        <!-- Zero-knowledge Autofill provider. Structure-only in onFillRequest; the vault
+             is decrypted solely after the user authenticates in AutofillUnlockActivity. -->
+        <service
+            android:name=".core.autofill.LedgerlineAutofillService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.autofill"
+                android:resource="@xml/autofill_service" />
+        </service>
+
+        <!-- Authenticated fill/save bridge launched by the OS from the autofill entry. -->
+        <activity
+            android:name=".ui.autofill.AutofillUnlockActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Ledgerline" />
     </application>
 </manifest>

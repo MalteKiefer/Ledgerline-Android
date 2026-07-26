@@ -114,3 +114,34 @@ data class Contact(
 
 /** The decrypted manifest plus the server version (kept for Phase-3 writes). */
 data class Workspace(val manifest: WorkspaceManifest, val version: Int)
+
+// ---------------------------------------------------------------------------
+//  Store v3 — per-module sealed manifests
+// ---------------------------------------------------------------------------
+// The server removed the monolith `/store`; each workspace module now has its own
+// sealed store `GET/PUT /api/v1/store/{module}` (`{ciphertext, version}`). Each
+// module manifest carries `v:3` and exactly the top-level keys the web client
+// (`resources/js/shared/module-store.js` MODULE_BLANKS) emits — the byte-contract.
+// The app still works against the aggregate [WorkspaceManifest]; these are the
+// per-module wire shapes the repository fans out to. Files/gallery are sharded and
+// migrated separately (see CLAUDE.md §14 R1).
+
+@Serializable
+data class NotesManifest(val v: Int = 3, val notes: List<Note> = emptyList())
+
+@Serializable
+data class TodosManifest(
+    val v: Int = 3,
+    val todos: List<TodoItem> = emptyList(),
+    val todoLists: List<TodoList> = emptyList(),
+)
+
+@Serializable
+data class BookmarksManifest(
+    val v: Int = 3,
+    val bookmarks: List<Bookmark> = emptyList(),
+    val bookmarkFolders: List<NamedFolder> = emptyList(),
+)
+
+@Serializable
+data class ContactsManifest(val v: Int = 3, val contacts: List<Contact> = emptyList())

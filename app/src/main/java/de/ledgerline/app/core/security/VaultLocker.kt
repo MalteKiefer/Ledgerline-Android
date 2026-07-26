@@ -20,13 +20,18 @@ class VaultLocker @Inject constructor(
     private val galleryCache: GalleryCache,
     private val thumbCache: ThumbCache,
     private val metaCache: MetaCache,
+    private val identityRepository: de.ledgerline.app.data.IdentityRepository,
+    private val passwordsCache: de.ledgerline.app.core.PasswordsCache,
 ) {
     /**
-     * Lock the vault: wipe the Vault Key + all in-memory decrypted state. Does NOT
-     * touch the persisted session or the keystore key — that is logout (ForceLogout).
+     * Lock the vault: wipe the Vault Key + all in-memory decrypted state (incl. the
+     * in-memory sharing-identity secrets). Does NOT touch the persisted session or the
+     * keystore key — that is logout (ForceLogout).
      */
     fun lock() {
         vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
         galleryCache.clear(); thumbCache.clear(); metaCache.clear()
+        identityRepository.clear()
+        passwordsCache.clear()
     }
 }

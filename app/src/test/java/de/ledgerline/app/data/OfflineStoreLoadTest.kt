@@ -27,9 +27,15 @@ class OfflineStoreLoadTest {
 
     // ---- Workspace ------------------------------------------------------------
 
+    // Store v3: the repo fans out to per-module stores. This fake serves the `notes`
+    // module its [body]; other modules are empty (null ciphertext, v0). When [fail]
+    // is set every module GET throws (offline).
     private class WorkspaceApi(val body: StoreResponse?, val fail: Boolean) : NotImplementedApi() {
-        override suspend fun store(): Response<StoreResponse> =
-            if (fail) throw java.io.IOException("offline") else Response.success(body!!)
+        override suspend fun moduleStore(module: String): Response<StoreResponse> = when {
+            fail -> throw java.io.IOException("offline")
+            module == "notes" -> Response.success(body!!)
+            else -> Response.success(StoreResponse(null, 0))
+        }
     }
 
     @Test fun workspace_online_writes_cache_then_offline_reads_it() = runBlocking {
@@ -37,21 +43,22 @@ class OfflineStoreLoadTest {
         val vh = VaultKeyHolder().apply { set(vk) }
         val storeCache = tmpStoreCache()
 
-        val manifestJson = """{"v":1,"fileFolders":[{"id":"d1","name":"Docs"}]}"""
-        val onlineApi = WorkspaceApi(StoreResponse("SEALED:$manifestJson", 7), fail = false)
+        val notesJson = """{"v":3,"notes":[{"id":"n1","title":"Docs"}]}"""
+        val onlineApi = WorkspaceApi(StoreResponse("SEALED:$notesJson", 7), fail = false)
         val online = WorkspaceRepository(
             sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(), apiProvider = { onlineApi },
         )
 
         val first = online.load()
         assertTrue(first is Outcome.Ok)
-        // Envelope persisted with the server version + ciphertext.
-        val env = storeCache.get("workspace")
+        // The notes module envelope is persisted with its server version + ciphertext.
+        val env = storeCache.get("workspace_notes")
         assertNotNull(env)
         assertEquals(7, env!!.version)
-        assertEquals("SEALED:$manifestJson", env.ciphertext)
+        assertEquals("SEALED:$notesJson", env.ciphertext)
 
-        // New repo instance sharing the SAME cache, but the network now fails.
+        // New repo instance sharing the SAME cache, but the network now fails: every
+        // module (incl. the empty ones cached above) is served from disk.
         val offlineApi = WorkspaceApi(null, fail = true)
         val offline = WorkspaceRepository(
             sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(), apiProvider = { offlineApi },
@@ -59,8 +66,7 @@ class OfflineStoreLoadTest {
         val second = offline.load()
         assertTrue(second is Outcome.Ok)
         val ws = (second as Outcome.Ok).value
-        assertEquals(7, ws.version)
-        assertEquals(listOf("Docs"), ws.manifest.fileFolders.map { it.name })
+        assertEquals(listOf("Docs"), ws.manifest.notes.map { it.title })
     }
 
     @Test fun workspace_offline_without_cache_returns_network_error() = runBlocking {
@@ -78,7 +84,7 @@ class OfflineStoreLoadTest {
         val vh = VaultKeyHolder().apply { set(vk) }
         val storeCache = tmpStoreCache()
         // Populate the cache directly, but the master flag is OFF → must not be consulted.
-        storeCache.put("workspace", de.ledgerline.app.core.offline.StoreEnvelope("SEALED:{}", 3))
+        storeCache.put("workspace_notes", de.ledgerline.app.core.offline.StoreEnvelope("SEALED:{}", 3))
         val api = WorkspaceApi(null, fail = true)
         val repo = WorkspaceRepository(
             sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(enabled = false), apiProvider = { api },
@@ -103,6 +109,7 @@ class OfflineStoreLoadTest {
         val manifestJson = """{"v":1,"photos":[{"id":"p1"}],"albums":[],"people":[]}"""
         val online = GalleryRepository(
             sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
+            galleryUpload = NoGalleryUpload,
             apiProvider = { GalleryApi(StoreResponse("SEALED:$manifestJson", 4), code = null) },
         )
         assertTrue(online.load() is Outcome.Ok)
@@ -111,6 +118,7 @@ class OfflineStoreLoadTest {
         // Non-2xx (503, not 401) → cache fallback.
         val offline = GalleryRepository(
             sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
+            galleryUpload = NoGalleryUpload,
             apiProvider = { GalleryApi(null, code = 503) },
         )
         val res = offline.load()
@@ -126,6 +134,7 @@ class OfflineStoreLoadTest {
         storeCache.put("gallery", de.ledgerline.app.core.offline.StoreEnvelope("SEALED:{}", 9))
         val repo = GalleryRepository(
             sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
+            galleryUpload = NoGalleryUpload,
             apiProvider = { GalleryApi(null, code = 401) },
         )
         // 401 → HTTP error (forced-logout path), NOT the cached manifest.

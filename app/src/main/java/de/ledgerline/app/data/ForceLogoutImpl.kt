@@ -35,11 +35,18 @@ class ForceLogoutImpl @Inject constructor(
     private val backupStateStore: BackupStateStore,
     private val rememberedVault: RememberedVaultStore,
     private val placeRepository: PlaceRepository,
+    private val securityLog: de.ledgerline.app.core.security.SecurityLog,
+    private val duressGuard: de.ledgerline.app.core.security.DuressGuard,
+    private val clockGuard: de.ledgerline.app.core.security.ClockRollbackGuard,
+    private val identityRepository: IdentityRepository,
+    private val passwordsCache: de.ledgerline.app.core.PasswordsCache,
 ) : ForceLogout {
     override suspend fun invoke() {
         // In-memory first (secrets + decrypted caches).
         vaultKeyHolder.wipe()
         sessionHolder.clear()
+        identityRepository.clear()
+        passwordsCache.clear()
         workspaceCache.clear()
         galleryCache.clear()
         thumbCache.clear()
@@ -52,6 +59,11 @@ class ForceLogoutImpl @Inject constructor(
         backupStateStore.clear()
         rememberedVault.clear()
         placeRepository.clear()
+        // Security state: reset the duress counter and erase the audit log so a wiped
+        // device is left clean (the wipe reason is moot once the device is unpaired).
+        duressGuard.reset()
+        clockGuard.reset()
+        securityLog.clear()
         sessionStore.clear()
         keystoreSealer.clear()
     }

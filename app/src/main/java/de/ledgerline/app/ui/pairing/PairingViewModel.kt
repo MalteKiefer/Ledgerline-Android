@@ -19,6 +19,7 @@ import javax.inject.Inject
 class PairingViewModel @Inject constructor(
     private val repository: PairingRepository,
     private val sessionStore: SessionStore,
+    private val securityLog: de.ledgerline.app.core.security.SecurityLog,
 ) : ViewModel() {
     private val _state = MutableStateFlow<PairingState>(PairingState.Idle)
     val state: StateFlow<PairingState> = _state.asStateFlow()
@@ -36,6 +37,10 @@ class PairingViewModel @Inject constructor(
      * single CryptoObject-bound biometric that authorizes the keystore seal.
      * @return true on success, false if the auth was cancelled/failed.
      */
-    suspend fun persist(session: Session, authorize: suspend (Cipher) -> Cipher?): Boolean =
-        sessionStore.save(session, authorize)
+    suspend fun persist(session: Session, authorize: suspend (Cipher) -> Cipher?): Boolean {
+        val ok = sessionStore.save(session, authorize)
+        // Record the coupling in the security audit log once the session is sealed.
+        if (ok) securityLog.record(de.ledgerline.app.core.security.SecurityEventType.PAIRED)
+        return ok
+    }
 }

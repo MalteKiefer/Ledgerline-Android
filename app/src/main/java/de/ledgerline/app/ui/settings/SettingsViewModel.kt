@@ -56,10 +56,24 @@ class SettingsViewModel @Inject constructor(
     private val backupStateStore: BackupStateStore,
     private val rememberedVault: RememberedVaultStore,
     private val biometric: BiometricAvailability,
+    private val securityLog: de.ledgerline.app.core.security.SecurityLog,
 ) : ViewModel() {
 
     /** STRONG biometrics enrolled — gates whether the "remember unlock" toggle is usable. */
     val strongBiometricAvailable: Boolean = biometric.strongEnrolled()
+
+    /** Duress auto-wipe threshold (always active; one of [WipePolicy.options]). */
+    val duressThreshold: StateFlow<Int> = settingsStore.duressThreshold
+        .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.core.security.WipePolicy.defaultThreshold)
+
+    fun setDuressThreshold(n: Int) { viewModelScope.launch { settingsStore.setDuressThreshold(n) } }
+
+    /** The encrypted security audit log (newest last). */
+    val securityEvents: StateFlow<List<de.ledgerline.app.core.security.SecurityLogEntry>> = securityLog.entries
+
+    init { viewModelScope.launch { securityLog.ensureLoaded() } }
+
+    fun clearSecurityLog() { viewModelScope.launch { securityLog.clear() } }
 
     /** Signed-in account (name/email/groups), fetched once from `/api/v1/me`; null while
      *  loading, offline, or on failure — the Account screen degrades gracefully. */
