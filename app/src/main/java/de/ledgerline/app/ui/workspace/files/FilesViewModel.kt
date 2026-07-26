@@ -260,6 +260,8 @@ class FilesViewModel @Inject constructor(
     /** Permanently delete a trashed file: drop the manifest entry, then free its content
      * blob and every version blob to reclaim quota. */
     fun deleteForever(file: FileEntry) = viewModelScope.launch {
+        // Revoke a live public share BEFORE dropping the file, so the link isn't orphaned.
+        if (file.share != null) shareRepo.revokeFileShare(file.id, isFolder = false)
         val res = mutate.invoke { FileOps.removeFile(it, file.id) }
         if (res is Outcome.Ok) {
             blobRepo.deleteBlobs(listOf(file.blob) + file.versions.map { it.blob })
@@ -272,6 +274,8 @@ class FilesViewModel @Inject constructor(
     fun emptyTrash() = viewModelScope.launch {
         val trashed = cache.value.value?.manifest?.files?.filter { it.trashed }.orEmpty()
         val freedBlobs = trashed.flatMap { listOf(it.blob) + it.versions.map { v -> v.blob } }
+        // Revoke any live shares of the files being purged so their links aren't orphaned.
+        trashed.filter { it.share != null }.forEach { shareRepo.revokeFileShare(it.id, isFolder = false) }
         val res = mutate.invoke { FileOps.emptyTrashFiles(it) }
         if (res is Outcome.Ok) {
             blobRepo.deleteBlobs(freedBlobs)
@@ -296,6 +300,11 @@ class FilesViewModel @Inject constructor(
         val current = cache.value.value?.manifest ?: return@launch
         val subFolders = collectSubtreeFolderIds(current, folderId)
         val freedBlobs = current.files.filter { it.folder in subFolders }.map { it.blob }
+        // Revoke live shares on the folder(s) and any shared files in the removed subtree.
+        current.fileFolders.filter { it.id in subFolders && it.share != null }
+            .forEach { shareRepo.revokeFileShare(it.id, isFolder = true) }
+        current.files.filter { it.folder in subFolders && it.share != null }
+            .forEach { shareRepo.revokeFileShare(it.id, isFolder = false) }
         val res = mutate.invoke { m ->
             m.copy(
                 files = m.files.filterNot { it.folder in subFolders },
