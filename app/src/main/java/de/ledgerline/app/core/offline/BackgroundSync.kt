@@ -3,11 +3,14 @@ package de.ledgerline.app.core.offline
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.AccountRepository
+import de.ledgerline.app.data.PasswordsRepository
+import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.data.WorkspaceRepository
 import de.ledgerline.app.di.ApplicationScope
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -36,6 +39,8 @@ class BackgroundSync @Inject constructor(
     private val connectivity: Connectivity,
     private val prefetcher: Prefetcher,
     private val accountRepository: AccountRepository,
+    private val passwordsRepo: PasswordsRepository,
+    private val settingsStore: SettingsStore,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     @Volatile
@@ -48,8 +53,15 @@ class BackgroundSync @Inject constructor(
         scope.launch {
             delay(INITIAL_DELAY_MS)
             while (true) {
+                val seconds = runCatching { settingsStore.backgroundRefreshSeconds.first() }
+                    .getOrDefault(SettingsStore.DEFAULT_BACKGROUND_REFRESH_SECONDS)
+                if (seconds <= 0) {
+                    // Auto-refresh off: idle-poll so a settings change is picked up promptly.
+                    delay(OFF_POLL_MS)
+                    continue
+                }
                 runCatching { syncOnce() }
-                delay(INTERVAL_MS)
+                delay(seconds * 1000L)
             }
         }
     }
@@ -63,14 +75,16 @@ class BackgroundSync @Inject constructor(
         if (!offlineFlags.enabled()) return
         if (vaultKeyHolder.get() != null) {
             load.invoke()
+            passwordsRepo.load()
             prefetcher.maybePrefetchOnUnlock()
         } else {
             workspaceRepo.refreshStoreCache()
+            passwordsRepo.refreshStoreCache()
         }
     }
 
     private companion object {
         const val INITIAL_DELAY_MS = 20_000L
-        const val INTERVAL_MS = 15 * 60_000L
+        const val OFF_POLL_MS = 60_000L
     }
 }

@@ -3,8 +3,11 @@ package de.ledgerline.app.ui.passwords
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.compose.ui.graphics.ImageBitmap
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.PasswordsCache
+import de.ledgerline.app.core.autofill.DomainMatch
+import de.ledgerline.app.core.passwords.Favicons
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.PasswordsRepository
 import de.ledgerline.app.domain.model.SecretFields
@@ -12,11 +15,13 @@ import de.ledgerline.app.domain.model.SecretItem
 import de.ledgerline.app.domain.model.SecretVersion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -52,6 +57,12 @@ class PasswordsViewModel @Inject constructor(
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing
 
+    // 2fa.directory dataset (host → setup-docs URL), loaded once best-effort.
+    private val _tfa = MutableStateFlow<Map<String, String>>(emptyMap())
+    // Favicon caches: positive (domain → bitmap) + a "already tried, no icon" set.
+    private val iconCache = java.util.concurrent.ConcurrentHashMap<String, ImageBitmap>()
+    private val iconTried = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
     /** Pull-to-refresh: re-fetch the sealed secrets store. */
     fun reload() {
         viewModelScope.launch {
@@ -74,13 +85,47 @@ class PasswordsViewModel @Inject constructor(
             .filter { it }
             .onEach {
                 if (cache.value.value == null) {
-                    when (repo.load()) {
-                        is Outcome.Ok -> {}
-                        is Outcome.Err -> _state.value = _state.value.copy(loading = false, error = true)
-                    }
+                    if (repo.load() is Outcome.Err) _state.value = _state.value.copy(loading = false, error = true)
                 }
             }
             .launchIn(viewModelScope)
+        // Best-effort: the "this site offers 2FA" hint stays hidden until this lands.
+        viewModelScope.launch { _tfa.value = repo.tfaDirectory() }
+    }
+
+    /**
+     * The site favicon for [item], or null to fall back to the type icon. Prefers a stored
+     * `icon` data-URI; otherwise fetches one for the item's first web domain (cached per domain).
+     */
+    suspend fun iconFor(item: SecretItem): ImageBitmap? = withContext(Dispatchers.Default) {
+        // Runs off the main thread: the network fetch + Base64/Bitmap decode must never block
+        // the UI (produceState's producer runs on the Main dispatcher otherwise).
+        Favicons.decode(item.icon)?.let { return@withContext it }
+        val domain = DomainMatch.hostsOf(item).firstOrNull() ?: return@withContext null
+        iconCache[domain]?.let { return@withContext it }
+        if (!iconTried.add(domain)) return@withContext null // already fetched, no usable icon
+        val bmp = repo.fetchIcon(domain)?.let { Favicons.decode(it) }
+        if (bmp != null) iconCache[domain] = bmp
+        bmp
+    }
+
+    /**
+     * For a login with **no** stored TOTP whose site is known to support app 2FA, the setup-docs
+     * URL (http/https) from the 2fa.directory dataset — else null. Walks each URL's host and its
+     * parent domains, matching the web `_tfaMatch`.
+     */
+    fun tfaSetupUrl(item: SecretItem): String? {
+        if (item.type != "login" || SecretFields.str(item, "totp").isNotBlank()) return null
+        val map = _tfa.value
+        if (map.isEmpty()) return null
+        for (u in SecretFields.urls(item)) {
+            var d = DomainMatch.normalizeHost(u) ?: continue
+            while (d.contains('.')) {
+                map[d]?.let { url -> if (url.startsWith("http://") || url.startsWith("https://")) return url }
+                d = d.substringAfter('.')
+            }
+        }
+        return null
     }
 
     private fun recompute(store: de.ledgerline.app.domain.model.SecretsStore?, q: String, type: String?, favOnly: Boolean, trash: Boolean) {

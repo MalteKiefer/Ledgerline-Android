@@ -1,6 +1,8 @@
 package de.ledgerline.app.ui.passwords
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -30,6 +32,7 @@ import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.Visibility
@@ -50,14 +53,18 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
@@ -98,6 +105,32 @@ private fun typeTint(type: String): Color = when (type) {
     "server" -> Brand.tintViolet
     "identity" -> Brand.tintOrange
     else -> Brand.tintGray
+}
+
+/**
+ * The leading avatar for a secret: the site favicon when one is available (stored `icon` or
+ * fetched for the item's domain), otherwise the tinted type [IconChip]. The favicon load is
+ * async + cached in the ViewModel, so a missing/slow icon simply shows the type chip.
+ */
+@Composable
+private fun SecretAvatar(item: SecretItem, vm: PasswordsViewModel) {
+    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, item.id, item.icon) {
+        value = vm.iconFor(item)
+    }
+    val bmp = bitmap
+    if (bmp != null) {
+        Image(
+            bitmap = bmp,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(Brand.chipSize)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(Brand.chipRadius))
+                .background(Color.White),
+        )
+    } else {
+        IconChip(typeIcon(item.type), tint = typeTint(item.type))
+    }
 }
 
 /** Readable label for a field key (kept simple; localised chrome uses string resources). */
@@ -179,7 +212,7 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onOpen: (String) 
                         items(ui.secrets, key = { it.id }) { s ->
                             ListItem(
                                 modifier = Modifier.clickable { onOpen(s.id) },
-                                leadingContent = { IconChip(typeIcon(s.type), tint = typeTint(s.type)) },
+                                leadingContent = { SecretAvatar(s, vm) },
                                 headlineContent = { Text(s.title.ifBlank { typeLabel(s.type) }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                                 supportingContent = { SecretFields.subtitle(s).takeIf { it.isNotBlank() }?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
                                 trailingContent = { if (s.favorite) Icon(Icons.Outlined.Star, contentDescription = null, tint = Brand.accent) },
@@ -240,7 +273,38 @@ private fun PwDetail(item: SecretItem, vm: PasswordsViewModel, onBack: () -> Uni
                 }
             }
             item.custom.forEach { c -> FieldRow(c.label.ifBlank { "Field" }, c.value, secret = c.kind == "secret", context) }
+            vm.tfaSetupUrl(item)?.let { url -> TfaOfferRow(url, context) }
         }
+    }
+}
+
+/**
+ * "This site offers 2FA" hint for a login without a stored TOTP whose domain is in the
+ * 2fa.directory dataset. Tapping "Set up" opens the site's setup-docs URL in the browser.
+ */
+@Composable
+private fun TfaOfferRow(setupUrl: String, context: android.content.Context) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(Brand.chipRadius))
+            .background(Brand.tintTeal.copy(alpha = 0.14f))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.Shield, contentDescription = null, tint = Brand.tintTeal)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            stringResource(de.ledgerline.app.R.string.pw_tfa_available),
+            modifier = Modifier.weight(1f),
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+        )
+        TextButton(onClick = {
+            runCatching {
+                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(setupUrl)))
+            }
+        }) { Text(stringResource(de.ledgerline.app.R.string.pw_tfa_setup)) }
     }
 }
 

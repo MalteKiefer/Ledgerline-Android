@@ -489,9 +489,28 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   Logins zum Speichern an (`SecretItem` login). Manifest: Service (`BIND_AUTOFILL_SERVICE`) +
   `xml/autofill_service`; aktivieren via Settings→Autofill (`ACTION_REQUEST_SET_AUTOFILL_SERVICE`).
   Kein Klartext verlässt die App vor Auth. Strings EN/DE/RU.
-  **Offen:** Passkeys, geteilte Passwort-Vaults (PQ-Sharing, §S3), Favicon/TFA-Anzeige,
-  Inline-Autofill-Presentations (aktuell Menu-Presentation, `Dataset.Builder(RemoteViews)` ist
-  deprecated aber funktional), volle RU-Übersetzung der übrigen Passwort-UI-Strings.
+  **Favicon + TFA-Anzeige — ERLEDIGT (2026-07-26).** `SecretAvatar` zeigt das Site-Favicon
+  (`GET /passwords/icon?domain=`, server-proxied → data-URI; `Favicons`-Decoder für PNG/JPEG,
+  SVG/ICO-Fallback auf Typ-Icon; VM cacht pro Domain) in Liste + Detail, sonst Typ-`IconChip`.
+  Detail zeigt eine „Diese Seite bietet 2FA"-Zeile für Logins **ohne** TOTP, deren Domain in der
+  `GET /passwords/tfa-directory` (2fa.directory) steht — mit „Einrichten"-Link (Doku-URL). Match
+  = Host + Parent-Domains (web `_tfaMatch`). Strings EN/DE/RU.
+  **Passkeys — ERLEDIGT (2026-07-26, on-device-Verifikation offen).** App ist WebAuthn-
+  **Credential-Provider** via Android Credential Manager (`androidx.credentials` 1.6.0). Krypto-Kern
+  (byte-exakt zu Web `passkey.js` + iOS, unit-getestet `PasskeyCryptoTest`): `core/passkey/` —
+  `P256Key` (JCA secp256r1/ES256, JWK `{kty,crv,d,x,y}`, DER-Signatur), `WebAuthnCbor` (hand-rolled
+  COSE_Key + authData create 0x5D/assert 0x1D + none-Attestation, kein CBOR-Lib), `PasskeyStore`
+  (standalone `passkey`-Item **oder** in `login.fields["passkeys"]` eingebettet; `candidates`/
+  `standaloneItem`/`attach`/`rpIdAllowed`), `PasskeyResponses`/`PasskeyRequests` (WebAuthn-JSON).
+  `LedgerlinePasskeyService` (BeginCreate→CreateEntry, BeginGet→**AuthenticationAction** da locked)
+  + `PasskeyProviderActivity` (unlock-gated wie Autofill/Share; CREATE→generieren+speichern,
+  GET→entsperren+Kandidaten enumerieren, ASSERT→signieren). Manifest `BIND_CREDENTIAL_PROVIDER_SERVICE`
+  + `xml/passkey_provider`; aktivieren via Settings→Passkeys. **Offen/best-effort:** clientDataJSON-
+  Origin für App-Caller (Browser liefern `clientDataHash`, korrekt behandelt; App-Caller-Origin
+  `https://<rpId>` provisorisch), on-device-Ceremony-Verifikation.
+  **Offen:** geteilte Passwort-Vaults (PQ-Sharing, §S3), Inline-Autofill-Presentations
+  (Menu-Presentation, `Dataset.Builder(RemoteViews)` deprecated aber funktional), volle
+  RU-Übersetzung der übrigen Passwort-UI-Strings.
 - **Öffentliche Share-Links** (Files/Gallery, `*/shares`, Key im URL-Fragment).
 - **Cross-User Shared Vaults/Ordner** (Rollen, Rotation, TOFU) + **PQ-Hybrid-KEM** (§4).
 - **Passkeys/WebAuthn.**
@@ -618,7 +637,8 @@ Tests grün (`PQKEMKatTest` on-JVM, `*InstrumentedTest` on-device).
   MockWebServer) fangen den Real-TLS-Pfad nicht. Erst nach First-Party-Converter + OkHttp-5-TLS-
   Review + On-Device-Pairing-Test re-adoptieren.
 - Sonst alle auf neuestem Stand (2026-07-25): AGP 9.3.1, Kotlin 2.4.10, lifecycle 2.11.0,
-  camerax 1.6.1, mockk 1.14.11, MapLibre 13.4.1, jna 5.19.1, zxing 3.5.4, BC 1.84.
+  camerax 1.6.1, mockk 1.14.11, MapLibre 13.4.1, jna 5.19.1, zxing 3.5.4, BC 1.84,
+  androidx.credentials 1.6.0 (Passkeys; 1.7.0 ist alpha → gehalten).
   (KSP 2.3.10, Hilt 2.60.1, Compose-BOM 2026.06.01 waren bereits latest.)
 
 ---

@@ -122,6 +122,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setTimeoutMinutes(minutes) }
     }
 
+    /** Automatic background-refresh cadence in seconds (0 = off). Drives the BackgroundSync loop. */
+    val backgroundRefreshSeconds: StateFlow<Int> = settingsStore.backgroundRefreshSeconds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_BACKGROUND_REFRESH_SECONDS)
+
+    fun setBackgroundRefreshSeconds(seconds: Int) {
+        viewModelScope.launch { settingsStore.setBackgroundRefreshSeconds(seconds) }
+    }
+
     /** Whether the Vault Key may be biometric-persisted so unlock skips the passphrase. */
     val rememberVaultEnabled: StateFlow<Boolean> = settingsStore.rememberVaultEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)

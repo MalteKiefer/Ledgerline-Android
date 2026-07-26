@@ -83,6 +83,12 @@ class PasswordsRepository(
         val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
+        // Offline-first: publish the disk-cached store immediately (instant display at app start,
+        // and the only source when offline), then refresh from the network below. This makes the
+        // password list appear on unlock without waiting for a round-trip / pull-to-refresh.
+        if (cache.value.value == null && offlineFlags.enabled()) {
+            (cachedOr(Outcome.Err(ErrorKind.NETWORK), vk) as? Outcome.Ok)?.let { cache.set(it.value) }
+        }
         return try {
             val res = api.moduleStore(MODULE)
             when {
@@ -105,6 +111,24 @@ class PasswordsRepository(
         }
     }
 
+    /**
+     * Token-only refresh of the offline cache: fetch the sealed store and write its ciphertext to
+     * disk WITHOUT decrypting (no VK needed), so a background sync keeps the offline copy current
+     * while the vault is locked. The ciphertext is opaque. No-op when offline caching is off / no
+     * session. Returns true on a successful refresh.
+     */
+    suspend fun refreshStoreCache(): Boolean {
+        if (!offlineFlags.enabled()) return false
+        val session = sessionHolder.get() ?: return false
+        return try {
+            val res = apiProvider(session).moduleStore(MODULE)
+            if (!res.isSuccessful) return false
+            val body = res.body() ?: return false
+            storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
+            true
+        } catch (_: Exception) { false }
+    }
+
     private fun cachedOr(err: Outcome<SecretsStore>, vk: ByteArray): Outcome<SecretsStore> =
         cachedOrStore(
             cachingEnabled = offlineFlags.enabled(),
@@ -115,6 +139,28 @@ class PasswordsRepository(
             empty = { SecretsManifest() },
             wrap = { m, v -> SecretsStore(m, v) },
         )
+
+    /**
+     * Server-assisted site favicon for [domain] → a data-URI string, or null. The server proxies
+     * favicon/BIMI lookups so the client never contacts the third-party site directly (metadata
+     * hygiene). Best-effort: any failure returns null (the UI falls back to the type icon).
+     */
+    suspend fun fetchIcon(domain: String): String? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val res = apiProvider(session).passwordsIcon(domain)
+            if (!res.isSuccessful) null else res.body()?.icon?.takeIf { it.isNotBlank() }
+        } catch (_: Exception) { null }
+    }
+
+    /** 2fa.directory dataset: `{ host → setup-docs URL }`. Empty on any failure. */
+    suspend fun tfaDirectory(): Map<String, String> {
+        val session = sessionHolder.get() ?: return emptyMap()
+        return try {
+            val res = apiProvider(session).passwordsTfaDirectory()
+            if (!res.isSuccessful) emptyMap() else res.body()?.entries.orEmpty()
+        } catch (_: Exception) { emptyMap() }
+    }
 
     /** Optimistic write with 409-merge (reload → re-apply [mutate] → retry). */
     suspend fun save(mutate: (SecretsManifest) -> SecretsManifest): Outcome<SecretsStore> {

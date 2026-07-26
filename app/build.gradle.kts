@@ -132,6 +132,7 @@ dependencies {
     implementation(libs.media3.datasource)
     implementation(libs.zxing.core)
     implementation(libs.biometric)
+    implementation(libs.credentials)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
     implementation(libs.lazysodium.android) { exclude(group = "net.java.dev.jna", module = "jna") }

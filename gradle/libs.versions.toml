@@ -25,6 +25,7 @@ camerax = "1.6.1"
 media3 = "1.10.1"
 zxing = "3.5.4"
 biometric = "1.1.0"
+credentials = "1.6.0"
 lazysodium = "5.2.0"
 jna = "5.19.1"
 coroutines = "1.11.0"
@@ -78,6 +79,7 @@ media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
 media3-datasource = { module = "androidx.media3:media3-datasource", version.ref = "media3" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
 biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
+credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
 lazysodium-android = { module = "com.goterl:lazysodium-android", version.ref = "lazysodium" }
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
 coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }

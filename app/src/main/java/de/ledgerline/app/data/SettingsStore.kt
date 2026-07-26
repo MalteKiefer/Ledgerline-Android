@@ -23,6 +23,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
  */
 class SettingsStore(private val context: Context) {
     private val timeoutKey = intPreferencesKey("idle_timeout_minutes")
+    private val backgroundRefreshSecondsKey = intPreferencesKey("background_refresh_seconds")
     private val bgOpsKey = booleanPreferencesKey("background_ops_enabled")
     private val offlineKey = booleanPreferencesKey("offline_cache_enabled")
     private val filesPolicyKey = stringPreferencesKey("offline_files_policy")
@@ -54,6 +55,18 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setTimeoutMinutes(minutes: Int) {
         context.settingsDataStore.edit { it[timeoutKey] = minutes }
+    }
+
+    /**
+     * Automatic background-refresh cadence in **seconds** (while the app is alive), matching the
+     * iOS Passwords refresh-interval picker. Governs the [BackgroundSync] loop for the whole
+     * offline cache. `0` = off (manual pull-to-refresh only). Default 300 (5 min).
+     */
+    val backgroundRefreshSeconds: Flow<Int> =
+        context.settingsDataStore.data.map { it[backgroundRefreshSecondsKey] ?: DEFAULT_BACKGROUND_REFRESH_SECONDS }
+
+    suspend fun setBackgroundRefreshSeconds(seconds: Int) {
+        context.settingsDataStore.edit { it[backgroundRefreshSecondsKey] = seconds }
     }
 
     /**
@@ -257,6 +270,9 @@ class SettingsStore(private val context: Context) {
 
     companion object {
         const val DEFAULT_TIMEOUT_MINUTES = 5
+        const val DEFAULT_BACKGROUND_REFRESH_SECONDS = 300
+        /** Selectable background-refresh cadences (seconds); 0 = off. Mirrors iOS. */
+        val BACKGROUND_REFRESH_OPTIONS = listOf(0, 60, 300, 900, 1800, 3600, 10800, 43200, 86400)
         val TIMEOUT_OPTIONS = listOf(1, 5, 10, 30)
 
         const val DEFAULT_CACHE_MAX_MB = 1024
