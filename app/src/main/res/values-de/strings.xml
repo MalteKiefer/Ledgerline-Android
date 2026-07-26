@@ -96,7 +96,6 @@
     <string name="store_degraded">Einige Elemente konnten gerade nicht geladen werden — es wurde nichts gelöscht, und die Bearbeitung pausiert, bis sie wieder da sind.</string>
     <string name="ws_retry">Erneut versuchen</string>
     <string name="ws_reauth">Sitzung abgelaufen — Gerät neu koppeln.</string>
-    <string name="ws_file_phase3">Dateien öffnen kommt in einer späteren Version.</string>
 
     <!-- Prioritätsstufen -->
     <string name="priority_low">Niedrig</string>
@@ -563,4 +562,12 @@
     <string name="settings_theme_dark">Dunkel</string>
     <string name="settings_dynamic_color">Dynamische Farben</string>
     <string name="settings_dynamic_color_sub">Palette aus dem Hintergrundbild ableiten (Android 12+)</string>
+    <string name="cd_add">Hinzufügen</string>
+    <string name="cd_edit">Bearbeiten</string>
+    <string name="cd_trash">In den Papierkorb</string>
+    <string name="cd_reveal">Anzeigen oder verbergen</string>
+    <string name="cd_copy">Kopieren</string>
+    <string name="cd_copy_code">Code kopieren</string>
+    <string name="cd_generate">Generieren</string>
+    <string name="cd_remove">Entfernen</string>
 </resources>

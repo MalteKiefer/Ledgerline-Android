@@ -247,7 +247,7 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onOpen: (String) 
         }
         if (!showTrash) {
             FloatingActionButton(onClick = { picker = true }, modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp)) {
-                Icon(Icons.Filled.Add, contentDescription = "Add")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(de.ledgerline.app.R.string.cd_add))
             }
         }
     }
@@ -275,14 +275,14 @@ private fun PwDetail(item: SecretItem, vm: PasswordsViewModel, onBack: () -> Uni
         topBar = {
             AppTopBar(item.title.ifBlank { typeLabel(item.type) }, onBack = onBack, actions = {
                 IconButton(onClick = { vm.toggleFavorite(item.id) }) {
-                    Icon(if (item.favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, contentDescription = "Favorite")
+                    Icon(if (item.favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, contentDescription = stringResource(de.ledgerline.app.R.string.action_favorite))
                 }
                 if (item.isTrashed) {
-                    IconButton(onClick = { vm.restore(item.id); onBack() }) { Icon(Icons.Outlined.Restore, contentDescription = "Restore") }
-                    IconButton(onClick = { vm.deleteForever(item.id); onBack() }) { Icon(Icons.Outlined.Delete, contentDescription = "Delete") }
+                    IconButton(onClick = { vm.restore(item.id); onBack() }) { Icon(Icons.Outlined.Restore, contentDescription = stringResource(de.ledgerline.app.R.string.action_restore)) }
+                    IconButton(onClick = { vm.deleteForever(item.id); onBack() }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(de.ledgerline.app.R.string.action_delete)) }
                 } else {
-                    IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = "Edit") }
-                    IconButton(onClick = { vm.trash(item.id); onBack() }) { Icon(Icons.Outlined.Delete, contentDescription = "Trash") }
+                    IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(de.ledgerline.app.R.string.cd_edit)) }
+                    IconButton(onClick = { vm.trash(item.id); onBack() }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(de.ledgerline.app.R.string.cd_trash)) }
                 }
             })
         },
@@ -433,10 +433,10 @@ private fun FieldRow(label: String, value: String, secret: Boolean, context: and
                 style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
             )
             if (secret) IconButton(onClick = { revealed = !revealed }) {
-                Icon(if (revealed) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, contentDescription = "Reveal")
+                Icon(if (revealed) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, contentDescription = stringResource(de.ledgerline.app.R.string.cd_reveal))
             }
             IconButton(onClick = { if (secret) SecureClipboard.copySensitive(context, label, value) else SecureClipboard.copyPlain(context, label, value) }) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy")
+                Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(de.ledgerline.app.R.string.cd_copy))
             }
         }
     }
@@ -457,7 +457,7 @@ private fun TotpRow(secret: String, context: android.content.Context) {
             Text(display, modifier = Modifier.weight(1f), style = androidx.compose.material3.MaterialTheme.typography.headlineSmall, color = Brand.accent)
             Text("${remaining}s", style = androidx.compose.material3.MaterialTheme.typography.labelLarge, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
             IconButton(onClick = { code?.let { SecureClipboard.copySensitive(context, "TOTP", it) } }) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy code")
+                Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(de.ledgerline.app.R.string.cd_copy_code))
             }
         }
     }
@@ -513,7 +513,7 @@ private fun PwEdit(item: SecretItem, vm: PasswordsViewModel, onCancel: () -> Uni
                             visualTransformation = if (secret) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
                             keyboardOptions = if (secret) de.ledgerline.app.ui.common.secretKeyboardOptions() else KeyboardOptions.Default,
                             trailingIcon = if (key == "password") {
-                                { IconButton(onClick = { genSheet = true }) { Icon(Icons.Outlined.Refresh, contentDescription = "Generate") } }
+                                { IconButton(onClick = { genSheet = true }) { Icon(Icons.Outlined.Refresh, contentDescription = stringResource(de.ledgerline.app.R.string.cd_generate)) } }
                             } else null,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         )
@@ -594,7 +594,7 @@ private fun TagsField(tags: MutableList<String>) {
             tags.toList().forEach { t ->
                 androidx.compose.material3.InputChip(
                     selected = false, onClick = {}, label = { Text(t) },
-                    trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "remove", modifier = Modifier.size(16.dp).clickable { tags.remove(t) }) },
+                    trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = stringResource(de.ledgerline.app.R.string.cd_remove), modifier = Modifier.size(16.dp).clickable { tags.remove(t) }) },
                 )
             }
         }
@@ -629,7 +629,7 @@ private fun CustomFieldsEditor(custom: MutableList<de.ledgerline.app.domain.mode
                     // §3.3: a secret custom field must be excluded from IME learning too.
                     keyboardOptions = if (cf.kind == "secret") de.ledgerline.app.ui.common.secretKeyboardOptions() else KeyboardOptions.Default,
                 )
-                IconButton(onClick = { custom.removeAt(i) }) { Icon(Icons.Outlined.Delete, contentDescription = "remove") }
+                IconButton(onClick = { custom.removeAt(i) }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(de.ledgerline.app.R.string.cd_remove)) }
             }
         }
         TextButton(onClick = { custom.add(de.ledgerline.app.domain.model.CustomField()) }) {

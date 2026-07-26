@@ -103,14 +103,14 @@ fun WorkspaceScaffold(
                         NavigationBarItem(
                             selected = selected == i,
                             onClick = { overflow = null; selected = i },
-                            icon = { Icon(tab.icon, contentDescription = null) },
+                            icon = { Icon(tab.icon, contentDescription = stringResource(tab.labelRes)) },
                             label = { Text(stringResource(tab.labelRes)) },
                         )
                     }
                     NavigationBarItem(
                         selected = false,
                         onClick = { showSheet = true },
-                        icon = { Icon(Icons.Outlined.MoreVert, contentDescription = null) },
+                        icon = { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.menu_more)) },
                         label = { Text(stringResource(R.string.menu_more)) },
                     )
                 }

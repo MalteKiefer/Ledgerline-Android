@@ -32,7 +32,7 @@ fun AppTopBar(
                 IconButton(onClick = onBack) {
                     Icon(
                         Icons.AutoMirrored.Outlined.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = androidx.compose.ui.res.stringResource(de.ledgerline.app.R.string.action_back),
                     )
                 }
             }

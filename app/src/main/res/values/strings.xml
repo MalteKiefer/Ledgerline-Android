@@ -96,7 +96,6 @@
     <string name="store_degraded">Some items could not be loaded right now — nothing was deleted, and editing is paused until they are back.</string>
     <string name="ws_retry">Retry</string>
     <string name="ws_reauth">Session expired — re-pair this device.</string>
-    <string name="ws_file_phase3">Opening files arrives in a later version.</string>
 
     <!-- Priority labels -->
     <string name="priority_low">Low</string>
@@ -565,4 +564,12 @@
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_dynamic_color">Dynamic color</string>
     <string name="settings_dynamic_color_sub">Derive the palette from your wallpaper (Android 12+)</string>
+    <string name="cd_add">Add</string>
+    <string name="cd_edit">Edit</string>
+    <string name="cd_trash">Move to trash</string>
+    <string name="cd_reveal">Reveal or hide</string>
+    <string name="cd_copy">Copy</string>
+    <string name="cd_copy_code">Copy code</string>
+    <string name="cd_generate">Generate</string>
+    <string name="cd_remove">Remove</string>
 </resources>
