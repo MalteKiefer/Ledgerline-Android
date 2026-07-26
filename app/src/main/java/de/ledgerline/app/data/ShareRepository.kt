@@ -44,6 +44,8 @@ interface AlbumSharing {
     fun existingLink(share: ShareInfo?): String?
     suspend fun createAlbumShare(albumId: String, opts: ShareOptions): Outcome<ShareResult>
     suspend fun updateAlbumShare(albumId: String, opts: ShareOptions): Outcome<ShareResult>
+    /** Best-effort re-push of a shared album's manifest, PRESERVING its options; no-op if unshared. */
+    suspend fun refreshAlbumShare(albumId: String): Outcome<Unit>
     suspend fun revokeAlbumShare(albumId: String): Outcome<Unit>
 }
 
@@ -316,6 +318,27 @@ class ShareRepository(
             if (saved is Outcome.Err) return@withContext saved
             Outcome.Ok(ShareResult(existing.token, sk, linkFor(session.baseUrl, existing.token, sk)))
         }
+
+    /**
+     * Re-push a shared album's manifest after its contents/name changed, keeping the existing
+     * options (allow-download, expiry, password). No-op (Ok) when the album isn't shared. The
+     * server's update replaces sealed_manifest+blob_refs and would RESET allow_download/expires_at
+     * if omitted, so both are re-sent from the stored descriptor; a blank password keeps the
+     * existing one.
+     */
+    override suspend fun refreshAlbumShare(albumId: String): Outcome<Unit> {
+        val existing = currentGallery()?.albums?.find { it.id == albumId }?.share
+            ?: return Outcome.Ok(Unit)
+        val opts = ShareOptions(
+            allowDownload = existing.allowDownload ?: true,
+            expiresAtIso = existing.expiresAt,
+            password = null,
+        )
+        return when (val r = updateAlbumShare(albumId, opts)) {
+            is Outcome.Ok -> Outcome.Ok(Unit)
+            is Outcome.Err -> r
+        }
+    }
 
     override suspend fun revokeAlbumShare(albumId: String): Outcome<Unit> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)

@@ -105,18 +105,23 @@ class AlbumsViewModel @Inject constructor(
 
     fun rename(albumId: String, name: String) = viewModelScope.launch {
         mutate.invoke { AlbumOps.rename(it, albumId, name) }
+        sharing.refreshAlbumShare(albumId) // keep the public link's title current (best-effort)
     }
 
     fun delete(albumId: String) = viewModelScope.launch {
+        // Revoke a live share BEFORE dropping the album, so the public link isn't orphaned.
+        sharing.revokeAlbumShare(albumId)
         mutate.invoke { AlbumOps.delete(it, albumId) }
     }
 
     fun addPhotos(albumId: String, ids: List<String>) = viewModelScope.launch {
         mutate.invoke { AlbumOps.addPhotos(it, albumId, ids) }
+        sharing.refreshAlbumShare(albumId) // re-push so recipients see the added photos
     }
 
     fun removePhoto(albumId: String, photoId: String) = viewModelScope.launch {
         mutate.invoke { AlbumOps.removePhoto(it, albumId, photoId) }
+        sharing.refreshAlbumShare(albumId) // re-push so removed photos disappear from the link
     }
 
     fun setCover(albumId: String, photoId: String) = viewModelScope.launch {
