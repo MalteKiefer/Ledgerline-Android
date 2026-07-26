@@ -23,9 +23,11 @@ import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.model.TodosManifest
 import de.ledgerline.app.domain.model.Workspace
 import de.ledgerline.app.domain.model.WorkspaceManifest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -309,11 +311,13 @@ class WorkspaceRepository(
         uploadBlob = { b, n -> uploadFilesBytes(api, vk, b, n) },
     )
 
-    suspend fun load(): Outcome<Workspace> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
-        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+    // On Dispatchers.IO: opening + JSON-decoding every module + the sharded files slice is
+    // CPU/IO-heavy and must not block the caller's main thread (large stores would ANR).
+    suspend fun load(): Outcome<Workspace> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
-        return try {
+        try {
             val loaded = coroutineScope {
                 val filesDeferred = async { loadFilesSlice(api, vk) }
                 val mods = specs.map { spec -> async { spec to fetchModule(api, spec, vk) } }.awaitAll()
@@ -402,9 +406,9 @@ class WorkspaceRepository(
      * `/files/store` migration lands (CLAUDE.md §14 R1) — better a loud failure than
      * a silent drop.
      */
-    suspend fun save(mutate: (WorkspaceManifest) -> WorkspaceManifest): Outcome<Workspace> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
-        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+    suspend fun save(mutate: (WorkspaceManifest) -> WorkspaceManifest): Outcome<Workspace> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
 
         // Establish the aggregate base + per-module versions.
@@ -412,7 +416,7 @@ class WorkspaceRepository(
         if (curBase == null || versions.size < specs.size) {
             when (val l = load()) {
                 is Outcome.Ok -> curBase = l.value.manifest
-                is Outcome.Err -> return l
+                is Outcome.Err -> return@withContext l
             }
         }
 
@@ -424,19 +428,19 @@ class WorkspaceRepository(
         if (curNext.files != curBase!!.files || curNext.fileFolders != curBase!!.fileFolders) {
             // Frozen while degraded: a shard blob is missing, so rewriting the root would drop the
             // missing shard's slot and make the loss permanent. Reject the write loudly.
-            if (_filesDegraded.value) return Outcome.Err(ErrorKind.HTTP)
+            if (_filesDegraded.value) return@withContext Outcome.Err(ErrorKind.HTTP)
             val writer = newFilesWriter(api, vk)
             var version = filesVersion
             var attempts = 0
             while (true) {
-                if (attempts++ >= 5) return Outcome.Err(ErrorKind.HTTP)
+                if (attempts++ >= 5) return@withContext Outcome.Err(ErrorKind.HTTP)
                 val result = writer.build(curNext.files, curNext.fileFolders, priorFilesRoot)
-                    ?: return Outcome.Err(ErrorKind.NETWORK) // a shard/collection upload failed
+                    ?: return@withContext Outcome.Err(ErrorKind.NETWORK) // a shard/collection upload failed
                 val rootCipher = crypto.sealManifest(CanonicalJson.encode(result.rootJson), vk)
                 val put = try {
                     api.filesStorePut(StorePutRequest(rootCipher, version, result.shardRefs))
                 } catch (e: Exception) {
-                    return Outcome.Err(ErrorKind.NETWORK, e)
+                    return@withContext Outcome.Err(ErrorKind.NETWORK, e)
                 }
                 when {
                     put.isSuccessful -> {
@@ -452,7 +456,7 @@ class WorkspaceRepository(
                         curBase = curBase!!.copy(files = sf, fileFolders = sfo)
                         curNext = mutate(curBase!!)
                     }
-                    else -> return Outcome.Err(ErrorKind.HTTP)
+                    else -> return@withContext Outcome.Err(ErrorKind.HTTP)
                 }
             }
         }
@@ -462,12 +466,12 @@ class WorkspaceRepository(
             var version = versions[spec.key] ?: 0
             var attempts = 0
             while (true) {
-                if (attempts++ >= 4) return Outcome.Err(ErrorKind.HTTP)
+                if (attempts++ >= 4) return@withContext Outcome.Err(ErrorKind.HTTP)
                 val ciphertext = crypto.sealManifest(spec.encode(curNext), vk)
                 val put = try {
                     api.putModuleStore(spec.key, StorePutRequest(ciphertext, version))
                 } catch (e: Exception) {
-                    return Outcome.Err(ErrorKind.NETWORK, e)
+                    return@withContext Outcome.Err(ErrorKind.NETWORK, e)
                 }
                 when {
                     put.isSuccessful -> {
@@ -481,24 +485,24 @@ class WorkspaceRepository(
                         val res = try {
                             api.moduleStore(spec.key)
                         } catch (e: Exception) {
-                            return Outcome.Err(ErrorKind.NETWORK, e)
+                            return@withContext Outcome.Err(ErrorKind.NETWORK, e)
                         }
-                        if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
+                        if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
                         val body = res.body()!!
                         version = body.version
                         val freshPlain = body.ciphertext?.let {
-                            crypto.openManifest(it, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
+                            crypto.openManifest(it, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
                         } ?: spec.emptyPlain()
                         curBase = spec.merge(curBase!!, freshPlain)
                         curNext = mutate(curBase!!)
                     }
-                    else -> return Outcome.Err(ErrorKind.HTTP)
+                    else -> return@withContext Outcome.Err(ErrorKind.HTTP)
                 }
             }
         }
 
         val result = Workspace(curNext, 0)
         cache.set(result)
-        return Outcome.Ok(result)
+        return@withContext Outcome.Ok(result)
     }
 }

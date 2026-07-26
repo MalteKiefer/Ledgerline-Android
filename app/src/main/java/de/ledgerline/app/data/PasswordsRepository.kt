@@ -14,6 +14,8 @@ import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.domain.model.SecretsManifest
 import de.ledgerline.app.domain.model.SecretsStore
 import de.ledgerline.app.domain.model.Session
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -79,9 +81,12 @@ class PasswordsRepository(
         return crypto.sealManifest(jsonEncoder.encodeToString(JsonObject.serializer(), merged), vk)
     }
 
-    suspend fun load(): Outcome<SecretsStore> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
-        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+    // Runs on Dispatchers.IO: opening the sealed manifest (secretbox), JSON-decoding the records,
+    // and writing the ciphertext to the disk cache (kotlinx encode of a large base64 string) are all
+    // CPU/IO-heavy and MUST NOT run on the caller's main thread — otherwise a large store ANRs.
+    suspend fun load(): Outcome<SecretsStore> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
         // Offline-first: publish the disk-cached store immediately (instant display at app start,
         // and the only source when offline), then refresh from the network below. This makes the
@@ -89,7 +94,7 @@ class PasswordsRepository(
         if (cache.value.value == null && offlineFlags.enabled()) {
             (cachedOr(Outcome.Err(ErrorKind.NETWORK), vk) as? Outcome.Ok)?.let { cache.set(it.value) }
         }
-        return try {
+        try {
             val res = api.moduleStore(MODULE)
             when {
                 res.code() == HttpURLConnection.HTTP_UNAUTHORIZED -> Outcome.Err(ErrorKind.HTTP)
@@ -97,7 +102,7 @@ class PasswordsRepository(
                 else -> {
                     val body = res.body()!!
                     val manifest = body.ciphertext?.let { ct ->
-                        val plain = crypto.openManifest(ct, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
+                        val plain = crypto.openManifest(ct, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
                         decodeManifest(plain)
                     } ?: SecretsManifest()
                     if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
@@ -176,12 +181,14 @@ class PasswordsRepository(
     }
 
     /** Optimistic write with 409-merge (reload → re-apply [mutate] → retry). */
-    suspend fun save(mutate: (SecretsManifest) -> SecretsManifest): Outcome<SecretsStore> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
-        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+    // On Dispatchers.IO: sealing the manifest (CanonicalJson + secretbox over the whole store),
+    // JSON decode on a 409 rebase, and the disk-cache write are heavy — never on the main thread.
+    suspend fun save(mutate: (SecretsManifest) -> SecretsManifest): Outcome<SecretsStore> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
         val current = cache.value.value
-        return optimisticSave(
+        optimisticSave(
             cached = current?.let { it.manifest to it.version },
             mutate = mutate,
             fetch = { api.moduleStore(MODULE) },
