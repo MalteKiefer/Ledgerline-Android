@@ -113,6 +113,10 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun claimPair(body: PairClaimRequest): Response<PairClaimResponse> = throw NotImplementedError()
     override suspend fun pollPair(body: de.ledgerline.app.data.remote.dto.PairCollectRequest): Response<PairPollResponse> = throw NotImplementedError()
     override suspend fun me(): Response<de.ledgerline.app.data.remote.dto.MeResponse> = throw NotImplementedError()
+    override suspend fun devices(): Response<de.ledgerline.app.data.remote.dto.DevicesResponse> = throw NotImplementedError()
+    override suspend fun revokeDevice(token: String): Response<Unit> = throw NotImplementedError()
+    override suspend fun wipeDevice(token: String): Response<Unit> = throw NotImplementedError()
+
     override suspend fun passwordsBreach(prefix: String): Response<ResponseBody> = throw NotImplementedError()
     override suspend fun passwordsIcon(domain: String): Response<de.ledgerline.app.data.remote.dto.IconResponse> = throw NotImplementedError()
     override suspend fun passwordsTfaDirectory(): Response<de.ledgerline.app.data.remote.dto.TfaDirectoryResponse> = throw NotImplementedError()

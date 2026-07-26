@@ -91,6 +91,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { _account.value = accountRepository.me() }
     }
 
+    /** Connected devices (paired Sanctum tokens). Loaded on demand when the Account screen opens. */
+    private val _devices = MutableStateFlow<List<de.ledgerline.app.data.remote.dto.DeviceDto>>(emptyList())
+    val devices: StateFlow<List<de.ledgerline.app.data.remote.dto.DeviceDto>> = _devices.asStateFlow()
+
+    fun loadDevices() = viewModelScope.launch { _devices.value = accountRepository.devices() }
+    fun revokeDevice(id: Long) = viewModelScope.launch { if (accountRepository.revokeDevice(id)) loadDevices() }
+    fun wipeDevice(id: Long) = viewModelScope.launch { if (accountRepository.wipeDevice(id)) loadDevices() }
+
     val backupEnabled: StateFlow<Boolean> = settingsStore.backupEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val backupAlbumIds: StateFlow<Set<String>> = settingsStore.backupAlbumIds
