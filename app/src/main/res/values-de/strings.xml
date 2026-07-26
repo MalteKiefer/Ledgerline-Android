@@ -465,6 +465,9 @@
     <string name="contacts_sync">Mit Gerät abgleichen</string>
     <string name="contacts_export_device">Auf Gerät exportieren</string>
     <string name="contacts_import_device">Vom Gerät importieren</string>
+    <string name="contacts_export_vcf">vCard exportieren (.vcf)</string>
+    <string name="contacts_import_vcf">vCard importieren (.vcf)</string>
+    <string name="contacts_vcf_imported">%1$d Kontakte importiert</string>
     <string name="address_street">Straße</string>
     <string name="address_zip">PLZ</string>
     <string name="address_city">Stadt</string>

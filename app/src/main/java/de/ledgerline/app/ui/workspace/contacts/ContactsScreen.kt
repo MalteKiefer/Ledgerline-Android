@@ -45,6 +45,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -114,6 +116,24 @@ fun ContactsScreen(
     var deleteForeverTarget by remember { mutableStateOf<String?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
     var syncMenuOpen by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    // vCard (.vcf) file export/import via the Storage Access Framework.
+    val exportVcfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/x-vcard")) { uri ->
+        if (uri != null) runCatching {
+            context.contentResolver.openOutputStream(uri)?.use { it.write(vm.exportVcf().toByteArray(Charsets.UTF_8)) }
+        }
+    }
+    val importVcfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            val text = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+            }.getOrNull()
+            if (text != null) vm.importVcf(text) { n ->
+                scope.launch { snackbar.showSnackbar(context.getString(R.string.contacts_vcf_imported, n)) }
+            }
+        }
+    }
 
     // Contacts permission is requested lazily on first export/import (also offered on
     // the welcome screen). The pending action runs once the grant comes back.
@@ -188,6 +208,14 @@ fun ContactsScreen(
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.contacts_import_device)) },
                             onClick = { syncMenuOpen = false; withContactsPermission { vm.importFromDevice() } },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.contacts_export_vcf)) },
+                            onClick = { syncMenuOpen = false; exportVcfLauncher.launch("contacts.vcf") },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.contacts_import_vcf)) },
+                            onClick = { syncMenuOpen = false; importVcfLauncher.launch(arrayOf("text/vcard", "text/x-vcard", "text/*", "*/*")) },
                         )
                     }
                 },

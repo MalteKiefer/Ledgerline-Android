@@ -299,6 +299,29 @@ class ContactsViewModel @Inject constructor(
     private fun newId(): String = de.ledgerline.app.core.Ids.newId()
     private fun nowIso(): String = OffsetDateTime.now(ZoneOffset.UTC).toString()
 
+    // ---- vCard import / export (RFC 6350) ----
+
+    /** All non-trashed contacts serialised as a vCard 4.0 (.vcf) document. */
+    fun exportVcf(): String {
+        val contacts = cache.value.value?.manifest?.contacts.orEmpty().filter { !it.trashed }
+        return de.ledgerline.app.core.contacts.VCard.export(contacts)
+    }
+
+    /**
+     * Parse a `.vcf` file and add each contact (fresh id + timestamp). Returns the number added via
+     * [onDone]; 0 on a parse yielding no cards. Avatars are not imported (separate encrypted blob).
+     */
+    fun importVcf(text: String, onDone: (Int) -> Unit = {}) {
+        val parsed = runCatching { de.ledgerline.app.core.contacts.VCard.parse(text) }.getOrDefault(emptyList())
+            .map { it.copy(id = newId(), updated = nowIso()) }
+        if (parsed.isEmpty()) { onDone(0); return }
+        viewModelScope.launch {
+            val ok = mutate.invoke { m -> m.copy(contacts = m.contacts + parsed) } is Outcome.Ok
+            if (!ok) _message.value = "Import failed"
+            onDone(if (ok) parsed.size else 0)
+        }
+    }
+
     private fun displayName(c: Contact): String = when {
         c.last.isNotBlank() && c.first.isNotBlank() -> "${c.last}, ${c.first}"
         c.last.isNotBlank() -> c.last

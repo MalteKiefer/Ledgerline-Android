@@ -467,6 +467,9 @@
     <string name="contacts_sync">Sync with device</string>
     <string name="contacts_export_device">Export to device</string>
     <string name="contacts_import_device">Import from device</string>
+    <string name="contacts_export_vcf">Export vCard (.vcf)</string>
+    <string name="contacts_import_vcf">Import vCard (.vcf)</string>
+    <string name="contacts_vcf_imported">Imported %1$d contacts</string>
     <string name="address_street">Street</string>
     <string name="address_zip">ZIP</string>
     <string name="address_city">City</string>

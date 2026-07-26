@@ -468,6 +468,9 @@
     <string name="contacts_sync">Синхронизировать с устройством</string>
     <string name="contacts_export_device">Экспортировать на устройство</string>
     <string name="contacts_import_device">Импортировать с устройства</string>
+    <string name="contacts_export_vcf">Экспорт vCard (.vcf)</string>
+    <string name="contacts_import_vcf">Импорт vCard (.vcf)</string>
+    <string name="contacts_vcf_imported">Импортировано контактов: %1$d</string>
     <string name="address_street">Улица</string>
     <string name="address_zip">Индекс</string>
     <string name="address_city">Город</string>
