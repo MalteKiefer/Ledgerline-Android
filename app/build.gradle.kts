@@ -22,7 +22,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        resourceConfigurations += listOf("en", "de")
+        resourceConfigurations += listOf("en", "de", "ru")
         // 64-bit only; also drops the stale 4 KB-aligned prebuilt ABIs from lazysodium.
         ndk { abiFilters += listOf("arm64-v8a") }
     }
@@ -133,6 +133,7 @@ dependencies {
     implementation(libs.zxing.core)
     implementation(libs.biometric)
     implementation(libs.credentials)
+    implementation(libs.autofill)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
     implementation(libs.lazysodium.android) { exclude(group = "net.java.dev.jna", module = "jna") }

@@ -642,6 +642,7 @@ Tests grün (`PQKEMKatTest` on-JVM, `*InstrumentedTest` on-device).
 - Sonst alle auf neuestem Stand (2026-07-25): AGP 9.3.1, Kotlin 2.4.10, lifecycle 2.11.0,
   camerax 1.6.1, mockk 1.14.11, MapLibre 13.4.1, jna 5.19.1, zxing 3.5.4, BC 1.84,
   androidx.credentials 1.6.0 (Passkeys; 1.7.0 ist alpha → gehalten).
+  androidx.autofill 1.3.0 (Inline-Autofill-Presentations).
   (KSP 2.3.10, Hilt 2.60.1, Compose-BOM 2026.06.01 waren bereits latest.)
 
 ---
