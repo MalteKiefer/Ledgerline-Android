@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -264,7 +265,11 @@ private fun PwDetail(item: SecretItem, vm: PasswordsViewModel, onBack: () -> Uni
             })
         },
     ) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize().padding(16.dp)) {
+        Column(
+            Modifier.padding(pad).fillMaxSize()
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(16.dp),
+        ) {
             (SecretTypes.fields[item.type] ?: emptyList()).forEach { key ->
                 when (key) {
                     "urls" -> SecretFields.urls(item).forEach { u -> FieldRow(fieldLabel("urls"), u, secret = false, context) }
@@ -274,6 +279,62 @@ private fun PwDetail(item: SecretItem, vm: PasswordsViewModel, onBack: () -> Uni
             }
             item.custom.forEach { c -> FieldRow(c.label.ifBlank { "Field" }, c.value, secret = c.kind == "secret", context) }
             vm.tfaSetupUrl(item)?.let { url -> TfaOfferRow(url, context) }
+            if (SecretFields.str(item, "password").isNotBlank()) BreachRow(item, vm)
+            if (item.versions.isNotEmpty()) VersionHistory(item, vm)
+        }
+    }
+}
+
+/** Opt-in HIBP breach check (k-anonymity — only a 5-hex SHA-1 prefix is sent to the server). */
+@Composable
+private fun BreachRow(item: SecretItem, vm: PasswordsViewModel) {
+    var state by remember(item.id) { mutableStateOf<Int?>(-1) } // -1 = not checked, null = failed/none
+    var loading by remember(item.id) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        when {
+            state == -1 -> TextButton(onClick = {
+                loading = true; vm.checkBreach(item) { c -> state = c; loading = false }
+            }, enabled = !loading) { Text(stringResource(de.ledgerline.app.R.string.pw_breach_check)) }
+            state == null -> Text(stringResource(de.ledgerline.app.R.string.pw_breach_error), color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+            state == 0 -> Text(stringResource(de.ledgerline.app.R.string.pw_breach_clear), color = Brand.tintGreen)
+            else -> Text(stringResource(de.ledgerline.app.R.string.pw_breach_found, state!!), color = androidx.compose.material3.MaterialTheme.colorScheme.error)
+        }
+        Text(stringResource(de.ledgerline.app.R.string.pw_breach_note), style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Password strength bar (web pwScore 0–4). */
+@Composable
+private fun StrengthBar(pw: String) {
+    val score = de.ledgerline.app.core.passwords.PasswordStrength.score(pw)
+    val (color, labelRes) = when {
+        score >= 4 -> Brand.tintGreen to de.ledgerline.app.R.string.pw_strength_strong
+        score == 3 -> Brand.tintTeal to de.ledgerline.app.R.string.pw_strength_good
+        score == 2 -> Brand.tintOrange to de.ledgerline.app.R.string.pw_strength_fair
+        else -> androidx.compose.material3.MaterialTheme.colorScheme.error to de.ledgerline.app.R.string.pw_strength_weak
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        androidx.compose.material3.LinearProgressIndicator(
+            progress = { (score.coerceIn(0, 4)) / 4f },
+            color = color,
+            modifier = Modifier.weight(1f).height(6.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(labelRes), style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = color)
+    }
+}
+
+/** Saved version history with restore. */
+@Composable
+private fun VersionHistory(item: SecretItem, vm: PasswordsViewModel) {
+    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+        Text(stringResource(de.ledgerline.app.R.string.pw_version_history), style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
+        item.versions.take(20).forEach { ver ->
+            ListItem(
+                headlineContent = { Text(ver.title.ifBlank { "—" }) },
+                supportingContent = { Text(ver.at) },
+                trailingContent = { TextButton(onClick = { vm.restoreVersion(item, ver) }) { Text(stringResource(de.ledgerline.app.R.string.pw_version_restore)) } },
+            )
         }
     }
 }
@@ -395,6 +456,7 @@ private fun PwEdit(item: SecretItem, onCancel: () -> Unit, onSave: (SecretItem) 
                             } else null,
                             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                         )
+                        if (key == "password" && v.value.isNotEmpty()) StrengthBar(v.value)
                     }
                 }
             }

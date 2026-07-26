@@ -56,6 +56,17 @@
     <string name="tab_passwords">Passwörter</string>
     <string name="pw_tfa_available">Diese Website unterstützt Zwei-Faktor-Authentifizierung.</string>
     <string name="pw_tfa_setup">Einrichten</string>
+    <string name="pw_strength_weak">Schwach</string>
+    <string name="pw_strength_fair">Mäßig</string>
+    <string name="pw_strength_good">Gut</string>
+    <string name="pw_strength_strong">Stark</string>
+    <string name="pw_breach_check">Auf Lecks prüfen</string>
+    <string name="pw_breach_note">Fragt die Have-I-Been-Pwned-Datenbank ab (nur ein Teil-Hash wird gesendet).</string>
+    <string name="pw_breach_clear">In bekannten Lecks nicht gefunden</string>
+    <string name="pw_breach_found">In %1$d Lecks gefunden — ändere dieses Passwort</string>
+    <string name="pw_breach_error">Leck-Prüfung nicht verfügbar</string>
+    <string name="pw_version_history">Versionsverlauf</string>
+    <string name="pw_version_restore">Wiederherstellen</string>
     <string name="settings_cat_passkeys">Passkeys</string>
     <string name="settings_cat_passkeys_sub">Ledgerline für Passkeys in Apps &amp; Browser nutzen</string>
     <string name="passkey_unlock_action">Ledgerline entsperren, um einen Passkey zu verwenden</string>
@@ -190,6 +201,8 @@
     <string name="autofill_unlock_and_fill">Ledgerline — entsperren &amp; ausfüllen</string>
     <string name="autofill_pick_title">Login auswählen</string>
     <string name="autofill_no_matches">Keine passenden Logins</string>
+    <string name="autofill_no_match_for">Kein gespeichertes Login für %1$s</string>
+    <string name="autofill_show_all">Alle Logins anzeigen</string>
     <string name="autofill_saved">In Ledgerline gespeichert</string>
     <string name="autofill_save_failed">Konnte nicht gespeichert werden</string>
     <string name="settings_cat_autofill">Autofill</string>

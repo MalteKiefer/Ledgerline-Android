@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,8 +64,16 @@ fun AutofillPickerScreen(
 
     val all = store?.manifest?.secrets.orEmpty().filter { !it.isTrashed }
     val matched = all.filter { DomainMatch.matches(it, webDomain, packageName) }
-    val fallback = all.filter { it.type in setOf("login", "password", "server") }
-    val shown = if (matched.isNotEmpty()) matched else fallback
+    val fillable = all.filter { it.type in setOf("login", "password", "server") }
+    // Anti-phishing: never blindly offer ALL logins on a domain mismatch. Show matches only;
+    // browsing the full list is an explicit, searchable opt-in.
+    var showAll by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    val label = webDomain ?: packageName ?: ""
+    val browseList = fillable.filter {
+        query.isBlank() || it.title.lowercase().contains(query.lowercase()) ||
+            SecretFields.subtitle(it).lowercase().contains(query.lowercase())
+    }
 
     AppScaffold(
         topBar = {
@@ -76,25 +85,39 @@ fun AutofillPickerScreen(
     ) { padding ->
         when {
             loading -> Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) { CircularProgressIndicator() }
-            shown.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
+            matched.isNotEmpty() -> LazyColumn(Modifier.fillMaxSize().padding(padding)) {
+                items(matched, key = { it.id }) { item -> PickRow(item, onPick) }
+            }
+            !showAll -> Box(Modifier.fillMaxSize().padding(padding), Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(stringResource(R.string.autofill_no_matches))
+                    Text(stringResource(R.string.autofill_no_match_for, label))
+                    TextButton(onClick = { showAll = true }) { Text(stringResource(R.string.autofill_show_all)) }
                     TextButton(onClick = onCancel) { Text(stringResource(R.string.action_cancel)) }
                 }
             }
-            else -> LazyColumn(Modifier.fillMaxSize().padding(padding)) {
-                items(shown, key = { it.id }) { item ->
-                    ListItem(
-                        headlineContent = { Text(item.title) },
-                        supportingContent = {
-                            val sub = SecretFields.subtitle(item)
-                            if (sub.isNotBlank()) Text(sub)
-                        },
-                        leadingContent = { IconChip(icon = Icons.Outlined.Person) },
-                        modifier = Modifier.fillMaxWidth().clickable { onPick(item) },
-                    )
+            else -> Column(Modifier.fillMaxSize().padding(padding)) {
+                OutlinedTextField(
+                    value = query, onValueChange = { query = it },
+                    label = { Text(stringResource(R.string.autofill_pick_title)) },
+                    singleLine = true, modifier = Modifier.fillMaxWidth().padding(12.dp),
+                )
+                LazyColumn(Modifier.fillMaxSize()) {
+                    items(browseList, key = { it.id }) { item -> PickRow(item, onPick) }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun PickRow(item: SecretItem, onPick: (SecretItem) -> Unit) {
+    ListItem(
+        headlineContent = { Text(item.title) },
+        supportingContent = {
+            val sub = SecretFields.subtitle(item)
+            if (sub.isNotBlank()) Text(sub)
+        },
+        leadingContent = { IconChip(icon = Icons.Outlined.Person) },
+        modifier = Modifier.fillMaxWidth().clickable { onPick(item) },
+    )
 }

@@ -56,6 +56,17 @@
     <string name="tab_passwords">Passwords</string>
     <string name="pw_tfa_available">This site offers two-factor authentication.</string>
     <string name="pw_tfa_setup">Set up</string>
+    <string name="pw_strength_weak">Weak</string>
+    <string name="pw_strength_fair">Fair</string>
+    <string name="pw_strength_good">Good</string>
+    <string name="pw_strength_strong">Strong</string>
+    <string name="pw_breach_check">Check for breaches</string>
+    <string name="pw_breach_note">Queries the Have I Been Pwned database (only a partial hash is sent).</string>
+    <string name="pw_breach_clear">Not found in known breaches</string>
+    <string name="pw_breach_found">Found in %1$d breaches — change this password</string>
+    <string name="pw_breach_error">Breach check unavailable</string>
+    <string name="pw_version_history">Version history</string>
+    <string name="pw_version_restore">Restore</string>
     <string name="settings_cat_passkeys">Passkeys</string>
     <string name="settings_cat_passkeys_sub">Use Ledgerline for passkeys in apps &amp; the browser</string>
     <string name="passkey_unlock_action">Unlock Ledgerline to use a passkey</string>
@@ -205,6 +216,8 @@
     <string name="autofill_unlock_and_fill">Ledgerline — unlock &amp; fill</string>
     <string name="autofill_pick_title">Choose a login</string>
     <string name="autofill_no_matches">No matching logins</string>
+    <string name="autofill_no_match_for">No saved login for %1$s</string>
+    <string name="autofill_show_all">Show all logins</string>
     <string name="autofill_saved">Saved to Ledgerline</string>
     <string name="autofill_save_failed">Couldn\'t save</string>
     <string name="settings_cat_autofill">Autofill</string>

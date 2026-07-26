@@ -202,6 +202,27 @@ class PasswordsViewModel @Inject constructor(
         }
     }
 
+    /** Restore a past [version]'s content onto [item] (upsert snapshots the current as a new version). */
+    fun restoreVersion(item: SecretItem, version: SecretVersion, onDone: (Boolean) -> Unit = {}) =
+        upsert(item.copy(title = version.title, fields = version.fields, custom = version.custom), onDone)
+
+    /**
+     * HIBP breach check for [item]'s password (opt-in, k-anonymity — only the 5-hex SHA-1 prefix is
+     * sent). [onResult] gets the breach count, or null when there is no password / the lookup failed.
+     */
+    fun checkBreach(item: SecretItem, onResult: (Int?) -> Unit) {
+        val pw = SecretFields.str(item, "password")
+        if (pw.isBlank()) { onResult(null); return }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.Default) {
+                val hex = de.ledgerline.app.core.passwords.BreachCheck.sha1Hex(pw)
+                val range = repo.breachRange(de.ledgerline.app.core.passwords.BreachCheck.prefix(hex))
+                range?.let { de.ledgerline.app.core.passwords.BreachCheck.countInRange(it, de.ledgerline.app.core.passwords.BreachCheck.suffix(hex)) }
+            }
+            onResult(result)
+        }
+    }
+
     private fun mutate(tag: String, block: (List<SecretItem>) -> List<SecretItem>) {
         viewModelScope.launch {
             val res = repo.save { m -> m.copy(secrets = block(m.secrets)) }

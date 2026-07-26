@@ -57,6 +57,17 @@
     <string name="tab_passwords">Пароли</string>
     <string name="pw_tfa_available">Этот сайт поддерживает двухфакторную аутентификацию.</string>
     <string name="pw_tfa_setup">Настроить</string>
+    <string name="pw_strength_weak">Слабый</string>
+    <string name="pw_strength_fair">Средний</string>
+    <string name="pw_strength_good">Хороший</string>
+    <string name="pw_strength_strong">Надёжный</string>
+    <string name="pw_breach_check">Проверить утечки</string>
+    <string name="pw_breach_note">Запрос к базе Have I Been Pwned (отправляется только часть хеша).</string>
+    <string name="pw_breach_clear">В известных утечках не найдено</string>
+    <string name="pw_breach_found">Найдено в %1$d утечках — смените пароль</string>
+    <string name="pw_breach_error">Проверка утечек недоступна</string>
+    <string name="pw_version_history">История версий</string>
+    <string name="pw_version_restore">Восстановить</string>
     <string name="settings_cat_passkeys">Passkeys</string>
     <string name="settings_cat_passkeys_sub">Использовать Ledgerline для passkey в приложениях и браузере</string>
     <string name="passkey_unlock_action">Разблокируйте Ledgerline, чтобы использовать passkey</string>
@@ -206,6 +217,8 @@
     <string name="autofill_unlock_and_fill">Ledgerline — разблокировать и заполнить</string>
     <string name="autofill_pick_title">Выберите логин</string>
     <string name="autofill_no_matches">Нет подходящих логинов</string>
+    <string name="autofill_no_match_for">Нет сохранённого логина для %1$s</string>
+    <string name="autofill_show_all">Показать все логины</string>
     <string name="autofill_saved">Сохранено в Ledgerline</string>
     <string name="autofill_save_failed">Не удалось сохранить</string>
     <string name="settings_cat_autofill">Автозаполнение</string>

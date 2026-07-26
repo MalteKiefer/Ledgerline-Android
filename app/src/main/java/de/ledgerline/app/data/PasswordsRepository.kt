@@ -153,6 +153,19 @@ class PasswordsRepository(
         } catch (_: Exception) { null }
     }
 
+    /**
+     * HIBP k-anonymity breach range for a 5-hex SHA-1 [prefix]: the server proxies the query so
+     * only the prefix leaves the device (the full hash never does). Returns the raw range body
+     * (`SUFFIX:count` lines) or null on failure. Match locally with [de.ledgerline.app.core.passwords.BreachCheck].
+     */
+    suspend fun breachRange(prefix: String): String? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val res = apiProvider(session).passwordsBreach(prefix)
+            if (!res.isSuccessful) null else res.body()?.string()
+        } catch (_: Exception) { null }
+    }
+
     /** 2fa.directory dataset: `{ host → setup-docs URL }`. Empty on any failure. */
     suspend fun tfaDirectory(): Map<String, String> {
         val session = sessionHolder.get() ?: return emptyMap()
