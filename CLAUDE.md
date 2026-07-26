@@ -547,7 +547,11 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   Anzeige. Nicht mit „geliefert" verwechseln. Empfohlener nächster Bau: **Shared-Vault read/accept**
   (Krypto liegt bereit) vor dem vollen Rollen/Rotation-Epic.
 - **Passkeys/WebAuthn.**
-- **Geräte-Verwaltung + Remote-Wipe-UI**, **Notifications**, **Konto-Export/Löschen**.
+- **Geräte-Verwaltung + Remote-Wipe-UI — ERLEDIGT (2026-07-27):** Settings→Account listet die
+  gekoppelten Geräte (`GET /devices`) mit Widerruf (`DELETE /devices/{token}`) + Remote-Wipe
+  (`POST /devices/{token}/wipe`); aktuelles Gerät markiert, nicht selbst-widerrufbar
+  (`AccountRepository.devices/revokeDevice/wipeDevice` + `DeviceDto`). **Notifications**,
+  **Konto-Export/Löschen** weiterhin offen.
 - **Explore/Maps** (Tracks, Routing), **Health-Modul**, **Invoices-Modul**.
 - Galerie-ML-Parität: semantische Suche (embed-text ist da), Duplikate, Alben-Feinschliff.
 
