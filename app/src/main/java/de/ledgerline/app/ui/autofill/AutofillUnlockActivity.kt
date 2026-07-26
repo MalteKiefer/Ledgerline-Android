@@ -145,7 +145,9 @@ class AutofillUnlockActivity : FragmentActivity() {
             val urls = listOfNotNull(webDomain?.takeIf { it.isNotBlank() }?.let { "https://$it" })
             val fields = SecretFields.build(kotlinx.serialization.json.JsonObject(emptyMap()), "login", values, urls)
             val now = java.time.Instant.now().toString()
-            val item = SecretItem(id = de.ledgerline.app.core.Ids.newId(), type = "login", title = title, fields = fields, created = now, updated = now)
+            // Web mandates a folder; drop a new autofill-saved login into the first one if any exist.
+            val folder = passwordsCache.value.value?.manifest?.secretFolders?.firstOrNull()?.id
+            val item = SecretItem(id = de.ledgerline.app.core.Ids.newId(), type = "login", title = title, fields = fields, folder = folder, created = now, updated = now)
             val res = passwordsRepo.save { m -> m.copy(secrets = m.secrets + item) }
             val msg = if (res is Outcome.Ok) R.string.autofill_saved else R.string.autofill_save_failed
             Toast.makeText(this@AutofillUnlockActivity, msg, Toast.LENGTH_SHORT).show()

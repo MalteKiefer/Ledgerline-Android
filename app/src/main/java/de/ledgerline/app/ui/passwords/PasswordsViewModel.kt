@@ -16,10 +16,13 @@ import de.ledgerline.app.domain.model.SecretVersion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
@@ -47,8 +50,15 @@ class PasswordsViewModel @Inject constructor(
     val favoritesOnly: StateFlow<Boolean> = _favoritesOnly
     private val _showTrash = MutableStateFlow(false)
     val showTrash: StateFlow<Boolean> = _showTrash
+    private val _folderFilter = MutableStateFlow<String?>(null) // null = all folders
+    val folderFilter: StateFlow<String?> = _folderFilter
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message
+
+    /** The password folders (secretFolders), for the picker + filter. */
+    val folders: StateFlow<List<de.ledgerline.app.domain.model.SecretFolder>> =
+        cache.value.map { it?.manifest?.secretFolders.orEmpty() }
+            .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
 
     private val _state = MutableStateFlow(PasswordsUi())
     val state: StateFlow<PasswordsUi> = _state
@@ -72,10 +82,12 @@ class PasswordsViewModel @Inject constructor(
     }
 
     init {
-        // Recompute the visible list whenever the store or any filter changes.
-        combine(cache.value, _query, _typeFilter, _favoritesOnly, _showTrash) { store, q, type, favOnly, trash ->
-            recompute(store, q, type, favOnly, trash)
-        }.launchIn(viewModelScope)
+        // Recompute the visible list whenever the store or any filter changes. Two nested
+        // combines because there are more than five filter inputs.
+        val filters = combine(_query, _typeFilter, _favoritesOnly, _showTrash, _folderFilter) { q, type, fav, trash, folder ->
+            Filters(q, type, fav, trash, folder)
+        }
+        combine(cache.value, filters) { store, f -> recompute(store, f) }.launchIn(viewModelScope)
         // Load as soon as the vault is unlocked. This VM can init before the unlock
         // completes (passwords is the first tab), when repo.load() would fail with no VK;
         // observing the unlocked flow re-loads the moment the key lands — and fires
@@ -127,13 +139,16 @@ class PasswordsViewModel @Inject constructor(
         return null
     }
 
-    private fun recompute(store: de.ledgerline.app.domain.model.SecretsStore?, q: String, type: String?, favOnly: Boolean, trash: Boolean) {
+    private data class Filters(val q: String, val type: String?, val favOnly: Boolean, val trash: Boolean, val folder: String?)
+
+    private fun recompute(store: de.ledgerline.app.domain.model.SecretsStore?, f: Filters) {
         val all = store?.manifest?.secrets.orEmpty()
-        val query = q.trim().lowercase()
+        val query = f.q.trim().lowercase()
         val visible = all.asSequence()
-            .filter { it.isTrashed == trash }
-            .filter { type == null || it.type == type }
-            .filter { !favOnly || it.favorite }
+            .filter { it.isTrashed == f.trash }
+            .filter { f.type == null || it.type == f.type }
+            .filter { !f.favOnly || it.favorite }
+            .filter { f.folder == null || it.folder == f.folder }
             .filter {
                 query.isEmpty() ||
                     it.title.lowercase().contains(query) ||
@@ -152,9 +167,19 @@ class PasswordsViewModel @Inject constructor(
 
     fun setQuery(q: String) { _query.value = q }
     fun setTypeFilter(t: String?) { _typeFilter.value = t }
+    fun setFolderFilter(id: String?) { _folderFilter.value = id }
     fun toggleFavoritesOnly() { _favoritesOnly.value = !_favoritesOnly.value }
     fun setShowTrash(v: Boolean) { _showTrash.value = v }
     fun consumeMessage() { _message.value = null }
+
+    /** Create a new password folder and return its id (via [onDone]); default role "manage". */
+    fun createFolder(name: String, onDone: (String?) -> Unit = {}) {
+        val id = de.ledgerline.app.core.Ids.newId()
+        viewModelScope.launch {
+            val res = repo.save { m -> m.copy(secretFolders = m.secretFolders + de.ledgerline.app.domain.model.SecretFolder(id, name)) }
+            onDone(if (res is Outcome.Ok) id else null)
+        }
+    }
 
     fun secretById(id: String): SecretItem? = cache.value.value?.manifest?.secrets?.firstOrNull { it.id == id }
 

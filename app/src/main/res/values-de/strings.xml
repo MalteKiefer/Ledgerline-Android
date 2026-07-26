@@ -67,6 +67,16 @@
     <string name="pw_breach_error">Leck-Prüfung nicht verfügbar</string>
     <string name="pw_version_history">Versionsverlauf</string>
     <string name="pw_version_restore">Wiederherstellen</string>
+    <string name="pw_folder">Ordner</string>
+    <string name="pw_folder_none">Kein Ordner</string>
+    <string name="pw_folder_new">Neuer Ordner…</string>
+    <string name="pw_folder_create">Erstellen</string>
+    <string name="pw_tags">Tags</string>
+    <string name="pw_tag_add">Tag hinzufügen</string>
+    <string name="pw_custom_fields">Eigene Felder</string>
+    <string name="pw_custom_label">Bezeichnung</string>
+    <string name="pw_custom_value">Wert</string>
+    <string name="pw_custom_add">Feld hinzufügen</string>
     <string name="settings_cat_passkeys">Passkeys</string>
     <string name="settings_cat_passkeys_sub">Ledgerline für Passkeys in Apps &amp; Browser nutzen</string>
     <string name="passkey_unlock_action">Ledgerline entsperren, um einen Passkey zu verwenden</string>

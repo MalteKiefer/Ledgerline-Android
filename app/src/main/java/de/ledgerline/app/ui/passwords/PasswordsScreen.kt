@@ -23,8 +23,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Edit
@@ -41,6 +43,8 @@ import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -58,6 +62,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -167,7 +172,7 @@ fun PasswordsScreen(modifier: Modifier = Modifier, vm: PasswordsViewModel = hilt
                 PwDetail(item, vm, onBack = { route = PwRoute.List }, onEdit = { route = PwRoute.Edit(item) })
             }
         }
-        is PwRoute.Edit -> PwEdit(r.item, onCancel = { route = PwRoute.List }, onSave = { vm.upsert(it) { ok -> if (ok) route = PwRoute.List } })
+        is PwRoute.Edit -> PwEdit(r.item, vm, onCancel = { route = PwRoute.List }, onSave = { vm.upsert(it) { ok -> if (ok) route = PwRoute.List } })
     }
 }
 
@@ -193,6 +198,23 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onOpen: (String) 
                 FilterChip(selected = favOnly, onClick = { vm.toggleFavoritesOnly() }, label = { Text("Favorites") })
                 FilterChip(selected = showTrash, onClick = { vm.setShowTrash(!showTrash) }, label = { Text(if (ui.trashCount > 0) "Trash (${ui.trashCount})" else "Trash") })
                 if (typeFilter != null) AssistChip(onClick = { vm.setTypeFilter(null) }, label = { Text(typeLabel(typeFilter!!)) })
+                val folders by vm.folders.collectAsStateWithLifecycle()
+                val folderFilter by vm.folderFilter.collectAsStateWithLifecycle()
+                if (folders.isNotEmpty()) {
+                    var folderMenu by remember { mutableStateOf(false) }
+                    Box {
+                        FilterChip(
+                            selected = folderFilter != null,
+                            onClick = { folderMenu = true },
+                            label = { Text(folders.firstOrNull { it.id == folderFilter }?.name ?: stringResource(de.ledgerline.app.R.string.pw_folder)) },
+                            leadingIcon = { Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        )
+                        DropdownMenu(expanded = folderMenu, onDismissRequest = { folderMenu = false }) {
+                            DropdownMenuItem(text = { Text(stringResource(de.ledgerline.app.R.string.pw_folder_none)) }, onClick = { vm.setFolderFilter(null); folderMenu = false })
+                            folders.forEach { f -> DropdownMenuItem(text = { Text(f.name) }, onClick = { vm.setFolderFilter(f.id); folderMenu = false }) }
+                        }
+                    }
+                }
             }
             androidx.compose.material3.pulltorefresh.PullToRefreshBox(
                 isRefreshing = refreshing,
@@ -413,12 +435,17 @@ private fun TotpRow(secret: String, context: android.content.Context) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PwEdit(item: SecretItem, onCancel: () -> Unit, onSave: (SecretItem) -> Unit) {
+private fun PwEdit(item: SecretItem, vm: PasswordsViewModel, onCancel: () -> Unit, onSave: (SecretItem) -> Unit) {
     var title by remember { mutableStateOf(item.title) }
     val keys = SecretTypes.fields[item.type] ?: listOf("note")
     val values = remember { keys.filter { it != "urls" }.associateWith { mutableStateOf(SecretFields.str(item, it)) }.toMutableMap() }
     var url by remember { mutableStateOf(SecretFields.urls(item).firstOrNull().orEmpty()) }
     var genSheet by remember { mutableStateOf(false) }
+    val folders by vm.folders.collectAsStateWithLifecycle()
+    // New items default to the current folder filter or the first folder (web mandates a folder).
+    var folder by remember { mutableStateOf(item.folder ?: vm.folderFilter.value ?: vm.folders.value.firstOrNull()?.id) }
+    val tags = remember { item.tags.toMutableStateList() }
+    val custom = remember { item.custom.toMutableStateList() }
 
     AppScaffold(
         topBar = {
@@ -429,12 +456,16 @@ private fun PwEdit(item: SecretItem, onCancel: () -> Unit, onSave: (SecretItem) 
                         if (k == "totp") de.ledgerline.app.core.passwords.Totp.normalizeSecret(st.value) else st.value
                     }
                     val fields = SecretFields.build(item.fields, item.type, normalized, listOf(url))
-                    onSave(item.copy(title = title.ifBlank { typeLabel(item.type) }, fields = fields))
+                    onSave(item.copy(
+                        title = title.ifBlank { typeLabel(item.type) },
+                        fields = fields, folder = folder, tags = tags.toList(),
+                        custom = custom.filter { it.label.isNotBlank() || it.value.isNotBlank() }.toList(),
+                    ))
                 }) { Text("Save") }
             })
         },
     ) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize().padding(16.dp)) {
+        Column(Modifier.padding(pad).fillMaxSize().verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp)) {
             OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             keys.forEach { key ->
@@ -460,6 +491,10 @@ private fun PwEdit(item: SecretItem, onCancel: () -> Unit, onSave: (SecretItem) 
                     }
                 }
             }
+            Spacer(Modifier.height(8.dp))
+            FolderField(folders, folder, onSelect = { folder = it }, onCreate = { name -> vm.createFolder(name) { id -> if (id != null) folder = id } })
+            TagsField(tags)
+            CustomFieldsEditor(custom)
         }
     }
 
@@ -478,6 +513,95 @@ private fun PwEdit(item: SecretItem, onCancel: () -> Unit, onSave: (SecretItem) 
                     TextButton(onClick = { values["password"]?.value = generated; genSheet = false }) { Text("Use") }
                 }
             }
+        }
+    }
+}
+
+/** Folder picker: existing password folders + "None" + inline "New folder…". */
+@Composable
+private fun FolderField(
+    folders: List<de.ledgerline.app.domain.model.SecretFolder>,
+    selected: String?,
+    onSelect: (String?) -> Unit,
+    onCreate: (String) -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    var newDialog by remember { mutableStateOf(false) }
+    val name = folders.firstOrNull { it.id == selected }?.name ?: stringResource(de.ledgerline.app.R.string.pw_folder_none)
+    Box {
+        OutlinedTextField(
+            value = name, onValueChange = {}, readOnly = true,
+            label = { Text(stringResource(de.ledgerline.app.R.string.pw_folder)) },
+            trailingIcon = { IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.Folder, contentDescription = null) } },
+            modifier = Modifier.fillMaxWidth().clickable { menu = true },
+        )
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenuItem(text = { Text(stringResource(de.ledgerline.app.R.string.pw_folder_none)) }, onClick = { onSelect(null); menu = false })
+            folders.forEach { f -> DropdownMenuItem(text = { Text(f.name) }, onClick = { onSelect(f.id); menu = false }) }
+            DropdownMenuItem(text = { Text(stringResource(de.ledgerline.app.R.string.pw_folder_new)) }, onClick = { menu = false; newDialog = true })
+        }
+    }
+    if (newDialog) {
+        var input by remember { mutableStateOf("") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { newDialog = false },
+            confirmButton = { TextButton(onClick = { if (input.isNotBlank()) onCreate(input.trim()); newDialog = false }) { Text(stringResource(de.ledgerline.app.R.string.pw_folder_create)) } },
+            dismissButton = { TextButton(onClick = { newDialog = false }) { Text(stringResource(de.ledgerline.app.R.string.action_cancel)) } },
+            title = { Text(stringResource(de.ledgerline.app.R.string.pw_folder_new)) },
+            text = { OutlinedTextField(value = input, onValueChange = { input = it }, singleLine = true, label = { Text(stringResource(de.ledgerline.app.R.string.pw_folder)) }) },
+        )
+    }
+}
+
+/** Editable tag chips. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun TagsField(tags: MutableList<String>) {
+    var input by remember { mutableStateOf("") }
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Text(stringResource(de.ledgerline.app.R.string.pw_tags), style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            tags.toList().forEach { t ->
+                androidx.compose.material3.InputChip(
+                    selected = false, onClick = {}, label = { Text(t) },
+                    trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "remove", modifier = Modifier.size(16.dp).clickable { tags.remove(t) }) },
+                )
+            }
+        }
+        OutlinedTextField(
+            value = input, onValueChange = { input = it }, singleLine = true,
+            label = { Text(stringResource(de.ledgerline.app.R.string.pw_tag_add)) },
+            keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (input.isNotBlank()) { tags.add(input.trim()); input = "" } }),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+        )
+    }
+}
+
+/** Editable custom fields (label + value, add/remove). */
+@Composable
+private fun CustomFieldsEditor(custom: MutableList<de.ledgerline.app.domain.model.CustomField>) {
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+        Text(stringResource(de.ledgerline.app.R.string.pw_custom_fields), style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+        custom.forEachIndexed { i, cf ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                OutlinedTextField(
+                    value = cf.label, onValueChange = { custom[i] = cf.copy(label = it) },
+                    label = { Text(stringResource(de.ledgerline.app.R.string.pw_custom_label)) },
+                    singleLine = true, modifier = Modifier.weight(1f),
+                )
+                Spacer(Modifier.width(8.dp))
+                OutlinedTextField(
+                    value = cf.value, onValueChange = { custom[i] = cf.copy(value = it) },
+                    label = { Text(stringResource(de.ledgerline.app.R.string.pw_custom_value)) },
+                    singleLine = true, modifier = Modifier.weight(1f),
+                    visualTransformation = if (cf.kind == "secret") PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+                )
+                IconButton(onClick = { custom.removeAt(i) }) { Icon(Icons.Outlined.Delete, contentDescription = "remove") }
+            }
+        }
+        TextButton(onClick = { custom.add(de.ledgerline.app.domain.model.CustomField()) }) {
+            Icon(Icons.Filled.Add, contentDescription = null); Spacer(Modifier.width(4.dp)); Text(stringResource(de.ledgerline.app.R.string.pw_custom_add))
         }
     }
 }

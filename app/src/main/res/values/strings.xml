@@ -67,6 +67,16 @@
     <string name="pw_breach_error">Breach check unavailable</string>
     <string name="pw_version_history">Version history</string>
     <string name="pw_version_restore">Restore</string>
+    <string name="pw_folder">Folder</string>
+    <string name="pw_folder_none">No folder</string>
+    <string name="pw_folder_new">New folder…</string>
+    <string name="pw_folder_create">Create</string>
+    <string name="pw_tags">Tags</string>
+    <string name="pw_tag_add">Add a tag</string>
+    <string name="pw_custom_fields">Custom fields</string>
+    <string name="pw_custom_label">Label</string>
+    <string name="pw_custom_value">Value</string>
+    <string name="pw_custom_add">Add field</string>
     <string name="settings_cat_passkeys">Passkeys</string>
     <string name="settings_cat_passkeys_sub">Use Ledgerline for passkeys in apps &amp; the browser</string>
     <string name="passkey_unlock_action">Unlock Ledgerline to use a passkey</string>
