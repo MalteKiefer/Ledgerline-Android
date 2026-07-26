@@ -141,6 +141,8 @@ fun SettingsContent(
     val account by vm.account.collectAsStateWithLifecycle()
     val contactSort by vm.contactSort.collectAsStateWithLifecycle()
     val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
+    val themeMode by vm.themeMode.collectAsStateWithLifecycle()
+    val dynamicColor by vm.dynamicColor.collectAsStateWithLifecycle()
     val backupEnabled by vm.backupEnabled.collectAsStateWithLifecycle()
     val backupAlbumIds by vm.backupAlbumIds.collectAsStateWithLifecycle()
     val albums by vm.albums.collectAsStateWithLifecycle()
@@ -210,6 +212,10 @@ fun SettingsContent(
                     onSelectContactSort = vm::setContactSort,
                     dateFormat = dateFormat,
                     onSelectDateFormat = vm::setDateFormat,
+                    themeMode = themeMode,
+                    onSelectTheme = vm::setThemeMode,
+                    dynamicColor = dynamicColor,
+                    onSetDynamicColor = vm::setDynamicColor,
                 )
 
                 SettingsRoute.SECURITY -> SecuritySettings(
@@ -479,8 +485,34 @@ private fun AppearanceSettings(
     onSelectContactSort: (ContactSort) -> Unit,
     dateFormat: DateFormatPref,
     onSelectDateFormat: (DateFormatPref) -> Unit,
+    themeMode: de.ledgerline.app.data.ThemeMode,
+    onSelectTheme: (de.ledgerline.app.data.ThemeMode) -> Unit,
+    dynamicColor: Boolean,
+    onSetDynamicColor: (Boolean) -> Unit,
 ) {
     SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_theme))
+        Column(Modifier.selectableGroup()) {
+            RadioRow(stringResource(R.string.settings_theme_system), themeMode == de.ledgerline.app.data.ThemeMode.SYSTEM) {
+                onSelectTheme(de.ledgerline.app.data.ThemeMode.SYSTEM)
+            }
+            RadioRow(stringResource(R.string.settings_theme_light), themeMode == de.ledgerline.app.data.ThemeMode.LIGHT) {
+                onSelectTheme(de.ledgerline.app.data.ThemeMode.LIGHT)
+            }
+            RadioRow(stringResource(R.string.settings_theme_dark), themeMode == de.ledgerline.app.data.ThemeMode.DARK) {
+                onSelectTheme(de.ledgerline.app.data.ThemeMode.DARK)
+            }
+        }
+        // Material You wallpaper colors are only available on Android 12+.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            SwitchRow(
+                stringResource(R.string.settings_dynamic_color),
+                stringResource(R.string.settings_dynamic_color_sub),
+                dynamicColor,
+                onSetDynamicColor,
+            )
+        }
+
         SectionHeader(stringResource(R.string.settings_language))
         Column(Modifier.selectableGroup()) {
             RadioRow(stringResource(R.string.settings_language_system), currentLang == "") {

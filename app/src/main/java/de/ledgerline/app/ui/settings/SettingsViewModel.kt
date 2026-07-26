@@ -129,6 +129,15 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsStore.setTimeoutMinutes(minutes) }
     }
 
+    /** App theme (System/Light/Dark) + Material-You dynamic-color opt-in. */
+    val themeMode: StateFlow<de.ledgerline.app.data.ThemeMode> = settingsStore.themeMode
+        .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.data.ThemeMode.SYSTEM)
+    fun setThemeMode(mode: de.ledgerline.app.data.ThemeMode) { viewModelScope.launch { settingsStore.setThemeMode(mode) } }
+
+    val dynamicColor: StateFlow<Boolean> = settingsStore.dynamicColor
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setDynamicColor(on: Boolean) { viewModelScope.launch { settingsStore.setDynamicColor(on) } }
+
     /** Automatic background-refresh cadence in seconds (0 = off). Drives the BackgroundSync loop. */
     val backgroundRefreshSeconds: StateFlow<Int> = settingsStore.backgroundRefreshSeconds
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_BACKGROUND_REFRESH_SECONDS)

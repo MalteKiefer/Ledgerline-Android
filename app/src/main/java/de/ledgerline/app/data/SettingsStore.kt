@@ -35,6 +35,8 @@ class SettingsStore(private val context: Context) {
     private val linkChooserKey = booleanPreferencesKey("link_chooser_enabled")
     private val contactSortKey = stringPreferencesKey("contact_sort")
     private val dateFormatKey = stringPreferencesKey("date_format")
+    private val themeModeKey = stringPreferencesKey("theme_mode")
+    private val dynamicColorKey = booleanPreferencesKey("dynamic_color")
     private val backupEnabledKey = booleanPreferencesKey("backup_enabled")
     private val backupAlbumsKey = stringSetPreferencesKey("backup_album_ids")
     private val keepScreenOnKey = booleanPreferencesKey("keep_screen_on")
@@ -192,6 +194,24 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setDateFormat(fmt: DateFormatPref) {
         context.settingsDataStore.edit { it[dateFormatKey] = fmt.name }
+    }
+
+    /** App theme mode. Defaults to [ThemeMode.SYSTEM] (follows the device light/dark setting). */
+    val themeMode: Flow<ThemeMode> =
+        context.settingsDataStore.data.map {
+            runCatching { ThemeMode.valueOf(it[themeModeKey] ?: "") }.getOrDefault(ThemeMode.SYSTEM)
+        }
+
+    suspend fun setThemeMode(mode: ThemeMode) {
+        context.settingsDataStore.edit { it[themeModeKey] = mode.name }
+    }
+
+    /** Material-You dynamic (wallpaper) color. Defaults to OFF — the hand-authored brand palette. */
+    val dynamicColor: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[dynamicColorKey] ?: false }
+
+    suspend fun setDynamicColor(on: Boolean) {
+        context.settingsDataStore.edit { it[dynamicColorKey] = on }
     }
 
     /** Master camera-backup switch. Defaults to OFF (opt-in). */

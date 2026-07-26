@@ -557,4 +557,10 @@
     <string name="jobs_faces">Gesichter</string>
     <string name="jobs_failed">Fehlgeschlagene Uploads</string>
     <string name="jobs_run_all">Alles ausführen</string>
+    <string name="settings_theme">Design</string>
+    <string name="settings_theme_system">Systemstandard</string>
+    <string name="settings_theme_light">Hell</string>
+    <string name="settings_theme_dark">Dunkel</string>
+    <string name="settings_dynamic_color">Dynamische Farben</string>
+    <string name="settings_dynamic_color_sub">Palette aus dem Hintergrundbild ableiten (Android 12+)</string>
 </resources>
