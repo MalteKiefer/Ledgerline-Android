@@ -97,6 +97,7 @@ class GallerySaveTest {
         override suspend fun embedText(body: de.ledgerline.app.data.remote.dto.EmbedTextRequest): Response<de.ledgerline.app.data.remote.dto.EmbedTextResponse> = throw NotImplementedError()
         override suspend fun filesUsage(): Response<UsageResponse> = throw NotImplementedError()
         override suspend fun galleryRaw(blob: String): Response<ResponseBody> = throw NotImplementedError()
+        override suspend fun galleryRawBatch(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<ResponseBody> = throw NotImplementedError()
         override suspend fun galleryUsage(): Response<UsageResponse> = throw NotImplementedError()
         override suspend fun galleryUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
         override suspend fun filesUploadInit(body: de.ledgerline.app.data.remote.dto.UploadInitRequest): Response<de.ledgerline.app.data.remote.dto.UploadInitResponse> = throw NotImplementedError()

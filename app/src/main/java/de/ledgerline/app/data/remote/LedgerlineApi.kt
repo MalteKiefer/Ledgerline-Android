@@ -154,6 +154,12 @@ interface LedgerlineApi {
     @Streaming
     suspend fun galleryRaw(@Path("blob") blob: String): Response<ResponseBody>
 
+    // Batched blob fetch: framed concat of up to 512 blobs' ciphertext (fewer round-trips
+    // for thumbnail prefetch). Frame = u32le(idLen) + id + u32le(size) + ciphertext.
+    @POST("api/v1/gallery/raw-batch")
+    @Streaming
+    suspend fun galleryRawBatch(@Body body: ReconcileRequest): Response<ResponseBody>
+
     @GET("api/v1/gallery/usage")
     suspend fun galleryUsage(): Response<UsageResponse>
 

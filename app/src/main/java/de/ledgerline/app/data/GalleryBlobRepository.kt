@@ -107,6 +107,31 @@ class GalleryBlobRepository @VisibleForTesting internal constructor(
         } catch (_: Exception) { false }
     }
 
+    /**
+     * Batch-prefetch many blobs' ciphertext via `POST /gallery/raw-batch` (one round-trip per
+     * ≤512-blob chunk instead of one per blob) and write each through to the disk cache. Already-
+     * cached ids are skipped. Returns the number newly cached; a failed chunk is a no-op (the
+     * per-blob [prefetch] path still covers those ids later).
+     */
+    suspend fun prefetchBatch(refs: List<String>): Int = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext 0
+        val pending = refs.distinct().filterNot { blobCache.has(it) }
+        if (pending.isEmpty()) return@withContext 0
+        var cached = 0
+        for (chunk in pending.chunked(512)) {
+            try {
+                val res = apiProvider(session).galleryRawBatch(
+                    de.ledgerline.app.data.remote.dto.ReconcileRequest(chunk),
+                )
+                if (!res.isSuccessful) continue
+                RawBatchFraming.parse(res.body()!!.bytes()).forEach { (id, cipher) ->
+                    blobCache.put(id, cipher); cached++
+                }
+            } catch (_: Exception) { /* fall back to per-blob prefetch */ }
+        }
+        cached
+    }
+
     override suspend fun uploadBytes(bytes: ByteArray, name: String): Outcome<UploadedBlob> =
         uploadStream(name, bytes.size.toLong()) { java.io.ByteArrayInputStream(bytes) }
 

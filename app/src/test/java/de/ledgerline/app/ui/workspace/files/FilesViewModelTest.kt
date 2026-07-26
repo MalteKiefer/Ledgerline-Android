@@ -85,6 +85,8 @@ class FilesViewModelTest {
         override fun existingLink(share: de.ledgerline.app.domain.model.ShareInfo?): String? = null
         override suspend fun createFileShare(id: String, isFolder: Boolean, opts: de.ledgerline.app.data.ShareOptions) =
             Outcome.Ok(de.ledgerline.app.data.ShareResult("t", "k", "https://h/s/t#s:k"))
+        override suspend fun updateFileShare(id: String, isFolder: Boolean, opts: de.ledgerline.app.data.ShareOptions) =
+            Outcome.Ok(de.ledgerline.app.data.ShareResult("t", "k", "https://h/s/t#s:k"))
         override suspend fun revokeFileShare(id: String, isFolder: Boolean) = Outcome.Ok(Unit)
     }
 

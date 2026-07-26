@@ -265,6 +265,8 @@
     <string name="share_copy">Kopieren</string>
     <string name="share_send">Senden</string>
     <string name="share_create">Link erstellen</string>
+    <string name="share_update">Link aktualisieren</string>
+    <string name="share_password_change">Passwort (leer = beibehalten)</string>
     <string name="share_revoke">Link widerrufen</string>
     <string name="share_allow_download">Download der Originale erlauben</string>
     <string name="share_password_optional">Passwort (optional)</string>

@@ -113,13 +113,23 @@ class Prefetcher @Inject constructor(
         val pending = refs.distinctBy { it.id }.filterNot { blobCache.has(it.id) }
         if (pending.isEmpty()) return
 
+        // Gallery blobs are fetched in batches (one raw-batch round-trip per ≤512 ids); files and
+        // contacts stay per-blob (their stores have no batch endpoint wired).
+        val galleryRefs = pending.filter { it.kind == Kind.GALLERY }.map { it.id }
+        val others = pending.filter { it.kind != Kind.GALLERY }
+
         operationManager.run(OpKind.PREFETCH, total = pending.size) { report ->
             var done = 0
-            for (ref in pending) {
+            for (chunk in galleryRefs.chunked(512)) {
+                galleryRepo.prefetchBatch(chunk)
+                done += chunk.size
+                report(done, pending.size)
+            }
+            for (ref in others) {
                 when (ref.kind) {
-                    Kind.GALLERY -> galleryRepo.prefetch(ref.id)
                     Kind.FILE -> fileRepo.prefetch(ref.id)
                     Kind.CONTACT -> contactRepo.prefetch(ref.id)
+                    Kind.GALLERY -> Unit // handled in the batch above
                 }
                 report(++done, pending.size)
             }

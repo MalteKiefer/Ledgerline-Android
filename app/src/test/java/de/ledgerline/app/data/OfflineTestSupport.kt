@@ -149,6 +149,7 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun filesUsage(): Response<UsageResponse> = throw NotImplementedError()
     override suspend fun galleryStore(): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun galleryRaw(blob: String): Response<ResponseBody> = throw NotImplementedError()
+    override suspend fun galleryRawBatch(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<ResponseBody> = throw NotImplementedError()
     override suspend fun galleryUsage(): Response<UsageResponse> = throw NotImplementedError()
     override suspend fun galleryUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
     override suspend fun galleryProcess(file: MultipartBody.Part): Response<ProcessResponse> = throw NotImplementedError()

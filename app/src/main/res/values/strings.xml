@@ -280,6 +280,8 @@
     <string name="share_copy">Copy</string>
     <string name="share_send">Send</string>
     <string name="share_create">Create link</string>
+    <string name="share_update">Update link</string>
+    <string name="share_password_change">Password (blank keeps current)</string>
     <string name="share_revoke">Revoke link</string>
     <string name="share_allow_download">Allow download of originals</string>
     <string name="share_password_optional">Password (optional)</string>

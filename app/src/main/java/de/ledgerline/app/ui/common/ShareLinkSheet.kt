@@ -69,6 +69,7 @@ data class ShareSheetState(
 fun ShareLinkSheet(
     state: ShareSheetState,
     onCreate: (ShareOptions) -> Unit,
+    onUpdate: (ShareOptions) -> Unit,
     onRevoke: () -> Unit,
     onCopy: (String) -> Unit,
     onShareIntent: (String) -> Unit,
@@ -78,13 +79,19 @@ fun ShareLinkSheet(
     var password by remember { mutableStateOf("") }
     var expires by remember { mutableStateOf("") }
 
+    fun currentOptions() = ShareOptions(
+        allowDownload = if (state.showDownloadToggle) allowDownload else true,
+        expiresAtIso = expires.trim().ifBlank { null }?.let { toIsoOrNull(it) },
+        password = password.ifBlank { null },
+    )
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text(stringResource(R.string.sharelink_title), style = MaterialTheme.typography.titleLarge)
             Text(state.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
+            // When shared: show the copyable link + copy/send + revoke.
             if (state.link != null) {
-                // Already shared (or just created): show the link + copy/share/revoke.
                 OutlinedTextField(
                     value = state.link, onValueChange = {}, readOnly = true,
                     label = { Text(stringResource(R.string.share_link_label)) },
@@ -103,57 +110,49 @@ fun ShareLinkSheet(
                     enabled = !state.busy,
                     modifier = Modifier.padding(top = 4.dp),
                 ) { Text(stringResource(R.string.share_revoke), color = MaterialTheme.colorScheme.error) }
-            } else {
-                // Not yet shared: options + create.
-                if (state.showDownloadToggle) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(top = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(stringResource(R.string.share_allow_download), Modifier.weight(1f))
-                        Switch(checked = allowDownload, onCheckedChange = { allowDownload = it })
-                    }
+            }
+
+            // Options (also available while shared, to re-push updated settings/contents).
+            if (state.showDownloadToggle) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.share_allow_download), Modifier.weight(1f))
+                    Switch(checked = allowDownload, onCheckedChange = { allowDownload = it })
                 }
-                OutlinedTextField(
-                    value = password, onValueChange = { password = it },
-                    label = { Text(stringResource(R.string.share_password_optional)) },
-                    singleLine = true,
-                    keyboardOptions = secretKeyboardOptions(),
-                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            }
+            OutlinedTextField(
+                value = password, onValueChange = { password = it },
+                label = { Text(stringResource(if (state.link != null) R.string.share_password_change else R.string.share_password_optional)) },
+                singleLine = true,
+                keyboardOptions = secretKeyboardOptions(),
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            )
+            OutlinedTextField(
+                value = expires, onValueChange = { expires = it },
+                label = { Text(stringResource(R.string.share_expires_optional)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+            if (state.error) {
+                Text(
+                    stringResource(R.string.share_error),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
-                OutlinedTextField(
-                    value = expires, onValueChange = { expires = it },
-                    label = { Text(stringResource(R.string.share_expires_optional)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
+                if (state.busy) {
+                    CircularProgressIndicator(Modifier.padding(end = 12.dp))
+                }
+                TextButton(onClick = onDismiss, enabled = !state.busy) { Text(stringResource(R.string.action_cancel)) }
+                PrimaryGradientButton(
+                    text = stringResource(if (state.link != null) R.string.share_update else R.string.share_create),
+                    onClick = { if (state.link != null) onUpdate(currentOptions()) else onCreate(currentOptions()) },
+                    enabled = !state.busy,
                 )
-                if (state.error) {
-                    Text(
-                        stringResource(R.string.share_error),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.End) {
-                    if (state.busy) {
-                        CircularProgressIndicator(Modifier.padding(end = 12.dp))
-                    }
-                    TextButton(onClick = onDismiss, enabled = !state.busy) { Text(stringResource(R.string.action_cancel)) }
-                    PrimaryGradientButton(
-                        text = stringResource(R.string.share_create),
-                        onClick = {
-                            onCreate(
-                                ShareOptions(
-                                    allowDownload = if (state.showDownloadToggle) allowDownload else true,
-                                    expiresAtIso = expires.trim().ifBlank { null }?.let { toIsoOrNull(it) },
-                                    password = password.ifBlank { null },
-                                ),
-                            )
-                        },
-                        enabled = !state.busy,
-                    )
-                }
             }
         }
     }

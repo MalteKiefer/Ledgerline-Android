@@ -281,6 +281,8 @@
     <string name="share_copy">Копировать</string>
     <string name="share_send">Отправить</string>
     <string name="share_create">Создать ссылку</string>
+    <string name="share_update">Обновить ссылку</string>
+    <string name="share_password_change">Пароль (пусто = без изменений)</string>
     <string name="share_revoke">Отозвать ссылку</string>
     <string name="share_allow_download">Разрешить скачивание оригиналов</string>
     <string name="share_password_optional">Пароль (необязательно)</string>
