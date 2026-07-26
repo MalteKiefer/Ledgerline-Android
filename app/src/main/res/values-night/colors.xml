@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark window background (the "vault depth" near-black, faint indigo tint). -->
+    <color name="ledgerline_background">#131318</color>
+    <color name="ledgerline_accent">#7066F5</color>
+</resources>

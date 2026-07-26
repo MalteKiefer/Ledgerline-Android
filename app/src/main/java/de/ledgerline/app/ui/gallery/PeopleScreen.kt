@@ -3,6 +3,8 @@ package de.ledgerline.app.ui.gallery
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -68,6 +70,8 @@ fun PeopleScreen(
     val scanning = ops.any { it.kind == OpKind.FACE_SCAN }
     var scanMenu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<GalleryPerson?>(null) }
+    var merging by remember { mutableStateOf<GalleryPerson?>(null) }
+    var linking by remember { mutableStateOf<GalleryPerson?>(null) }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -102,6 +106,9 @@ fun PeopleScreen(
                             onClick = { onOpenPerson(person.id) },
                             onRename = { renaming = person },
                             onHide = { peopleVm.hide(person) },
+                            onMerge = { merging = person },
+                            onLink = { linking = person },
+                            onUnlink = { peopleVm.unlinkContact(person) },
                         )
                     }
                 }
@@ -137,6 +144,51 @@ fun PeopleScreen(
             )
         }
 
+        // Link this person to a workspace contact (contact picker).
+        linking?.let { p ->
+            val contacts = remember(people) { peopleVm.contacts() }
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { linking = null },
+                title = { Text(stringResource(R.string.person_link_contact)) },
+                text = {
+                    if (contacts.isEmpty()) {
+                        Text(stringResource(R.string.contacts_empty_link))
+                    } else {
+                        Column(Modifier.verticalScroll(rememberScrollState())) {
+                            contacts.forEach { c ->
+                                val label = c.fn.ifBlank { listOf(c.first, c.last).filter { it.isNotBlank() }.joinToString(" ") }
+                                Text(
+                                    text = label.ifBlank { stringResource(R.string.person_unnamed) },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { peopleVm.linkToContact(p, c); linking = null }
+                                        .padding(vertical = 12.dp, horizontal = 4.dp),
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { linking = null }) {
+                        Text(stringResource(R.string.action_cancel))
+                    }
+                },
+            )
+        }
+
+        // Merge this person into another (target picker).
+        merging?.let { src ->
+            PersonPickerDialog(
+                people = people.filter { it.id != src.id && !it.hidden },
+                title = stringResource(R.string.person_merge_into),
+                peopleVm = peopleVm,
+                onPick = { targetId -> peopleVm.merge(src, targetId); merging = null },
+                onDismiss = { merging = null },
+            )
+        }
+
         // Shared progress overlay (face scan / uploads / duplicate scan).
         OpProgressOverlay()
     }
@@ -149,6 +201,9 @@ private fun PersonCard(
     onClick: () -> Unit,
     onRename: () -> Unit,
     onHide: () -> Unit,
+    onMerge: () -> Unit,
+    onLink: () -> Unit,
+    onUnlink: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     val cover = peopleVm.personCover(person)
@@ -203,10 +258,25 @@ private fun PersonCard(
                         onClick = { menu = false; onRename() },
                     )
                     DropdownMenuItem(
+                        text = { Text(stringResource(R.string.person_merge)) },
+                        onClick = { menu = false; onMerge() },
+                    )
+                    if (person.contactId == null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.person_link_contact)) },
+                            onClick = { menu = false; onLink() },
+                        )
+                    } else {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.person_unlink_contact)) },
+                            onClick = { menu = false; onUnlink() },
+                        )
+                    }
+                    DropdownMenuItem(
                         text = { Text(stringResource(R.string.person_hide)) },
                         onClick = { menu = false; onHide() },
                     )
-                }
+}
             }
         }
         Text(
@@ -236,6 +306,7 @@ fun PersonDetailScreen(
     val people by peopleVm.people.collectAsStateWithLifecycle()
     val person = remember(personId, people) { peopleVm.personById(personId) }
     var openId by remember { mutableStateOf<String?>(null) }
+    var reassignPhotoId by remember { mutableStateOf<String?>(null) }
 
     val photos = remember(person, people) { person?.let { peopleVm.personPhotos(it) }.orEmpty() }
 
@@ -280,8 +351,75 @@ fun PersonDetailScreen(
             modifier = Modifier.fillMaxSize().padding(padding),
         ) {
             items(photos, key = { it.id }) { photo ->
-                ThumbCell(photo, galleryVm) { openId = photo.id }
+                var cellMenu by remember { mutableStateOf(false) }
+                Box {
+                    ThumbCell(photo, galleryVm, onLongClick = { cellMenu = true }) { openId = photo.id }
+                    DropdownMenu(expanded = cellMenu, onDismissRequest = { cellMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.person_set_cover)) },
+                            onClick = { cellMenu = false; peopleVm.setCover(person, photo.id) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.person_remove_face)) },
+                            onClick = { cellMenu = false; peopleVm.removeFromPerson(person, photo.id) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.person_reassign_face)) },
+                            onClick = { cellMenu = false; reassignPhotoId = photo.id },
+                        )
+                    }
+                }
             }
         }
     }
+
+    // Move a photo's faces from this person to another (target picker).
+    reassignPhotoId?.let { pid ->
+        PersonPickerDialog(
+            people = people.filter { it.id != person.id && !it.hidden },
+            title = stringResource(R.string.person_reassign_face),
+            peopleVm = peopleVm,
+            onPick = { targetId -> peopleVm.reassignFace(person, targetId, pid); reassignPhotoId = null },
+            onDismiss = { reassignPhotoId = null },
+        )
+    }
+}
+
+/** Picks a target person from [people] (face-crop avatar + name). Used for reassign + merge. */
+@Composable
+private fun PersonPickerDialog(
+    people: List<GalleryPerson>,
+    title: String,
+    peopleVm: PeopleViewModel,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            if (people.isEmpty()) {
+                Text(stringResource(R.string.person_none_other))
+            } else {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    people.forEach { p ->
+                        Text(
+                            text = p.name.ifBlank { stringResource(R.string.person_unnamed) },
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onPick(p.id) }
+                                .padding(vertical = 12.dp, horizontal = 4.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        },
+    )
 }

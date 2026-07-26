@@ -83,6 +83,7 @@ class BlobDiskCacheTest {
         override fun enabled() = true
         override fun filesPolicy() = de.ledgerline.app.data.offline.FileBlobPolicy.ON_DEMAND
         override fun photosPolicy() = de.ledgerline.app.data.offline.PhotoBlobPolicy.ON_DEMAND
+        override fun contactsPolicy() = de.ledgerline.app.data.offline.ContactBlobPolicy.ON_DEMAND
         override fun maxBytes() = max
         override fun wifiOnly() = false
         override fun chargingOnly() = false

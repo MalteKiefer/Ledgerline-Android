@@ -5,13 +5,20 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -99,6 +106,21 @@ fun PhotoViewerScreen(
     var viewport by remember { mutableStateOf(IntSize.Zero) }
     var playingMotion by remember { mutableStateOf(false) }
 
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // SAF export of the decrypted original. The chosen document is opened and the plaintext
+    // bytes are written off the main thread; nothing plaintext is left elsewhere on disk.
+    val saveLauncher = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument(photo.mime ?: "application/octet-stream"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            val bytes = vm.originalBytes(photo)
+            if (bytes != null) withContext(kotlinx.coroutines.Dispatchers.IO) {
+                context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+            }
+        }
+    }
+
     val isVideo = photo.media_type == "video"
     // A live/motion photo is a still IMAGE that carries an embedded motion clip.
     val hasMotion = !isVideo && photo.motionRef != null && photo.motionKey != null
@@ -146,35 +168,7 @@ fun PhotoViewerScreen(
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
-                actions = {
-                    // Non-destructive edits apply only to images (video renders a poster).
-                    if (!isVideo) {
-                        IconButton(onClick = { vm.rotatePhoto(photo.id) }) {
-                            Icon(Icons.AutoMirrored.Outlined.RotateRight, contentDescription = stringResource(R.string.action_rotate))
-                        }
-                        IconButton(onClick = { vm.flipHorizontal(photo.id) }) {
-                            Icon(Icons.Outlined.Flip, contentDescription = stringResource(R.string.action_flip_h))
-                        }
-                        IconButton(onClick = { vm.flipVertical(photo.id) }) {
-                            Icon(
-                                Icons.Outlined.Flip,
-                                contentDescription = stringResource(R.string.action_flip_v),
-                                modifier = Modifier.graphicsLayer(rotationZ = 90f),
-                            )
-                        }
-                    }
-                    IconButton(onClick = { vm.toggleFavorite(photo.id) }) {
-                        Icon(
-                            imageVector = if (photo.favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                            contentDescription = stringResource(
-                                if (photo.favorite) R.string.action_unfavorite else R.string.action_favorite
-                            ),
-                        )
-                    }
-                    IconButton(onClick = { showInfo = !showInfo }) {
-                        Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.info_title))
-                    }
-                },
+                // Actions moved to the floating bottom bar (see below).
             )
         },
     ) { pad ->
@@ -253,6 +247,51 @@ fun PhotoViewerScreen(
                             tint = Color.White,
                         )
                     }
+                }
+            }
+
+            // Floating action bar — the photo actions live here (moved off the top bar):
+            // rotate / flip (images only), favorite, info. Dark scrim + white icons to stay
+            // legible over any photo; sits above the navigation-bar inset.
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 20.dp)
+                    .clip(RoundedCornerShape(28.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (!isVideo) {
+                    IconButton(onClick = { vm.rotatePhoto(photo.id) }) {
+                        Icon(Icons.AutoMirrored.Outlined.RotateRight, stringResource(R.string.action_rotate), tint = Color.White)
+                    }
+                    IconButton(onClick = { vm.flipHorizontal(photo.id) }) {
+                        Icon(Icons.Outlined.Flip, stringResource(R.string.action_flip_h), tint = Color.White)
+                    }
+                    IconButton(onClick = { vm.flipVertical(photo.id) }) {
+                        Icon(
+                            Icons.Outlined.Flip,
+                            stringResource(R.string.action_flip_v),
+                            modifier = Modifier.graphicsLayer(rotationZ = 90f),
+                            tint = Color.White,
+                        )
+                    }
+                }
+                IconButton(onClick = { vm.toggleFavorite(photo.id) }) {
+                    Icon(
+                        if (photo.favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                        stringResource(if (photo.favorite) R.string.action_unfavorite else R.string.action_favorite),
+                        tint = if (photo.favorite) MaterialTheme.colorScheme.primary else Color.White,
+                    )
+                }
+                IconButton(onClick = { saveLauncher.launch(photo.name?.takeIf { it.isNotBlank() } ?: "photo.jpg") }) {
+                    Icon(Icons.Outlined.Download, stringResource(R.string.action_download), tint = Color.White)
+                }
+                IconButton(onClick = { showInfo = !showInfo }) {
+                    Icon(Icons.Outlined.Info, stringResource(R.string.info_title), tint = Color.White)
                 }
             }
         }
@@ -478,17 +517,14 @@ private fun PhotoInfoSheet(
             InfoRow(label = stringResource(R.string.info_resolution), value = resValue)
 
             // Location — show coords immediately, replace with readable place when loaded
+            val p = place
             val locationValue = when {
-                place != null -> {
-                    val display = place!!.display?.takeIf { it.isNotBlank() }
-                    if (display != null) {
-                        display
-                    } else {
-                        listOfNotNull(place!!.city, place!!.state, place!!.country)
-                            .filter { it.isNotBlank() }
-                            .joinToString(", ")
-                            .ifBlank { unknown }
-                    }
+                p != null -> {
+                    val display = p.display?.takeIf { it.isNotBlank() }
+                    display ?: listOfNotNull(p.city, p.state, p.country)
+                        .filter { it.isNotBlank() }
+                        .joinToString(", ")
+                        .ifBlank { unknown }
                 }
                 photo.lat != null && photo.lng != null ->
                     "%.5f, %.5f".format(photo.lat, photo.lng)

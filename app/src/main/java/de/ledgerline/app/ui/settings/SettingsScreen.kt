@@ -3,9 +3,13 @@ package de.ledgerline.app.ui.settings
 import android.Manifest
 import android.app.LocaleManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
+import android.provider.Settings
+import android.view.autofill.AutofillManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,10 +33,13 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Password
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -64,7 +71,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.BuildConfig
 import de.ledgerline.app.R
+import de.ledgerline.app.data.ContactSort
+import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.data.backup.DeviceAlbum
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.dto.MeUser
@@ -76,7 +87,7 @@ import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
 /** Internal Settings destinations — a categorized landing (ROOT) plus one sub-screen per category. */
-private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, OFFLINE, BACKGROUND, ACCOUNT, ABOUT }
+private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, ABOUT }
 
 /**
  * Settings screen — a categorized landing list plus per-category sub-screens, in the
@@ -102,17 +113,31 @@ fun SettingsContent(
     // Collect every flow the sub-screens need here in the parent, then pass state +
     // callbacks down. Wiring to SettingsViewModel is unchanged — only the layout moves.
     val timeout by vm.timeoutMinutes.collectAsStateWithLifecycle()
+    val keepScreenOn by vm.keepScreenOn.collectAsStateWithLifecycle()
+    val keepScreenOnMinutes by vm.keepScreenOnMinutes.collectAsStateWithLifecycle()
+    val rememberVault by vm.rememberVaultEnabled.collectAsStateWithLifecycle()
+    val rememberVaultDays by vm.rememberVaultDays.collectAsStateWithLifecycle()
+    val duressThreshold by vm.duressThreshold.collectAsStateWithLifecycle()
+    val securityEvents by vm.securityEvents.collectAsStateWithLifecycle()
+    val mapTiles by vm.mapTilesEnabled.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
     val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
     val offlineEnabled by vm.offlineEnabled.collectAsStateWithLifecycle()
     val filesPolicy by vm.filesPolicy.collectAsStateWithLifecycle()
     val photosPolicy by vm.photosPolicy.collectAsStateWithLifecycle()
+    val contactsPolicy by vm.contactsPolicy.collectAsStateWithLifecycle()
     val cacheMaxMb by vm.cacheMaxMb.collectAsStateWithLifecycle()
     val prefetchWifiOnly by vm.prefetchWifiOnly.collectAsStateWithLifecycle()
     val prefetchChargingOnly by vm.prefetchChargingOnly.collectAsStateWithLifecycle()
     val prefetchMessage by vm.prefetchMessage.collectAsStateWithLifecycle()
     val cacheSize by vm.cacheSizeBytes.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
+    val contactSort by vm.contactSort.collectAsStateWithLifecycle()
+    val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
+    val backupEnabled by vm.backupEnabled.collectAsStateWithLifecycle()
+    val backupAlbumIds by vm.backupAlbumIds.collectAsStateWithLifecycle()
+    val albums by vm.albums.collectAsStateWithLifecycle()
+    val backedUpCount by vm.backedUpCount.collectAsStateWithLifecycle()
 
     var route by rememberSaveable { mutableStateOf(SettingsRoute.ROOT) }
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
@@ -137,6 +162,10 @@ fun SettingsContent(
     val notificationsLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    // Result is ignored: backup runs regardless; the permission grant allows reading media.
+    val mediaLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
     // Back: a sub-screen returns to the landing list; the landing list exits Settings.
     BackHandler {
         if (route == SettingsRoute.ROOT) onBack() else route = SettingsRoute.ROOT
@@ -148,6 +177,7 @@ fun SettingsContent(
         SettingsRoute.SECURITY -> stringResource(R.string.settings_cat_security)
         SettingsRoute.OFFLINE -> stringResource(R.string.settings_cat_offline)
         SettingsRoute.BACKGROUND -> stringResource(R.string.settings_cat_background)
+        SettingsRoute.BACKUP -> stringResource(R.string.settings_cat_backup)
         SettingsRoute.ACCOUNT -> stringResource(R.string.settings_cat_account)
         SettingsRoute.ABOUT -> stringResource(R.string.settings_cat_about)
     }
@@ -169,13 +199,32 @@ fun SettingsContent(
                     padding = innerPadding,
                     currentLang = currentLang,
                     onSelectLang = { tag -> applyLanguage(context, tag); currentLang = tag },
+                    contactSort = contactSort,
+                    onSelectContactSort = vm::setContactSort,
+                    dateFormat = dateFormat,
+                    onSelectDateFormat = vm::setDateFormat,
                 )
 
                 SettingsRoute.SECURITY -> SecuritySettings(
                     padding = innerPadding,
                     timeout = timeout,
                     onSetTimeout = vm::setTimeoutMinutes,
+                    keepScreenOn = keepScreenOn,
+                    keepScreenOnMinutes = keepScreenOnMinutes,
+                    onSetKeepScreenOn = vm::setKeepScreenOn,
+                    onSetKeepScreenOnMinutes = vm::setKeepScreenOnMinutes,
+                    rememberVault = rememberVault,
+                    rememberVaultDays = rememberVaultDays,
+                    biometricAvailable = vm.strongBiometricAvailable,
+                    onSetRememberVault = vm::setRememberVaultEnabled,
+                    onSetRememberVaultDays = vm::setRememberVaultDays,
+                    mapTiles = mapTiles,
+                    onSetMapTiles = vm::setMapTilesEnabled,
                     onLockNow = onLockNow,
+                    duressThreshold = duressThreshold,
+                    onSetDuressThreshold = vm::setDuressThreshold,
+                    securityEvents = securityEvents,
+                    onClearSecurityLog = vm::clearSecurityLog,
                 )
 
                 SettingsRoute.OFFLINE -> OfflineSettings(
@@ -183,6 +232,7 @@ fun SettingsContent(
                     offlineEnabled = offlineEnabled,
                     filesPolicy = filesPolicy,
                     photosPolicy = photosPolicy,
+                    contactsPolicy = contactsPolicy,
                     cacheMaxMb = cacheMaxMb,
                     prefetchWifiOnly = prefetchWifiOnly,
                     prefetchChargingOnly = prefetchChargingOnly,
@@ -190,6 +240,7 @@ fun SettingsContent(
                     onSetOffline = vm::setOfflineEnabled,
                     onSetFilesPolicy = vm::setFilesPolicy,
                     onSetPhotosPolicy = vm::setPhotosPolicy,
+                    onSetContactsPolicy = vm::setContactsPolicy,
                     onSetCacheMaxMb = vm::setCacheMaxMb,
                     onSetWifiOnly = vm::setPrefetchWifiOnly,
                     onSetChargingOnly = vm::setPrefetchChargingOnly,
@@ -214,6 +265,23 @@ fun SettingsContent(
                         }
                     },
                     onSetLinkChooser = vm::setLinkChooserEnabled,
+                )
+
+                SettingsRoute.BACKUP -> BackupSettings(
+                    padding = innerPadding,
+                    enabled = backupEnabled,
+                    albums = albums,
+                    selected = backupAlbumIds,
+                    backedUpCount = backedUpCount,
+                    onSetEnabled = { on ->
+                        vm.setBackupEnabled(on)
+                        if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            mediaLauncher.launch(arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO))
+                        }
+                    },
+                    onToggleAlbum = vm::toggleAlbum,
+                    onBackupNow = vm::backupNow,
+                    onLoadAlbums = vm::loadAlbums,
                 )
 
                 SettingsRoute.ACCOUNT -> AccountSettings(
@@ -293,6 +361,12 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             title = stringResource(R.string.settings_cat_security),
             subtitle = stringResource(R.string.settings_cat_security_sub),
         ) { onNavigate(SettingsRoute.SECURITY) }
+        val autofillContext = LocalContext.current
+        CategoryRow(
+            icon = Icons.Outlined.Password,
+            title = stringResource(R.string.settings_cat_autofill),
+            subtitle = stringResource(R.string.settings_cat_autofill_sub),
+        ) { launchAutofillSettings(autofillContext) }
         CategoryRow(
             icon = Icons.Outlined.CloudOff,
             title = stringResource(R.string.settings_cat_offline),
@@ -304,6 +378,11 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             subtitle = stringResource(R.string.settings_cat_background_sub),
         ) { onNavigate(SettingsRoute.BACKGROUND) }
         CategoryRow(
+            icon = Icons.Outlined.PhotoLibrary,
+            title = stringResource(R.string.settings_cat_backup),
+            subtitle = stringResource(R.string.settings_cat_backup_sub),
+        ) { onNavigate(SettingsRoute.BACKUP) }
+        CategoryRow(
             icon = Icons.Outlined.AccountCircle,
             title = stringResource(R.string.settings_cat_account),
             subtitle = stringResource(R.string.settings_cat_account_sub),
@@ -314,6 +393,23 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             subtitle = stringResource(R.string.settings_cat_about_sub),
         ) { onNavigate(SettingsRoute.ABOUT) }
     }
+}
+
+/**
+ * Opens the system dialog to set Ledgerline as the device autofill service. Uses
+ * ACTION_REQUEST_SET_AUTOFILL_SERVICE targeted at our package when autofill is supported and we
+ * are not already the provider; otherwise falls back to the general autofill settings so the user
+ * can switch away. Best-effort — swallows the (rare) ActivityNotFound on stripped-down ROMs.
+ */
+private fun launchAutofillSettings(context: Context) {
+    val am = context.getSystemService(AutofillManager::class.java)
+    val intent = if (am != null && am.isAutofillSupported && !am.hasEnabledAutofillServices()) {
+        Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE)
+            .setData(Uri.parse("package:${context.packageName}"))
+    } else {
+        Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE)
+    }
+    runCatching { context.startActivity(intent) }
 }
 
 /** A single tappable category row on a tonal surface: leading icon + title + short subtitle. */
@@ -334,11 +430,26 @@ private fun CategoryRow(icon: ImageVector, title: String, subtitle: String, onCl
 
 /* --------------------------- Category sub-screens --------------------------- */
 
+/**
+ * App languages offered in Settings, as (BCP-47 tag → native display name). Kept in
+ * sync with res/xml/locales_config.xml and the values-<tag>/strings.xml translations.
+ * "System default" is a separate localized row.
+ */
+private val SUPPORTED_LANGUAGES = listOf(
+    "en" to "English",
+    "de" to "Deutsch",
+    "ru" to "Русский",
+)
+
 @Composable
 private fun AppearanceSettings(
     padding: PaddingValues,
     currentLang: String,
     onSelectLang: (String) -> Unit,
+    contactSort: ContactSort,
+    onSelectContactSort: (ContactSort) -> Unit,
+    dateFormat: DateFormatPref,
+    onSelectDateFormat: (DateFormatPref) -> Unit,
 ) {
     SubScreen(padding) {
         SectionHeader(stringResource(R.string.settings_language))
@@ -346,11 +457,39 @@ private fun AppearanceSettings(
             RadioRow(stringResource(R.string.settings_language_system), currentLang == "") {
                 onSelectLang("")
             }
-            RadioRow(stringResource(R.string.settings_language_de), currentLang == "de") {
-                onSelectLang("de")
+            // Supported languages, shown by their native (locale-invariant) names. Keep in
+            // sync with res/xml/locales_config.xml and the values-<tag>/strings.xml files.
+            SUPPORTED_LANGUAGES.forEach { (tag, nativeName) ->
+                RadioRow(nativeName, currentLang == tag) { onSelectLang(tag) }
             }
-            RadioRow(stringResource(R.string.settings_language_en), currentLang == "en") {
-                onSelectLang("en")
+        }
+
+        SectionHeader(stringResource(R.string.settings_contact_sort))
+        Column(Modifier.selectableGroup()) {
+            RadioRow(stringResource(R.string.settings_contact_sort_first), contactSort == ContactSort.FIRST) {
+                onSelectContactSort(ContactSort.FIRST)
+            }
+            RadioRow(stringResource(R.string.settings_contact_sort_last), contactSort == ContactSort.LAST) {
+                onSelectContactSort(ContactSort.LAST)
+            }
+            RadioRow(stringResource(R.string.settings_contact_sort_display), contactSort == ContactSort.DISPLAY) {
+                onSelectContactSort(ContactSort.DISPLAY)
+            }
+        }
+
+        SectionHeader(stringResource(R.string.settings_date_format))
+        Column(Modifier.selectableGroup()) {
+            RadioRow(stringResource(R.string.settings_date_format_system), dateFormat == DateFormatPref.SYSTEM) {
+                onSelectDateFormat(DateFormatPref.SYSTEM)
+            }
+            RadioRow(stringResource(R.string.settings_date_format_dmy), dateFormat == DateFormatPref.DMY) {
+                onSelectDateFormat(DateFormatPref.DMY)
+            }
+            RadioRow(stringResource(R.string.settings_date_format_ymd), dateFormat == DateFormatPref.YMD) {
+                onSelectDateFormat(DateFormatPref.YMD)
+            }
+            RadioRow(stringResource(R.string.settings_date_format_mdy), dateFormat == DateFormatPref.MDY) {
+                onSelectDateFormat(DateFormatPref.MDY)
             }
         }
     }
@@ -361,7 +500,22 @@ private fun SecuritySettings(
     padding: PaddingValues,
     timeout: Int,
     onSetTimeout: (Int) -> Unit,
+    keepScreenOn: Boolean,
+    keepScreenOnMinutes: Int,
+    onSetKeepScreenOn: (Boolean) -> Unit,
+    onSetKeepScreenOnMinutes: (Int) -> Unit,
+    rememberVault: Boolean,
+    rememberVaultDays: Int,
+    biometricAvailable: Boolean,
+    onSetRememberVault: (Boolean) -> Unit,
+    onSetRememberVaultDays: (Int) -> Unit,
+    mapTiles: Boolean,
+    onSetMapTiles: (Boolean) -> Unit,
     onLockNow: () -> Unit,
+    duressThreshold: Int,
+    onSetDuressThreshold: (Int) -> Unit,
+    securityEvents: List<de.ledgerline.app.core.security.SecurityLogEntry>,
+    onClearSecurityLog: () -> Unit,
 ) {
     SubScreen(padding) {
         SectionHeader(stringResource(R.string.settings_security))
@@ -375,6 +529,49 @@ private fun SecuritySettings(
                 RadioRow(timeoutLabel(minutes), timeout == minutes) { onSetTimeout(minutes) }
             }
         }
+        SwitchRow(
+            title = stringResource(R.string.settings_keep_screen_on),
+            subtitle = stringResource(R.string.settings_keep_screen_on_note),
+            checked = keepScreenOn,
+            onCheckedChange = onSetKeepScreenOn,
+        )
+        SelectorGroup(stringResource(R.string.settings_keep_screen_on_duration), enabled = keepScreenOn) {
+            SettingsStore.KEEP_SCREEN_ON_OPTIONS.forEach { minutes ->
+                RadioRow(
+                    keepScreenOnLabel(minutes),
+                    keepScreenOnMinutes == minutes,
+                    enabled = keepScreenOn,
+                ) { onSetKeepScreenOnMinutes(minutes) }
+            }
+        }
+        SwitchRow(
+            title = stringResource(R.string.settings_remember_vault),
+            subtitle = stringResource(
+                if (biometricAvailable) R.string.settings_remember_vault_note
+                else R.string.settings_remember_vault_needs_biometric,
+            ),
+            checked = rememberVault && biometricAvailable,
+            onCheckedChange = onSetRememberVault,
+            enabled = biometricAvailable,
+        )
+        SelectorGroup(
+            stringResource(R.string.settings_remember_vault_interval),
+            enabled = rememberVault && biometricAvailable,
+        ) {
+            SettingsStore.REMEMBER_VAULT_DAYS_OPTIONS.forEach { days ->
+                RadioRow(
+                    daysLabel(days),
+                    rememberVaultDays == days,
+                    enabled = rememberVault && biometricAvailable,
+                ) { onSetRememberVaultDays(days) }
+            }
+        }
+        SwitchRow(
+            title = stringResource(R.string.settings_map_tiles),
+            subtitle = stringResource(R.string.settings_map_tiles_note),
+            checked = mapTiles,
+            onCheckedChange = onSetMapTiles,
+        )
         OutlinedButton(
             onClick = onLockNow,
             modifier = Modifier
@@ -387,8 +584,71 @@ private fun SecuritySettings(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         )
+
+        // Duress auto-wipe — always active; the threshold is one of WipePolicy.options.
+        SectionHeader(stringResource(R.string.security_duress_title))
+        Text(
+            stringResource(R.string.security_duress_body),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        Column(Modifier.selectableGroup()) {
+            de.ledgerline.app.core.security.WipePolicy.options.forEach { n ->
+                RadioRow(stringResource(R.string.security_duress_threshold, n), duressThreshold == n) {
+                    onSetDuressThreshold(n)
+                }
+            }
+        }
+
+        // Security audit log — newest first.
+        SectionHeader(stringResource(R.string.security_log_title))
+        if (securityEvents.isEmpty()) {
+            Text(
+                stringResource(R.string.security_log_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        } else {
+            securityEvents.asReversed().take(100).forEach { e ->
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                    Text(securityEventLabel(e.type), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        formatSecTs(e.at),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onClearSecurityLog,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            ) { Text(stringResource(R.string.security_log_clear)) }
+        }
     }
 }
+
+/** Localised label for a [de.ledgerline.app.core.security.SecurityEventType] name. */
+@Composable
+private fun securityEventLabel(type: String): String = stringResource(
+    when (type) {
+        "PAIRED" -> R.string.sec_event_PAIRED
+        "UNLOCK_SUCCESS" -> R.string.sec_event_UNLOCK_SUCCESS
+        "UNLOCK_FAILED" -> R.string.sec_event_UNLOCK_FAILED
+        "RECOVERY_UNLOCK" -> R.string.sec_event_RECOVERY_UNLOCK
+        "THROTTLE_LOCKOUT" -> R.string.sec_event_THROTTLE_LOCKOUT
+        "DURESS_WIPE" -> R.string.sec_event_DURESS_WIPE
+        "REMOTE_WIPE" -> R.string.sec_event_REMOTE_WIPE
+        "LOGOUT" -> R.string.sec_event_LOGOUT
+        else -> R.string.sec_event_UNLOCK_FAILED
+    },
+)
+
+private fun formatSecTs(millis: Long): String =
+    java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(millis))
 
 @Composable
 private fun OfflineSettings(
@@ -396,6 +656,7 @@ private fun OfflineSettings(
     offlineEnabled: Boolean,
     filesPolicy: FileBlobPolicy,
     photosPolicy: PhotoBlobPolicy,
+    contactsPolicy: ContactBlobPolicy,
     cacheMaxMb: Int,
     prefetchWifiOnly: Boolean,
     prefetchChargingOnly: Boolean,
@@ -403,6 +664,7 @@ private fun OfflineSettings(
     onSetOffline: (Boolean) -> Unit,
     onSetFilesPolicy: (FileBlobPolicy) -> Unit,
     onSetPhotosPolicy: (PhotoBlobPolicy) -> Unit,
+    onSetContactsPolicy: (ContactBlobPolicy) -> Unit,
     onSetCacheMaxMb: (Int) -> Unit,
     onSetWifiOnly: (Boolean) -> Unit,
     onSetChargingOnly: (Boolean) -> Unit,
@@ -451,6 +713,30 @@ private fun OfflineSettings(
                 onSetPhotosPolicy(PhotoBlobPolicy.ALL)
             }
         }
+
+        // Contact avatars policy: Off / On demand / All.
+        SelectorGroup(
+            title = stringResource(R.string.settings_contacts_policy),
+            enabled = offlineEnabled,
+        ) {
+            RadioRow(stringResource(R.string.policy_off), contactsPolicy == ContactBlobPolicy.OFF, offlineEnabled) {
+                onSetContactsPolicy(ContactBlobPolicy.OFF)
+            }
+            RadioRow(stringResource(R.string.policy_on_demand), contactsPolicy == ContactBlobPolicy.ON_DEMAND, offlineEnabled) {
+                onSetContactsPolicy(ContactBlobPolicy.ON_DEMAND)
+            }
+            RadioRow(stringResource(R.string.policy_all), contactsPolicy == ContactBlobPolicy.ALL, offlineEnabled) {
+                onSetContactsPolicy(ContactBlobPolicy.ALL)
+            }
+        }
+
+        // Notes/todos/bookmarks/contacts records ride the sealed manifest (master switch).
+        Text(
+            stringResource(R.string.settings_offline_manifest_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
 
         // Cache size limit: 512 MB / 1 GB / 2 GB / Unlimited.
         SelectorGroup(
@@ -518,6 +804,52 @@ private fun BackgroundSettings(
             checked = linkChooser,
             onCheckedChange = onSetLinkChooser,
         )
+    }
+}
+
+@Composable
+private fun BackupSettings(
+    padding: PaddingValues,
+    enabled: Boolean,
+    albums: List<DeviceAlbum>,
+    selected: Set<String>,
+    backedUpCount: Int,
+    onSetEnabled: (Boolean) -> Unit,
+    onToggleAlbum: (String) -> Unit,
+    onBackupNow: () -> Unit,
+    onLoadAlbums: () -> Unit,
+) {
+    LaunchedEffect(enabled) { if (enabled) onLoadAlbums() }
+    SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_backup_section))
+        SwitchRow(
+            title = stringResource(R.string.settings_backup_title),
+            subtitle = stringResource(R.string.settings_backup_subtitle),
+            checked = enabled,
+            onCheckedChange = onSetEnabled,
+        )
+        if (enabled) {
+            SectionHeader(stringResource(R.string.settings_backup_albums))
+            albums.forEach { a ->
+                ListItem(
+                    headlineContent = { Text(a.name) },
+                    supportingContent = { Text(stringResource(R.string.settings_backup_album_count, a.count)) },
+                    trailingContent = {
+                        Checkbox(checked = a.bucketId in selected, onCheckedChange = { onToggleAlbum(a.bucketId) })
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable { onToggleAlbum(a.bucketId) },
+                )
+            }
+            Text(
+                stringResource(R.string.settings_backup_status, backedUpCount),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            OutlinedButton(onClick = onBackupNow, modifier = Modifier.padding(16.dp)) {
+                Text(stringResource(R.string.settings_backup_now))
+            }
+        }
     }
 }
 
@@ -691,6 +1023,24 @@ private fun timeoutLabel(minutes: Int): String = when (minutes) {
     10 -> stringResource(R.string.minutes_10)
     30 -> stringResource(R.string.minutes_30)
     else -> minutes.toString()
+}
+
+@Composable
+private fun keepScreenOnLabel(minutes: Int): String = when (minutes) {
+    0 -> stringResource(R.string.settings_keep_screen_on_unlimited)
+    5 -> stringResource(R.string.minutes_5)
+    15 -> stringResource(R.string.minutes_15)
+    30 -> stringResource(R.string.minutes_30)
+    else -> minutes.toString()
+}
+
+@Composable
+private fun daysLabel(days: Int): String = when (days) {
+    1 -> stringResource(R.string.days_1)
+    7 -> stringResource(R.string.days_7)
+    14 -> stringResource(R.string.days_14)
+    30 -> stringResource(R.string.days_30)
+    else -> days.toString()
 }
 
 /** Reads the current app locale tag ("" = system default) via the AOSP LocaleManager. */

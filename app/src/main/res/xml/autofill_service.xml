@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Autofill service metadata. Points at the in-app settings for the compat-mode
+     allow-list / configuration entry the framework surfaces. -->
+<autofill-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="de.ledgerline.app.MainActivity" />

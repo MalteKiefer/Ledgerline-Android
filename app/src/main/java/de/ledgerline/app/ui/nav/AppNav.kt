@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.AuthEventBus
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.domain.usecase.ForceLogout
 import de.ledgerline.app.ui.onboarding.WelcomeScreen
@@ -34,6 +35,7 @@ class RootViewModel @Inject constructor(
     private val vaultKeyHolder: VaultKeyHolder,
     private val authEventBus: AuthEventBus,
     private val forceLogout: ForceLogout,
+    private val accountRepository: AccountRepository,
 ) : ViewModel() {
     private val _dest = MutableStateFlow(Destination.LOADING)
     val dest: StateFlow<Destination> = _dest
@@ -70,11 +72,23 @@ class RootViewModel @Inject constructor(
                 _dest.value = Destination.WELCOME
             }
         }
+        // Remote kill switch: the owner flagged this device to wipe from the web
+        // (`GET /me` → `wipe:true`). Same outcome as a 401 — erase all local state + re-pair.
+        viewModelScope.launch {
+            authEventBus.wipe.collect {
+                forceLogout.invoke()
+                _dest.value = Destination.WELCOME
+            }
+        }
     }
 
     fun toPairing() { _dest.value = Destination.PAIRING }
     fun toUnlock() { _dest.value = Destination.UNLOCK }
-    fun toHome() { _dest.value = Destination.HOME }
+    fun toHome() {
+        _dest.value = Destination.HOME
+        // Check the kill switch right after unlock (me() fires the wipe event on wipe:true).
+        viewModelScope.launch { accountRepository.me() }
+    }
     fun toWelcome() { _dest.value = Destination.WELCOME }
 }
 
@@ -87,6 +101,7 @@ class RootViewModel @Inject constructor(
 @Composable
 fun AppNav(
     authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
+    strongAuthorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
     initialPairLink: String? = null,
     vm: RootViewModel = hiltViewModel(),
 ) {
@@ -105,7 +120,7 @@ fun AppNav(
         Destination.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         Destination.WELCOME -> WelcomeScreen(onGetStarted = { vm.toPairing() })
         Destination.PAIRING -> PairingScreen(authorize = authorize, initialPairLink = initialPairLink, onPaired = { vm.toUnlock() })
-        Destination.UNLOCK -> UnlockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
+        Destination.UNLOCK -> UnlockScreen(authorize = authorize, strongAuthorize = strongAuthorize, onUnlocked = { vm.toHome() })
         Destination.HOME -> {
             val unlocked by vm.unlocked.collectAsStateWithLifecycle()
             if (unlocked) {
@@ -114,7 +129,7 @@ fun AppNav(
                     onDisconnected = { vm.toWelcome() },
                 )
             } else {
-                UnlockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
+                UnlockScreen(authorize = authorize, strongAuthorize = strongAuthorize, onUnlocked = { vm.toHome() })
             }
         }
     }

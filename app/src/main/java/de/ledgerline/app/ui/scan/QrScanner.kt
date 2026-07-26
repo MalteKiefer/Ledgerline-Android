@@ -44,6 +44,9 @@ fun parsePairLink(uri: String): Pair<String, String>? {
         val url = params["url"] ?: return null
         val code = params["code"] ?: return null
         if (!url.startsWith("https://")) return null
+        // The pairing code is a 256-bit one-time token; reject anything outside a sane
+        // length/charset so a crafted deep link can't push arbitrary bytes at the server (L3).
+        if (code.length !in 1..512 || !code.all { it.isLetterOrDigit() || it == '_' || it == '-' }) return null
         url to code
     } catch (_: Exception) { null }
 }

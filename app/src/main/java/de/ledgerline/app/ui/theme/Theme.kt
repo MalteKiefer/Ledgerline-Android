@@ -1,78 +1,114 @@
 package de.ledgerline.app.ui.theme
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 /**
- * The one and only Ledgerline color scheme: a complete Material 3 dark scheme
- * built from the teal brand. The app is always dark and never uses dynamic
- * (wallpaper) color — this scheme is fully hand-authored in [Color]. Every M3
- * role is filled so components that reach for tonal container roles
- * (surfaceContainer*, surfaceDim/Bright, inverse*, tertiary*, error*) resolve
- * to intentional teal-family colors rather than framework fallbacks.
+ * The Ledgerline dark scheme: a complete Material 3 dark scheme built from the
+ * indigo → violet brand ([Color]). Never uses dynamic (wallpaper) color — the
+ * palette is hand-authored so every M3 role is intentional.
  */
-private val LedgerlineColorScheme = darkColorScheme(
-    primary = Primary,
-    onPrimary = OnPrimary,
-    primaryContainer = PrimaryContainer,
-    onPrimaryContainer = OnPrimaryContainer,
-    inversePrimary = InversePrimary,
-    secondary = Secondary,
-    onSecondary = OnSecondary,
-    secondaryContainer = SecondaryContainer,
-    onSecondaryContainer = OnSecondaryContainer,
-    tertiary = Tertiary,
-    onTertiary = OnTertiary,
-    tertiaryContainer = TertiaryContainer,
-    onTertiaryContainer = OnTertiaryContainer,
-    error = ErrorColor,
-    onError = OnErrorColor,
-    errorContainer = ErrorContainer,
-    onErrorContainer = OnErrorContainer,
-    background = Background,
-    onBackground = OnBackground,
-    surface = Surface,
-    onSurface = OnSurface,
-    surfaceVariant = SurfaceVariant,
-    onSurfaceVariant = OnSurfaceVariant,
-    surfaceTint = SurfaceTint,
-    outline = Outline,
-    outlineVariant = OutlineVariant,
-    scrim = Scrim,
-    inverseSurface = InverseSurface,
-    inverseOnSurface = InverseOnSurface,
-    surfaceDim = SurfaceDim,
-    surfaceBright = SurfaceBright,
-    surfaceContainerLowest = SurfaceContainerLowest,
-    surfaceContainerLow = SurfaceContainerLow,
-    surfaceContainer = SurfaceContainer,
-    surfaceContainerHigh = SurfaceContainerHigh,
-    surfaceContainerHighest = SurfaceContainerHighest,
+private val LedgerlineDarkScheme = darkColorScheme(
+    primary = DarkPrimary,
+    onPrimary = DarkOnPrimary,
+    primaryContainer = DarkPrimaryContainer,
+    onPrimaryContainer = DarkOnPrimaryContainer,
+    inversePrimary = DarkInversePrimary,
+    secondary = DarkSecondary,
+    onSecondary = DarkOnSecondary,
+    secondaryContainer = DarkSecondaryContainer,
+    onSecondaryContainer = DarkOnSecondaryContainer,
+    tertiary = DarkTertiary,
+    onTertiary = DarkOnTertiary,
+    tertiaryContainer = DarkTertiaryContainer,
+    onTertiaryContainer = DarkOnTertiaryContainer,
+    error = DarkError,
+    onError = DarkOnError,
+    errorContainer = DarkErrorContainer,
+    onErrorContainer = DarkOnErrorContainer,
+    background = DarkBackground,
+    onBackground = DarkOnBackground,
+    surface = DarkSurface,
+    onSurface = DarkOnSurface,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = DarkOnSurfaceVariant,
+    surfaceTint = DarkPrimary,
+    outline = DarkOutline,
+    outlineVariant = DarkOutlineVariant,
+    scrim = DarkScrim,
+    inverseSurface = DarkInverseSurface,
+    inverseOnSurface = DarkInverseOnSurface,
+    surfaceDim = DarkSurfaceDim,
+    surfaceBright = DarkSurfaceBright,
+    surfaceContainerLowest = DarkSurfaceContainerLowest,
+    surfaceContainerLow = DarkSurfaceContainerLow,
+    surfaceContainer = DarkSurfaceContainer,
+    surfaceContainerHigh = DarkSurfaceContainerHigh,
+    surfaceContainerHighest = DarkSurfaceContainerHighest,
+)
+
+/** The Ledgerline light scheme — indigo accent on a near-white indigo-tinted surface. */
+private val LedgerlineLightScheme = lightColorScheme(
+    primary = LightPrimary,
+    onPrimary = LightOnPrimary,
+    primaryContainer = LightPrimaryContainer,
+    onPrimaryContainer = LightOnPrimaryContainer,
+    inversePrimary = LightInversePrimary,
+    secondary = LightSecondary,
+    onSecondary = LightOnSecondary,
+    secondaryContainer = LightSecondaryContainer,
+    onSecondaryContainer = LightOnSecondaryContainer,
+    tertiary = LightTertiary,
+    onTertiary = LightOnTertiary,
+    tertiaryContainer = LightTertiaryContainer,
+    onTertiaryContainer = LightOnTertiaryContainer,
+    error = LightError,
+    onError = LightOnError,
+    errorContainer = LightErrorContainer,
+    onErrorContainer = LightOnErrorContainer,
+    background = LightBackground,
+    onBackground = LightOnBackground,
+    surface = LightSurface,
+    onSurface = LightOnSurface,
+    surfaceVariant = LightSurfaceVariant,
+    onSurfaceVariant = LightOnSurfaceVariant,
+    surfaceTint = LightPrimary,
+    outline = LightOutline,
+    outlineVariant = LightOutlineVariant,
+    scrim = LightScrim,
+    inverseSurface = LightInverseSurface,
+    inverseOnSurface = LightInverseOnSurface,
+    surfaceDim = LightSurfaceDim,
+    surfaceBright = LightSurfaceBright,
+    surfaceContainerLowest = LightSurfaceContainerLowest,
+    surfaceContainerLow = LightSurfaceContainerLow,
+    surfaceContainer = LightSurfaceContainer,
+    surfaceContainerHigh = LightSurfaceContainerHigh,
+    surfaceContainerHighest = LightSurfaceContainerHighest,
 )
 
 /**
- * App-wide Material 3 theme. Emits the full teal [LedgerlineColorScheme], the
- * complete [LedgerlineTypography] scale and the [LedgerlineShapes] corner ramp.
+ * App-wide Material 3 theme. Selects the light or dark [MaterialTheme] scheme by
+ * the system setting ([isSystemInDarkTheme]) — matching the adaptive iOS app —
+ * and emits the shared [LedgerlineTypography] scale and [LedgerlineShapes] ramp.
  *
- * Note on Expressive: material3 1.4.0 ships `MaterialExpressiveTheme` but keeps it
- * (and `ExperimentalMaterial3ExpressiveApi`) `internal` — it is not callable from
- * app code in this stable release. We therefore use the standard [MaterialTheme],
- * which is fully expressive-ready: the tonal `surfaceContainer*`/`surfaceDim`/
- * `surfaceBright` roles and the expressive shape/type scales all resolve through it.
- * Switch to `MaterialExpressiveTheme` once it becomes public.
- *
- * The outer [Surface] paints the dark background so every screen has a guaranteed
- * opaque, high-contrast backdrop (fixes text rendering on the raw window
- * background) and so edge-to-edge system bars sit over an intentional color.
+ * The outer [Surface] paints the scheme background so every screen has a
+ * guaranteed opaque backdrop and edge-to-edge system bars sit over an
+ * intentional color.
  */
 @Composable
-fun LedgerlineTheme(content: @Composable () -> Unit) {
+fun LedgerlineTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
+) {
     MaterialTheme(
-        colorScheme = LedgerlineColorScheme,
+        colorScheme = if (darkTheme) LedgerlineDarkScheme else LedgerlineLightScheme,
         typography = LedgerlineTypography,
         shapes = LedgerlineShapes,
     ) {

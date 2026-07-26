@@ -12,6 +12,8 @@ import de.ledgerline.app.data.FileBlobRepository
 import de.ledgerline.app.data.GalleryBlobRepository
 import de.ledgerline.app.data.NotImplementedApi
 import de.ledgerline.app.data.SealTagCrypto
+import de.ledgerline.app.data.contactBlobRepoForTest
+import de.ledgerline.app.data.galleryBlobRepoForTest
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
@@ -70,7 +72,7 @@ class PrefetcherTest {
     private fun galleryRepo(api: LedgerlineApi, cache: BlobDiskCache): GalleryBlobRepository {
         val sh = SessionHolder().apply { set(Session("https://x", "tok", "", null)) }
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
-        return GalleryBlobRepository.forTest(sh, vh, SealTagCrypto(), cache, FakeOfflineFlags(), api)
+        return galleryBlobRepoForTest(sh, vh, SealTagCrypto(), cache, FakeOfflineFlags(), api)
     }
 
     private fun fileRepo(api: LedgerlineApi, cache: BlobDiskCache): FileBlobRepository {
@@ -89,7 +91,10 @@ class PrefetcherTest {
     ): Prefetcher {
         val gc = GalleryCache().apply { gallery?.let { set(it) } }
         val wc = WorkspaceCache().apply { workspace?.let { set(it) } }
-        return Prefetcher(gc, wc, galleryRepo(api, cache), fileRepo(api, cache), cache, flags, constraints, opManager())
+        val sh = SessionHolder().apply { set(Session("https://x", "tok", "", null)) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val contactRepo = contactBlobRepoForTest(sh, vh, SealTagCrypto(), cache, FakeOfflineFlags(), api)
+        return Prefetcher(gc, wc, galleryRepo(api, cache), fileRepo(api, cache), contactRepo, cache, flags, constraints, opManager())
     }
 
     private fun awaitIdle() = Thread.sleep(200)

@@ -6,6 +6,7 @@ import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
+import androidx.annotation.VisibleForTesting
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
@@ -17,7 +18,6 @@ import de.ledgerline.app.domain.usecase.EmbedText
 import de.ledgerline.app.domain.usecase.GalleryBlobs
 import de.ledgerline.app.domain.usecase.GalleryUploadApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -26,7 +26,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class GalleryBlobRepository private constructor(
+class GalleryBlobRepository @VisibleForTesting internal constructor(
     private val sessionHolder: SessionHolder,
     private val vaultKeyHolder: VaultKeyHolder,
     private val crypto: Crypto,
@@ -47,8 +47,18 @@ class GalleryBlobRepository private constructor(
         offlineFlags.enabled() && offlineFlags.photosPolicy() != PhotoBlobPolicy.OFF
 
     override suspend fun download(ref: String, key: String): Outcome<ByteArray> = withContext(Dispatchers.IO) {
-        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        // Cache-first: gallery content blobs are content-addressed and immutable, so a cache
+        // hit is always current — decrypt from disk and skip the network entirely. This makes
+        // scroll-back and repeat opens instant instead of re-fetching every thumb (the per-blob
+        // throttle otherwise serialises thousands of thumbs into minutes).
+        if (cachingEnabled()) {
+            blobCache.get(ref)?.let { cached ->
+                runCatching { BlobDownloader.decrypt(cached, key, vk, crypto) }.getOrNull()
+                    ?.let { return@withContext Outcome.Ok(it) }
+            }
+        }
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         try {
             val res = apiProvider(session).galleryRaw(ref)
             // Non-2xx (except the 401 auth path) may fall back to the ciphertext cache.
@@ -117,20 +127,7 @@ class GalleryBlobRepository private constructor(
     override suspend fun deleteBlobs(refs: List<String>) = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext
         val api = apiProvider(session)
-        for (ref in refs.filter { it.isNotBlank() }.distinct()) {
-            var attempt = 0
-            while (attempt < 3) {
-                val res = try { api.deleteGalleryBlob(ref) } catch (_: Exception) { break }
-                if (res.code() == 429) {
-                    val retryAfterMs = res.headers()["Retry-After"]?.toLongOrNull()?.times(1000)
-                        ?: (1000L shl attempt)
-                    delay(minOf(retryAfterMs, 30_000L))
-                    attempt++
-                } else {
-                    break
-                }
-            }
-        }
+        deleteBlobsWithBackoff(refs) { api.deleteGalleryBlob(it) }
     }
 
     override suspend fun process(bytes: ByteArray, name: String, mime: String): Outcome<ProcessResponse> = withContext(Dispatchers.IO) {
@@ -153,16 +150,4 @@ class GalleryBlobRepository private constructor(
         } catch (_: Exception) { null }
     }
 
-    companion object {
-        /** Test factory exposing the api-provider seam (the `@Inject` ctor wires the real network). */
-        internal fun forTest(
-            sessionHolder: SessionHolder,
-            vaultKeyHolder: VaultKeyHolder,
-            crypto: Crypto,
-            blobCache: BlobDiskCache,
-            offlineFlags: OfflineFlags,
-            api: LedgerlineApi,
-        ): GalleryBlobRepository =
-            GalleryBlobRepository(sessionHolder, vaultKeyHolder, crypto, blobCache, offlineFlags, { api })
-    }
 }

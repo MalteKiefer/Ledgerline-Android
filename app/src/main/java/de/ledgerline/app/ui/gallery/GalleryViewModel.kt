@@ -25,11 +25,18 @@ import de.ledgerline.app.domain.usecase.LoadGallery
 import de.ledgerline.app.domain.usecase.PhotoSource
 import de.ledgerline.app.ui.workspace.files.UsageInfo
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 import javax.inject.Inject
 
 data class GalleryUi(
@@ -62,6 +69,7 @@ class GalleryViewModel @Inject constructor(
     private val operationManager: OperationManager,
     private val embedText: EmbedText,
     private val metaCache: MetaCache,
+    private val places: de.ledgerline.app.data.PlaceRepository,
 ) : ViewModel() {
 
     /** IO dispatcher for meta-blob downloads during search — overridable in tests so
@@ -302,7 +310,13 @@ class GalleryViewModel @Inject constructor(
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = false)
-        if (load.invoke() is Outcome.Err) _state.value = _state.value.copy(loading = false, error = true)
+        // Clear the spinner explicitly on success too: GalleryCache holds a data-class
+        // Gallery, so a reload of unchanged data is value-equal and the StateFlow does NOT
+        // re-emit — the cache collector would never fire and `loading` would stick forever.
+        when (load.invoke()) {
+            is Outcome.Err -> _state.value = _state.value.copy(loading = false, error = true)
+            is Outcome.Ok -> recompute()
+        }
         loadUsage()
     }
 
@@ -317,12 +331,28 @@ class GalleryViewModel @Inject constructor(
      * and surfaced as `"upload_failed:N"` in [message]. [loadUsage] is called when the
      * queue drains.
      */
+    // Sources that failed in the last import, retryable within the session (their content
+    // Uris are still readable). Not persisted — an app restart drops them.
+    private var lastFailedImports: List<PhotoSource> = emptyList()
+    private val _failedImportCount = MutableStateFlow(0)
+    val failedImportCount: StateFlow<Int> = _failedImportCount
+
     fun uploadAll(sources: List<PhotoSource>) {
         operationManager.run(OpKind.UPLOAD, total = sources.size) { report ->
             val result = importPhotos.invoke(sources, report)
             loadUsage()
+            lastFailedImports = result.failedSources
+            _failedImportCount.value = result.failedSources.size
             if (result.failed > 0) _message.value = "upload_failed:${result.failed}"
         }
+    }
+
+    /** Re-run the import for the sources that failed in the last upload batch. */
+    fun retryFailedImports() {
+        val retry = lastFailedImports
+        lastFailedImports = emptyList()
+        _failedImportCount.value = 0
+        if (retry.isNotEmpty()) uploadAll(retry)
     }
 
     /** Returns a cached thumbnail bitmap or downloads+decodes it (cached). Null on failure. */
@@ -331,31 +361,65 @@ class GalleryViewModel @Inject constructor(
         val ref = photo.thumbRef ?: return null
         val key = photo.thumbKey ?: return null
         return when (val r = blobs.download(ref, key)) {
-            is Outcome.Ok -> BitmapFactory.decodeByteArray(r.value, 0, r.value.size)?.also { thumbs.put(photo.id, it) }
+            // Decode off the caller's dispatcher (produceState composes on Main) and as
+            // RGB_565 — photo thumbnails need no alpha, so this halves the bitmap memory and
+            // lets a larger in-memory cache fit without OOM risk.
+            is Outcome.Ok -> withContext(ioDispatcher) {
+                val opts = BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 }
+                BitmapFactory.decodeByteArray(r.value, 0, r.value.size, opts)
+            }?.also { thumbs.put(photo.id, it) }
             is Outcome.Err -> null
         }
     }
 
     suspend fun downloadBytes(ref: String, key: String): Outcome<ByteArray> = blobs.download(ref, key)
 
-    /** Lazily loads and decodes the encrypted meta blob's place. Cached per photo id. Returns null on any failure. */
+    /** Decrypt a photo's ORIGINAL blob fully into memory (for export via SAF). Null on failure. */
+    suspend fun originalBytes(photo: GalleryPhoto): ByteArray? {
+        val ref = photo.originalRef ?: return null
+        val key = photo.originalKey ?: return null
+        return (blobs.download(ref, key) as? Outcome.Ok)?.value
+    }
+
+    /**
+     * Resolve a photo's place for the viewer. First the sealed meta blob (populated at
+     * upload only when the server has geocode-on-upload enabled); when that has no place,
+     * fall back to an on-demand reverse-geocode of the coordinate (ZK: server-proxied
+     * self-hosted geocoder + an encrypted, coarse-grid on-device cache). Cached per photo
+     * id in memory. Returns null on any failure / no coordinate.
+     */
     suspend fun loadPlace(photo: GalleryPhoto): PhotoPlace? {
         if (placeCache.containsKey(photo.id)) return placeCache[photo.id]
-        val ref = photo.metaRef ?: return null
-        val key = photo.metaKey ?: return null
-        val place = try {
-            when (val r = blobs.download(ref, key)) {
-                is Outcome.Ok -> {
-                    val metaJson = Json { ignoreUnknownKeys = true }
-                    metaJson.decodeFromString<PhotoMetaBlob>(String(r.value)).place
+        val fromMeta = photo.metaRef?.let { ref ->
+            photo.metaKey?.let { key ->
+                try {
+                    when (val r = blobs.download(ref, key)) {
+                        is Outcome.Ok ->
+                            Json { ignoreUnknownKeys = true }.decodeFromString<PhotoMetaBlob>(String(r.value)).place
+                        is Outcome.Err -> null
+                    }
+                } catch (_: Exception) {
+                    null
                 }
-                is Outcome.Err -> null
             }
-        } catch (_: Exception) {
-            null
+        }
+        val place = fromMeta ?: run {
+            val lat = photo.lat
+            val lng = photo.lng
+            if (lat != null && lng != null) places.resolve(lat, lng) else null
         }
         placeCache[photo.id] = place
         return place
+    }
+
+    /** Library counts for the Jobs/diagnostics sheet (non-trashed). */
+    fun diagnostics(): Triple<Int, Int, Int> {
+        val all = cache.value.value?.manifest?.photos.orEmpty().filter { !it.trashed }
+        return Triple(
+            all.count { it.media_type != "video" },
+            all.count { it.media_type == "video" },
+            all.count { it.lat != null && it.lng != null },
+        )
     }
 
     fun photoById(id: String) = cache.value.value?.manifest?.photos?.firstOrNull { it.id == id }
@@ -365,6 +429,46 @@ class GalleryViewModel @Inject constructor(
     fun geotaggedPhotos(): List<GalleryPhoto> =
         cache.value.value?.manifest?.photos.orEmpty()
             .filter { !it.trashed && it.lat != null && it.lng != null }
+
+    // Cached (sourceList identity → result) so the backfill decrypt pass runs once per manifest.
+    private var geoCache: Pair<List<GalleryPhoto>, List<GalleryPhoto>>? = null
+
+    /**
+     * Map set with a lazy geo-backfill: photos with a record geotag, PLUS older photos that
+     * lack one but carry lat/lon in their sealed meta blob's exif (decrypted + read on demand;
+     * cheap on repeat opens thanks to the cache-first blob cache). Result is memoised per
+     * manifest instance so the decrypt pass runs once.
+     */
+    suspend fun geotaggedWithBackfill(): List<GalleryPhoto> {
+        val all = cache.value.value?.manifest?.photos.orEmpty()
+        geoCache?.let { if (it.first === all) return it.second }
+        val result = withContext(ioDispatcher) {
+            val live = all.filter { !it.trashed }
+            val (has, missing) = live.partition { it.lat != null && it.lng != null }
+            val candidates = missing.filter { it.metaRef != null && it.metaKey != null }
+            val json = Json { ignoreUnknownKeys = true }
+            val sem = Semaphore(8)
+            val backfilled = coroutineScope {
+                candidates.map { p ->
+                    async {
+                        sem.withPermit {
+                            runCatching {
+                                val r = blobs.download(p.metaRef!!, p.metaKey!!)
+                                val ex = (r as? Outcome.Ok)
+                                    ?.let { json.decodeFromString<PhotoMetaBlob>(String(it.value)) }?.exif
+                                val lat = (ex?.get("lat") as? JsonPrimitive)?.doubleOrNull
+                                val lng = (ex?.get("lon") as? JsonPrimitive)?.doubleOrNull
+                                if (lat != null && lng != null) p.copy(lat = lat, lng = lng) else null
+                            }.getOrNull()
+                        }
+                    }
+                }.awaitAll().filterNotNull()
+            }
+            has + backfilled
+        }
+        geoCache = all to result
+        return result
+    }
 
     private fun recompute() {
         // Sort by capture date (EXIF taken_at), falling back to upload time — matches

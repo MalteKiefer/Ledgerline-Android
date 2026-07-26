@@ -9,6 +9,13 @@
          exclusively to geotag the shot. Never used for background tracking. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Optional: sync the encrypted address book with the device contacts app.
+         Read/write only the local "Ledgerline" account; never uploaded anywhere. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.WRITE_CONTACTS" />
+    <!-- Optional: read device photos/videos for camera-roll backup into the gallery. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <!-- Foreground service keeps long ops (scans/uploads) alive when backgrounded,
          behind a visible notification. Data-sync type; AOSP only, no Google. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -81,5 +88,29 @@
             android:name=".core.ops.BackgroundOpService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />
+
+        <!-- Zero-knowledge Autofill provider. Structure-only in onFillRequest; the vault
+             is decrypted solely after the user authenticates in AutofillUnlockActivity. -->
+        <service
+            android:name=".core.autofill.LedgerlineAutofillService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.autofill"
+                android:resource="@xml/autofill_service" />
+        </service>
+
+        <!-- Authenticated fill/save bridge launched by the OS from the autofill entry. -->
+        <activity
+            android:name=".ui.autofill.AutofillUnlockActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Ledgerline" />
     </application>
 </manifest>

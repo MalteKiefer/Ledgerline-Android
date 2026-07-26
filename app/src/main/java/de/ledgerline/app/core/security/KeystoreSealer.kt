@@ -33,6 +33,11 @@ import javax.crypto.spec.GCMParameterSpec
 class KeystoreSealer(
     private val alias: String = "ledgerline_token_key_v2",
     private val requireAuth: Boolean = true,
+    // Which user-auth types may authorize a key operation. The session key allows a
+    // device-credential fallback; the remembered-vault key is STRONG-biometric only
+    // (a device PIN alone must NOT unwrap the persisted Vault Key).
+    private val authTypes: Int =
+        KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
 ) {
     private val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
@@ -53,10 +58,7 @@ class KeystoreSealer(
                     // correct two-factor design — exactly one biometric authorizes the
                     // keystore decrypt of the sealed session, and the passphrase derives
                     // the Vault Key. DEVICE_CREDENTIAL works with a CryptoObject on API 30+.
-                    setUserAuthenticationParameters(
-                        0,
-                        KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL,
-                    )
+                    setUserAuthenticationParameters(0, authTypes)
                     setInvalidatedByBiometricEnrollment(true)
                 }
             }

@@ -3,71 +3,130 @@ package de.ledgerline.app.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Full Material 3 dark tonal scheme derived from the Ledgerline teal brand.
+ * Material 3 tonal schemes for Ledgerline, built from the shared cross-platform
+ * brand: an **indigo → violet** accent (byte-aligned with the iOS `Theme.swift`
+ * and the web app). The app now ships BOTH a light and a dark scheme; the active
+ * one follows the system setting (see [LedgerlineTheme]).
  *
- * The app is ALWAYS dark and privacy-first, so this is the single source of
- * truth — there is no light variant and no dynamic (wallpaper) color. Every M3
- * color role is defined here from a coherent teal ramp (primary), a muted
- * teal-grey (secondary), a complementary warm amber (tertiary), and a neutral
- * surface ramp tinted very slightly toward teal so containers read as a family
- * rather than flat grey.
+ * The brand seed is the iOS accent `#7066F5` (indigo) with a violet far-stop
+ * `#9E70FA`. Each M3 role below is hand-authored from that hue so tonal-container
+ * roles (surfaceContainer*, surfaceDim/Bright, inverse*, tertiary*, error*)
+ * resolve to intentional indigo-family colors rather than framework fallbacks.
  *
- * Naming follows the M3 role names 1:1 so `darkColorScheme(...)` in Theme.kt is
- * a direct, exhaustive mapping.
+ * The fixed accent gradient used by hero icons, icon chips and primary buttons
+ * lives in [Brand] (it is identical in light and dark, matching iOS).
  */
 
-// --- Primary (teal brand) ---------------------------------------------------
-val Primary = Color(0xFF4FD8C4)
-val OnPrimary = Color(0xFF00382F)
-val PrimaryContainer = Color(0xFF005046)
-val OnPrimaryContainer = Color(0xFF6FF7E3)
-val InversePrimary = Color(0xFF006A5C)
+// ============================================================================
+//  DARK scheme — the "vault depth" look (indigo on a near-black indigo-tinted
+//  surface). Mirrors the iOS dark appearance.
+// ============================================================================
 
-// --- Secondary (muted teal-grey) --------------------------------------------
-val Secondary = Color(0xFFB0CCC5)
-val OnSecondary = Color(0xFF1B3530)
-val SecondaryContainer = Color(0xFF324B45)
-val OnSecondaryContainer = Color(0xFFCCE8E1)
+// --- Primary (indigo brand) -------------------------------------------------
+val DarkPrimary = Color(0xFFC7C0FF)
+val DarkOnPrimary = Color(0xFF2A2178)
+val DarkPrimaryContainer = Color(0xFF433A90)
+val DarkOnPrimaryContainer = Color(0xFFE5DEFF)
+val DarkInversePrimary = Color(0xFF5A4FD6)
 
-// --- Tertiary (complementary warm amber, for accents/highlights) ------------
-val Tertiary = Color(0xFFF3C06B)
-val OnTertiary = Color(0xFF422C00)
-val TertiaryContainer = Color(0xFF5E4100)
-val OnTertiaryContainer = Color(0xFFFFDEA6)
+// --- Secondary (muted indigo-grey) ------------------------------------------
+val DarkSecondary = Color(0xFFC8C3DC)
+val DarkOnSecondary = Color(0xFF302E42)
+val DarkSecondaryContainer = Color(0xFF464459)
+val DarkOnSecondaryContainer = Color(0xFFE5DFF9)
+
+// --- Tertiary (violet accent) -----------------------------------------------
+val DarkTertiary = Color(0xFFDDB9FF)
+val DarkOnTertiary = Color(0xFF44205C)
+val DarkTertiaryContainer = Color(0xFF5C3A75)
+val DarkOnTertiaryContainer = Color(0xFFF1DBFF)
 
 // --- Error ------------------------------------------------------------------
-val ErrorColor = Color(0xFFFFB4AB)
-val OnErrorColor = Color(0xFF690005)
-val ErrorContainer = Color(0xFF93000A)
-val OnErrorContainer = Color(0xFFFFDAD6)
+val DarkError = Color(0xFFFFB4AB)
+val DarkOnError = Color(0xFF690005)
+val DarkErrorContainer = Color(0xFF93000A)
+val DarkOnErrorContainer = Color(0xFFFFDAD6)
 
-// --- Background / core surface ----------------------------------------------
-val Background = Color(0xFF0E1513)
-val OnBackground = Color(0xFFDEE4E1)
-val Surface = Color(0xFF0E1513)
-val OnSurface = Color(0xFFDEE4E1)
-val SurfaceVariant = Color(0xFF1B2723)
-val OnSurfaceVariant = Color(0xFFBFCBC6)
-val SurfaceTint = Primary
+// --- Background / core surface (near-black, faint indigo tint) ---------------
+val DarkBackground = Color(0xFF131318)
+val DarkOnBackground = Color(0xFFE5E1E9)
+val DarkSurface = Color(0xFF131318)
+val DarkOnSurface = Color(0xFFE5E1E9)
+val DarkSurfaceVariant = Color(0xFF48454F)
+val DarkOnSurfaceVariant = Color(0xFFC9C5D0)
 
 // --- Outlines ---------------------------------------------------------------
-val Outline = Color(0xFF89938F)
-val OutlineVariant = Color(0xFF3F4945)
+val DarkOutline = Color(0xFF938F9A)
+val DarkOutlineVariant = Color(0xFF48454F)
 
 // --- Inverse / scrim --------------------------------------------------------
-val InverseSurface = Color(0xFFDEE4E1)
-val InverseOnSurface = Color(0xFF2B322F)
-val Scrim = Color(0xFF000000)
+val DarkInverseSurface = Color(0xFFE5E1E9)
+val DarkInverseOnSurface = Color(0xFF303036)
+val DarkScrim = Color(0xFF000000)
 
-// --- Tonal container ramp (M3 surfaceContainer* + dim/bright) ---------------
-// A deliberate, monotonic ladder from the darkest recess (surfaceDim /
-// containerLowest) up to the brightest raised surface (surfaceBright /
-// containerHighest). Each step is tinted slightly teal so elevated cards,
-// sheets and bars read as one coherent family, never a single flat grey.
-val SurfaceDim = Color(0xFF0E1513)
-val SurfaceBright = Color(0xFF343B38)
-val SurfaceContainerLowest = Color(0xFF090F0D)
-val SurfaceContainerLow = Color(0xFF161D1B)
-val SurfaceContainer = Color(0xFF1A211F)
-val SurfaceContainerHigh = Color(0xFF242B29)
-val SurfaceContainerHighest = Color(0xFF2F3634)
+// --- Tonal container ramp (surfaceContainer* + dim/bright) ------------------
+// A monotonic ladder from the darkest recess up to the brightest raised surface,
+// each step tinted slightly indigo so cards/sheets/bars read as one family.
+val DarkSurfaceDim = Color(0xFF131318)
+val DarkSurfaceBright = Color(0xFF39373E)
+val DarkSurfaceContainerLowest = Color(0xFF0E0D12)
+val DarkSurfaceContainerLow = Color(0xFF1B1B21)
+val DarkSurfaceContainer = Color(0xFF1F1F25)
+val DarkSurfaceContainerHigh = Color(0xFF2A292F)
+val DarkSurfaceContainerHighest = Color(0xFF35343A)
+
+// ============================================================================
+//  LIGHT scheme — indigo accent on a near-white, faintly indigo-tinted surface.
+//  Mirrors the iOS light appearance.
+// ============================================================================
+
+// --- Primary (indigo brand) -------------------------------------------------
+val LightPrimary = Color(0xFF5A4FD6)
+val LightOnPrimary = Color(0xFFFFFFFF)
+val LightPrimaryContainer = Color(0xFFE5DEFF)
+val LightOnPrimaryContainer = Color(0xFF150764)
+val LightInversePrimary = Color(0xFFC7C0FF)
+
+// --- Secondary (muted indigo-grey) ------------------------------------------
+val LightSecondary = Color(0xFF5D5C72)
+val LightOnSecondary = Color(0xFFFFFFFF)
+val LightSecondaryContainer = Color(0xFFE3E0F9)
+val LightOnSecondaryContainer = Color(0xFF1A1A2C)
+
+// --- Tertiary (violet accent) -----------------------------------------------
+val LightTertiary = Color(0xFF7A4E9E)
+val LightOnTertiary = Color(0xFFFFFFFF)
+val LightTertiaryContainer = Color(0xFFF1DBFF)
+val LightOnTertiaryContainer = Color(0xFF2E0A47)
+
+// --- Error ------------------------------------------------------------------
+val LightError = Color(0xFFBA1A1A)
+val LightOnError = Color(0xFFFFFFFF)
+val LightErrorContainer = Color(0xFFFFDAD6)
+val LightOnErrorContainer = Color(0xFF410002)
+
+// --- Background / core surface (near-white, faint indigo tint) ---------------
+val LightBackground = Color(0xFFFDFBFF)
+val LightOnBackground = Color(0xFF1B1B21)
+val LightSurface = Color(0xFFFDFBFF)
+val LightOnSurface = Color(0xFF1B1B21)
+val LightSurfaceVariant = Color(0xFFE5E0EC)
+val LightOnSurfaceVariant = Color(0xFF47464F)
+
+// --- Outlines ---------------------------------------------------------------
+val LightOutline = Color(0xFF787680)
+val LightOutlineVariant = Color(0xFFC9C5D0)
+
+// --- Inverse / scrim --------------------------------------------------------
+val LightInverseSurface = Color(0xFF303036)
+val LightInverseOnSurface = Color(0xFFF3EFF7)
+val LightScrim = Color(0xFF000000)
+
+// --- Tonal container ramp ----------------------------------------------------
+val LightSurfaceDim = Color(0xFFDDD9E1)
+val LightSurfaceBright = Color(0xFFFDFBFF)
+val LightSurfaceContainerLowest = Color(0xFFFFFFFF)
+val LightSurfaceContainerLow = Color(0xFFF7F3FB)
+val LightSurfaceContainer = Color(0xFFF1EDF6)
+val LightSurfaceContainerHigh = Color(0xFFEBE7F0)
+val LightSurfaceContainerHighest = Color(0xFFE6E1EB)

@@ -74,6 +74,9 @@ class BlobDiskCache(
         enforceLimit(offlineFlags.maxBytes(), protect = blobId)
     }
 
+    /** A scratch directory (under the cache root) for transient encrypt-to-disk uploads. */
+    fun tempDir(): File = File(root, "tmp").apply { mkdirs() }
+
     /** True if a cached blob exists for [blobId]. */
     fun has(blobId: String): Boolean = safe(blobId) && File(root, blobId).exists()
 
@@ -116,6 +119,7 @@ class BlobDiskCache(
         override fun enabled() = true
         override fun filesPolicy() = de.ledgerline.app.data.offline.FileBlobPolicy.ON_DEMAND
         override fun photosPolicy() = de.ledgerline.app.data.offline.PhotoBlobPolicy.ON_DEMAND
+        override fun contactsPolicy() = de.ledgerline.app.data.offline.ContactBlobPolicy.ON_DEMAND
         override fun maxBytes() = 0L
         override fun wifiOnly() = false
         override fun chargingOnly() = false

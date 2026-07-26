@@ -92,7 +92,9 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
         if (uri != null) {
             val picked = queryPicked(context, uri)
             vm.uploadPicked(picked.name, picked.mime, picked.size) {
-                context.contentResolver.openInputStream(uri)!!
+                // A revoked/stale SAF grant yields null; a typed IOException is cleaner than
+                // a KotlinNPE and is caught by the upload path → Err(NETWORK) (L5).
+                context.contentResolver.openInputStream(uri) ?: throw java.io.IOException("cannot open $uri")
             }
         }
     }

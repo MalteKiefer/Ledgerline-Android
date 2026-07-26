@@ -34,12 +34,14 @@ class ImportPhotosImpl @Inject constructor(
         report(0, sources.size)
         var done = 0
         var failed = 0
+        val failedSources = mutableListOf<PhotoSource>()
 
         for (src in sources) {
             val bytes = try {
                 src.read()
             } catch (_: Exception) {
                 failed++
+                failedSources += src
                 done++
                 report(done, sources.size)
                 continue
@@ -58,13 +60,13 @@ class ImportPhotosImpl @Inject constructor(
                     mutate.invoke { it.copy(photos = it.photos + up.value) }
                     existing += sig
                 }
-                is Outcome.Err -> failed++
+                is Outcome.Err -> { failed++; failedSources += src }
             }
             done++
             report(done, sources.size)
         }
 
-        return ImportResult(done, failed)
+        return ImportResult(done, failed, failedSources)
     }
 
     /** Duplicate signature, byte-compatible with the web `_fileSig`:

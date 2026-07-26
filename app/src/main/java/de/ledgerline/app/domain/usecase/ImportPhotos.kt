@@ -13,8 +13,11 @@ data class PhotoSource(
     val lng: Double? = null,
 )
 
-/** Result of an [ImportPhotos] run: number of sources uploaded/deduped vs. failed. */
-data class ImportResult(val done: Int, val failed: Int)
+/**
+ * Result of an [ImportPhotos] run: number of sources uploaded/deduped vs. failed, plus the
+ * sources that failed (read error or upload error) so the caller can offer a retry.
+ */
+data class ImportResult(val done: Int, val failed: Int, val failedSources: List<PhotoSource> = emptyList())
 
 /**
  * Uploads a batch of photos into the gallery index: read bytes, compute the sha-256

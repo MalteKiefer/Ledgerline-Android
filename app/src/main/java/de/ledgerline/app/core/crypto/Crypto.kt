@@ -30,6 +30,19 @@ interface Crypto {
     /** Inverse of openManifest: pad to a 4-KiB bucket and secretbox-seal to `{"c","n"}`. */
     fun sealManifest(json: String, vk: ByteArray): String
 
+    // The following back the sharing-identity crypto (§ PQKEM / IdentityCrypto). They
+    // have default throwing bodies so the many lightweight test fakes that never touch
+    // them need no changes; the real [SodiumCrypto] overrides all three.
+
+    /** secretbox-seal raw [data] under [key] → JSON `{"c","n"}` (random nonce, NO padding). */
+    fun sealValue(data: ByteArray, key: ByteArray): String = throw NotImplementedError()
+
+    /** Open a `{"c","n"}` JSON string under [key]; null on failure. */
+    fun openValue(cn: String, key: ByteArray): ByteArray? = throw NotImplementedError()
+
+    /** crypto_generichash (BLAKE2b) to [outLen] bytes, keyless. */
+    fun genericHash(input: ByteArray, outLen: Int): ByteArray = throw NotImplementedError()
+
     /** Plaintext slice size a caller must feed the streaming content cipher (4 MiB). */
     val contentChunkSize: Int
 

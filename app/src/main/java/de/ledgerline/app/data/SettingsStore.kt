@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import kotlinx.coroutines.flow.Flow
@@ -25,10 +27,21 @@ class SettingsStore(private val context: Context) {
     private val offlineKey = booleanPreferencesKey("offline_cache_enabled")
     private val filesPolicyKey = stringPreferencesKey("offline_files_policy")
     private val photosPolicyKey = stringPreferencesKey("offline_photos_policy")
+    private val contactsPolicyKey = stringPreferencesKey("offline_contacts_policy")
     private val cacheMaxMbKey = intPreferencesKey("offline_cache_max_mb")
     private val prefetchWifiOnlyKey = booleanPreferencesKey("prefetch_wifi_only")
     private val prefetchChargingOnlyKey = booleanPreferencesKey("prefetch_charging_only")
     private val linkChooserKey = booleanPreferencesKey("link_chooser_enabled")
+    private val contactSortKey = stringPreferencesKey("contact_sort")
+    private val dateFormatKey = stringPreferencesKey("date_format")
+    private val backupEnabledKey = booleanPreferencesKey("backup_enabled")
+    private val backupAlbumsKey = stringSetPreferencesKey("backup_album_ids")
+    private val keepScreenOnKey = booleanPreferencesKey("keep_screen_on")
+    private val keepScreenOnMinutesKey = intPreferencesKey("keep_screen_on_minutes")
+    private val rememberVaultKey = booleanPreferencesKey("remember_vault")
+    private val rememberVaultDaysKey = intPreferencesKey("remember_vault_days")
+    private val mapTilesKey = booleanPreferencesKey("map_tiles_enabled")
+    private val duressThresholdKey = intPreferencesKey("duress_threshold")
 
     // Legacy 5a boolean keys, retained only so a stored value migrates into the new
     // enum policies when the new key is absent (§C1).
@@ -90,12 +103,35 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[photosPolicyKey] = p.name }
     }
 
+    /** Contact-avatar blob caching policy. Defaults to [ContactBlobPolicy.ON_DEMAND]. */
+    val contactsPolicy: Flow<ContactBlobPolicy> =
+        context.settingsDataStore.data.map {
+            runCatching { ContactBlobPolicy.valueOf(it[contactsPolicyKey] ?: "") }.getOrDefault(ContactBlobPolicy.ON_DEMAND)
+        }
+
+    suspend fun setContactsPolicy(p: ContactBlobPolicy) {
+        context.settingsDataStore.edit { it[contactsPolicyKey] = p.name }
+    }
+
     /** Cache size limit in MB (`0` = unlimited). Defaults to [DEFAULT_CACHE_MAX_MB]. */
     val cacheMaxMb: Flow<Int> =
         context.settingsDataStore.data.map { it[cacheMaxMbKey] ?: DEFAULT_CACHE_MAX_MB }
 
     suspend fun setCacheMaxMb(mb: Int) {
         context.settingsDataStore.edit { it[cacheMaxMbKey] = mb }
+    }
+
+    /**
+     * Duress auto-wipe threshold (consecutive wrong passphrases → wipe). Always active;
+     * any out-of-range value resolves to [WipePolicy.defaultThreshold]. Defaults to 10.
+     */
+    val duressThreshold: Flow<Int> =
+        context.settingsDataStore.data.map {
+            de.ledgerline.app.core.security.WipePolicy.effectiveThreshold(it[duressThresholdKey] ?: de.ledgerline.app.core.security.WipePolicy.defaultThreshold)
+        }
+
+    suspend fun setDuressThreshold(n: Int) {
+        context.settingsDataStore.edit { it[duressThresholdKey] = de.ledgerline.app.core.security.WipePolicy.effectiveThreshold(n) }
     }
 
     /** Whether prefetch is restricted to unmetered (Wi-Fi) networks. Defaults to ON. */
@@ -125,12 +161,113 @@ class SettingsStore(private val context: Context) {
         context.settingsDataStore.edit { it[linkChooserKey] = enabled }
     }
 
+    /** Contact-list sort order. Defaults to [ContactSort.FIRST]. */
+    val contactSort: Flow<ContactSort> =
+        context.settingsDataStore.data.map {
+            runCatching { ContactSort.valueOf(it[contactSortKey] ?: "") }.getOrDefault(ContactSort.FIRST)
+        }
+
+    suspend fun setContactSort(sort: ContactSort) {
+        context.settingsDataStore.edit { it[contactSortKey] = sort.name }
+    }
+
+    /** Date display format. Defaults to [DateFormatPref.SYSTEM] (device locale). */
+    val dateFormat: Flow<DateFormatPref> =
+        context.settingsDataStore.data.map {
+            runCatching { DateFormatPref.valueOf(it[dateFormatKey] ?: "") }.getOrDefault(DateFormatPref.SYSTEM)
+        }
+
+    suspend fun setDateFormat(fmt: DateFormatPref) {
+        context.settingsDataStore.edit { it[dateFormatKey] = fmt.name }
+    }
+
+    /** Master camera-backup switch. Defaults to OFF (opt-in). */
+    val backupEnabled: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[backupEnabledKey] ?: false }
+
+    suspend fun setBackupEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[backupEnabledKey] = enabled }
+    }
+
+    /** MediaStore bucket ids selected for backup. */
+    val backupAlbumIds: Flow<Set<String>> =
+        context.settingsDataStore.data.map { it[backupAlbumsKey].orEmpty() }
+
+    suspend fun setBackupAlbumIds(ids: Set<String>) {
+        context.settingsDataStore.edit { it[backupAlbumsKey] = ids }
+    }
+
+    /**
+     * Whether the screen is kept awake while the app is in the foreground (display-only;
+     * does NOT affect the idle auto-lock, which still wipes the VK). Defaults to OFF.
+     */
+    val keepScreenOn: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[keepScreenOnKey] ?: false }
+
+    suspend fun setKeepScreenOn(enabled: Boolean) {
+        context.settingsDataStore.edit { it[keepScreenOnKey] = enabled }
+    }
+
+    /**
+     * How long (minutes) the screen stays awake after the last interaction while
+     * [keepScreenOn] is on; `0` = unlimited (stays awake as long as the app is open).
+     * Defaults to [DEFAULT_KEEP_SCREEN_ON_MINUTES].
+     */
+    val keepScreenOnMinutes: Flow<Int> =
+        context.settingsDataStore.data.map { it[keepScreenOnMinutesKey] ?: DEFAULT_KEEP_SCREEN_ON_MINUTES }
+
+    suspend fun setKeepScreenOnMinutes(minutes: Int) {
+        context.settingsDataStore.edit { it[keepScreenOnMinutesKey] = minutes }
+    }
+
+    /**
+     * Whether the Vault Key may be persisted (biometric-sealed) so the vault unlocks
+     * without re-entering the passphrase. Opt-in, biometrics-only. Defaults to OFF.
+     */
+    val rememberVaultEnabled: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[rememberVaultKey] ?: false }
+
+    suspend fun setRememberVaultEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[rememberVaultKey] = enabled }
+    }
+
+    /**
+     * After how many days since the last passphrase entry the passphrase is required
+     * again. Defaults to [DEFAULT_REMEMBER_VAULT_DAYS].
+     */
+    val rememberVaultDays: Flow<Int> =
+        context.settingsDataStore.data.map { it[rememberVaultDaysKey] ?: DEFAULT_REMEMBER_VAULT_DAYS }
+
+    suspend fun setRememberVaultDays(days: Int) {
+        context.settingsDataStore.edit { it[rememberVaultDaysKey] = days }
+    }
+
+    /**
+     * Whether map tiles may be fetched from the third-party OpenStreetMap tile server.
+     * OFF by default: rendering a geotagged photo's location would otherwise leak the
+     * (private) coordinates + timing to a third party. When off, map views show a
+     * placeholder with an explicit "load map" opt-in.
+     */
+    val mapTilesEnabled: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[mapTilesKey] ?: false }
+
+    suspend fun setMapTilesEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[mapTilesKey] = enabled }
+    }
+
     companion object {
         const val DEFAULT_TIMEOUT_MINUTES = 5
         val TIMEOUT_OPTIONS = listOf(1, 5, 10, 30)
 
         const val DEFAULT_CACHE_MAX_MB = 1024
         val CACHE_MAX_MB_OPTIONS = listOf(512, 1024, 2048, 0)
+
+        const val DEFAULT_KEEP_SCREEN_ON_MINUTES = 15
+        // 0 == unlimited (awake while the app is open).
+        val KEEP_SCREEN_ON_OPTIONS = listOf(5, 15, 30, 0)
+
+        const val DEFAULT_REMEMBER_VAULT_DAYS = 7
+        val REMEMBER_VAULT_DAYS_OPTIONS = listOf(1, 7, 14, 30)
 
         /**
          * Decode the stored files policy (§C1). Prefers the new enum name (defaulting

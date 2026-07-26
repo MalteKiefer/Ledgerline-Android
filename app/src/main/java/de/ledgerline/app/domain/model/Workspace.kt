@@ -1,6 +1,7 @@
 package de.ledgerline.app.domain.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class WorkspaceManifest(
@@ -12,6 +13,7 @@ data class WorkspaceManifest(
     val todoLists: List<TodoList> = emptyList(),
     val files: List<FileEntry> = emptyList(),
     val fileFolders: List<NamedFolder> = emptyList(),
+    val contacts: List<Contact> = emptyList(),
 )
 
 @Serializable
@@ -68,5 +70,78 @@ data class FileVersion(
     val created: String? = null,
 )
 
+@Serializable
+data class LabeledValue(val value: String = "", val type: String = "home")
+
+@Serializable
+data class PostalAddress(
+    val street: String = "", val city: String = "", val region: String = "",
+    val zip: String = "", val country: String = "", val type: String = "home",
+)
+
+/**
+ * A zero-knowledge contact record. Lives in the sealed `/store` manifest; only the
+ * optional avatar is a separate encrypted blob (`avatarRef`/`avatarKey`). Every field
+ * is defaulted and tolerant so web-authored records decode cleanly; `_x` preserves
+ * unknown vCard properties through a decode→encode round-trip (Phase-A integrity fix).
+ */
+@Serializable
+data class Contact(
+    val id: String = "",
+    val uid: String? = null,        // vCard UID (urn:uuid) — preserved for round-trip/export
+    val fn: String = "",            // formatted/display name
+    val first: String = "", val last: String = "", val middle: String = "",
+    val prefix: String = "", val suffix: String = "", val nickname: String = "",
+    val org: String = "", val department: String = "", val title: String = "", val role: String = "",
+    val emails: List<LabeledValue> = emptyList(),
+    val phones: List<LabeledValue> = emptyList(),
+    val impp: List<LabeledValue> = emptyList(),
+    val urls: List<LabeledValue> = emptyList(),
+    val addresses: List<PostalAddress> = emptyList(),
+    val bday: String = "", val anniversary: String = "",
+    val note: String = "",
+    val categories: List<String> = emptyList(),
+    val favorite: Boolean = false,
+    @Serializable(with = FlexibleTrashedSerializer::class) val trashed: Boolean = false,
+    val avatarRef: String? = null, val avatarKey: String? = null,
+    val bdayNotified: Int? = null, val annivNotified: Int? = null,
+    // Link to a gallery Person (bidirectional; the person stores contactId back).
+    val personId: String? = null,
+    val personName: String? = null,
+    val _x: List<JsonElement> = emptyList(),  // preserve unknown vCard props round-trip
+    val updated: String? = null,
+)
+
 /** The decrypted manifest plus the server version (kept for Phase-3 writes). */
 data class Workspace(val manifest: WorkspaceManifest, val version: Int)
+
+// ---------------------------------------------------------------------------
+//  Store v3 — per-module sealed manifests
+// ---------------------------------------------------------------------------
+// The server removed the monolith `/store`; each workspace module now has its own
+// sealed store `GET/PUT /api/v1/store/{module}` (`{ciphertext, version}`). Each
+// module manifest carries `v:3` and exactly the top-level keys the web client
+// (`resources/js/shared/module-store.js` MODULE_BLANKS) emits — the byte-contract.
+// The app still works against the aggregate [WorkspaceManifest]; these are the
+// per-module wire shapes the repository fans out to. Files/gallery are sharded and
+// migrated separately (see CLAUDE.md §14 R1).
+
+@Serializable
+data class NotesManifest(val v: Int = 3, val notes: List<Note> = emptyList())
+
+@Serializable
+data class TodosManifest(
+    val v: Int = 3,
+    val todos: List<TodoItem> = emptyList(),
+    val todoLists: List<TodoList> = emptyList(),
+)
+
+@Serializable
+data class BookmarksManifest(
+    val v: Int = 3,
+    val bookmarks: List<Bookmark> = emptyList(),
+    val bookmarkFolders: List<NamedFolder> = emptyList(),
+)
+
+@Serializable
+data class ContactsManifest(val v: Int = 3, val contacts: List<Contact> = emptyList())

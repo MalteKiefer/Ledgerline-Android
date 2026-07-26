@@ -79,9 +79,9 @@ private class FakeGalleryUploadApi(val processResponse: ProcessResponse) : Galle
  * android.util.Base64 (which throws off-device) by not calling it at all —
  * the fake ProcessResponse has null thumb/medium/faces=empty.
  */
-private fun fakeUploader(api: GalleryUploadApi): GalleryUploader = object : GalleryUploader(api) {
-    // decodeBase64 is never called when thumb/medium/motion/crops are null — no override needed.
-}
+private fun fakeUploader(api: GalleryUploadApi): GalleryUploader =
+    // The decoder is never called when thumb/medium/motion/crops are null, so a throwing stub is fine.
+    GalleryUploader(api) { throw NotImplementedError() }
 
 /**
  * [MutateGallery] fake that applies the mutation directly to a [GalleryCache]
@@ -147,6 +147,7 @@ class GalleryViewModelTest {
         operationManager = operationManager,
         embedText = embedText,
         metaCache = MetaCache(),
+        places = io.mockk.mockk(relaxed = true),
     ).apply { ioDispatcher = UnconfinedTestDispatcher() }
 
     /**

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
+import de.ledgerline.app.ui.theme.PrimaryGradientButton
 import kotlinx.coroutines.launch
 
 /**
@@ -47,9 +48,11 @@ import kotlinx.coroutines.launch
 fun UnlockScreen(
     vm: UnlockViewModel = hiltViewModel(),
     authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
+    strongAuthorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
     onUnlocked: () -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val canQuickUnlock by vm.canQuickUnlock.collectAsStateWithLifecycle()
     var passphrase by remember { mutableStateOf("") }
     var recoveryCode by remember { mutableStateOf("") }
     var recoveryMode by remember { mutableStateOf(false) }
@@ -58,7 +61,7 @@ fun UnlockScreen(
     LaunchedEffect(state) { if (state is UnlockUiState.Unlocked) onUnlocked() }
     // Drop any stale error/not-configured message left from a previous attempt or a
     // forced logout when this screen is (re-)entered.
-    LaunchedEffect(Unit) { vm.reset() }
+    LaunchedEffect(Unit) { vm.onShown() }
 
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -95,6 +98,23 @@ fun UnlockScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (!recoveryMode) {
+                    if (canQuickUnlock) {
+                        // One STRONG biometric opens the remembered session + VK — no passphrase.
+                        PrimaryGradientButton(
+                            text = stringResource(R.string.unlock_biometric_button),
+                            onClick = { scope.launch { vm.quickUnlock(strongAuthorize) } },
+                            enabled = state != UnlockUiState.Working,
+                            modifier = Modifier.height(52.dp),
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            stringResource(R.string.unlock_or_passphrase),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
                     OutlinedTextField(
                         value = passphrase,
                         onValueChange = { passphrase = it; vm.reset() },
@@ -104,19 +124,17 @@ fun UnlockScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(16.dp))
-                    Button(
+                    PrimaryGradientButton(
+                        text = stringResource(R.string.unlock_button),
                         onClick = {
                             val entered = passphrase.toCharArray()
                             passphrase = ""
                             // Exactly one biometric, triggered inside load() via authorize.
-                            scope.launch { vm.unlock(entered, authorize) }
+                            scope.launch { vm.unlock(entered, authorize, strongAuthorize) }
                         },
                         enabled = state != UnlockUiState.Working,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Text(stringResource(R.string.unlock_button), style = MaterialTheme.typography.labelLarge)
-                    }
+                        modifier = Modifier.height(52.dp),
+                    )
                     TextButton(
                         onClick = { recoveryMode = true; vm.reset() },
                         enabled = state != UnlockUiState.Working,
@@ -133,18 +151,16 @@ fun UnlockScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(16.dp))
-                    Button(
+                    PrimaryGradientButton(
+                        text = stringResource(R.string.unlock_recovery_button),
                         onClick = {
                             val entered = recoveryCode
                             recoveryCode = ""
-                            scope.launch { vm.unlockWithRecovery(entered, authorize) }
+                            scope.launch { vm.unlockWithRecovery(entered, authorize, strongAuthorize) }
                         },
                         enabled = state != UnlockUiState.Working,
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
-                        shape = RoundedCornerShape(16.dp),
-                    ) {
-                        Text(stringResource(R.string.unlock_recovery_button), style = MaterialTheme.typography.labelLarge)
-                    }
+                        modifier = Modifier.height(52.dp),
+                    )
                     TextButton(
                         onClick = { recoveryMode = false; recoveryCode = ""; vm.reset() },
                         enabled = state != UnlockUiState.Working,
@@ -169,6 +185,14 @@ fun UnlockScreen(
                         Spacer(Modifier.height(12.dp))
                         Text(
                             stringResource(R.string.unlock_error),
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    is UnlockUiState.LockedOut -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            stringResource(R.string.unlock_locked_out, (state as UnlockUiState.LockedOut).seconds),
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center,
                         )

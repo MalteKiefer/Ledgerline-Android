@@ -66,8 +66,8 @@ class SodiumCrypto @Inject constructor() : Crypto {
     override fun openManifest(ciphertext: String, vk: ByteArray): String? {
         return try {
             val env = lenientJson.parseToJsonElement(ciphertext) as JsonObject
-            val c = env["c"]!!.jsonPrimitive.content
-            val n = env["n"]!!.jsonPrimitive.content
+            val c = (env["c"] ?: return null).jsonPrimitive.content
+            val n = (env["n"] ?: return null).jsonPrimitive.content
             val plain = secretBoxOpen(b64decode(c), b64decode(n), vk) ?: return null
             String(plain, Charsets.UTF_8)
         } catch (_: Exception) {
@@ -85,6 +85,36 @@ class SodiumCrypto @Inject constructor() : Crypto {
         val cipher = ByteArray(plain.size + SecretBox.MACBYTES)
         check(ls.cryptoSecretBoxEasy(cipher, plain, plain.size.toLong(), nonce, vk)) { "seal failed" }
         return """{"c":"${b64encode(cipher)}","n":"${b64encode(nonce)}"}"""
+    }
+
+    override fun sealValue(data: ByteArray, key: ByteArray): String {
+        val nonce = ByteArray(SecretBox.NONCEBYTES)
+        randomBytes(nonce)
+        val cipher = ByteArray(data.size + SecretBox.MACBYTES)
+        check(ls.cryptoSecretBoxEasy(cipher, data, data.size.toLong(), nonce, key)) { "seal failed" }
+        return """{"c":"${b64encode(cipher)}","n":"${b64encode(nonce)}"}"""
+    }
+
+    override fun openValue(cn: String, key: ByteArray): ByteArray? = try {
+        val env = lenientJson.parseToJsonElement(cn) as JsonObject
+        val c = (env["c"] ?: return null).jsonPrimitive.content
+        val n = (env["n"] ?: return null).jsonPrimitive.content
+        secretBoxOpen(b64decode(c), b64decode(n), key)
+    } catch (_: Exception) {
+        null
+    }
+
+    override fun genericHash(input: ByteArray, outLen: Int): ByteArray {
+        val out = ByteArray(outLen)
+        check(ls.cryptoGenericHash(out, out.size, input, input.size.toLong())) { "generichash failed" }
+        return out
+    }
+
+    /** Test-only: secretbox-seal [plaintext] with an explicit [nonce] (byte-parity fixtures). */
+    fun secretBoxSealForTest(plaintext: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray {
+        val cipher = ByteArray(plaintext.size + SecretBox.MACBYTES)
+        check(ls.cryptoSecretBoxEasy(cipher, plaintext, plaintext.size.toLong(), nonce, key)) { "seal failed" }
+        return cipher
     }
 
     private fun randomBytes(out: ByteArray) {
@@ -138,8 +168,8 @@ class SodiumCrypto @Inject constructor() : Crypto {
 
     override fun contentDecryptor(encFileKey: String, vk: ByteArray): Crypto.ContentDecryptor {
         val env = lenientJson.parseToJsonElement(encFileKey) as JsonObject
-        val c = env["c"]!!.jsonPrimitive.content
-        val n = env["n"]!!.jsonPrimitive.content
+        val c = (env["c"] ?: error("encFileKey missing 'c'")).jsonPrimitive.content
+        val n = (env["n"] ?: error("encFileKey missing 'n'")).jsonPrimitive.content
         val fk = secretBoxOpen(b64decode(c), b64decode(n), vk) ?: error("file key unwrap failed")
         val state = SecretStream.State.ByReference()
         return object : Crypto.ContentDecryptor {
@@ -158,12 +188,5 @@ class SodiumCrypto @Inject constructor() : Crypto {
                 return message to (tag[0] == SecretStream.TAG_FINAL)
             }
         }
-    }
-
-    /** Test-only helper to build a secretbox ciphertext fixture. */
-    internal fun secretBoxSealForTest(message: ByteArray, nonce: ByteArray, key: ByteArray): ByteArray {
-        val out = ByteArray(message.size + SecretBox.MACBYTES)
-        check(ls.cryptoSecretBoxEasy(out, message, message.size.toLong(), nonce, key)) { "seal failed" }
-        return out
     }
 }

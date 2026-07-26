@@ -9,6 +9,7 @@ import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.data.backup.BackupStateStore
 import de.ledgerline.app.domain.usecase.ForceLogout
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,20 +32,38 @@ class ForceLogoutImpl @Inject constructor(
     private val metaCache: MetaCache,
     private val storeCache: StoreDiskCache,
     private val blobCache: BlobDiskCache,
+    private val backupStateStore: BackupStateStore,
+    private val rememberedVault: RememberedVaultStore,
+    private val placeRepository: PlaceRepository,
+    private val securityLog: de.ledgerline.app.core.security.SecurityLog,
+    private val duressGuard: de.ledgerline.app.core.security.DuressGuard,
+    private val clockGuard: de.ledgerline.app.core.security.ClockRollbackGuard,
+    private val identityRepository: IdentityRepository,
+    private val passwordsCache: de.ledgerline.app.core.PasswordsCache,
 ) : ForceLogout {
     override suspend fun invoke() {
         // In-memory first (secrets + decrypted caches).
         vaultKeyHolder.wipe()
         sessionHolder.clear()
+        identityRepository.clear()
+        passwordsCache.clear()
         workspaceCache.clear()
         galleryCache.clear()
         thumbCache.clear()
         metaCache.clear()
-        // Persisted last: drop the sealed session, the offline ciphertext caches, and
-        // delete the keystore key so a re-pair is required. (A normal lock keeps the
-        // disk cache — only this forced-logout path wipes it, §11.)
+        // Persisted last: drop the sealed session, the offline ciphertext caches, the
+        // backup bookkeeping, and delete the keystore key so a re-pair is required. (A
+        // normal lock keeps the disk cache — only this forced-logout path wipes it, §11.)
         storeCache.clear()
         blobCache.clear()
+        backupStateStore.clear()
+        rememberedVault.clear()
+        placeRepository.clear()
+        // Security state: reset the duress counter and erase the audit log so a wiped
+        // device is left clean (the wipe reason is moot once the device is unpaired).
+        duressGuard.reset()
+        clockGuard.reset()
+        securityLog.clear()
         sessionStore.clear()
         keystoreSealer.clear()
     }

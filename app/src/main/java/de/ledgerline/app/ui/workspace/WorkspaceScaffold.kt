@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,7 +41,10 @@ import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.gallery.GalleryScreen
 import de.ledgerline.app.ui.settings.SettingsContent
+import de.ledgerline.app.ui.theme.Brand
+import de.ledgerline.app.ui.theme.IconChip
 import de.ledgerline.app.ui.workspace.bookmarks.BookmarksScreen
+import de.ledgerline.app.ui.workspace.contacts.ContactsScreen
 import de.ledgerline.app.ui.workspace.files.FilesScreen
 import de.ledgerline.app.ui.workspace.notes.NotesScreen
 import de.ledgerline.app.ui.workspace.todos.TodosScreen
@@ -47,7 +52,7 @@ import de.ledgerline.app.ui.workspace.todos.TodosScreen
 private data class Tab(val labelRes: Int, val icon: ImageVector)
 
 /** Secondary destinations reached from the bottom-bar "More" sheet. */
-private enum class Overflow { Bookmarks, Settings }
+private enum class Overflow { Todos, Bookmarks, Contacts, Settings }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,9 +66,9 @@ fun WorkspaceScaffold(
     // Four primary content tabs; secondary destinations (Bookmarks, Settings) live
     // behind the bottom-bar "More" item, shown in a modal bottom sheet.
     val tabs = listOf(
+        Tab(R.string.tab_passwords, Icons.Outlined.Password),
         Tab(R.string.tab_files, Icons.Outlined.Folder),
         Tab(R.string.tab_gallery, Icons.Outlined.PhotoLibrary),
-        Tab(R.string.tab_todos, Icons.Outlined.CheckCircle),
         Tab(R.string.tab_notes, Icons.Outlined.Description),
     )
     var selected by remember { mutableIntStateOf(0) }
@@ -114,9 +119,21 @@ fun WorkspaceScaffold(
     ) { innerPadding ->
         CompositionLocalProvider(LocalFullscreen provides fullscreen) {
             when (overflow) {
+                // When Bookmarks opens a full-screen detail (it sets LocalFullscreen), drop
+                // this wrapper's bar + insets so the detail owns the screen — otherwise the
+                // detail's own top bar stacks under this one (double chrome).
                 Overflow.Bookmarks -> AppScaffold(
-                    topBar = { AppTopBar(stringResource(R.string.menu_bookmarks), onBack = { overflow = null }) },
+                    immersive = fullscreen.value,
+                    topBar = { if (!fullscreen.value) AppTopBar(stringResource(R.string.menu_bookmarks), onBack = { overflow = null }) },
                 ) { p -> BookmarksScreen(Modifier.padding(p)) }
+
+                // Contacts owns its own top bar (so the full-screen contact detail can
+                // replace it cleanly — no double back arrow). onExit closes the overflow.
+                Overflow.Todos -> AppScaffold(
+                    topBar = { AppTopBar(stringResource(R.string.tab_todos), onBack = { overflow = null }) },
+                ) { p -> TodosScreen(Modifier.padding(p)) }
+
+                Overflow.Contacts -> ContactsScreen(onExit = { overflow = null })
 
                 Overflow.Settings -> SettingsContent(
                     onLockNow = onLockNow,
@@ -127,9 +144,9 @@ fun WorkspaceScaffold(
                 null -> {
                     val m = Modifier.padding(innerPadding)
                     when (selected) {
-                        0 -> FilesScreen(m)
-                        1 -> GalleryScreen(m)
-                        2 -> TodosScreen(m)
+                        0 -> de.ledgerline.app.ui.passwords.PasswordsScreen(m)
+                        1 -> FilesScreen(m)
+                        2 -> GalleryScreen(m)
                         else -> NotesScreen(m)
                     }
                 }
@@ -145,15 +162,29 @@ fun WorkspaceScaffold(
             ListItem(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { overflow = Overflow.Todos; showSheet = false },
+                leadingContent = { IconChip(Icons.Outlined.CheckCircle, tint = Brand.tintGreen) },
+                headlineContent = { Text(stringResource(R.string.tab_todos)) },
+            )
+            ListItem(
+                modifier = Modifier
+                    .fillMaxWidth()
                     .clickable { overflow = Overflow.Bookmarks; showSheet = false },
-                leadingContent = { Icon(Icons.Outlined.Bookmarks, contentDescription = null) },
+                leadingContent = { IconChip(Icons.Outlined.Bookmarks, tint = Brand.tintOrange) },
                 headlineContent = { Text(stringResource(R.string.menu_bookmarks)) },
             )
             ListItem(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable { overflow = Overflow.Contacts; showSheet = false },
+                leadingContent = { IconChip(Icons.Outlined.Contacts, tint = Brand.tintBlue) },
+                headlineContent = { Text(stringResource(R.string.menu_contacts)) },
+            )
+            ListItem(
+                modifier = Modifier
+                    .fillMaxWidth()
                     .clickable { overflow = Overflow.Settings; showSheet = false },
-                leadingContent = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                leadingContent = { IconChip(Icons.Outlined.Settings, tint = Brand.tintGray) },
                 headlineContent = { Text(stringResource(R.string.settings_title)) },
             )
         }

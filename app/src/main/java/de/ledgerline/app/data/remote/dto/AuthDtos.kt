@@ -5,6 +5,9 @@ import kotlinx.serialization.Serializable
 @Serializable data class PairClaimRequest(val code: String, val device_name: String)
 @Serializable data class PairClaimResponse(val status: String)
 
+/** `POST /api/v1/auth/pair/collect` — poll for approval with the same one-time code. */
+@Serializable data class PairCollectRequest(val code: String)
+
 @Serializable data class PairPollResponse(
     val status: String,
     val token: String? = null,
@@ -22,6 +25,8 @@ import kotlinx.serialization.Serializable
 @Serializable data class MeResponse(
     val user: MeUser,
     val usage: MeUsage? = null,
+    /** Remote kill switch: the owner flagged this device to wipe its local state. */
+    val wipe: Boolean = false,
 )
 
 @Serializable data class MeUser(

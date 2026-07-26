@@ -11,9 +11,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,12 +39,18 @@ import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Deselect
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MotionPhotosOn
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -113,6 +121,7 @@ fun GalleryScreen(
     var openPersonId by remember { mutableStateOf<String?>(null) }
     var showDuplicates by remember { mutableStateOf(false) }
     var showMap by remember { mutableStateOf(false) }
+    var showJobs by remember { mutableStateOf(false) }
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
     val favoritesOnly by vm.favoritesOnly.collectAsStateWithLifecycle()
@@ -157,6 +166,15 @@ fun GalleryScreen(
             onBack = { vm.setTrash(false) },
         )
         return
+    }
+
+    // Jobs / diagnostics sheet — overlays the gallery.
+    if (showJobs) {
+        GalleryJobsSheet(
+            vm = vm,
+            onOpenDuplicates = { showJobs = false; showDuplicates = true },
+            onDismiss = { showJobs = false },
+        )
     }
 
     // Album detail — full-screen, hides the tabs.
@@ -276,6 +294,13 @@ fun GalleryScreen(
                         onClick = {
                             overflowOpen = false
                             showDuplicates = true
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.jobs_action)) },
+                        onClick = {
+                            overflowOpen = false
+                            showJobs = true
                         },
                     )
                     DropdownMenuItem(
@@ -424,6 +449,33 @@ private fun PhotosTab(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    // Bulk export: pick a destination folder, then decrypt each selected original and write
+    // it there (off the main thread). Plaintext lands only in the user-chosen SAF tree.
+    val exportLauncher = rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree(),
+    ) { treeUri ->
+        if (treeUri != null) {
+            val ids = selected.toList()
+            val tree = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
+            scope.launch {
+                var ok = 0
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    ids.forEach { id ->
+                        val photo = ui.photos.firstOrNull { it.id == id } ?: return@forEach
+                        val bytes = vm.originalBytes(photo) ?: return@forEach
+                        val doc = tree?.createFile(
+                            photo.mime ?: "application/octet-stream",
+                            photo.name?.takeIf { it.isNotBlank() } ?: "photo.jpg",
+                        )
+                        doc?.uri?.let { u -> context.contentResolver.openOutputStream(u)?.use { it.write(bytes); ok++ } }
+                    }
+                }
+                snackbarHostState.showSnackbar(context.getString(R.string.export_done, ok))
+                exitSelection()
+            }
+        }
+    }
+
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(maxItems = 30)
     ) { uris ->
@@ -432,7 +484,7 @@ private fun PhotosTab(
                 PhotoSource(
                     name = queryPhotoName(context, uri),
                     mime = context.contentResolver.getType(uri) ?: "image/jpeg",
-                    read = { context.contentResolver.openInputStream(uri)!!.use { it.readBytes() } },
+                    read = { (context.contentResolver.openInputStream(uri) ?: error("cannot open $uri")).use { it.readBytes() } },
                 )
             }
             vm.uploadAll(sources)
@@ -446,9 +498,12 @@ private fun PhotosTab(
         if (msg.startsWith(failedPrefix)) {
             val count = msg.removePrefix(failedPrefix).toIntOrNull() ?: 1
             scope.launch {
-                snackbarHostState.showSnackbar(
-                    context.resources.getString(R.string.gallery_upload_failed, count)
+                val res = snackbarHostState.showSnackbar(
+                    message = context.resources.getString(R.string.gallery_upload_failed, count),
+                    actionLabel = context.resources.getString(R.string.gallery_upload_retry),
+                    duration = androidx.compose.material3.SnackbarDuration.Long,
                 )
+                if (res == androidx.compose.material3.SnackbarResult.ActionPerformed) vm.retryFailedImports()
             }
             vm.clearMessage()
         }
@@ -514,7 +569,18 @@ private fun PhotosTab(
                             span = { GridItemSpan(maxLineSpan) },
                             key = "day-${group.dayKey}",
                         ) {
-                            DayHeader(group.label)
+                            DayHeader(
+                                label = group.label,
+                                selectionMode = selectionMode,
+                                checked = group.photos.isNotEmpty() && group.photos.all { it.id in selected },
+                                onToggle = {
+                                    if (group.photos.all { it.id in selected }) {
+                                        selected.removeAll(group.photos.map { it.id })
+                                    } else {
+                                        group.photos.forEach { if (it.id !in selected) selected.add(it.id) }
+                                    }
+                                },
+                            )
                         }
                         items(group.photos, key = { it.id }) { photo ->
                             SelectableThumbCell(
@@ -605,6 +671,12 @@ private fun PhotosTab(
                 onDelete = { showDeleteConfirm = true },
                 onSetDate = { showDatePicker = true },
                 onSetLocation = { showLocationPicker = true },
+                onExport = { exportLauncher.launch(null) },
+                allSelected = ui.photos.isNotEmpty() && ui.photos.all { it.id in selected },
+                onSelectAll = {
+                    if (ui.photos.all { it.id in selected }) selected.clear()
+                    else ui.photos.forEach { if (it.id !in selected) selected.add(it.id) }
+                },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(16.dp),
@@ -752,6 +824,9 @@ private fun SelectionBar(
     onDelete: () -> Unit,
     onSetDate: () -> Unit,
     onSetLocation: () -> Unit,
+    onExport: () -> Unit,
+    allSelected: Boolean,
+    onSelectAll: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var overflow by remember { mutableStateOf(false) }
@@ -792,6 +867,23 @@ private fun SelectionBar(
                     Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more))
                 }
                 DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(stringResource(if (allSelected) R.string.selection_clear else R.string.selection_select_all))
+                        },
+                        leadingIcon = {
+                            Icon(
+                                if (allSelected) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = { overflow = false; onSelectAll() },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.action_download)) },
+                        leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+                        onClick = { overflow = false; onExport() },
+                    )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.action_set_date)) },
                         leadingIcon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
@@ -844,6 +936,74 @@ private fun AddToAlbumDialog(
             }
         },
     )
+}
+
+/** Jobs / diagnostics bottom sheet: library counts + one-tap maintenance actions. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GalleryJobsSheet(
+    vm: GalleryViewModel,
+    onOpenDuplicates: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val peopleVm: PeopleViewModel = hiltViewModel()
+    val people by peopleVm.people.collectAsStateWithLifecycle()
+    val failedCount by vm.failedImportCount.collectAsStateWithLifecycle()
+    val (images, videos, geo) = remember(people) { vm.diagnostics() }
+    val faces = remember(people) { people.sumOf { it.faces.size } }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp),
+        ) {
+            Text(
+                stringResource(R.string.jobs_action),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            JobStat(stringResource(R.string.jobs_photos), images.toString())
+            JobStat(stringResource(R.string.jobs_videos), videos.toString())
+            JobStat(stringResource(R.string.jobs_geotagged), geo.toString())
+            JobStat(stringResource(R.string.jobs_people), people.size.toString())
+            JobStat(stringResource(R.string.jobs_faces), faces.toString())
+            if (failedCount > 0) JobStat(stringResource(R.string.jobs_failed), failedCount.toString())
+            Spacer(Modifier.size(12.dp))
+            OutlinedButton(onClick = { peopleVm.scanFaces(0) }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.people_scan_all))
+            }
+            Spacer(Modifier.size(8.dp))
+            OutlinedButton(onClick = onOpenDuplicates, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.duplicates_action))
+            }
+            if (failedCount > 0) {
+                Spacer(Modifier.size(8.dp))
+                OutlinedButton(onClick = { vm.retryFailedImports() }, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.gallery_upload_retry))
+                }
+            }
+            Spacer(Modifier.size(12.dp))
+            Button(
+                onClick = { peopleVm.scanFaces(0); vm.retryFailedImports() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.jobs_run_all))
+            }
+        }
+    }
+}
+
+@Composable
+private fun JobStat(label: String, value: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 /**
@@ -1073,27 +1233,40 @@ private fun queryPhotoName(context: Context, uri: Uri): String {
 
 /** Full-span timeline day header shown above each capture-day group in the grid. */
 @Composable
-private fun DayHeader(label: String) {
-    Text(
-        text = label,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+private fun DayHeader(
+    label: String,
+    selectionMode: Boolean = false,
+    checked: Boolean = false,
+    onToggle: () -> Unit = {},
+) {
+    androidx.compose.foundation.layout.Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 6.dp),
-    )
+            .padding(start = 12.dp, end = 4.dp, top = 16.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        if (selectionMode) {
+            androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onClick: () -> Unit) {
+internal fun ThumbCell(photo: GalleryPhoto, vm: GalleryViewModel, onLongClick: () -> Unit = {}, onClick: () -> Unit) {
     SelectableThumbCell(
         photo = photo,
         vm = vm,
         selectionMode = false,
         selected = false,
         onClick = onClick,
-        onLongClick = {},
+        onLongClick = onLongClick,
     )
 }
 

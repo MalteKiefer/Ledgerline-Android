@@ -38,6 +38,8 @@ class VaultLockerTest {
             galleryCache = galleryCache,
             thumbCache = thumbCache,
             metaCache = metaCache,
+            identityRepository = io.mockk.mockk(relaxed = true),
+            passwordsCache = de.ledgerline.app.core.PasswordsCache(),
         )
 
         locker.lock()

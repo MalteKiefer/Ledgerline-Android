@@ -20,29 +20,31 @@ import java.util.concurrent.TimeUnit
  * Production traffic is HTTPS-only: the client is restricted to RESTRICTED_TLS
  * (TLS 1.2+/strong ciphers) and cleartext is never permitted here — the platform
  * network_security_config additionally blocks it app-wide (defense in depth).
- * The `internal` overload allows CLEARTEXT solely for JVM unit tests hitting a
- * plain-HTTP MockWebServer; the public API can never enable it.
+ * The public API can never enable cleartext; the `internal` [build] seam takes the
+ * connection specs so JVM unit tests (in this package) can add CLEARTEXT to hit a
+ * plain-HTTP MockWebServer.
  */
 object NetworkFactory {
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Production entry point: HTTPS-only (RESTRICTED_TLS), optionally pinned. */
     fun create(baseUrl: String, tokenProvider: () -> String?, pin: String?): LedgerlineApi =
-        create(baseUrl, tokenProvider, pin, allowCleartext = false)
+        build(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
 
-    internal fun create(
+    /**
+     * Shared wiring seam: builds the interceptor chain + Retrofit client for the given
+     * [connectionSpecs]. Production always passes RESTRICTED_TLS only; tests may add
+     * CLEARTEXT. Kept `internal` so cleartext can never leak into the public surface.
+     */
+    internal fun build(
         baseUrl: String,
         tokenProvider: () -> String?,
         pin: String?,
-        allowCleartext: Boolean,
+        connectionSpecs: List<ConnectionSpec>,
     ): LedgerlineApi {
         val host = baseUrl.toHttpUrl().host
-        val specs = if (allowCleartext) {
-            listOf(ConnectionSpec.RESTRICTED_TLS, ConnectionSpec.CLEARTEXT)
-        } else {
-            listOf(ConnectionSpec.RESTRICTED_TLS)
-        }
         val builder = OkHttpClient.Builder()
-            .connectionSpecs(specs)
+            .connectionSpecs(connectionSpecs)
             .callTimeout(60, TimeUnit.SECONDS)
             .addInterceptor(AuthInterceptor(tokenProvider))
             // Detect an authenticated 401 (revoked token) and signal a forced

@@ -1,10 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Dark window theme so there is no white flash before Compose draws. -->
-    <style name="Theme.Ledgerline" parent="android:Theme.Material.NoActionBar">
+    <!-- Light window theme (default). The window background matches the Compose
+         light scheme so there is no flash before Compose draws. The dark variant
+         lives in values-night/themes.xml; the active one follows the system. -->
+    <style name="Theme.Ledgerline" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/ledgerline_background</item>
         <item name="android:statusBarColor">@color/ledgerline_background</item>
         <item name="android:navigationBarColor">@color/ledgerline_background</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <!-- Light background → dark (light-bar) status icons. -->
+        <item name="android:windowLightStatusBar">true</item>
     </style>
 </resources>

@@ -1,6 +1,8 @@
+import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
@@ -9,7 +11,9 @@ plugins {
 
 android {
     namespace = "de.ledgerline.app"
-    compileSdk = 36
+    // AGP 9.2 + the AndroidX bumps (core 1.19, lifecycle 2.11, hilt-nav 1.4) require
+    // compiling against API 37. targetSdk/minSdk stay at 36 (runtime behavior unchanged).
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "de.ledgerline.app"
@@ -23,19 +27,39 @@ android {
         ndk { abiFilters += listOf("arm64-v8a") }
     }
 
+    // Release signing from environment (CI secrets) or a gitignored keystore.properties —
+    // never hardcode credentials. Absent → release stays unsigned (local dev / CI without
+    // secrets) rather than silently signing with the debug key.
+    val keystoreProps = rootProject.file("keystore.properties")
+    val signingEnabled = System.getenv("LL_KEYSTORE_FILE") != null || keystoreProps.exists()
+    signingConfigs {
+        if (signingEnabled) {
+            create("release") {
+                val props = Properties().apply {
+                    if (keystoreProps.exists()) keystoreProps.inputStream().use { load(it) }
+                }
+                fun cfg(env: String, key: String): String? = System.getenv(env) ?: props.getProperty(key)
+                storeFile = cfg("LL_KEYSTORE_FILE", "storeFile")?.let { file(it) }
+                storePassword = cfg("LL_KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = cfg("LL_KEY_ALIAS", "keyAlias")
+                keyPassword = cfg("LL_KEY_PASSWORD", "keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug { isMinifyEnabled = false }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (signingEnabled) signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -45,7 +69,16 @@ android {
             pickFirsts += "**/libsodium.so"
         }
     }
-    testOptions { unitTests.isIncludeAndroidResources = true }
+    testOptions {
+        // NOTE: isIncludeAndroidResources cannot be true when minSdk >= 36 because
+        // Robolectric (max SDK 35) rejects the binary-XML manifest that AGP injects.
+        // No existing unit test needs merged Android resources; Robolectric tests use
+        // @Config(sdk=[35]) + the synthetic Robolectric application context.
+        unitTests.isIncludeAndroidResources = false
+        // The unit-test suite grew large; give the forked test JVM enough heap so the
+        // MockWebServer/OkHttp-based repo tests don't OutOfMemoryError.
+        unitTests.all { it.maxHeapSize = "1536m" }
+    }
     lint {
         // The bundled lifecycle lint detector `NonNullableMutableLiveDataDetector`
         // (check id `NullSafeMutableLiveData`) crashes against the Kotlin analysis
@@ -54,6 +87,12 @@ android {
         // lint/AGP bug, not a code issue — disable the single offending check so the
         // release lint-vital pass runs. Revisit when AGP/lint ships a compatible build.
         disable += "NullSafeMutableLiveData"
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -81,6 +120,7 @@ dependencies {
     implementation(libs.okhttp.logging)
 
     implementation(libs.datastore.preferences)
+    implementation(libs.androidx.documentfile)
     implementation(libs.coroutines.android)
 
     implementation(libs.camera.camera2)
@@ -99,9 +139,21 @@ dependencies {
 
     // Pure-Java/Kotlin PDF rendering (Apache-2, no native .so).
     implementation(libs.pdfbox.android)
+    // pdfbox-android 2.0.27.0 transitively pulls BouncyCastle 1.72 (CVE-2023-33201/33202 +
+    // 2024 CVEs). Force the patched line even though PDFBox uses only the render paths.
+    constraints {
+        implementation(libs.bouncycastle.bcprov) { because("CVE-2023-33201/33202 patched in >=1.74") }
+        implementation(libs.bouncycastle.bcpkix) { because("CVE-2023-33201/33202 patched in >=1.74") }
+        implementation(libs.bouncycastle.bcutil) { because("align BouncyCastle modules") }
+    }
 
-    // Pure-Java OSM map tiles (Apache-2, no native .so).
-    implementation(libs.osmdroid)
+    // MapLibre GL Android — BSD-licensed, libre map renderer (no Google, no Mapbox,
+    // no API key, no telemetry). Renders OpenStreetMap RASTER tiles via a custom
+    // raster style JSON (same tile source as the old osmdroid setup). The annotation
+    // plugin (SymbolManager) provides marker pins. UA + tile HTTP client wired in
+    // LedgerlineApp. android-sdk 13.x defaults to the Vulkan backend (fine at minSdk 36).
+    implementation(libs.maplibre)
+    implementation(libs.maplibre.annotation)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
@@ -109,6 +161,7 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.okhttp.tls)
     testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
 }

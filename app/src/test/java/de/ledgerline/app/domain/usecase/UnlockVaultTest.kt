@@ -30,7 +30,9 @@ class UnlockVaultTest {
 
     private fun gateway(configured: Boolean = true) = object : VaultGateway {
         override suspend fun fetch() = if (configured)
-            VaultParams(configured = true, salt = "s", kdfOps = 2, kdfMem = 1, wrappedVk = "w", wrapNonce = "n",
+            // In-range KDF cost (matches server OPSLIMIT_SENSITIVE / MEMLIMIT_MODERATE); the
+            // fake deriveKek ignores the numbers but they must pass UnlockVault's sanity bounds.
+            VaultParams(configured = true, salt = "s", kdfOps = 4, kdfMem = 268_435_456, wrappedVk = "w", wrapNonce = "n",
                 hasRecovery = true, wrappedVkRecovery = "wr", recoveryNonce = "rn")
         else VaultParams(configured = false)
     }
@@ -53,5 +55,18 @@ class UnlockVaultTest {
         val vk = VaultKeyHolder()
         val res = UnlockVault(fakeCrypto, vk).withPassphrase(gateway(configured = false), "x".toByteArray())
         assertTrue(res is Outcome.Err && res.kind == ErrorKind.NOT_CONFIGURED)
+    }
+
+    @Test fun weak_kdf_params_are_rejected() = runTest {
+        // A server serving near-zero Argon2id cost must not yield a (weak) unlock (M1).
+        val weak = object : VaultGateway {
+            override suspend fun fetch() = VaultParams(
+                configured = true, salt = "s", kdfOps = 0, kdfMem = 1, wrappedVk = "w", wrapNonce = "n",
+            )
+        }
+        val vk = VaultKeyHolder()
+        val res = UnlockVault(fakeCrypto, vk).withPassphrase(weak, "rightKEK".toByteArray())
+        assertTrue(res is Outcome.Err && res.kind == ErrorKind.NOT_CONFIGURED)
+        assertEquals(false, vk.unlocked.value)
     }
 }

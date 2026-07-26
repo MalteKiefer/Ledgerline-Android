@@ -1,14 +1,13 @@
 package de.ledgerline.app.core.offline
 
 import de.ledgerline.app.data.SettingsStore
+import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
 import de.ledgerline.app.data.offline.PhotoBlobPolicy
+import de.ledgerline.app.data.SettingsStore.Companion.DEFAULT_CACHE_MAX_MB
+import de.ledgerline.app.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,6 +26,9 @@ interface OfflineFlags {
     /** Latest photo blob caching policy. */
     fun photosPolicy(): PhotoBlobPolicy
 
+    /** Latest contact-avatar blob caching policy. */
+    fun contactsPolicy(): ContactBlobPolicy
+
     /** Cache size limit in bytes (`0` = unlimited). */
     fun maxBytes(): Long
 
@@ -39,38 +41,44 @@ interface OfflineFlags {
 
 /**
  * Synchronous, always-current view of the offline settings so repositories can read
- * them without suspending on every request. Seeds each value synchronously at
- * construction (`runBlocking { first() }`) then keeps them live via collectors on an
- * internal scope — mirrors how [de.ledgerline.app.core.ops.OperationManager] caches
- * its background-ops flag.
+ * them without suspending on every request. Seeds each value with the SettingsStore
+ * default (NOT a blocking DataStore read — that would risk an ANR when this @Singleton
+ * is first injected on the main thread), then keeps them live via collectors on an
+ * internal scope. The first collector emission (the real stored value) lands within
+ * milliseconds; until then the defaults — identical to the store defaults — apply.
  */
 @Singleton
-class OfflinePrefs @Inject constructor(settings: SettingsStore) : OfflineFlags {
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    @Volatile
-    private var enabled: Boolean = runBlocking { settings.offlineEnabled.first() }
+class OfflinePrefs @Inject constructor(
+    settings: SettingsStore,
+    @ApplicationScope private val scope: CoroutineScope,
+) : OfflineFlags {
 
     @Volatile
-    private var filesPolicy: FileBlobPolicy = runBlocking { settings.filesPolicy.first() }
+    private var enabled: Boolean = true
 
     @Volatile
-    private var photosPolicy: PhotoBlobPolicy = runBlocking { settings.photosPolicy.first() }
+    private var filesPolicy: FileBlobPolicy = FileBlobPolicy.ON_DEMAND
 
     @Volatile
-    private var cacheMaxMb: Int = runBlocking { settings.cacheMaxMb.first() }
+    private var photosPolicy: PhotoBlobPolicy = PhotoBlobPolicy.ON_DEMAND
 
     @Volatile
-    private var wifiOnly: Boolean = runBlocking { settings.prefetchWifiOnly.first() }
+    private var contactsPolicy: ContactBlobPolicy = ContactBlobPolicy.ON_DEMAND
 
     @Volatile
-    private var chargingOnly: Boolean = runBlocking { settings.prefetchChargingOnly.first() }
+    private var cacheMaxMb: Int = DEFAULT_CACHE_MAX_MB
+
+    @Volatile
+    private var wifiOnly: Boolean = true
+
+    @Volatile
+    private var chargingOnly: Boolean = true
 
     init {
         scope.launch { settings.offlineEnabled.collect { enabled = it } }
         scope.launch { settings.filesPolicy.collect { filesPolicy = it } }
         scope.launch { settings.photosPolicy.collect { photosPolicy = it } }
+        scope.launch { settings.contactsPolicy.collect { contactsPolicy = it } }
         scope.launch { settings.cacheMaxMb.collect { cacheMaxMb = it } }
         scope.launch { settings.prefetchWifiOnly.collect { wifiOnly = it } }
         scope.launch { settings.prefetchChargingOnly.collect { chargingOnly = it } }
@@ -81,6 +89,8 @@ class OfflinePrefs @Inject constructor(settings: SettingsStore) : OfflineFlags {
     override fun filesPolicy(): FileBlobPolicy = filesPolicy
 
     override fun photosPolicy(): PhotoBlobPolicy = photosPolicy
+
+    override fun contactsPolicy(): ContactBlobPolicy = contactsPolicy
 
     override fun maxBytes(): Long = cacheMaxMb.toLong() * 1024L * 1024L
 
