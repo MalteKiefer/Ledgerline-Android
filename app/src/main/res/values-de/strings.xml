@@ -570,4 +570,6 @@
     <string name="cd_copy_code">Code kopieren</string>
     <string name="cd_generate">Generieren</string>
     <string name="cd_remove">Entfernen</string>
+    <string name="settings_licenses">Open-Source-Lizenzen</string>
+    <string name="settings_licenses_sub">Die Bibliotheken, die Ledgerline ermöglichen</string>
 </resources>

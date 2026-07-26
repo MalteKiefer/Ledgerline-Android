@@ -87,12 +87,13 @@ import de.ledgerline.app.data.remote.dto.MeUser
 import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.common.SectionHeader
+import de.ledgerline.app.ui.common.openUrl
 import de.ledgerline.app.ui.ops.OpProgressOverlay
 import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
 /** Internal Settings destinations — a categorized landing (ROOT) plus one sub-screen per category. */
-private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, ABOUT }
+private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, ABOUT, LICENSES }
 
 /**
  * Settings screen — a categorized landing list plus per-category sub-screens, in the
@@ -189,6 +190,7 @@ fun SettingsContent(
         SettingsRoute.BACKUP -> stringResource(R.string.settings_cat_backup)
         SettingsRoute.ACCOUNT -> stringResource(R.string.settings_cat_account)
         SettingsRoute.ABOUT -> stringResource(R.string.settings_cat_about)
+        SettingsRoute.LICENSES -> stringResource(R.string.settings_licenses)
     }
 
     AppScaffold(
@@ -306,7 +308,8 @@ fun SettingsContent(
                     onDisconnect = { showDisconnectConfirm = true },
                 )
 
-                SettingsRoute.ABOUT -> AboutSettings(innerPadding)
+                SettingsRoute.ABOUT -> AboutSettings(innerPadding, onOpenLicenses = { route = SettingsRoute.LICENSES })
+                SettingsRoute.LICENSES -> LicensesScreen(innerPadding)
             }
 
             // Shared op overlay: a manual "Prefetch now" (OpKind.PREFETCH) shows here.
@@ -979,7 +982,7 @@ private fun AccountSettings(
 }
 
 @Composable
-private fun AboutSettings(padding: PaddingValues) {
+private fun AboutSettings(padding: PaddingValues, onOpenLicenses: () -> Unit) {
     SubScreen(padding) {
         SectionHeader(stringResource(R.string.settings_about))
         Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -994,6 +997,44 @@ private fun AboutSettings(padding: PaddingValues) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_licenses)) },
+            supportingContent = { Text(stringResource(R.string.settings_licenses_sub)) },
+            leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
+            modifier = Modifier.clickable { onOpenLicenses() },
+        )
+    }
+}
+
+/** Static list of the app's open-source dependencies and their licenses (legal notice §5.10). */
+private data class License(val name: String, val license: String, val url: String)
+
+private val OSS_LICENSES = listOf(
+    License("libsodium (lazysodium-android)", "ISC", "https://github.com/terl/lazysodium-android"),
+    License("BouncyCastle", "MIT", "https://www.bouncycastle.org/licence.html"),
+    License("MapLibre GL Native", "BSD-2-Clause", "https://github.com/maplibre/maplibre-native"),
+    License("ZXing", "Apache-2.0", "https://github.com/zxing/zxing"),
+    License("Retrofit", "Apache-2.0", "https://github.com/square/retrofit"),
+    License("OkHttp", "Apache-2.0", "https://github.com/square/okhttp"),
+    License("Jetpack Compose & AndroidX", "Apache-2.0", "https://developer.android.com/jetpack/androidx"),
+    License("Kotlin & kotlinx.serialization", "Apache-2.0", "https://github.com/Kotlin"),
+    License("Dagger Hilt", "Apache-2.0", "https://github.com/google/dagger"),
+    License("JNA", "Apache-2.0 / LGPL-2.1", "https://github.com/java-native-access/jna"),
+    License("Media3 (ExoPlayer)", "Apache-2.0", "https://github.com/androidx/media"),
+)
+
+@Composable
+private fun LicensesScreen(padding: PaddingValues) {
+    val context = LocalContext.current
+    SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_licenses))
+        OSS_LICENSES.forEach { lib ->
+            ListItem(
+                headlineContent = { Text(lib.name) },
+                supportingContent = { Text(lib.license) },
+                modifier = Modifier.clickable { openUrl(context, lib.url, chooser = false) },
             )
         }
     }

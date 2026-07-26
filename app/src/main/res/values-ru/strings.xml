@@ -573,4 +573,6 @@
     <string name="cd_copy_code">Копировать код</string>
     <string name="cd_generate">Сгенерировать</string>
     <string name="cd_remove">Удалить</string>
+    <string name="settings_licenses">Лицензии открытого кода</string>
+    <string name="settings_licenses_sub">Библиотеки, на которых работает Ledgerline</string>
 </resources>
