@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -50,7 +49,7 @@ class AlbumsViewModel @Inject constructor(
     fun count(album: GalleryAlbum): Int = albumPhotos(album).size
 
     fun create(name: String, photoIds: List<String>) = viewModelScope.launch {
-        val id = UUID.randomUUID().toString()
+        val id = de.ledgerline.app.core.Ids.newId()
         val now = nowIso()
         mutate.invoke { AlbumOps.create(it, id, name, photoIds, now) }
     }

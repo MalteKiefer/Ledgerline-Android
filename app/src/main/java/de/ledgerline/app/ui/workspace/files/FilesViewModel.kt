@@ -24,7 +24,6 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.time.Instant
-import java.util.UUID
 import javax.inject.Inject
 
 data class FilesUi(
@@ -344,7 +343,7 @@ class FilesViewModel @Inject constructor(
         return out
     }
 
-    private fun newId(): String = UUID.randomUUID().toString()
+    private fun newId(): String = de.ledgerline.app.core.Ids.newId()
 
     companion object {
         /** Sentinel messages the UI maps to localized strings (see FilesScreen). */

@@ -6,7 +6,6 @@ import de.ledgerline.app.domain.usecase.FileBlobs
 import de.ledgerline.app.domain.usecase.ImportFile
 import de.ledgerline.app.domain.usecase.MutateWorkspace
 import java.io.InputStream
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,7 +31,7 @@ class ImportFileImpl @Inject constructor(
             val res = mutate.invoke { m ->
                 m.copy(
                     files = m.files + FileEntry(
-                        id = UUID.randomUUID().toString(), // entry id distinct from the blob id (matches the web contract)
+                        id = de.ledgerline.app.core.Ids.newId(), // entry id distinct from the blob id (matches the web contract)
                         blob = up.value.id,
                         encFileKey = up.value.encFileKey,
                         name = name,

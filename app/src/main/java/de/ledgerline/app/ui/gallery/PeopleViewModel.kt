@@ -285,7 +285,7 @@ class PeopleViewModel @Inject constructor(
 
             var builtPeople = built.map {
                 GalleryPerson(
-                    id = it.id ?: UUID.randomUUID().toString(),
+                    id = it.id ?: de.ledgerline.app.core.Ids.newId(),
                     name = it.name,
                     hidden = it.hidden,
                     centroid = it.centroid,

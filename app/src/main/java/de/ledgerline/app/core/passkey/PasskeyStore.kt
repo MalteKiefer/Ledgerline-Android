@@ -7,7 +7,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.util.Base64
-import java.util.UUID
 
 /**
  * Resolves and creates passkeys in the zero-knowledge secrets manifest, byte-compatible with the
@@ -76,7 +75,7 @@ object PasskeyStore {
         rpId: String, rpName: String, credentialId: ByteArray, privateKeyJwk: String, publicKeyJwk: String,
         userHandle: ByteArray, userName: String, userDisplayName: String, now: String,
     ): SecretItem = SecretItem(
-        id = UUID.randomUUID().toString(),
+        id = de.ledgerline.app.core.Ids.newId(),
         type = "passkey",
         title = rpName.ifBlank { rpId },
         fields = passkeyFields(rpId, rpName, credentialId, privateKeyJwk, publicKeyJwk, userHandle, userName, userDisplayName, now),

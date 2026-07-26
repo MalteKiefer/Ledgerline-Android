@@ -93,7 +93,7 @@ class GalleryUploader @VisibleForTesting internal constructor(
         fun exifDbl(k: String): Double? = (exif?.get(k) as? JsonPrimitive)?.doubleOrNull
 
         val entry = GalleryPhoto(
-            id = java.util.UUID.randomUUID().toString(),
+            id = de.ledgerline.app.core.Ids.newId(),
             media_type = if (mime.startsWith("video")) "video" else "image",
             originalRef = original.id, originalKey = original.encFileKey,
             thumbRef = thumb?.id, thumbKey = thumb?.encFileKey,

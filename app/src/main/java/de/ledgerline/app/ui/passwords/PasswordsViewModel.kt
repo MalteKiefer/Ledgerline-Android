@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
-import java.util.UUID
 import javax.inject.Inject
 
 data class PasswordsUi(
@@ -160,7 +159,7 @@ class PasswordsViewModel @Inject constructor(
     fun secretById(id: String): SecretItem? = cache.value.value?.manifest?.secrets?.firstOrNull { it.id == id }
 
     /** A blank draft of [type] (not yet persisted). */
-    fun draft(type: String) = SecretItem(id = UUID.randomUUID().toString(), type = type, title = "")
+    fun draft(type: String) = SecretItem(id = de.ledgerline.app.core.Ids.newId(), type = type, title = "")
 
     fun toggleFavorite(id: String) = mutate("favorite") { secrets ->
         secrets.map { if (it.id == id) it.copy(favorite = !it.favorite) else it }

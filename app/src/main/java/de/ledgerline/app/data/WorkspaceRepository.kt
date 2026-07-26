@@ -117,35 +117,63 @@ class WorkspaceRepository(
     private val specs = listOf(
         ModuleSpec(
             key = "notes",
-            encode = { m -> jsonEncoder.encodeToString(NotesManifest.serializer(), NotesManifest(notes = m.notes)) },
-            merge = { m, plain -> m.copy(notes = json.decodeFromString(NotesManifest.serializer(), plain).notes) },
+            encode = { m -> encModule { it["notes"] = arr(m.notes.map(WorkspaceRecordCodec::encodeNote)) } },
+            merge = { m, plain -> m.copy(notes = records(plain, "notes").map(WorkspaceRecordCodec::decodeNote)) },
             changed = { a, b -> a.notes != b.notes },
         ),
         ModuleSpec(
             key = "todos",
-            encode = { m -> jsonEncoder.encodeToString(TodosManifest.serializer(), TodosManifest(todos = m.todos, todoLists = m.todoLists)) },
+            encode = { m ->
+                encModule {
+                    it["todos"] = arr(m.todos.map(WorkspaceRecordCodec::encodeTodo))
+                    it["todoLists"] = arr(m.todoLists.map(WorkspaceRecordCodec::encodeTodoList))
+                }
+            },
             merge = { m, plain ->
-                val d = json.decodeFromString(TodosManifest.serializer(), plain)
-                m.copy(todos = d.todos, todoLists = d.todoLists)
+                m.copy(
+                    todos = records(plain, "todos").map(WorkspaceRecordCodec::decodeTodo),
+                    todoLists = records(plain, "todoLists").map(WorkspaceRecordCodec::decodeTodoList),
+                )
             },
             changed = { a, b -> a.todos != b.todos || a.todoLists != b.todoLists },
         ),
         ModuleSpec(
             key = "bookmarks",
-            encode = { m -> jsonEncoder.encodeToString(BookmarksManifest.serializer(), BookmarksManifest(bookmarks = m.bookmarks, bookmarkFolders = m.bookmarkFolders)) },
+            encode = { m ->
+                encModule {
+                    it["bookmarks"] = arr(m.bookmarks.map(WorkspaceRecordCodec::encodeBookmark))
+                    it["bookmarkFolders"] = arr(m.bookmarkFolders.map(WorkspaceRecordCodec::encodeBookmarkFolder))
+                }
+            },
             merge = { m, plain ->
-                val d = json.decodeFromString(BookmarksManifest.serializer(), plain)
-                m.copy(bookmarks = d.bookmarks, bookmarkFolders = d.bookmarkFolders)
+                m.copy(
+                    bookmarks = records(plain, "bookmarks").map(WorkspaceRecordCodec::decodeBookmark),
+                    bookmarkFolders = records(plain, "bookmarkFolders").map(WorkspaceRecordCodec::decodeBookmarkFolder),
+                )
             },
             changed = { a, b -> a.bookmarks != b.bookmarks || a.bookmarkFolders != b.bookmarkFolders },
         ),
         ModuleSpec(
             key = "contacts",
-            encode = { m -> jsonEncoder.encodeToString(ContactsManifest.serializer(), ContactsManifest(contacts = m.contacts)) },
-            merge = { m, plain -> m.copy(contacts = json.decodeFromString(ContactsManifest.serializer(), plain).contacts) },
+            encode = { m -> encModule { it["contacts"] = arr(m.contacts.map(WorkspaceRecordCodec::encodeContact)) } },
+            merge = { m, plain -> m.copy(contacts = records(plain, "contacts").map(WorkspaceRecordCodec::decodeContact)) },
             changed = { a, b -> a.contacts != b.contacts },
         ),
     )
+
+    /** Build a `{v:3, …}` module manifest JSON string; [fill] adds the record arrays. */
+    private inline fun encModule(fill: (MutableMap<String, kotlinx.serialization.json.JsonElement>) -> Unit): String {
+        val out = linkedMapOf<String, kotlinx.serialization.json.JsonElement>("v" to kotlinx.serialization.json.JsonPrimitive(3))
+        fill(out)
+        return kotlinx.serialization.json.JsonObject(out).toString()
+    }
+
+    private fun arr(items: List<JsonObject>): kotlinx.serialization.json.JsonArray = kotlinx.serialization.json.JsonArray(items)
+
+    /** The [key] record array of a decrypted module manifest, as raw [JsonObject]s. */
+    private fun records(plain: String, key: String): List<JsonObject> =
+        (json.parseToJsonElement(plain).jsonObject[key] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { it as? JsonObject } ?: emptyList()
 
     // Internal signals used to map per-module fetch failures to Outcome errors.
     private class AuthException : Exception()

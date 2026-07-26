@@ -1,7 +1,14 @@
 package de.ledgerline.app.domain.model
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+
+// Every workspace record carries a `@Transient raw` — the original decrypted JsonObject captured
+// on load — so a save re-emits every Web/iOS field this Kotlin model doesn't know (no cross-client
+// data loss). See [de.ledgerline.app.data.WorkspaceRecordCodec]; mirrors Files/Gallery. `raw` is
+// `@Transient` so kotlinx never (de)serialises it as a nested key.
 
 @Serializable
 data class WorkspaceManifest(
@@ -23,6 +30,7 @@ data class Note(
     @Serializable(with = FlexibleTrashedSerializer::class) val trashed: Boolean = false,
     val updated: String? = null,
     val tags: List<String> = emptyList(),
+    @Transient val raw: JsonObject = JsonObject(emptyMap()),
 )
 
 @Serializable
@@ -32,16 +40,26 @@ data class Bookmark(
     val read: Boolean = false,
     @Serializable(with = FlexibleTrashedSerializer::class) val trashed: Boolean = false,
     val tags: List<String> = emptyList(),
+    @Transient val raw: JsonObject = JsonObject(emptyMap()),
 )
 
+/**
+ * A named folder (bookmark or file tree). The app field [parent] is the parent-folder id; on the
+ * wire it is **`parentId`** for bookmark folders (web `bookmarks.js`) and **`parent`** for file
+ * folders — the per-module codecs map it. `color`/`icon` are Android-only extras.
+ */
 @Serializable
 data class NamedFolder(
     val id: String = "", val name: String = "", val parent: String? = null,
     val color: String = "", val icon: String = "",
+    @Transient val raw: JsonObject = JsonObject(emptyMap()),
 )
 
 @Serializable
-data class TodoList(val id: String = "", val name: String = "")
+data class TodoList(
+    val id: String = "", val name: String = "",
+    @Transient val raw: JsonObject = JsonObject(emptyMap()),
+)
 
 @Serializable
 data class TodoItem(
@@ -50,6 +68,7 @@ data class TodoItem(
     val due: String = "", val done: Boolean = false,
     @Serializable(with = FlexibleTrashedSerializer::class) val trashed: Boolean = false,
     val tags: List<String> = emptyList(),
+    @Transient val raw: JsonObject = JsonObject(emptyMap()),
 )
 
 @Serializable
@@ -93,6 +112,7 @@ data class Contact(
     val first: String = "", val last: String = "", val middle: String = "",
     val prefix: String = "", val suffix: String = "", val nickname: String = "",
     val org: String = "", val department: String = "", val title: String = "", val role: String = "",
+    val vatId: String = "",         // VAT / tax id (web/iOS field; was dropped before)
     val emails: List<LabeledValue> = emptyList(),
     val phones: List<LabeledValue> = emptyList(),
     val impp: List<LabeledValue> = emptyList(),
@@ -110,6 +130,7 @@ data class Contact(
     val personName: String? = null,
     val _x: List<JsonElement> = emptyList(),  // preserve unknown vCard props round-trip
     val updated: String? = null,
+    @Transient val raw: JsonObject = JsonObject(emptyMap()),
 )
 
 /** The decrypted manifest plus the server version (kept for Phase-3 writes). */

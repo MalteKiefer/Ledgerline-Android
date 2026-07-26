@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import java.util.UUID
 import javax.inject.Inject
 
 data class ContactsUi(
@@ -291,7 +290,7 @@ class ContactsViewModel @Inject constructor(
             if (mutate.invoke { m -> mutation(m) } is Outcome.Err) _message.value = "Save failed"
         }
 
-    private fun newId(): String = UUID.randomUUID().toString()
+    private fun newId(): String = de.ledgerline.app.core.Ids.newId()
     private fun nowIso(): String = OffsetDateTime.now(ZoneOffset.UTC).toString()
 
     private fun displayName(c: Contact): String = when {

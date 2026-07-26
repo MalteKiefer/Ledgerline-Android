@@ -593,11 +593,14 @@ Supply-Chain). **Bei jeder Änderung mitpflegen.**
 - **Share-Link-Krypto (2026-07-25):** `ShareCrypto` (SK im URL-Fragment, per-file-key re-wrap
   + Manifest-Seal unter SK), fixture-verifiziert (`ShareCryptoInstrumentedTest`). REST/UI = §14 R-S3/S4.
 - **Verbleibend:** Sharing-Flows (Invite/Accept/Rotate, TOFU-Map), Share-REST/UI, Passkeys — §14.
-- **Unbekannte Felder (Integrität):** Store-v3-Migration nutzt getippte Modul-Manifeste
-  (`NotesManifest` etc.). Die Top-Level-Keys sind exakt die Web-`MODULE_BLANKS` → kein
-  Verlust im Normalfall, aber ein künftig neu hinzugefügter Fremd-Key oder unbekanntes
-  **Record**-Feld würde beim Schreiben gedroppt (nur `Contact._x` erhält vCard-Extras).
-  Raw-JSON-Overlay pro Modul (wie iOS `JSONValue`) ist die verbleibende Härtung.
+- **Unbekannte Felder (Integrität) — GESCHLOSSEN (2026-07-26, Rebuild-Phase 0).** Notes/Todos/
+  Bookmarks/Contacts nutzen jetzt den **Raw-JSON-Overlay** (`WorkspaceRecordCodec`, wie
+  `FileRecordCodec`): jeder Record trägt sein originales `@Transient raw:JsonObject`, beim Save
+  werden nur die bekannten Felder web-shaped überlagert (presence-aware) → **jedes unbekannte
+  Top-Level-Record-Feld von Web/iOS überlebt** den Android-Round-Trip. Zusätzlich: Bookmark-Ordner
+  mappen `parent↔parentId` (keine flach-gedrückte Hierarchie mehr), `Contact.vatId` ergänzt,
+  `trashed` wird `false | ISO` gerendert (Timestamp nicht mehr auf bool kollabiert), IDs sind
+  32-Hex (`Ids.newId`, byte-shape wie Web). Test `WorkspaceRecordCodecTest`.
 - **Konto-Kontrolle:** Remote-Devices-Liste/-Widerruf, Notifications, Export/Löschen (`/devices`,
   `/notifications`, `/account/*`) **noch nicht in Android** (nur Web).
 
