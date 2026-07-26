@@ -120,6 +120,7 @@ fun AlbumsScreen(
         de.ledgerline.app.ui.common.ShareLinkSheet(
             state = st,
             onCreate = { albumsVm.createShare(it) },
+            onUpdate = { albumsVm.updateShare(it) },
             onRevoke = { albumsVm.revokeShare() },
             onCopy = { link -> de.ledgerline.app.ui.common.copyToClipboard(shareContext, link) },
             onShareIntent = { link -> shareContext.startActivity(de.ledgerline.app.ui.common.shareTextChooser(shareContext, link)) },

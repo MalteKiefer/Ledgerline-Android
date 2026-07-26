@@ -413,6 +413,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
         de.ledgerline.app.ui.common.ShareLinkSheet(
             state = st,
             onCreate = { vm.createShare(it) },
+            onUpdate = { vm.updateShare(it) },
             onRevoke = { vm.revokeShare() },
             onCopy = { link ->
                 copyToClipboard(context, link)

@@ -46,6 +46,21 @@ class PrefetcherTest {
             galleryRefs.add(blob)
             return Response.success(byteArrayOf(1, 2, 3).toResponseBody("application/octet-stream".toMediaType()))
         }
+        // Gallery prefetch batches through raw-batch: record the requested ids and return a
+        // valid framed concat (id + 3-byte ciphertext each) so prefetchBatch caches them.
+        override suspend fun galleryRawBatch(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<ResponseBody> {
+            galleryRefs.addAll(body.blobs)
+            val out = java.io.ByteArrayOutputStream()
+            for (id in body.blobs) {
+                val idb = id.toByteArray(Charsets.UTF_8)
+                out.write(u32le(idb.size)); out.write(idb); out.write(u32le(3)); out.write(byteArrayOf(1, 2, 3))
+            }
+            return Response.success(out.toByteArray().toResponseBody("application/octet-stream".toMediaType()))
+        }
+        private fun u32le(n: Int) = byteArrayOf(
+            (n and 0xFF).toByte(), ((n shr 8) and 0xFF).toByte(),
+            ((n shr 16) and 0xFF).toByte(), ((n shr 24) and 0xFF).toByte(),
+        )
         override suspend fun rawFile(blob: String): Response<ResponseBody> {
             fileRefs.add(blob)
             return Response.success(byteArrayOf(4, 5, 6).toResponseBody("application/octet-stream".toMediaType()))

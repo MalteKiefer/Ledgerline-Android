@@ -50,6 +50,19 @@ class AlbumsViewModel @Inject constructor(
         }
     }
 
+    fun updateShare(opts: de.ledgerline.app.data.ShareOptions) {
+        val target = _shareSheet.value ?: return
+        _shareSheet.value = target.copy(busy = true, error = false)
+        viewModelScope.launch {
+            when (val r = sharing.updateAlbumShare(target.id, opts)) {
+                is de.ledgerline.app.core.Outcome.Ok ->
+                    _shareSheet.value = _shareSheet.value?.copy(busy = false, link = r.value.link)
+                is de.ledgerline.app.core.Outcome.Err ->
+                    _shareSheet.value = _shareSheet.value?.copy(busy = false, error = true)
+            }
+        }
+    }
+
     fun revokeShare() {
         val target = _shareSheet.value ?: return
         _shareSheet.value = target.copy(busy = true)
