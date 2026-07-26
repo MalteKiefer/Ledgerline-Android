@@ -5,3 +5,6 @@ enum class ContactSort { FIRST, LAST, DISPLAY }
 
 /** How dates (contact birthdays/anniversaries, etc.) are rendered. */
 enum class DateFormatPref { SYSTEM, DMY, YMD, MDY }
+
+/** App theme selection: follow the device, or force light/dark. */
+enum class ThemeMode { SYSTEM, LIGHT, DARK }

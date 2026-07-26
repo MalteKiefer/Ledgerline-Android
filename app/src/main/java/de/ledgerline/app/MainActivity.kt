@@ -149,7 +149,22 @@ class MainActivity : FragmentActivity() {
         })
 
         setContent {
-            LedgerlineTheme {
+            // Resolve the theme from the user's setting (System/Light/Dark) + dynamic-color opt-in,
+            // reactively so a change in Settings applies immediately.
+            val themeMode by settingsStore.themeMode.collectAsState(initial = de.ledgerline.app.data.ThemeMode.SYSTEM)
+            val dynamicColor by settingsStore.dynamicColor.collectAsState(initial = false)
+            val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+            val dark = when (themeMode) {
+                de.ledgerline.app.data.ThemeMode.LIGHT -> false
+                de.ledgerline.app.data.ThemeMode.DARK -> true
+                de.ledgerline.app.data.ThemeMode.SYSTEM -> systemDark
+            }
+            // Keep the status-bar icon contrast in step with the resolved (possibly forced) scheme.
+            androidx.compose.runtime.SideEffect {
+                androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+                    .isAppearanceLightStatusBars = !dark
+            }
+            LedgerlineTheme(darkTheme = dark, dynamicColor = dynamicColor) {
                 val link by pairLink.collectAsState()
                 // One shared factory for both CryptoObject-bound biometric authorizers.
                 val auth = VaultAuthorizers(
@@ -167,11 +182,6 @@ class MainActivity : FragmentActivity() {
                 )
             }
         }
-
-        // Belt-and-suspenders: match the status-bar icon style to the active
-        // light/dark scheme (light background → dark icons, and vice-versa).
-        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
-            .isAppearanceLightStatusBars = !isDark
     }
 
     // singleTask: a pairing link delivered while the activity is alive comes here.

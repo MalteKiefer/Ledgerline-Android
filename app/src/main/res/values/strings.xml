@@ -559,4 +559,10 @@
     <string name="jobs_faces">Faces</string>
     <string name="jobs_failed">Failed uploads</string>
     <string name="jobs_run_all">Run all</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System default</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_sub">Derive the palette from your wallpaper (Android 12+)</string>
 </resources>

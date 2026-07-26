@@ -105,10 +105,21 @@ private val LedgerlineLightScheme = lightColorScheme(
 @Composable
 fun LedgerlineTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Dynamic (Material You / wallpaper) color is opt-in and only on Android 12+; otherwise the
+    // hand-authored brand scheme is used so every M3 role stays intentional.
+    val scheme = when {
+        dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S ->
+            if (darkTheme) androidx.compose.material3.dynamicDarkColorScheme(context)
+            else androidx.compose.material3.dynamicLightColorScheme(context)
+        darkTheme -> LedgerlineDarkScheme
+        else -> LedgerlineLightScheme
+    }
     MaterialTheme(
-        colorScheme = if (darkTheme) LedgerlineDarkScheme else LedgerlineLightScheme,
+        colorScheme = scheme,
         typography = LedgerlineTypography,
         shapes = LedgerlineShapes,
     ) {

@@ -560,4 +560,10 @@
     <string name="jobs_faces">Лица</string>
     <string name="jobs_failed">Неудачные загрузки</string>
     <string name="jobs_run_all">Запустить всё</string>
+    <string name="settings_theme">Тема</string>
+    <string name="settings_theme_system">Как в системе</string>
+    <string name="settings_theme_light">Светлая</string>
+    <string name="settings_theme_dark">Тёмная</string>
+    <string name="settings_dynamic_color">Динамические цвета</string>
+    <string name="settings_dynamic_color_sub">Палитра из обоев (Android 12+)</string>
 </resources>
