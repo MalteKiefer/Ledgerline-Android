@@ -97,7 +97,6 @@
     <string name="store_degraded">Некоторые элементы сейчас не удалось загрузить — ничего не удалено, редактирование приостановлено до их восстановления.</string>
     <string name="ws_retry">Повторить</string>
     <string name="ws_reauth">Сессия истекла — подключите это устройство заново.</string>
-    <string name="ws_file_phase3">Открытие файлов появится в более поздней версии.</string>
 
     <!-- Priority labels -->
     <string name="priority_low">Низкий</string>
@@ -566,4 +565,12 @@
     <string name="settings_theme_dark">Тёмная</string>
     <string name="settings_dynamic_color">Динамические цвета</string>
     <string name="settings_dynamic_color_sub">Палитра из обоев (Android 12+)</string>
+    <string name="cd_add">Добавить</string>
+    <string name="cd_edit">Изменить</string>
+    <string name="cd_trash">В корзину</string>
+    <string name="cd_reveal">Показать или скрыть</string>
+    <string name="cd_copy">Копировать</string>
+    <string name="cd_copy_code">Копировать код</string>
+    <string name="cd_generate">Сгенерировать</string>
+    <string name="cd_remove">Удалить</string>
 </resources>

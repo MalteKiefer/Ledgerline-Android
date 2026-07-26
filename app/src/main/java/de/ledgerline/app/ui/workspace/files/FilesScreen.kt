@@ -625,7 +625,7 @@ private fun TagEditDialog(initial: List<String>, onSave: (List<String>) -> Unit,
                     tags.toList().forEach { t ->
                         androidx.compose.material3.InputChip(
                             selected = false, onClick = {}, label = { Text(t) },
-                            trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "remove", modifier = Modifier.size(16.dp).clickable { tags.remove(t) }) },
+                            trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.cd_remove), modifier = Modifier.size(16.dp).clickable { tags.remove(t) }) },
                         )
                     }
                 }
