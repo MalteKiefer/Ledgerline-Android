@@ -83,7 +83,7 @@ class FilesViewModelTest {
 
     private fun vm() = FilesViewModel(
         load, cache, mutate, blobs, usage, de.ledgerline.app.core.security.LockGuard(),
-        ImportFileImpl(blobs, mutate),
+        ImportFileImpl(blobs, mutate), de.ledgerline.app.core.offline.DegradedState(),
     )
 
     @Test fun root_shows_folders_then_files_excluding_trashed() = runTest {

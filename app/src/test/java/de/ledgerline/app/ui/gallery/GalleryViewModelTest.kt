@@ -153,6 +153,7 @@ class GalleryViewModelTest {
         embedText = embedText,
         metaCache = MetaCache(),
         places = io.mockk.mockk(relaxed = true),
+        degradedState = de.ledgerline.app.core.offline.DegradedState(),
     ).apply { ioDispatcher = UnconfinedTestDispatcher() }
 
     /**

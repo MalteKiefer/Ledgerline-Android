@@ -74,7 +74,11 @@ class FilesViewModel @Inject constructor(
     private val filesUsage: FilesUsage,
     private val lockGuard: LockGuard,
     private val importFile: ImportFile,
+    degradedState: de.ledgerline.app.core.offline.DegradedState,
 ) : ViewModel() {
+
+    /** True when the files store is degraded (a shard blob is missing); writes are frozen. */
+    val degraded: StateFlow<Boolean> = degradedState.files
     private val stack = ArrayDeque<String?>().apply { addLast(null) }   // current folder = last
     private val _state = MutableStateFlow(FilesUi(loading = true))
     val state: StateFlow<FilesUi> = _state

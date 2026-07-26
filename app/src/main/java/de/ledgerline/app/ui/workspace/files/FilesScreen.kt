@@ -18,9 +18,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
+import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -88,6 +92,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val sort by vm.sort.collectAsStateWithLifecycle()
+    val degraded by vm.degraded.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -169,6 +174,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     var deleteForeverEntry by remember { mutableStateOf<FileEntry?>(null) }
     var moveTarget by remember { mutableStateOf<FileEntry?>(null) }
     var versionsTarget by remember { mutableStateOf<FileEntry?>(null) }
+    var tagsTarget by remember { mutableStateOf<FileEntry?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -193,6 +199,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                 ui.loading -> LoadingBox()
                 ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() })
                 else -> Column(Modifier.fillMaxSize()) {
+                    if (degraded) de.ledgerline.app.ui.workspace.common.DegradedBanner()
                     // Fixed header: trash bar in trash view, else a "Trash (N)" entry
                     // (only when the trash has something).
                     if (showTrash) {
@@ -292,6 +299,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                                 onFavorite = { vm.toggleFavorite(file.id) },
                                                 onMove = { moveTarget = file },
                                                 onVersions = { versionsTarget = file },
+                                                onTags = { tagsTarget = file },
                                             )
                                         },
                                         modifier = Modifier.fillMaxWidth().clickable { vm.openFile(file) },
@@ -387,6 +395,13 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
             onDismiss = { versionsTarget = null },
         )
     }
+    tagsTarget?.let { file ->
+        TagEditDialog(
+            initial = file.tags,
+            onSave = { tags -> vm.setTags(file.id, tags); tagsTarget = null },
+            onDismiss = { tagsTarget = null },
+        )
+    }
     if (confirmEmptyTrash) {
         ConfirmDialog(
             message = stringResource(R.string.trash_empty_confirm),
@@ -441,6 +456,7 @@ private fun FileRowOverflow(
     onFavorite: () -> Unit,
     onMove: () -> Unit,
     onVersions: () -> Unit,
+    onTags: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -457,6 +473,11 @@ private fun FileRowOverflow(
                 text = { Text(stringResource(R.string.file_move)) },
                 leadingIcon = { Icon(Icons.Outlined.DriveFileMove, null) },
                 onClick = { expanded = false; onMove() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.pw_tags)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Label, null) },
+                onClick = { expanded = false; onTags() },
             )
             if (file.versions.isNotEmpty()) DropdownMenuItem(
                 text = { Text(stringResource(R.string.file_versions, file.versions.size)) },
@@ -557,4 +578,37 @@ private fun VersionsSheet(
             }
         }
     }
+}
+
+/** Edit a file's tags: chip add (Enter/Done) + remove. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun TagEditDialog(initial: List<String>, onSave: (List<String>) -> Unit, onDismiss: () -> Unit) {
+    val tags = remember { initial.toMutableStateList() }
+    var input by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = { onSave(tags.toList()) }) { Text(stringResource(R.string.action_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        title = { Text(stringResource(R.string.pw_tags)) },
+        text = {
+            Column {
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+                    tags.toList().forEach { t ->
+                        androidx.compose.material3.InputChip(
+                            selected = false, onClick = {}, label = { Text(t) },
+                            trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "remove", modifier = Modifier.size(16.dp).clickable { tags.remove(t) }) },
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = input, onValueChange = { input = it }, singleLine = true,
+                    label = { Text(stringResource(R.string.pw_tag_add)) },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (input.isNotBlank()) { tags.add(input.trim()); input = "" } }),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+            }
+        },
+    )
 }

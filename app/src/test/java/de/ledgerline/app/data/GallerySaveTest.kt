@@ -129,7 +129,7 @@ class GallerySaveTest {
             override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
         }
 
-        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), fakeUpload, apiProvider = { fakeApi })
+        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), fakeUpload, de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
 
         val result = repo.save { manifest ->
             manifest.copy(photos = manifest.photos + GalleryPhoto(id = "new"))

@@ -227,6 +227,8 @@ fun GalleryScreen(
     }
 
     Column(modifier = modifier.fillMaxSize()) {
+        val degraded by vm.degraded.collectAsStateWithLifecycle()
+        if (degraded) de.ledgerline.app.ui.workspace.common.DegradedBanner()
         var overflowOpen by remember { mutableStateOf(false) }
         var searchActive by rememberSaveable { mutableStateOf(false) }
         Row(

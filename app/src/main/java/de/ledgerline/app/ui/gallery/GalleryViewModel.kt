@@ -70,7 +70,11 @@ class GalleryViewModel @Inject constructor(
     private val embedText: EmbedText,
     private val metaCache: MetaCache,
     private val places: de.ledgerline.app.data.PlaceRepository,
+    degradedState: de.ledgerline.app.core.offline.DegradedState,
 ) : ViewModel() {
+
+    /** True when the gallery store is degraded (a shard blob is missing); writes are frozen. */
+    val degraded: kotlinx.coroutines.flow.StateFlow<Boolean> = degradedState.gallery
 
     /** IO dispatcher for meta-blob downloads during search — overridable in tests so
      *  the work runs deterministically and doesn't leak a coroutine past the test. */

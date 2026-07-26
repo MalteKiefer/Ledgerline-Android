@@ -41,6 +41,8 @@ class GalleryRepository(
     private val storeCache: StoreDiskCache,
     private val offlineFlags: OfflineFlags,
     private val galleryUpload: de.ledgerline.app.domain.usecase.GalleryUploadApi,
+    private val degradedState: de.ledgerline.app.core.offline.DegradedState,
+    private val blobCache: de.ledgerline.app.core.offline.BlobDiskCache,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
     @Inject constructor(
@@ -51,6 +53,8 @@ class GalleryRepository(
         storeCache: StoreDiskCache,
         offlineFlags: OfflineFlags,
         galleryUpload: de.ledgerline.app.domain.usecase.GalleryUploadApi,
+        degradedState: de.ledgerline.app.core.offline.DegradedState,
+        blobCache: de.ledgerline.app.core.offline.BlobDiskCache,
     ) : this(
         sessionHolder,
         vaultKeyHolder,
@@ -59,6 +63,8 @@ class GalleryRepository(
         storeCache,
         offlineFlags,
         galleryUpload,
+        degradedState,
+        blobCache,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
@@ -92,10 +98,6 @@ class GalleryRepository(
     @Volatile
     private var priorRoot: GalleryShardWriter.RootState = GalleryShardWriter.RootState()
 
-    /** Gallery degraded flag: a photo shard blob is durably missing (404 after retries). Writes are
-     *  frozen while degraded so a save never rewrites the root dropping the missing shard's slot. */
-    private val _degraded = kotlinx.coroutines.flow.MutableStateFlow(false)
-    val degraded: kotlinx.coroutines.flow.StateFlow<Boolean> = _degraded
 
     /** The dirty-save reuse state carried by a decoded [GalleryRoot]. */
     private fun rootStateFrom(root: GalleryRoot) = GalleryShardWriter.RootState(
@@ -129,12 +131,12 @@ class GalleryRepository(
             when {
                 // 401 stays an auth failure → forced-logout path; never fall back to cache.
                 res.code() == HttpURLConnection.HTTP_UNAUTHORIZED -> Outcome.Err(ErrorKind.HTTP)
-                !res.isSuccessful -> cachedOr(Outcome.Err(ErrorKind.NETWORK), vk)
+                !res.isSuccessful -> cachedOr(Outcome.Err(ErrorKind.NETWORK), session, vk)
                 else -> {
                     val body = res.body()!!
                     val manifest = body.ciphertext?.let { ct ->
                         val plain = crypto.openManifest(ct, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
-                        assembleManifest(json.decodeFromString<GalleryRoot>(plain), session, vk)
+                        assembleManifest(json.decodeFromString<GalleryRoot>(plain), session, vk, allowNetwork = true)
                     } ?: GalleryManifest()
                     if (offlineFlags.enabled()) {
                         storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
@@ -142,7 +144,7 @@ class GalleryRepository(
                     Outcome.Ok(Gallery(manifest, body.version))
                 }
             }
-        } catch (e: Exception) { cachedOr(Outcome.Err(ErrorKind.NETWORK, e), vk) }
+        } catch (e: Exception) { cachedOr(Outcome.Err(ErrorKind.NETWORK, e), session, vk) }
     }
 
     /**
@@ -153,19 +155,19 @@ class GalleryRepository(
      * The assembled manifest is v1-shaped, so a later save writes inline photos (web reads
      * that as legacy and re-shards on its next save).
      */
-    private suspend fun assembleManifest(root: GalleryRoot, session: Session, vk: ByteArray): GalleryManifest {
+    private suspend fun assembleManifest(root: GalleryRoot, session: Session, vk: ByteArray, allowNetwork: Boolean): GalleryManifest {
         val api = apiProvider(session)
         // Remember the sealed-root state + the raw records so the next save reuses unchanged
         // blobs and re-emits every web field byte-exact (no data loss).
         priorRoot = rootStateFrom(root)
         photoRawById.clear(); albumRawById.clear(); personRawById.clear()
 
-        _degraded.value = false
+        degradedState.setGallery(false)
         val photos = if (root.v >= 2 && root.shards.isNotEmpty()) {
             // Fetch + decrypt + decode all shards concurrently. A durable 404 marks the store
             // degraded + skips that shard (descriptor kept, writes frozen); other errors throw.
             coroutineScope {
-                root.shards.map { s -> async(Dispatchers.IO) { fetchGalleryShard(api, s, vk) } }.awaitAll()
+                root.shards.map { s -> async(Dispatchers.IO) { fetchGalleryShard(api, s, vk, allowNetwork) } }.awaitAll()
             }.flatMap { it ?: emptyList() }.map { obj ->
                 val p = GalleryRecordCodec.decodePhoto(obj)
                 photoRawById[p.id] = obj
@@ -178,14 +180,14 @@ class GalleryRepository(
         // v3 keeps albums/people in content-addressed collection blobs (refs on the root);
         // v1/v2 inline them. Prefer the blob when the ref is present.
         val albums = if (root.albumsRef != null) {
-            fetchCollectionRaw(api, root.albumsRef!!, root.albumsKey ?: "", vk).map { obj ->
+            fetchCollectionRaw(api, root.albumsRef!!, root.albumsKey ?: "", vk, allowNetwork).map { obj ->
                 GalleryRecordCodec.decodeAlbum(obj).also { albumRawById[it.id] = obj }
             }
         } else {
             root.albums
         }
         val people = if (root.peopleRef != null) {
-            fetchCollectionRaw(api, root.peopleRef!!, root.peopleKey ?: "", vk).map { obj ->
+            fetchCollectionRaw(api, root.peopleRef!!, root.peopleKey ?: "", vk, allowNetwork).map { obj ->
                 GalleryRecordCodec.decodePerson(obj).also { personRawById[it.id] = obj }
             }
         } else {
@@ -195,55 +197,93 @@ class GalleryRepository(
     }
 
     /**
-     * Fetch + decrypt one photo shard's records. Retries a 404 (eventually-consistent object
-     * storage) 3× with backoff; a persistent 404 marks the store degraded and returns null (records
-     * skipped, descriptor kept). Any non-404 error throws (recoverable — never lose photos).
+     * Raw ciphertext for a content-addressed gallery blob (shard/collection). **Cache-first:**
+     * refs are content-addressed (a ref only ever names one immutable payload), so a cached hit
+     * is always current and skips the network entirely — this is what makes offline assembly
+     * work and speeds up warm online loads. On a miss with [allowNetwork], fetch (404-retried),
+     * persist the ciphertext when offline caching is on, and mark degraded on a persistent 404
+     * (only when [markDegraded]). Offline (`allowNetwork=false`) a miss returns null — that slice
+     * is simply unavailable until the next online load caches it.
      */
-    private suspend fun fetchGalleryShard(api: LedgerlineApi, s: de.ledgerline.app.domain.model.GalleryShard, vk: ByteArray): List<kotlinx.serialization.json.JsonObject>? {
+    private suspend fun blobCipher(
+        api: LedgerlineApi,
+        ref: String,
+        allowNetwork: Boolean,
+        markDegraded: Boolean,
+    ): ByteArray? {
+        blobCache.get(ref)?.let { return it }
+        if (!allowNetwork) return null
         var attempt = 0
         while (true) {
-            val r = api.galleryRaw(s.ref)
+            val r = api.galleryRaw(ref)
             if (r.isSuccessful) {
-                val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), s.key, vk, crypto)
-                return json.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
+                val bytes = r.body()!!.bytes()
+                if (offlineFlags.enabled()) blobCache.put(ref, bytes)
+                return bytes
             }
             if (r.code() == HttpURLConnection.HTTP_NOT_FOUND) {
                 if (attempt < 3) { kotlinx.coroutines.delay(500L * (1 shl attempt)); attempt++; continue }
-                _degraded.value = true
+                if (markDegraded) degradedState.setGallery(true)
                 return null
             }
-            error("gallery shard ${s.ref}: http ${r.code()}")
+            error("gallery blob $ref: http ${r.code()}")
         }
     }
 
-    /** Download + decrypt a collection blob (albums/people) into its raw record objects. */
+    /**
+     * Fetch + decrypt one photo shard's records. A durable 404 marks the store degraded and
+     * returns null (records skipped, descriptor kept, writes frozen). Offline: a cache miss
+     * returns null (those photos are unavailable until the next online load). Non-404 throws.
+     */
+    private suspend fun fetchGalleryShard(
+        api: LedgerlineApi,
+        s: de.ledgerline.app.domain.model.GalleryShard,
+        vk: ByteArray,
+        allowNetwork: Boolean,
+    ): List<kotlinx.serialization.json.JsonObject>? {
+        val cipher = blobCipher(api, s.ref, allowNetwork, markDegraded = true) ?: return null
+        val bytes = BlobDownloader.decrypt(cipher, s.key, vk, crypto)
+        return json.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
+    }
+
+    /**
+     * Download + decrypt a collection blob (albums/people) into its raw record objects. Online
+     * a fetch failure throws (never silently lose albums/people); offline a cache miss yields
+     * an empty list (that collection is unavailable until the next online load).
+     */
     private suspend fun fetchCollectionRaw(
         api: LedgerlineApi,
         ref: String,
         key: String,
         vk: ByteArray,
+        allowNetwork: Boolean,
     ): List<kotlinx.serialization.json.JsonObject> {
-        val r = api.galleryRaw(ref)
-        check(r.isSuccessful) { "gallery collection $ref: http ${r.code()}" }
-        val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), key, vk, crypto)
+        val cipher = blobCipher(api, ref, allowNetwork, markDegraded = false)
+            ?: if (allowNetwork) error("gallery collection $ref: unavailable") else return emptyList()
+        val bytes = BlobDownloader.decrypt(cipher, key, vk, crypto)
         return json.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
     }
 
     /**
-     * Network-first cache fallback: when a fetch fails with a non-auth error, try the
-     * on-disk sealed envelope and decrypt it in-memory with [vk]. Returns [err]
-     * unchanged if offline caching is off, no entry exists, or decryption fails.
+     * Network-first cache fallback: when a fetch fails with a non-auth error, decrypt the
+     * on-disk sealed **root** and assemble the manifest from the locally cached shard/collection
+     * blobs (no network). Photos/albums/people whose blobs were never prefetched are simply
+     * absent offline. Returns [err] unchanged if offline caching is off, no entry exists, or
+     * the root fails to decrypt/decode.
      */
-    private fun cachedOr(err: Outcome<Gallery>, vk: ByteArray): Outcome<Gallery> =
-        cachedOrStore(
-            cachingEnabled = offlineFlags.enabled(),
-            envelope = storeCache.get(KEY),
-            err = err,
-            open = { ct -> crypto.openManifest(ct, vk) },
-            decode = { plain -> json.decodeFromString<GalleryManifest>(plain) },
-            empty = { GalleryManifest() },
-            wrap = { m, v -> Gallery(m, v) },
-        )
+    private suspend fun cachedOr(err: Outcome<Gallery>, session: Session, vk: ByteArray): Outcome<Gallery> {
+        if (!offlineFlags.enabled()) return err
+        val env = storeCache.get(KEY) ?: return err
+        val ct = env.ciphertext ?: return Outcome.Ok(Gallery(GalleryManifest(), env.version))
+        val plain = crypto.openManifest(ct, vk) ?: return err
+        return try {
+            val root = json.decodeFromString<GalleryRoot>(plain)
+            val manifest = assembleManifest(root, session, vk, allowNetwork = false)
+            Outcome.Ok(Gallery(manifest, env.version))
+        } catch (_: Exception) {
+            err
+        }
+    }
 
     /**
      * Optimistic write: apply [mutate] to the current manifest, PUT it; on 409 reload
@@ -260,7 +300,7 @@ class GalleryRepository(
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         // Frozen while degraded: a shard blob is missing; rewriting the root would drop it for good.
-        if (_degraded.value) return@withContext Outcome.Err(ErrorKind.HTTP)
+        if (degradedState.gallery.value) return@withContext Outcome.Err(ErrorKind.HTTP)
         val api = apiProvider(session)
 
         var base = cache.value.value
@@ -303,7 +343,7 @@ class GalleryRepository(
                     version = body.version
                     val serverManifest = body.ciphertext?.let { ct ->
                         val plain = crypto.openManifest(ct, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
-                        assembleManifest(json.decodeFromString<GalleryRoot>(plain), session, vk)
+                        assembleManifest(json.decodeFromString<GalleryRoot>(plain), session, vk, allowNetwork = true)
                     } ?: GalleryManifest().also { priorRoot = GalleryShardWriter.RootState() }
                     next = mutate(serverManifest)
                 }
