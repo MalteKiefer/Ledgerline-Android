@@ -207,7 +207,7 @@ fun GalleryScreen(
                 showCamera = false
                 val ts = System.currentTimeMillis()
                 vm.uploadAll(
-                    listOf(PhotoSource(name = "IMG_$ts.jpg", mime = "image/jpeg", read = { bytes }, lat = lat, lng = lng))
+                    listOf(PhotoSource(name = "IMG_$ts.jpg", mime = "image/jpeg", size = bytes.size.toLong(), openInput = { java.io.ByteArrayInputStream(bytes) }, lat = lat, lng = lng))
                 )
             },
             onBack = { showCamera = false },
@@ -484,7 +484,8 @@ private fun PhotosTab(
                 PhotoSource(
                     name = queryPhotoName(context, uri),
                     mime = context.contentResolver.getType(uri) ?: "image/jpeg",
-                    read = { (context.contentResolver.openInputStream(uri) ?: error("cannot open $uri")).use { it.readBytes() } },
+                    size = de.ledgerline.app.core.util.blobSize(context.contentResolver, uri),
+                    openInput = { context.contentResolver.openInputStream(uri) ?: error("cannot open $uri") },
                 )
             }
             vm.uploadAll(sources)

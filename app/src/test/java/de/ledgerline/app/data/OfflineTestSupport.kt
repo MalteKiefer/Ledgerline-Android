@@ -105,7 +105,8 @@ fun tmpBlobCache(): BlobDiskCache =
  *  gallery tests that never upload (load-path tests). */
 object NoGalleryUpload : de.ledgerline.app.domain.usecase.GalleryUploadApi {
     override suspend fun uploadBytes(bytes: ByteArray, name: String) = throw NotImplementedError()
-    override suspend fun process(bytes: ByteArray, name: String, mime: String) = throw NotImplementedError()
+    override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
+    override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
 }
 
 open class NotImplementedApi : LedgerlineApi {

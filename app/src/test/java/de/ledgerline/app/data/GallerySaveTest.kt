@@ -124,7 +124,9 @@ class GallerySaveTest {
         val fakeUpload = object : de.ledgerline.app.domain.usecase.GalleryUploadApi {
             override suspend fun uploadBytes(bytes: ByteArray, name: String) =
                 Outcome.Ok(UploadedBlob("shard-blob", "shard-key", bytes.size.toLong()))
-            override suspend fun process(bytes: ByteArray, name: String, mime: String) = throw NotImplementedError()
+            override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream) =
+                Outcome.Ok(UploadedBlob("shard-blob", "shard-key", size))
+            override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
         }
 
         val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), fakeUpload, apiProvider = { fakeApi })

@@ -107,16 +107,32 @@ class GalleryBlobRepository @VisibleForTesting internal constructor(
         } catch (_: Exception) { false }
     }
 
-    override suspend fun uploadBytes(bytes: ByteArray, name: String): Outcome<UploadedBlob> = withContext(Dispatchers.IO) {
+    override suspend fun uploadBytes(bytes: ByteArray, name: String): Outcome<UploadedBlob> =
+        uploadStream(name, bytes.size.toLong()) { java.io.ByteArrayInputStream(bytes) }
+
+    override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream): Outcome<UploadedBlob> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val enc = crypto.newContentEncryptor(vk)
-        val body = EncryptedUpload.body(enc, crypto.contentChunkSize, bytes.size.toLong()) { java.io.ByteArrayInputStream(bytes) }
+        val api = apiProvider(session)
+        // Large originals (videos) go via the S3-multipart chunked path (constant memory); smaller
+        // blobs stream single-shot. Either way the plaintext is never fully held in RAM.
+        if (size >= ChunkedUpload.THRESHOLD) {
+            return@withContext ChunkedUpload.upload(
+                encryptor = enc, chunkSize = crypto.contentChunkSize, size = size, openInput = openInput,
+                tempDir = blobCache.tempDir(),
+                init = { encSize -> api.galleryUploadInit(de.ledgerline.app.data.remote.dto.UploadInitRequest(encSize)).bodyOrNull() },
+                part = { token, num, chunk -> api.galleryUploadPart(token.textPart(), num.toString().textPart(), chunk.chunkPart(num)).bodyOrNull() },
+                complete = { token, parts -> api.galleryUploadComplete(de.ledgerline.app.data.remote.dto.UploadCompleteRequest(token, parts)).bodyOrNull()?.id },
+                abort = { token -> runCatching { api.galleryUploadAbort(de.ledgerline.app.data.remote.dto.UploadAbortRequest(token)) } },
+            )
+        }
+        val body = EncryptedUpload.body(enc, crypto.contentChunkSize, size, openInput)
         try {
             val part = MultipartBody.Part.createFormData("file", name, body)
-            val res = apiProvider(session).galleryUpload(part)
+            val res = api.galleryUpload(part)
             if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
-            Outcome.Ok(UploadedBlob(res.body()!!.id, enc.sealKey(), bytes.size.toLong()))
+            Outcome.Ok(UploadedBlob(res.body()!!.id, enc.sealKey(), size))
         } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
     }
 
@@ -130,11 +146,11 @@ class GalleryBlobRepository @VisibleForTesting internal constructor(
         deleteBlobsWithBackoff(refs) { api.deleteGalleryBlob(it) }
     }
 
-    override suspend fun process(bytes: ByteArray, name: String, mime: String): Outcome<ProcessResponse> = withContext(Dispatchers.IO) {
+    override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream): Outcome<ProcessResponse> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         try {
-            val requestBody = bytes.toRequestBody(mime.toMediaTypeOrNull())
-            val part = MultipartBody.Part.createFormData("file", name, requestBody)
+            // Stream the plaintext to the server (never held fully in RAM — large videos would OOM).
+            val part = MultipartBody.Part.createFormData("file", name, plaintextStreamBody(mime, size, openInput))
             val res = apiProvider(session).galleryProcess(part)
             if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
             Outcome.Ok(res.body()!!)

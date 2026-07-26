@@ -37,8 +37,8 @@ class ImportPhotosImpl @Inject constructor(
         val failedSources = mutableListOf<PhotoSource>()
 
         for (src in sources) {
-            val bytes = try {
-                src.read()
+            val sig = try {
+                fileSig(src.openInput, src.size)
             } catch (_: Exception) {
                 failed++
                 failedSources += src
@@ -47,7 +47,6 @@ class ImportPhotosImpl @Inject constructor(
                 continue
             }
 
-            val sig = fileSig(bytes)
             if (sig in existing) {
                 // Dedup: already present in the gallery index.
                 done++
@@ -55,7 +54,7 @@ class ImportPhotosImpl @Inject constructor(
                 continue
             }
 
-            when (val up = uploader.upload(src.name, src.mime, sig, bytes, nowIso(), src.lat, src.lng)) {
+            when (val up = uploader.upload(src.name, src.mime, sig, src.size, src.openInput, nowIso(), src.lat, src.lng)) {
                 is Outcome.Ok -> {
                     mutate.invoke { it.copy(photos = it.photos + up.value) }
                     existing += sig
@@ -69,16 +68,45 @@ class ImportPhotosImpl @Inject constructor(
         return ImportResult(done, failed, failedSources)
     }
 
-    /** Duplicate signature, byte-compatible with the web `_fileSig`:
-     *  "${size}:${hex(sha256(first1MiB ++ last1MiB))}" (tail empty when size <= 1 MiB). */
-    private fun fileSig(bytes: ByteArray): String {
+    /**
+     * Duplicate signature, byte-compatible with the web `_fileSig`:
+     * `"${size}:${hex(sha256(first1MiB ++ last1MiB))}"` (tail omitted when size <= 1 MiB).
+     * Reads only the first + last 1 MiB by (re-)streaming from [openInput] — never the whole file.
+     */
+    private fun fileSig(openInput: () -> java.io.InputStream, size: Long): String {
         val cap = 1024 * 1024
-        val size = bytes.size
         val md = MessageDigest.getInstance("SHA-256")
-        md.update(bytes, 0, minOf(cap, size))
-        if (size > cap) md.update(bytes, size - cap, cap)
+        val head = ByteArray(minOf(cap.toLong(), size).toInt())
+        openInput().use { readFully(it, head) }
+        md.update(head)
+        if (size > cap) {
+            val tail = ByteArray(cap)
+            openInput().use { ins -> skipFully(ins, size - cap); readFully(ins, tail) }
+            md.update(tail)
+        }
         val hex = md.digest().joinToString("") { "%02x".format(it) }
         return "$size:$hex"
+    }
+
+    /** Read exactly [buf].size bytes (or throw). */
+    private fun readFully(ins: java.io.InputStream, buf: ByteArray) {
+        var off = 0
+        while (off < buf.size) {
+            val n = ins.read(buf, off, buf.size - off)
+            if (n < 0) throw java.io.EOFException()
+            off += n
+        }
+    }
+
+    /** Skip exactly [n] bytes (InputStream.skip may skip fewer). */
+    private fun skipFully(ins: java.io.InputStream, n: Long) {
+        var left = n
+        while (left > 0) {
+            val s = ins.skip(left)
+            if (s > 0) { left -= s; continue }
+            if (ins.read() < 0) throw java.io.EOFException()
+            left--
+        }
     }
 
     private fun nowIso(): String = OffsetDateTime.now(ZoneOffset.UTC).toString()

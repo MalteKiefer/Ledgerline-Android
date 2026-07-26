@@ -7,11 +7,14 @@ import de.ledgerline.app.data.remote.dto.PartRef
 import de.ledgerline.app.data.remote.dto.UploadInitResponse
 import de.ledgerline.app.data.remote.dto.UploadPartResponse
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okio.BufferedSink
 import okio.buffer
 import okio.sink
+import okio.source
 import retrofit2.Response
 import java.io.File
 import java.io.InputStream
@@ -19,6 +22,18 @@ import java.io.InputStream
 /** Retrofit/multipart helpers shared by the files + gallery chunked-upload wiring. */
 fun <T> Response<T>.bodyOrNull(): T? = if (isSuccessful) body() else null
 fun String.textPart(): RequestBody = toRequestBody("text/plain".toMediaType())
+
+/**
+ * A **plaintext** streaming request body of exactly [size] bytes read from [openInput] on demand —
+ * so a large original is never held in memory (used for `/gallery/process`, which needs the raw
+ * bytes). For ENCRYPTED content uploads use [EncryptedUpload.body] instead.
+ */
+fun plaintextStreamBody(mime: String, size: Long, openInput: () -> InputStream): RequestBody =
+    object : RequestBody() {
+        override fun contentType() = mime.toMediaTypeOrNull()
+        override fun contentLength() = size
+        override fun writeTo(sink: BufferedSink) { openInput().use { sink.writeAll(it.source()) } }
+    }
 fun ByteArray.chunkPart(num: Int): MultipartBody.Part =
     MultipartBody.Part.createFormData("chunk", "part$num", toRequestBody("application/octet-stream".toMediaType()))
 

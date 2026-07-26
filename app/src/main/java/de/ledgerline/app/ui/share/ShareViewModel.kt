@@ -108,10 +108,8 @@ class ShareViewModel @Inject constructor(
     private fun SharedItem.toPhotoSource() = PhotoSource(
         name = name,
         mime = mime,
-        read = {
-            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                ?: error("cannot open $uri")
-        },
+        size = de.ledgerline.app.core.util.blobSize(context.contentResolver, uri),
+        openInput = { context.contentResolver.openInputStream(uri) ?: error("cannot open $uri") },
         lat = null,
         lng = null,
     )

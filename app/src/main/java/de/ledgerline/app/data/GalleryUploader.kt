@@ -40,13 +40,16 @@ class GalleryUploader @VisibleForTesting internal constructor(
         name: String,
         mime: String,
         sig: String,
-        bytes: ByteArray,
+        size: Long,
+        openInput: () -> java.io.InputStream,
         createdIso: String,
         lat: Double? = null,
         lng: Double? = null,
     ): Outcome<GalleryPhoto> {
-        val original = blobs.uploadBytes(bytes, name).okOr { return it }
-        val d = blobs.process(bytes, name, mime).okOr { return it }
+        // Both the original upload and /gallery/process STREAM from the source — the plaintext
+        // (a multi-GB video) is never fully held in memory.
+        val original = blobs.uploadStream(name, size, openInput).okOr { return it }
+        val d = blobs.process(name, mime, size, openInput).okOr { return it }
 
         val thumb = d.thumb?.let { blobs.uploadBytes(decodeBase64(it), "thumb.enc").okOr { e -> return e } }
         val medium = d.medium?.let { blobs.uploadBytes(decodeBase64(it), "medium.enc").okOr { e -> return e } }
@@ -111,7 +114,7 @@ class GalleryUploader @VisibleForTesting internal constructor(
             content_id = d.content_id,
             name = name,
             mime = mime,          // web needs this for video playback + original download
-            size = bytes.size.toLong(),
+            size = size,
         )
         return Outcome.Ok(entry)
     }
