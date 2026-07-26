@@ -43,6 +43,14 @@ interface Crypto {
     /** crypto_generichash (BLAKE2b) to [outLen] bytes, keyless. */
     fun genericHash(input: ByteArray, outLen: Int): ByteArray = throw NotImplementedError()
 
+    /**
+     * Constant-time equality for secret comparisons (TOFU fingerprints, MACs), routed
+     * through libsodium `sodium_memcmp` in [SodiumCrypto] (vetted primitive). Unequal
+     * lengths return false without probing the bytes. The default falls back to the
+     * pure-Kotlin [ConstantTime.equal] so lightweight test fakes need no override.
+     */
+    fun constantTimeEquals(a: ByteArray, b: ByteArray): Boolean = ConstantTime.equal(a, b)
+
     /** Plaintext slice size a caller must feed the streaming content cipher (4 MiB). */
     val contentChunkSize: Int
 

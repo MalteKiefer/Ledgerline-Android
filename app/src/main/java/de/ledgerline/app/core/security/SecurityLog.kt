@@ -28,6 +28,8 @@ enum class SecurityEventType {
     DURESS_WIPE,
     REMOTE_WIPE,
     LOGOUT,
+    /** A client-integrity check flagged a non-hardware-attested key or a rooted/tampered device (informational, never blocking). */
+    INTEGRITY_WARNING,
 }
 
 @Serializable

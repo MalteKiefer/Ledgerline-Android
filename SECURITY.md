@@ -56,12 +56,16 @@ Byte-compatible with the reference web client (`resources/js/vault.js`):
 ## Application lock
 
 A biometric / device-credential prompt is required immediately before the sealed
-session is read or written (post-pairing seal, and pre-unlock load). The keystore
-key uses a short time-bound auth window so a standard `BiometricPrompt` authorizes
-the operation.
+session is read or written (post-pairing seal, and pre-unlock load). Each keystore
+operation is bound to a **per-use `CryptoObject`** (auth validity 0): exactly one
+biometric prompt authorizes exactly that one decrypt/encrypt, with no time window a
+later operation could ride on. The remembered-vault key (opt-in) is class-3-biometric
+only — a device PIN alone cannot unwrap the persisted Vault Key.
 
-Future hardening: bind a `CryptoObject` to each key operation for per-use auth
-instead of a time-bound window.
+Secret input fields (master passphrase, recovery code, and every password-manager
+secret field) use the password input type, which excludes them from keyboard
+personalized-learning and autocorrect/suggestions, so a typed secret is never
+persisted into the IME's learned-words store.
 
 ## Screen & backup protection
 
@@ -93,8 +97,12 @@ secretbox/secretstream; **suite-tagged, canonical-JSON, Padmé-padded** sealed m
 byte-verified) for sharing crypto; per-use `CryptoObject`-bound biometric Keystore keys
 (StrongBox where available); an unlock throttle, always-on duress auto-wipe, monotonic
 idle-lock, clock-rollback guard, and an encrypted local security audit log; `FLAG_SECURE`
-app-wide; remote-wipe kill switch. The Vault Key lives in memory only and is zeroed on
-background/idle and when replaced.
+app-wide; remote-wipe kill switch. Secret comparisons run in constant time via libsodium
+`sodium_memcmp`. At pairing the app performs an **advisory client-integrity check** — Android
+Keystore key attestation (proves keys are TEE/StrongBox-backed, detects an emulated keystore)
+plus lightweight root/tamper heuristics — surfaced in Settings → Security and the audit log.
+It is **never** blocking: a legitimately-rooted privacy ROM is warned, not locked out. The
+Vault Key lives in memory only and is zeroed on background/idle and when replaced.
 
 ## Revocation
 

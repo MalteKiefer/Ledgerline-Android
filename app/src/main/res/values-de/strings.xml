@@ -92,6 +92,7 @@
     <string name="ws_empty_bookmarks">Noch keine Lesezeichen.</string>
     <string name="ws_empty_todos">Noch keine Todos.</string>
     <string name="ws_error">Workspace konnte nicht geladen werden.</string>
+    <string name="store_degraded">Einige Elemente konnten gerade nicht geladen werden — es wurde nichts gelöscht, und die Bearbeitung pausiert, bis sie wieder da sind.</string>
     <string name="ws_retry">Erneut versuchen</string>
     <string name="ws_reauth">Sitzung abgelaufen — Gerät neu koppeln.</string>
     <string name="ws_file_phase3">Dateien öffnen kommt in einer späteren Version.</string>
@@ -259,6 +260,15 @@
     <string name="settings_date_format_ymd">JJJJ-MM-TT</string>
     <string name="settings_date_format_mdy">MM/TT/JJJJ</string>
     <string name="settings_security">Sicherheit</string>
+    <string name="settings_integrity_title">Geräte-Integrität</string>
+    <string name="integrity_ok">Geräte-Integrität bestätigt</string>
+    <string name="integrity_warning">Geräte-Integritätswarnung</string>
+    <string name="integrity_attest_label">Schlüssel-Attestierung: %1$s</string>
+    <string name="integrity_attest_strongbox">StrongBox (Hardware)</string>
+    <string name="integrity_attest_tee">Trusted Execution Environment</string>
+    <string name="integrity_attest_software">nur Software</string>
+    <string name="integrity_attest_unverified">nicht überprüfbar</string>
+    <string name="integrity_root_detected">Root-/Manipulationshinweise: %1$s</string>
     <string name="settings_idle_timeout">Automatisch sperren nach</string>
     <string name="settings_lock_now">Jetzt sperren</string>
     <string name="settings_background_ops_title">Hintergrund-Verarbeitung</string>

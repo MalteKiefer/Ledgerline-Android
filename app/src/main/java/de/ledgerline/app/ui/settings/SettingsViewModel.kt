@@ -57,7 +57,14 @@ class SettingsViewModel @Inject constructor(
     private val rememberedVault: RememberedVaultStore,
     private val biometric: BiometricAvailability,
     private val securityLog: de.ledgerline.app.core.security.SecurityLog,
+    private val integrity: de.ledgerline.app.core.integrity.IntegritySignal,
 ) : ViewModel() {
+
+    /** §3.6 client-integrity report (attestation + root heuristics); null until assessed. */
+    private val _integrity = MutableStateFlow<de.ledgerline.app.core.integrity.IntegrityReport?>(null)
+    val integrityReport: StateFlow<de.ledgerline.app.core.integrity.IntegrityReport?> = _integrity.asStateFlow()
+
+    init { viewModelScope.launch { _integrity.value = integrity.assess() } }
 
     /** STRONG biometrics enrolled — gates whether the "remember unlock" toggle is usable. */
     val strongBiometricAvailable: Boolean = biometric.strongEnrolled()

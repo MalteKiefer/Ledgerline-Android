@@ -93,6 +93,7 @@
     <string name="ws_empty_bookmarks">Пока нет закладок.</string>
     <string name="ws_empty_todos">Пока нет задач.</string>
     <string name="ws_error">Не удалось загрузить рабочую область.</string>
+    <string name="store_degraded">Некоторые элементы сейчас не удалось загрузить — ничего не удалено, редактирование приостановлено до их восстановления.</string>
     <string name="ws_retry">Повторить</string>
     <string name="ws_reauth">Сессия истекла — подключите это устройство заново.</string>
     <string name="ws_file_phase3">Открытие файлов появится в более поздней версии.</string>
@@ -275,6 +276,15 @@
     <string name="settings_date_format_ymd">ГГГГ-ММ-ДД</string>
     <string name="settings_date_format_mdy">ММ/ДД/ГГГГ</string>
     <string name="settings_security">Безопасность</string>
+    <string name="settings_integrity_title">Целостность устройства</string>
+    <string name="integrity_ok">Целостность устройства подтверждена</string>
+    <string name="integrity_warning">Предупреждение о целостности устройства</string>
+    <string name="integrity_attest_label">Аттестация ключа: %1$s</string>
+    <string name="integrity_attest_strongbox">StrongBox (аппаратно)</string>
+    <string name="integrity_attest_tee">Trusted Execution Environment</string>
+    <string name="integrity_attest_software">только программно</string>
+    <string name="integrity_attest_unverified">невозможно проверить</string>
+    <string name="integrity_root_detected">Признаки root/вмешательства: %1$s</string>
     <string name="settings_idle_timeout">Авто-блокировка через</string>
     <string name="settings_lock_now">Заблокировать сейчас</string>
     <string name="settings_background_ops_title">Фоновая обработка</string>

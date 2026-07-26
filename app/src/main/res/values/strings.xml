@@ -92,6 +92,7 @@
     <string name="ws_empty_bookmarks">No bookmarks yet.</string>
     <string name="ws_empty_todos">No todos yet.</string>
     <string name="ws_error">Couldn\'t load your workspace.</string>
+    <string name="store_degraded">Some items could not be loaded right now — nothing was deleted, and editing is paused until they are back.</string>
     <string name="ws_retry">Retry</string>
     <string name="ws_reauth">Session expired — re-pair this device.</string>
     <string name="ws_file_phase3">Opening files arrives in a later version.</string>
@@ -274,6 +275,15 @@
     <string name="settings_date_format_ymd">YYYY-MM-DD</string>
     <string name="settings_date_format_mdy">MM/DD/YYYY</string>
     <string name="settings_security">Security</string>
+    <string name="settings_integrity_title">Device integrity</string>
+    <string name="integrity_ok">Device integrity verified</string>
+    <string name="integrity_warning">Device integrity warning</string>
+    <string name="integrity_attest_label">Key attestation: %1$s</string>
+    <string name="integrity_attest_strongbox">StrongBox (hardware)</string>
+    <string name="integrity_attest_tee">Trusted Execution Environment</string>
+    <string name="integrity_attest_software">software only</string>
+    <string name="integrity_attest_unverified">not verifiable</string>
+    <string name="integrity_root_detected">Root/tamper indicators: %1$s</string>
     <string name="settings_idle_timeout">Auto-lock after</string>
     <string name="settings_lock_now">Lock now</string>
     <string name="settings_background_ops_title">Background processing</string>

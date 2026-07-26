@@ -481,7 +481,7 @@ private fun PwEdit(item: SecretItem, vm: PasswordsViewModel, onCancel: () -> Uni
                             label = { Text(fieldLabel(key)) },
                             singleLine = key != "note",
                             visualTransformation = if (secret) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
-                            keyboardOptions = if (secret) KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false) else KeyboardOptions.Default,
+                            keyboardOptions = if (secret) de.ledgerline.app.ui.common.secretKeyboardOptions() else KeyboardOptions.Default,
                             trailingIcon = if (key == "password") {
                                 { IconButton(onClick = { genSheet = true }) { Icon(Icons.Outlined.Refresh, contentDescription = "Generate") } }
                             } else null,
@@ -596,6 +596,8 @@ private fun CustomFieldsEditor(custom: MutableList<de.ledgerline.app.domain.mode
                     label = { Text(stringResource(de.ledgerline.app.R.string.pw_custom_value)) },
                     singleLine = true, modifier = Modifier.weight(1f),
                     visualTransformation = if (cf.kind == "secret") PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+                    // §3.3: a secret custom field must be excluded from IME learning too.
+                    keyboardOptions = if (cf.kind == "secret") de.ledgerline.app.ui.common.secretKeyboardOptions() else KeyboardOptions.Default,
                 )
                 IconButton(onClick = { custom.removeAt(i) }) { Icon(Icons.Outlined.Delete, contentDescription = "remove") }
             }

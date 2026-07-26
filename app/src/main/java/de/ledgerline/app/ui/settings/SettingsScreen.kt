@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +36,8 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.GppMaybe
+import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Sync
@@ -120,6 +124,7 @@ fun SettingsContent(
     val rememberVaultDays by vm.rememberVaultDays.collectAsStateWithLifecycle()
     val duressThreshold by vm.duressThreshold.collectAsStateWithLifecycle()
     val securityEvents by vm.securityEvents.collectAsStateWithLifecycle()
+    val integrityReport by vm.integrityReport.collectAsStateWithLifecycle()
     val mapTiles by vm.mapTilesEnabled.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
     val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
@@ -227,6 +232,7 @@ fun SettingsContent(
                     onSetDuressThreshold = vm::setDuressThreshold,
                     securityEvents = securityEvents,
                     onClearSecurityLog = vm::clearSecurityLog,
+                    integrity = integrityReport,
                 )
 
                 SettingsRoute.OFFLINE -> OfflineSettings(
@@ -539,8 +545,11 @@ private fun SecuritySettings(
     onSetDuressThreshold: (Int) -> Unit,
     securityEvents: List<de.ledgerline.app.core.security.SecurityLogEntry>,
     onClearSecurityLog: () -> Unit,
+    integrity: de.ledgerline.app.core.integrity.IntegrityReport?,
 ) {
     SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_integrity_title))
+        IntegrityCard(integrity)
         SectionHeader(stringResource(R.string.settings_security))
         Text(
             stringResource(R.string.settings_idle_timeout),
@@ -1105,4 +1114,52 @@ private fun applyLanguage(context: Context, tag: String) {
     val lm = context.getSystemService(LocaleManager::class.java)
     lm.applicationLocales =
         if (tag.isEmpty()) LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(tag)
+}
+
+/**
+ * §3.6 — informational client-integrity card: Keystore attestation level + root/tamper
+ * heuristics. Advisory only (never blocks); a rooted privacy ROM is a warning, not a lockout.
+ */
+@Composable
+private fun IntegrityCard(report: de.ledgerline.app.core.integrity.IntegrityReport?) {
+    val clean = report?.clean == true
+    val tint = if (clean) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (clean) Icons.Outlined.VerifiedUser else Icons.Outlined.GppMaybe,
+            contentDescription = null,
+            tint = tint,
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            val attest = when (report?.attestation) {
+                de.ledgerline.app.core.integrity.AttestationLevel.STRONGBOX -> stringResource(R.string.integrity_attest_strongbox)
+                de.ledgerline.app.core.integrity.AttestationLevel.TEE -> stringResource(R.string.integrity_attest_tee)
+                de.ledgerline.app.core.integrity.AttestationLevel.SOFTWARE -> stringResource(R.string.integrity_attest_software)
+                else -> stringResource(R.string.integrity_attest_unverified)
+            }
+            Text(
+                if (clean) stringResource(R.string.integrity_ok) else stringResource(R.string.integrity_warning),
+                style = MaterialTheme.typography.bodyLarge,
+                color = tint,
+            )
+            Text(
+                stringResource(R.string.integrity_attest_label, attest),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (report?.rooted == true) {
+                Text(
+                    stringResource(R.string.integrity_root_detected, report.rootReasons.joinToString(", ")),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }

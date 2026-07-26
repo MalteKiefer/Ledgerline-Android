@@ -23,7 +23,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class SodiumCrypto @Inject constructor() : Crypto {
-    private val ls = LazySodiumAndroid(SodiumAndroid())
+    private val sodium = SodiumAndroid()
+    private val ls = LazySodiumAndroid(sodium)
 
     override fun deriveKek(passphrase: ByteArray, salt: ByteArray, opsLimit: Long, memLimit: Long): ByteArray {
         require(salt.size == PwHash.SALTBYTES) { "salt must be ${PwHash.SALTBYTES} bytes" }
@@ -130,6 +131,17 @@ class SodiumCrypto @Inject constructor() : Crypto {
         val out = ByteArray(outLen)
         check(ls.cryptoGenericHash(out, out.size, input, input.size.toLong())) { "generichash failed" }
         return out
+    }
+
+    /**
+     * Constant-time equality via libsodium `sodium_memcmp` (vetted primitive; §28). Lengths
+     * are compared first (not secret for the fixed-size fingerprints/MACs we compare); a
+     * length mismatch returns false without calling into native code. `sodium_memcmp` returns
+     * 0 iff the [len]-byte prefixes are equal, in constant time.
+     */
+    override fun constantTimeEquals(a: ByteArray, b: ByteArray): Boolean {
+        if (a.size != b.size) return false
+        return sodium.sodium_memcmp(a, b, a.size) == 0
     }
 
     /** Test-only: secretbox-seal [plaintext] with an explicit [nonce] (byte-parity fixtures). */

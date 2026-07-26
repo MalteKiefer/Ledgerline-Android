@@ -407,6 +407,17 @@ Blob-Uploads resumable nachholen. Settings: Master-Schalter „Alles offline" + 
 (Files/Gallery/Notizen/Lesezeichen/Todos), Blob-Strategie (alle/Favoriten/Thumbnails/aus),
 Wi-Fi-/Laden-Constraint, Cache-Limit + „Cache leeren" pro Modul.
 
+> **Sharded-Offline erledigt (2026-07-26):** die **sharded** Gallery- **und** Files-Stores
+> assemblen jetzt kalt-offline. Shard-/Collection-Blob-Fetches laufen cache-first + write-through
+> über `BlobDiskCache` (content-addressed Refs = unveränderlich → Cache-Hit ist immer aktuell,
+> beschleunigt auch warme Online-Loads). `assembleManifest`/`assembleFilesSlice` tragen ein
+> `allowNetwork`-Flag (online lädt+cached, offline liest nur Cache; nicht-gecachte Slices fehlen).
+> Der **Root**-Envelope wird ebenfalls gecacht (Gallery `storeCache["gallery"]`, Files neuer Key
+> `workspace_files_root`; Files-Save + `refreshStoreCache` halten ihn aktuell). Frisch geschriebene
+> Shard-Content-Blobs werden erst beim nächsten Online-Load gecacht (Uploader hält den Ciphertext
+> nicht). Tests: `OfflineStoreLoadTest.{gallery,files}_v3_online_caches_shard_blobs_then_offline_
+> assembles_them`. Behebt den früheren „Tab offline leer"-Bug (Root dekodierte flach → leer).
+
 ## 12. Share-Target (Kern-Anforderung)
 App als `ACTION_SEND`/`ACTION_SEND_MULTIPLE`-Ziel. `image/*`,`video/*` → Gallery-Import;
 alles andere → Files-Import (Ziel-Ordner wählbar). Kurzes Bestätigungs-Sheet. Offline → Queue.
@@ -559,13 +570,24 @@ Supply-Chain). **Bei jeder Änderung mitpflegen.**
   Data-Extraction-Rules schließen Cloud-/Device-Transfer aus.
 - **Side-Channels (teilweise):** `FLAG_SECURE` app-weit (Screenshot/Recording/Recents-Block).
   Kein Secret-Logging (R8 strippt Debug; CI-Greps). **Idle-Lock monotonic** (`IdleLocker`
-  elapsedRealtime — Wall-Clock-Sprung verschiebt Lock nicht).
+  elapsedRealtime — Wall-Clock-Sprung verschiebt Lock nicht). **IME-Härtung (2026-07-26):**
+  alle Secret-Felder (Master-Passphrase, Recovery-Code, Passwort-Manager-Secrets inkl. Custom-
+  Secret-Felder) nutzen `KeyboardType.Password` + `autoCorrectEnabled=false` (zentral
+  `ui/common/secretKeyboardOptions()`) → aus IME-Learning/Autocorrect ausgeschlossen.
+- **Client-Integrität (2026-07-26, advisory, §3.6):** `IntegritySignal`/`AndroidIntegritySignal`
+  (AOSP-only, `foss`-Baseline, via `CryptoModule` gebunden) — **Keystore-Key-Attestation** (Temp-
+  EC-Key mit `setAttestationChallenge`, Cert-Chain → KeyDescription-Extension `1.3.6.1.4.1.11129.2.1.17`
+  via BouncyCastle → `STRONGBOX`/`TEE`/`SOFTWARE`/`UNVERIFIED`) **+ Root-/Tamper-Heuristik** (su/Magisk/
+  test-keys). **Nie blockierend** (GrapheneOS-safe). Assessment bei Pairing (loggt `INTEGRITY_WARNING`
+  wenn nicht clean) + Live-Anzeige in Settings→Sicherheit (`IntegrityCard`). Test `IntegrityReportTest`.
 - **Clock-Rollback-Guard (2026-07-25):** forward-only Wall-Clock-High-Water
   (`ClockRollbackGuard`, Keystore-versiegelt); ein Rückwärts-Sprung > 5 min sperrt den
   passphrase-freien Remember-Vault-Pfad (fail-closed → Passphrase). Gate in `UnlockViewModel`.
-- **Constant-Time-Compare (2026-07-25):** `ConstantTime.equal` für Secret-Vergleiche
-  (TOFU-Fingerprints etc.). Uniformer opaquer Decrypt-Fehler: `SodiumCrypto` liefert für
-  alle Fehlermodi `null` (ununterscheidbar).
+- **Constant-Time-Compare (2026-07-25, libsodium 2026-07-26):** Secret-Vergleiche laufen über
+  `Crypto.constantTimeEquals` = libsodium `sodium_memcmp` in `SodiumCrypto` (vetted primitive;
+  `IdentityCrypto`-TOFU-Fingerprint nutzt es). `ConstantTime.equal` bleibt als pure-Kotlin-Fallback
+  (Default der Interface-Methode, für Test-Fakes). Uniformer opaquer Decrypt-Fehler: `SodiumCrypto`
+  liefert für alle Fehlermodi `null` (ununterscheidbar).
 - **Unlock-Throttle (2026-07-25):** monotoner exponentieller Lockout (`UnlockThrottle`,
   elapsedRealtime, 3 Freiversuche → 2s/4s/8s… cap 300s, **nie destruktiv**). Gate im
   `UnlockViewModel`; nur echte Passphrase-Fehler zählen. Tests `SecurityGuardsTest`.
