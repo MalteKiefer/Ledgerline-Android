@@ -38,6 +38,16 @@ interface LedgerlineApi {
     @POST("api/v1/auth/pair/collect")
     suspend fun pollPair(@Body body: de.ledgerline.app.data.remote.dto.PairCollectRequest): Response<PairPollResponse>
 
+    // Connected-device management (owner-scoped).
+    @GET("api/v1/devices")
+    suspend fun devices(): Response<de.ledgerline.app.data.remote.dto.DevicesResponse>
+
+    @DELETE("api/v1/devices/{token}")
+    suspend fun revokeDevice(@Path("token") token: String): Response<Unit>
+
+    @POST("api/v1/devices/{token}/wipe")
+    suspend fun wipeDevice(@Path("token") token: String): Response<Unit>
+
     @GET("api/v1/me")
     suspend fun me(): Response<MeResponse>
 

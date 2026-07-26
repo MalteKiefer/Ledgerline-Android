@@ -41,3 +41,21 @@ import kotlinx.serialization.Serializable
     val files: Long? = null,
     val gallery: Long? = null,
 )
+
+/** `GET /api/v1/devices` → the owner's paired devices (Sanctum tokens). */
+@kotlinx.serialization.Serializable
+data class DevicesResponse(val devices: List<DeviceDto> = emptyList())
+
+/** One paired device row. `id` is the token id used to revoke/wipe it; `current` = this device. */
+@kotlinx.serialization.Serializable
+data class DeviceDto(
+    // Sanctum token PK (numeric); used as the {token} path segment for revoke/wipe.
+    val id: Long = 0,
+    val current: Boolean = false,
+    val name: String = "",
+    val meta: String = "",
+    val version: String? = null,
+    val installId: String? = null,
+    val syncing: Boolean = false,
+    val wipeRequested: Boolean = false,
+)

@@ -572,4 +572,9 @@
     <string name="cd_remove">Entfernen</string>
     <string name="settings_licenses">Open-Source-Lizenzen</string>
     <string name="settings_licenses_sub">Die Bibliotheken, die Ledgerline ermöglichen</string>
+    <string name="settings_devices">Verbundene Geräte</string>
+    <string name="settings_device_this">%1$s (dieses Gerät)</string>
+    <string name="settings_device_revoke">Widerrufen</string>
+    <string name="settings_device_wipe">Remote-Löschung</string>
+    <string name="settings_device_wipe_pending">Löschung angefordert</string>
 </resources>

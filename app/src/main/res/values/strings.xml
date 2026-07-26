@@ -574,4 +574,9 @@
     <string name="cd_remove">Remove</string>
     <string name="settings_licenses">Open-source licenses</string>
     <string name="settings_licenses_sub">The libraries that make Ledgerline possible</string>
+    <string name="settings_devices">Connected devices</string>
+    <string name="settings_device_this">%1$s (this device)</string>
+    <string name="settings_device_revoke">Revoke</string>
+    <string name="settings_device_wipe">Remote wipe</string>
+    <string name="settings_device_wipe_pending">Wipe requested</string>
 </resources>

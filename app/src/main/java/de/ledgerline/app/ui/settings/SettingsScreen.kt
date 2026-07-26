@@ -33,6 +33,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Logout
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Fingerprint
@@ -47,6 +49,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -144,6 +147,7 @@ fun SettingsContent(
     val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val dynamicColor by vm.dynamicColor.collectAsStateWithLifecycle()
+    val devices by vm.devices.collectAsStateWithLifecycle()
     val backupEnabled by vm.backupEnabled.collectAsStateWithLifecycle()
     val backupAlbumIds by vm.backupAlbumIds.collectAsStateWithLifecycle()
     val albums by vm.albums.collectAsStateWithLifecycle()
@@ -305,6 +309,10 @@ fun SettingsContent(
                 SettingsRoute.ACCOUNT -> AccountSettings(
                     padding = innerPadding,
                     account = account,
+                    devices = devices,
+                    onLoadDevices = vm::loadDevices,
+                    onRevokeDevice = vm::revokeDevice,
+                    onWipeDevice = vm::wipeDevice,
                     onDisconnect = { showDisconnectConfirm = true },
                 )
 
@@ -937,8 +945,13 @@ private fun BackupSettings(
 private fun AccountSettings(
     padding: PaddingValues,
     account: MeUser?,
+    devices: List<de.ledgerline.app.data.remote.dto.DeviceDto>,
+    onLoadDevices: () -> Unit,
+    onRevokeDevice: (Long) -> Unit,
+    onWipeDevice: (Long) -> Unit,
     onDisconnect: () -> Unit,
 ) {
+    LaunchedEffect(Unit) { onLoadDevices() }
     SubScreen(padding) {
         SectionHeader(stringResource(R.string.settings_account))
         if (account != null) {
@@ -967,6 +980,32 @@ private fun AccountSettings(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
+        }
+        if (devices.isNotEmpty()) {
+            SectionHeader(stringResource(R.string.settings_devices))
+            devices.forEach { d ->
+                ListItem(
+                    headlineContent = {
+                        Text(if (d.current) stringResource(R.string.settings_device_this, d.name) else d.name)
+                    },
+                    supportingContent = {
+                        val extra = listOfNotNull(d.meta.takeIf { it.isNotBlank() }, d.version).joinToString(" · ")
+                        Text(if (d.wipeRequested) stringResource(R.string.settings_device_wipe_pending) else extra)
+                    },
+                    trailingContent = if (d.current) null else {
+                        {
+                            Row {
+                                if (!d.wipeRequested) IconButton(onClick = { onWipeDevice(d.id) }) {
+                                    Icon(Icons.Outlined.DeleteSweep, contentDescription = stringResource(R.string.settings_device_wipe))
+                                }
+                                IconButton(onClick = { onRevokeDevice(d.id) }) {
+                                    Icon(Icons.Outlined.Logout, contentDescription = stringResource(R.string.settings_device_revoke))
+                                }
+                            }
+                        }
+                    },
+                )
+            }
         }
         Button(
             onClick = onDisconnect,

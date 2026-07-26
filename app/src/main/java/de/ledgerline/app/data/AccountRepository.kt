@@ -39,4 +39,30 @@ class AccountRepository(
             null
         }
     }
+
+    /** The owner's paired devices, current device first. Empty on no session/failure. */
+    suspend fun devices(): List<de.ledgerline.app.data.remote.dto.DeviceDto> {
+        val session = sessionHolder.get() ?: return emptyList()
+        return try {
+            val res = apiProvider(session).devices()
+            if (res.isSuccessful) res.body()?.devices.orEmpty() else emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    /** Revoke a device's token (it can no longer sync). Returns true on success. */
+    suspend fun revokeDevice(id: Long): Boolean = call { it.revokeDevice(id.toString()) }
+
+    /** Flag a device to erase its local state on next contact (remote kill switch). */
+    suspend fun wipeDevice(id: Long): Boolean = call { it.wipeDevice(id.toString()) }
+
+    private suspend fun call(block: suspend (LedgerlineApi) -> retrofit2.Response<Unit>): Boolean {
+        val session = sessionHolder.get() ?: return false
+        return try {
+            block(apiProvider(session)).isSuccessful
+        } catch (_: Exception) {
+            false
+        }
+    }
 }

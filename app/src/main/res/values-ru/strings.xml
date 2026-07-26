@@ -575,4 +575,9 @@
     <string name="cd_remove">Удалить</string>
     <string name="settings_licenses">Лицензии открытого кода</string>
     <string name="settings_licenses_sub">Библиотеки, на которых работает Ledgerline</string>
+    <string name="settings_devices">Подключённые устройства</string>
+    <string name="settings_device_this">%1$s (это устройство)</string>
+    <string name="settings_device_revoke">Отозвать</string>
+    <string name="settings_device_wipe">Удалённая очистка</string>
+    <string name="settings_device_wipe_pending">Очистка запрошена</string>
 </resources>
