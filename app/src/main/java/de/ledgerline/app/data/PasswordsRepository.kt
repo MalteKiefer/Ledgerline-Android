@@ -14,6 +14,8 @@ import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.domain.model.SecretsManifest
 import de.ledgerline.app.domain.model.SecretsStore
 import de.ledgerline.app.domain.model.Session
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -79,11 +81,20 @@ class PasswordsRepository(
         return crypto.sealManifest(jsonEncoder.encodeToString(JsonObject.serializer(), merged), vk)
     }
 
-    suspend fun load(): Outcome<SecretsStore> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
-        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+    // Runs on Dispatchers.IO: opening the sealed manifest (secretbox), JSON-decoding the records,
+    // and writing the ciphertext to the disk cache (kotlinx encode of a large base64 string) are all
+    // CPU/IO-heavy and MUST NOT run on the caller's main thread — otherwise a large store ANRs.
+    suspend fun load(): Outcome<SecretsStore> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
-        return try {
+        // Offline-first: publish the disk-cached store immediately (instant display at app start,
+        // and the only source when offline), then refresh from the network below. This makes the
+        // password list appear on unlock without waiting for a round-trip / pull-to-refresh.
+        if (cache.value.value == null && offlineFlags.enabled()) {
+            (cachedOr(Outcome.Err(ErrorKind.NETWORK), vk) as? Outcome.Ok)?.let { cache.set(it.value) }
+        }
+        try {
             val res = api.moduleStore(MODULE)
             when {
                 res.code() == HttpURLConnection.HTTP_UNAUTHORIZED -> Outcome.Err(ErrorKind.HTTP)
@@ -91,7 +102,7 @@ class PasswordsRepository(
                 else -> {
                     val body = res.body()!!
                     val manifest = body.ciphertext?.let { ct ->
-                        val plain = crypto.openManifest(ct, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
+                        val plain = crypto.openManifest(ct, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
                         decodeManifest(plain)
                     } ?: SecretsManifest()
                     if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
@@ -105,6 +116,24 @@ class PasswordsRepository(
         }
     }
 
+    /**
+     * Token-only refresh of the offline cache: fetch the sealed store and write its ciphertext to
+     * disk WITHOUT decrypting (no VK needed), so a background sync keeps the offline copy current
+     * while the vault is locked. The ciphertext is opaque. No-op when offline caching is off / no
+     * session. Returns true on a successful refresh.
+     */
+    suspend fun refreshStoreCache(): Boolean {
+        if (!offlineFlags.enabled()) return false
+        val session = sessionHolder.get() ?: return false
+        return try {
+            val res = apiProvider(session).moduleStore(MODULE)
+            if (!res.isSuccessful) return false
+            val body = res.body() ?: return false
+            storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
+            true
+        } catch (_: Exception) { false }
+    }
+
     private fun cachedOr(err: Outcome<SecretsStore>, vk: ByteArray): Outcome<SecretsStore> =
         cachedOrStore(
             cachingEnabled = offlineFlags.enabled(),
@@ -116,13 +145,50 @@ class PasswordsRepository(
             wrap = { m, v -> SecretsStore(m, v) },
         )
 
+    /**
+     * Server-assisted site favicon for [domain] → a data-URI string, or null. The server proxies
+     * favicon/BIMI lookups so the client never contacts the third-party site directly (metadata
+     * hygiene). Best-effort: any failure returns null (the UI falls back to the type icon).
+     */
+    suspend fun fetchIcon(domain: String): String? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val res = apiProvider(session).passwordsIcon(domain)
+            if (!res.isSuccessful) null else res.body()?.icon?.takeIf { it.isNotBlank() }
+        } catch (_: Exception) { null }
+    }
+
+    /**
+     * HIBP k-anonymity breach range for a 5-hex SHA-1 [prefix]: the server proxies the query so
+     * only the prefix leaves the device (the full hash never does). Returns the raw range body
+     * (`SUFFIX:count` lines) or null on failure. Match locally with [de.ledgerline.app.core.passwords.BreachCheck].
+     */
+    suspend fun breachRange(prefix: String): String? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val res = apiProvider(session).passwordsBreach(prefix)
+            if (!res.isSuccessful) null else res.body()?.string()
+        } catch (_: Exception) { null }
+    }
+
+    /** 2fa.directory dataset: `{ host → setup-docs URL }`. Empty on any failure. */
+    suspend fun tfaDirectory(): Map<String, String> {
+        val session = sessionHolder.get() ?: return emptyMap()
+        return try {
+            val res = apiProvider(session).passwordsTfaDirectory()
+            if (!res.isSuccessful) emptyMap() else res.body()?.entries.orEmpty()
+        } catch (_: Exception) { emptyMap() }
+    }
+
     /** Optimistic write with 409-merge (reload → re-apply [mutate] → retry). */
-    suspend fun save(mutate: (SecretsManifest) -> SecretsManifest): Outcome<SecretsStore> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
-        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+    // On Dispatchers.IO: sealing the manifest (CanonicalJson + secretbox over the whole store),
+    // JSON decode on a 409 rebase, and the disk-cache write are heavy — never on the main thread.
+    suspend fun save(mutate: (SecretsManifest) -> SecretsManifest): Outcome<SecretsStore> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
         val current = cache.value.value
-        return optimisticSave(
+        optimisticSave(
             cached = current?.let { it.manifest to it.version },
             mutate = mutate,
             fetch = { api.moduleStore(MODULE) },

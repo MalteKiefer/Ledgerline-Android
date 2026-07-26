@@ -12,7 +12,11 @@ class VaultKeyHolder @Inject constructor() {
     private val _unlocked = MutableStateFlow(false)
     val unlocked: StateFlow<Boolean> = _unlocked
 
-    fun set(key: ByteArray) { vk = key; _unlocked.value = true }
+    fun set(key: ByteArray) {
+        vk?.fill(0)          // zero the previous key before releasing it to GC
+        vk = key
+        _unlocked.value = true
+    }
     fun get(): ByteArray? = vk
     fun wipe() {
         vk?.fill(0)          // overwrite key bytes before releasing

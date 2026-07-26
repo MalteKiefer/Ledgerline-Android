@@ -105,7 +105,8 @@ fun tmpBlobCache(): BlobDiskCache =
  *  gallery tests that never upload (load-path tests). */
 object NoGalleryUpload : de.ledgerline.app.domain.usecase.GalleryUploadApi {
     override suspend fun uploadBytes(bytes: ByteArray, name: String) = throw NotImplementedError()
-    override suspend fun process(bytes: ByteArray, name: String, mime: String) = throw NotImplementedError()
+    override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
+    override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
 }
 
 open class NotImplementedApi : LedgerlineApi {
@@ -133,6 +134,7 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun galleryUploadComplete(body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse> = throw NotImplementedError()
     override suspend fun galleryUploadAbort(body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
     override suspend fun deleteBlob(blob: String): Response<Unit> = throw NotImplementedError()
+    override suspend fun filesReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
     // Default to an empty sharded files store so WorkspaceRepository.load()'s files slice
     // resolves to an empty list in fakes that don't exercise files. Override where needed.
     override suspend fun filesStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))

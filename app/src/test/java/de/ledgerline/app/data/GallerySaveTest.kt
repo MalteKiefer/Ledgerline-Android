@@ -79,6 +79,7 @@ class GallerySaveTest {
         override suspend fun store(): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun moduleStore(module: String): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
+        override suspend fun filesReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
         override suspend fun filesStore(): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun filesStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun putStore(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
@@ -123,10 +124,12 @@ class GallerySaveTest {
         val fakeUpload = object : de.ledgerline.app.domain.usecase.GalleryUploadApi {
             override suspend fun uploadBytes(bytes: ByteArray, name: String) =
                 Outcome.Ok(UploadedBlob("shard-blob", "shard-key", bytes.size.toLong()))
-            override suspend fun process(bytes: ByteArray, name: String, mime: String) = throw NotImplementedError()
+            override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream) =
+                Outcome.Ok(UploadedBlob("shard-blob", "shard-key", size))
+            override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
         }
 
-        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), fakeUpload, apiProvider = { fakeApi })
+        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), fakeUpload, de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
 
         val result = repo.save { manifest ->
             manifest.copy(photos = manifest.photos + GalleryPhoto(id = "new"))

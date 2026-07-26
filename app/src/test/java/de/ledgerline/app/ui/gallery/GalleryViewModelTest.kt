@@ -68,7 +68,12 @@ private class FakeGalleryUploadApi(val processResponse: ProcessResponse) : Galle
         return Outcome.Ok(UploadedBlob(id = "blob-$uploadCount", encFileKey = "{c:\"x\",n:\"y\"}", size = bytes.size.toLong()))
     }
 
-    override suspend fun process(bytes: ByteArray, name: String, mime: String): Outcome<ProcessResponse> {
+    override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream): Outcome<UploadedBlob> {
+        uploadCount++
+        return Outcome.Ok(UploadedBlob(id = "blob-$uploadCount", encFileKey = "{c:\"x\",n:\"y\"}", size = size))
+    }
+
+    override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream): Outcome<ProcessResponse> {
         processCount++
         return Outcome.Ok(processResponse)
     }
@@ -148,6 +153,7 @@ class GalleryViewModelTest {
         embedText = embedText,
         metaCache = MetaCache(),
         places = io.mockk.mockk(relaxed = true),
+        degradedState = de.ledgerline.app.core.offline.DegradedState(),
     ).apply { ioDispatcher = UnconfinedTestDispatcher() }
 
     /**
@@ -383,7 +389,7 @@ class GalleryViewModelTest {
         val vm = makeVm(cache, uploader = uploader, mutate = FakeMutateGallery(cache), operationManager = om)
 
         val bytes = byteArrayOf(1, 2, 3)
-        val source = PhotoSource("a.jpg", "image/jpeg", read = { bytes })
+        val source = PhotoSource("a.jpg", "image/jpeg", size = bytes.size.toLong(), openInput = { java.io.ByteArrayInputStream(bytes) })
 
         // First upload — should go through. The op runs on the manager's app scope, so
         // wait for it to drain before asserting.

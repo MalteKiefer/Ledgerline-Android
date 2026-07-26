@@ -109,9 +109,9 @@ class GalleryBackupManager @VisibleForTesting internal constructor(
     private fun BackupItem.toSource() = PhotoSource(
         name = name,
         mime = mime,
+        size = sizeBytes, // known from MediaStore — no need to re-query
         // Throw (not empty bytes) on an unreadable/deleted item so ImportPhotos records it
-        // as a failure — which keeps the batch unmarked and retried, never uploads a 0-byte
-        // "photo".
-        read = { resolver.openInputStream(uri)?.use { it.readBytes() } ?: error("cannot open $uri") },
+        // as a failure — which keeps the batch unmarked and retried, never uploads a 0-byte "photo".
+        openInput = { resolver.openInputStream(uri) ?: error("cannot open $uri") },
     )
 }

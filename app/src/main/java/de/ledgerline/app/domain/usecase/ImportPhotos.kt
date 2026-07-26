@@ -1,14 +1,16 @@
 package de.ledgerline.app.domain.usecase
 
 /**
- * A content source for a gallery import: name + mime + lazy byte reader.
- * [lat]/[lng] are optional device coordinates for camera-captured photos (where the
- * EXIF strip has no GPS). Picker/share photos leave them null — the server reads their EXIF.
+ * A content source for a gallery import: name + mime + a **re-openable** input stream + [size].
+ * Streaming (not a single `ByteArray`) so a multi-GB video never OOMs — [openInput] may be called
+ * more than once (dedup signature, then upload, then process). [lat]/[lng] are optional device
+ * coordinates for camera-captured photos (picker/share leave them null — the server reads EXIF).
  */
 data class PhotoSource(
     val name: String,
     val mime: String,
-    val read: () -> ByteArray,
+    val size: Long,
+    val openInput: () -> java.io.InputStream,
     val lat: Double? = null,
     val lng: Double? = null,
 )

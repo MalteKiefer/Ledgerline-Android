@@ -20,7 +20,12 @@ class GalleryUploaderTest {
             return Outcome.Ok(UploadedBlob(id = "blob-$uploads", encFileKey = "{c,n}", size = bytes.size.toLong()))
         }
 
-        override suspend fun process(bytes: ByteArray, name: String, mime: String): Outcome<ProcessResponse> =
+        override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream): Outcome<UploadedBlob> {
+            uploads++
+            return Outcome.Ok(UploadedBlob(id = "blob-$uploads", encFileKey = "{c,n}", size = size))
+        }
+
+        override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream): Outcome<ProcessResponse> =
             Outcome.Ok(process)
     }
 
@@ -48,7 +53,7 @@ class GalleryUploaderTest {
         )
         val api = FakeApi(process)
 
-        val out = uploader(api).upload("a.jpg", "image/jpeg", "sig1", byteArrayOf(1, 2, 3), "2026-01-02T00:00:00Z")
+        val out = uploader(api).upload("a.jpg", "image/jpeg", "sig1", 3L, { java.io.ByteArrayInputStream(byteArrayOf(1, 2, 3)) }, "2026-01-02T00:00:00Z")
         val photo = (out as Outcome.Ok).value
 
         assertNotNull(photo.originalRef)
@@ -82,7 +87,8 @@ class GalleryUploaderTest {
             name = "IMG_1.jpg",
             mime = "image/jpeg",
             sig = "sig2",
-            bytes = byteArrayOf(7, 8, 9),
+            size = 3L,
+            openInput = { java.io.ByteArrayInputStream(byteArrayOf(7, 8, 9)) },
             createdIso = "2026-06-01T12:00:00Z",
             lat = 48.1,
             lng = 11.6,

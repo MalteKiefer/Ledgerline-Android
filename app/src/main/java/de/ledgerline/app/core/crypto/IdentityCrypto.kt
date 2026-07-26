@@ -64,7 +64,7 @@ class IdentityCrypto @Inject constructor(
         val pub = crypto.b64decode(pubB64)
         // Verify the server-reported fingerprint matches the public key (constant-time).
         resp.fingerprint?.let { fp ->
-            if (!ConstantTime.equal(fingerprintHex(pub).toByteArray(), fp.toByteArray())) return null
+            if (!crypto.constantTimeEquals(fingerprintHex(pub).toByteArray(), fp.toByteArray())) return null
         }
         val xSk = crypto.openValue(wsk, vk) ?: return null
         val seed = crypto.openValue(wseed, vk) ?: return null

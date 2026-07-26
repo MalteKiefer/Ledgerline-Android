@@ -90,7 +90,7 @@ class WorkspaceSaveTest {
         val cache = WorkspaceCache()
         val fakeApi = FakeApi()
 
-        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), apiProvider = { fakeApi })
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
 
         val result = repo.save { m ->
             m.copy(notes = m.notes + Note(id = "n3", title = "New"))
@@ -110,7 +110,7 @@ class WorkspaceSaveTest {
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
         val cache = WorkspaceCache()
         val fakeApi = FakeApi()
-        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), apiProvider = { fakeApi })
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
 
         // A folder mutation now seals + PUTs the sharded /files/store (no longer rejected).
         val result = repo.save { m ->

@@ -57,7 +57,14 @@ class SettingsViewModel @Inject constructor(
     private val rememberedVault: RememberedVaultStore,
     private val biometric: BiometricAvailability,
     private val securityLog: de.ledgerline.app.core.security.SecurityLog,
+    private val integrity: de.ledgerline.app.core.integrity.IntegritySignal,
 ) : ViewModel() {
+
+    /** §3.6 client-integrity report (attestation + root heuristics); null until assessed. */
+    private val _integrity = MutableStateFlow<de.ledgerline.app.core.integrity.IntegrityReport?>(null)
+    val integrityReport: StateFlow<de.ledgerline.app.core.integrity.IntegrityReport?> = _integrity.asStateFlow()
+
+    init { viewModelScope.launch { _integrity.value = integrity.assess() } }
 
     /** STRONG biometrics enrolled — gates whether the "remember unlock" toggle is usable. */
     val strongBiometricAvailable: Boolean = biometric.strongEnrolled()
@@ -120,6 +127,14 @@ class SettingsViewModel @Inject constructor(
     fun setTimeoutMinutes(minutes: Int) {
         idleLocker.setTimeoutMs(minutes * 60_000L)
         viewModelScope.launch { settingsStore.setTimeoutMinutes(minutes) }
+    }
+
+    /** Automatic background-refresh cadence in seconds (0 = off). Drives the BackgroundSync loop. */
+    val backgroundRefreshSeconds: StateFlow<Int> = settingsStore.backgroundRefreshSeconds
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_BACKGROUND_REFRESH_SECONDS)
+
+    fun setBackgroundRefreshSeconds(seconds: Int) {
+        viewModelScope.launch { settingsStore.setBackgroundRefreshSeconds(seconds) }
     }
 
     /** Whether the Vault Key may be biometric-persisted so unlock skips the passphrase. */

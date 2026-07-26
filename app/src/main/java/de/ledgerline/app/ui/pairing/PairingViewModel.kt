@@ -20,6 +20,7 @@ class PairingViewModel @Inject constructor(
     private val repository: PairingRepository,
     private val sessionStore: SessionStore,
     private val securityLog: de.ledgerline.app.core.security.SecurityLog,
+    private val integrity: de.ledgerline.app.core.integrity.IntegritySignal,
 ) : ViewModel() {
     private val _state = MutableStateFlow<PairingState>(PairingState.Idle)
     val state: StateFlow<PairingState> = _state.asStateFlow()
@@ -40,7 +41,24 @@ class PairingViewModel @Inject constructor(
     suspend fun persist(session: Session, authorize: suspend (Cipher) -> Cipher?): Boolean {
         val ok = sessionStore.save(session, authorize)
         // Record the coupling in the security audit log once the session is sealed.
-        if (ok) securityLog.record(de.ledgerline.app.core.security.SecurityEventType.PAIRED)
+        if (ok) {
+            securityLog.record(de.ledgerline.app.core.security.SecurityEventType.PAIRED)
+            // §3.6: assess client integrity at pairing. Advisory only — never blocks; a
+            // non-hardware-attested or rooted device just leaves a trail in the audit log.
+            runCatching {
+                val report = integrity.assess()
+                if (!report.clean) {
+                    val detail = buildList {
+                        if (!report.hardwareBacked) add("attestation=${report.attestation}")
+                        if (report.rooted) addAll(report.rootReasons)
+                    }.joinToString("; ")
+                    securityLog.record(
+                        de.ledgerline.app.core.security.SecurityEventType.INTEGRITY_WARNING,
+                        detail,
+                    )
+                }
+            }
+        }
         return ok
     }
 }

@@ -111,6 +111,10 @@ interface LedgerlineApi {
     @DELETE("api/v1/files/blob/{blob}")
     suspend fun deleteBlob(@Path("blob") blob: String): Response<Unit>
 
+    // Living-set reconcile: the server frees any files blob not in this list (24h grace).
+    @POST("api/v1/files/blobs/reconcile")
+    suspend fun filesReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
+
     // Store v3 sharded files index (root pointer table + external shard/collection blobs).
     @GET("api/v1/files/store")
     suspend fun filesStore(): Response<StoreResponse>

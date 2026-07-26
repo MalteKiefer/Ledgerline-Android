@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.UUID
 import javax.inject.Inject
 
 data class TodosUi(
@@ -165,7 +164,7 @@ class TodosViewModel @Inject constructor(
             if (mutate.invoke { m -> mutation(m) } is Outcome.Err) _message.value = "Save failed"
         }
 
-    private fun newId(): String = UUID.randomUUID().toString()
+    private fun newId(): String = de.ledgerline.app.core.Ids.newId()
 
     private fun priorityRank(priority: String): Int = when (priority.lowercase()) {
         "urgent" -> 0

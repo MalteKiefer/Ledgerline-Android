@@ -267,7 +267,9 @@ class PeopleViewModel @Inject constructor(
             val existing = manifest.people
             val seeds = if (incremental) {
                 existing.filter { it.centroid.isNotEmpty() }
-                    .map { SeedCluster(it.id, it.name, it.hidden, it.centroid, faces.map { f -> f.member }) }
+                    // Seed each existing person with ITS OWN faces, not the entire candidate set —
+                    // otherwise an incremental re-scan collapses/duplicates distinct people.
+                    .map { SeedCluster(it.id, it.name, it.hidden, it.centroid, it.faces) }
             } else {
                 emptyList()
             }
@@ -285,7 +287,7 @@ class PeopleViewModel @Inject constructor(
 
             var builtPeople = built.map {
                 GalleryPerson(
-                    id = it.id ?: UUID.randomUUID().toString(),
+                    id = it.id ?: de.ledgerline.app.core.Ids.newId(),
                     name = it.name,
                     hidden = it.hidden,
                     centroid = it.centroid,

@@ -23,9 +23,11 @@ import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.model.TodosManifest
 import de.ledgerline.app.domain.model.Workspace
 import de.ledgerline.app.domain.model.WorkspaceManifest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -59,6 +61,8 @@ class WorkspaceRepository(
     private val cache: WorkspaceCache,
     private val storeCache: StoreDiskCache,
     private val offlineFlags: OfflineFlags,
+    private val degraded: de.ledgerline.app.core.offline.DegradedState,
+    private val blobCache: de.ledgerline.app.core.offline.BlobDiskCache,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
     /** Production constructor used by Hilt. */
@@ -69,6 +73,8 @@ class WorkspaceRepository(
         cache: WorkspaceCache,
         storeCache: StoreDiskCache,
         offlineFlags: OfflineFlags,
+        degraded: de.ledgerline.app.core.offline.DegradedState,
+        blobCache: de.ledgerline.app.core.offline.BlobDiskCache,
     ) : this(
         sessionHolder,
         vaultKeyHolder,
@@ -76,8 +82,15 @@ class WorkspaceRepository(
         cache,
         storeCache,
         offlineFlags,
+        degraded,
+        blobCache,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
+
+    private companion object {
+        /** Offline-cache key for the sharded files-store **root** envelope. */
+        const val FILES_ROOT_KEY = "workspace_files_root"
+    }
 
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonEncoder = Json { encodeDefaults = true }
@@ -117,35 +130,63 @@ class WorkspaceRepository(
     private val specs = listOf(
         ModuleSpec(
             key = "notes",
-            encode = { m -> jsonEncoder.encodeToString(NotesManifest.serializer(), NotesManifest(notes = m.notes)) },
-            merge = { m, plain -> m.copy(notes = json.decodeFromString(NotesManifest.serializer(), plain).notes) },
+            encode = { m -> encModule { it["notes"] = arr(m.notes.map(WorkspaceRecordCodec::encodeNote)) } },
+            merge = { m, plain -> m.copy(notes = records(plain, "notes").map(WorkspaceRecordCodec::decodeNote)) },
             changed = { a, b -> a.notes != b.notes },
         ),
         ModuleSpec(
             key = "todos",
-            encode = { m -> jsonEncoder.encodeToString(TodosManifest.serializer(), TodosManifest(todos = m.todos, todoLists = m.todoLists)) },
+            encode = { m ->
+                encModule {
+                    it["todos"] = arr(m.todos.map(WorkspaceRecordCodec::encodeTodo))
+                    it["todoLists"] = arr(m.todoLists.map(WorkspaceRecordCodec::encodeTodoList))
+                }
+            },
             merge = { m, plain ->
-                val d = json.decodeFromString(TodosManifest.serializer(), plain)
-                m.copy(todos = d.todos, todoLists = d.todoLists)
+                m.copy(
+                    todos = records(plain, "todos").map(WorkspaceRecordCodec::decodeTodo),
+                    todoLists = records(plain, "todoLists").map(WorkspaceRecordCodec::decodeTodoList),
+                )
             },
             changed = { a, b -> a.todos != b.todos || a.todoLists != b.todoLists },
         ),
         ModuleSpec(
             key = "bookmarks",
-            encode = { m -> jsonEncoder.encodeToString(BookmarksManifest.serializer(), BookmarksManifest(bookmarks = m.bookmarks, bookmarkFolders = m.bookmarkFolders)) },
+            encode = { m ->
+                encModule {
+                    it["bookmarks"] = arr(m.bookmarks.map(WorkspaceRecordCodec::encodeBookmark))
+                    it["bookmarkFolders"] = arr(m.bookmarkFolders.map(WorkspaceRecordCodec::encodeBookmarkFolder))
+                }
+            },
             merge = { m, plain ->
-                val d = json.decodeFromString(BookmarksManifest.serializer(), plain)
-                m.copy(bookmarks = d.bookmarks, bookmarkFolders = d.bookmarkFolders)
+                m.copy(
+                    bookmarks = records(plain, "bookmarks").map(WorkspaceRecordCodec::decodeBookmark),
+                    bookmarkFolders = records(plain, "bookmarkFolders").map(WorkspaceRecordCodec::decodeBookmarkFolder),
+                )
             },
             changed = { a, b -> a.bookmarks != b.bookmarks || a.bookmarkFolders != b.bookmarkFolders },
         ),
         ModuleSpec(
             key = "contacts",
-            encode = { m -> jsonEncoder.encodeToString(ContactsManifest.serializer(), ContactsManifest(contacts = m.contacts)) },
-            merge = { m, plain -> m.copy(contacts = json.decodeFromString(ContactsManifest.serializer(), plain).contacts) },
+            encode = { m -> encModule { it["contacts"] = arr(m.contacts.map(WorkspaceRecordCodec::encodeContact)) } },
+            merge = { m, plain -> m.copy(contacts = records(plain, "contacts").map(WorkspaceRecordCodec::decodeContact)) },
             changed = { a, b -> a.contacts != b.contacts },
         ),
     )
+
+    /** Build a `{v:3, …}` module manifest JSON string; [fill] adds the record arrays. */
+    private inline fun encModule(fill: (MutableMap<String, kotlinx.serialization.json.JsonElement>) -> Unit): String {
+        val out = linkedMapOf<String, kotlinx.serialization.json.JsonElement>("v" to kotlinx.serialization.json.JsonPrimitive(3))
+        fill(out)
+        return kotlinx.serialization.json.JsonObject(out).toString()
+    }
+
+    private fun arr(items: List<JsonObject>): kotlinx.serialization.json.JsonArray = kotlinx.serialization.json.JsonArray(items)
+
+    /** The [key] record array of a decrypted module manifest, as raw [JsonObject]s. */
+    private fun records(plain: String, key: String): List<JsonObject> =
+        (json.parseToJsonElement(plain).jsonObject[key] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { it as? JsonObject } ?: emptyList()
 
     // Internal signals used to map per-module fetch failures to Outcome errors.
     private class AuthException : Exception()
@@ -186,44 +227,110 @@ class WorkspaceRepository(
         val res = try {
             api.filesStore()
         } catch (_: Exception) {
-            priorFilesRoot = FilesShardWriter.RootState(); return emptyList<FileEntry>() to emptyList()
+            return cachedFilesSliceOr(api, vk) // transient network error: assemble from the offline cache
         }
         if (res.code() == HttpURLConnection.HTTP_UNAUTHORIZED) throw AuthException()
-        if (!res.isSuccessful) { priorFilesRoot = FilesShardWriter.RootState(); return emptyList<FileEntry>() to emptyList() }
+        if (!res.isSuccessful) return cachedFilesSliceOr(api, vk)
 
         val body = res.body()!!
         filesVersion = body.version
         fileRawById.clear(); folderRawById.clear()
-        val root = body.ciphertext?.let { ct ->
-            val plain = crypto.openManifest(ct, vk) ?: throw DecryptException()
-            filesJson.decodeFromString(FilesRoot.serializer(), plain)
-        } ?: run { priorFilesRoot = FilesShardWriter.RootState(); return emptyList<FileEntry>() to emptyList() }
+        val ct = body.ciphertext
+            ?: run { priorFilesRoot = FilesShardWriter.RootState(); return emptyList<FileEntry>() to emptyList() }
+        // Persist the root envelope for cold offline assembly (opaque ciphertext).
+        if (offlineFlags.enabled()) storeCache.put(FILES_ROOT_KEY, StoreEnvelope(ct, body.version))
+        val plain = crypto.openManifest(ct, vk) ?: throw DecryptException()
+        val root = filesJson.decodeFromString(FilesRoot.serializer(), plain)
+        return assembleFilesSlice(api, root, vk, allowNetwork = true)
+    }
 
+    /**
+     * Assemble the files slice from a decoded [root]: shard blobs (parallel) + folders collection.
+     * Online ([allowNetwork]) fetches missing blobs and writes their ciphertext through to the
+     * offline cache; offline it reads shard/folder blobs from the cache only (uncached slices are
+     * simply absent). A durable 404 marks the store degraded (descriptor kept, writes frozen);
+     * any other online blob error throws (recoverable — never silently drop files).
+     */
+    private suspend fun assembleFilesSlice(
+        api: LedgerlineApi,
+        root: FilesRoot,
+        vk: ByteArray,
+        allowNetwork: Boolean,
+    ): Pair<List<FileEntry>, List<NamedFolder>> {
         priorFilesRoot = rootStateFrom(root)
+        degraded.setFiles(false)
         val files = if (root.shards.isNotEmpty()) {
             coroutineScope {
-                root.shards.map { s ->
-                    async {
-                        val r = api.rawFile(s.ref)
-                        check(r.isSuccessful) { "files shard ${s.ref}: http ${r.code()}" }
-                        val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), s.key, vk, crypto)
-                        filesJson.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
-                    }
-                }.awaitAll().flatten()
-            }.map { obj -> FileRecordCodec.decodeFile(obj).also { fileRawById[it.id] = obj } }
+                root.shards.map { s -> async { fetchFilesShard(api, s, vk, allowNetwork) } }.awaitAll()
+            }.flatMap { it ?: emptyList() }.map { obj -> FileRecordCodec.decodeFile(obj).also { fileRawById[it.id] = obj } }
         } else {
             root.files
         }
         val folders = if (root.foldersRef != null) {
-            val r = api.rawFile(root.foldersRef!!)
-            check(r.isSuccessful) { "files folders ${root.foldersRef}: http ${r.code()}" }
-            val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), root.foldersKey ?: "", vk, crypto)
-            filesJson.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
+            val desc = de.ledgerline.app.domain.model.GalleryShard(ref = root.foldersRef!!, key = root.foldersKey ?: "")
+            fetchFilesShard(api, desc, vk, allowNetwork).orEmpty()
                 .map { obj -> FileRecordCodec.decodeFolder(obj).also { folderRawById[it.id] = obj } }
         } else {
             emptyList()
         }
         return files to folders
+    }
+
+    /**
+     * Offline files slice: decrypt the cached files **root** and assemble it from the locally
+     * cached shard/folder blobs (no network). Falls back to whatever is already in the in-memory
+     * workspace cache when offline caching is off, no root is cached, or the root fails to
+     * decrypt/decode — never blanking a tab that already had content.
+     */
+    private suspend fun cachedFilesSliceOr(api: LedgerlineApi, vk: ByteArray): Pair<List<FileEntry>, List<NamedFolder>> {
+        if (offlineFlags.enabled()) {
+            storeCache.get(FILES_ROOT_KEY)?.ciphertext?.let { ct ->
+                crypto.openManifest(ct, vk)?.let { plain ->
+                    runCatching {
+                        val root = filesJson.decodeFromString(FilesRoot.serializer(), plain)
+                        filesVersion = storeCache.get(FILES_ROOT_KEY)!!.version
+                        return assembleFilesSlice(api, root, vk, allowNetwork = false)
+                    }
+                }
+            }
+        }
+        return cache.value.value?.manifest?.let { it.files to it.fileFolders } ?: (emptyList<FileEntry>() to emptyList())
+    }
+
+    /**
+     * Fetch + decrypt one files shard's records. Cache-first (content-addressed refs are
+     * immutable): a cached hit skips the network. On a miss with [allowNetwork], fetch
+     * (404-retried) and write the ciphertext through to the offline cache. A persistent 404 marks
+     * the store degraded and returns null (records skipped, descriptor kept). Offline a cache miss
+     * returns null (those records unavailable until the next online load). Non-404 online throws.
+     */
+    private suspend fun fetchFilesShard(
+        api: LedgerlineApi,
+        s: de.ledgerline.app.domain.model.GalleryShard,
+        vk: ByteArray,
+        allowNetwork: Boolean,
+    ): List<JsonObject>? {
+        blobCache.get(s.ref)?.let { cipher ->
+            val bytes = BlobDownloader.decrypt(cipher, s.key, vk, crypto)
+            return filesJson.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
+        }
+        if (!allowNetwork) return null
+        var attempt = 0
+        while (true) {
+            val r = api.rawFile(s.ref) // network/other throws → recoverable, fail the load rather than lose data
+            if (r.isSuccessful) {
+                val cipher = r.body()!!.bytes()
+                if (offlineFlags.enabled()) blobCache.put(s.ref, cipher)
+                val bytes = BlobDownloader.decrypt(cipher, s.key, vk, crypto)
+                return filesJson.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
+            }
+            if (r.code() == HttpURLConnection.HTTP_NOT_FOUND) {
+                if (attempt < 3) { kotlinx.coroutines.delay(500L * (1 shl attempt)); attempt++; continue }
+                degraded.setFiles(true)
+                return null // durably missing: skip records, keep the descriptor, freeze writes
+            }
+            error("files shard ${s.ref}: http ${r.code()}") // other non-2xx: recoverable → throw
+        }
     }
 
     /** Encrypt (secretstream + Padmé) + upload [bytes] as a files content blob → id + wrapped key. */
@@ -243,11 +350,13 @@ class WorkspaceRepository(
         uploadBlob = { b, n -> uploadFilesBytes(api, vk, b, n) },
     )
 
-    suspend fun load(): Outcome<Workspace> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
-        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+    // On Dispatchers.IO: opening + JSON-decoding every module + the sharded files slice is
+    // CPU/IO-heavy and must not block the caller's main thread (large stores would ANR).
+    suspend fun load(): Outcome<Workspace> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
-        return try {
+        try {
             val loaded = coroutineScope {
                 val filesDeferred = async { loadFilesSlice(api, vk) }
                 val mods = specs.map { spec -> async { spec to fetchModule(api, spec, vk) } }.awaitAll()
@@ -320,6 +429,12 @@ class WorkspaceRepository(
                 val body = res.body() ?: run { all = false; continue }
                 storeCache.put(spec.cacheKey(), StoreEnvelope(body.ciphertext, body.version))
             }
+            // Also refresh the sharded files-store root (token-only, opaque ciphertext).
+            runCatching {
+                val fr = api.filesStore()
+                if (fr.isSuccessful) fr.body()?.let { storeCache.put(FILES_ROOT_KEY, StoreEnvelope(it.ciphertext, it.version)) }
+                else all = false
+            }.onFailure { all = false }
             all
         } catch (_: Exception) {
             false
@@ -336,9 +451,9 @@ class WorkspaceRepository(
      * `/files/store` migration lands (CLAUDE.md §14 R1) — better a loud failure than
      * a silent drop.
      */
-    suspend fun save(mutate: (WorkspaceManifest) -> WorkspaceManifest): Outcome<Workspace> {
-        val session = sessionHolder.get() ?: return Outcome.Err(ErrorKind.HTTP)
-        val vk = vaultKeyHolder.get() ?: return Outcome.Err(ErrorKind.DECRYPT)
+    suspend fun save(mutate: (WorkspaceManifest) -> WorkspaceManifest): Outcome<Workspace> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
 
         // Establish the aggregate base + per-module versions.
@@ -346,7 +461,7 @@ class WorkspaceRepository(
         if (curBase == null || versions.size < specs.size) {
             when (val l = load()) {
                 is Outcome.Ok -> curBase = l.value.manifest
-                is Outcome.Err -> return l
+                is Outcome.Err -> return@withContext l
             }
         }
 
@@ -356,23 +471,30 @@ class WorkspaceRepository(
         // collection blob, reusing unchanged blobs), seal + PUT with the shards[] guard. On
         // 409, reload the winning slice, re-apply mutate, retry — same loop shape as a module.
         if (curNext.files != curBase!!.files || curNext.fileFolders != curBase!!.fileFolders) {
+            // Frozen while degraded: a shard blob is missing, so rewriting the root would drop the
+            // missing shard's slot and make the loss permanent. Reject the write loudly.
+            if (degraded.files.value) return@withContext Outcome.Err(ErrorKind.HTTP)
             val writer = newFilesWriter(api, vk)
             var version = filesVersion
             var attempts = 0
             while (true) {
-                if (attempts++ >= 5) return Outcome.Err(ErrorKind.HTTP)
+                if (attempts++ >= 5) return@withContext Outcome.Err(ErrorKind.HTTP)
                 val result = writer.build(curNext.files, curNext.fileFolders, priorFilesRoot)
-                    ?: return Outcome.Err(ErrorKind.NETWORK) // a shard/collection upload failed
+                    ?: return@withContext Outcome.Err(ErrorKind.NETWORK) // a shard/collection upload failed
                 val rootCipher = crypto.sealManifest(CanonicalJson.encode(result.rootJson), vk)
                 val put = try {
                     api.filesStorePut(StorePutRequest(rootCipher, version, result.shardRefs))
                 } catch (e: Exception) {
-                    return Outcome.Err(ErrorKind.NETWORK, e)
+                    return@withContext Outcome.Err(ErrorKind.NETWORK, e)
                 }
                 when {
                     put.isSuccessful -> {
                         filesVersion = put.body()?.version ?: (version + 1)
                         priorFilesRoot = result.state
+                        // Keep the offline root envelope in step with the write. Newly-written
+                        // shard blobs are cached lazily on the next online load (assembleFilesSlice
+                        // writes each fetched shard through) — the root always stays consistent.
+                        if (offlineFlags.enabled()) storeCache.put(FILES_ROOT_KEY, StoreEnvelope(rootCipher, filesVersion))
                         break
                     }
                     put.code() == 409 -> {
@@ -383,7 +505,7 @@ class WorkspaceRepository(
                         curBase = curBase!!.copy(files = sf, fileFolders = sfo)
                         curNext = mutate(curBase!!)
                     }
-                    else -> return Outcome.Err(ErrorKind.HTTP)
+                    else -> return@withContext Outcome.Err(ErrorKind.HTTP)
                 }
             }
         }
@@ -393,12 +515,12 @@ class WorkspaceRepository(
             var version = versions[spec.key] ?: 0
             var attempts = 0
             while (true) {
-                if (attempts++ >= 4) return Outcome.Err(ErrorKind.HTTP)
+                if (attempts++ >= 4) return@withContext Outcome.Err(ErrorKind.HTTP)
                 val ciphertext = crypto.sealManifest(spec.encode(curNext), vk)
                 val put = try {
                     api.putModuleStore(spec.key, StorePutRequest(ciphertext, version))
                 } catch (e: Exception) {
-                    return Outcome.Err(ErrorKind.NETWORK, e)
+                    return@withContext Outcome.Err(ErrorKind.NETWORK, e)
                 }
                 when {
                     put.isSuccessful -> {
@@ -412,24 +534,24 @@ class WorkspaceRepository(
                         val res = try {
                             api.moduleStore(spec.key)
                         } catch (e: Exception) {
-                            return Outcome.Err(ErrorKind.NETWORK, e)
+                            return@withContext Outcome.Err(ErrorKind.NETWORK, e)
                         }
-                        if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
+                        if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
                         val body = res.body()!!
                         version = body.version
                         val freshPlain = body.ciphertext?.let {
-                            crypto.openManifest(it, vk) ?: return Outcome.Err(ErrorKind.DECRYPT)
+                            crypto.openManifest(it, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
                         } ?: spec.emptyPlain()
                         curBase = spec.merge(curBase!!, freshPlain)
                         curNext = mutate(curBase!!)
                     }
-                    else -> return Outcome.Err(ErrorKind.HTTP)
+                    else -> return@withContext Outcome.Err(ErrorKind.HTTP)
                 }
             }
         }
 
         val result = Workspace(curNext, 0)
         cache.set(result)
-        return Outcome.Ok(result)
+        return@withContext Outcome.Ok(result)
     }
 }

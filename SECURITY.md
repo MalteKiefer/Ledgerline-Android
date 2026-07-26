@@ -56,12 +56,16 @@ Byte-compatible with the reference web client (`resources/js/vault.js`):
 ## Application lock
 
 A biometric / device-credential prompt is required immediately before the sealed
-session is read or written (post-pairing seal, and pre-unlock load). The keystore
-key uses a short time-bound auth window so a standard `BiometricPrompt` authorizes
-the operation.
+session is read or written (post-pairing seal, and pre-unlock load). Each keystore
+operation is bound to a **per-use `CryptoObject`** (auth validity 0): exactly one
+biometric prompt authorizes exactly that one decrypt/encrypt, with no time window a
+later operation could ride on. The remembered-vault key (opt-in) is class-3-biometric
+only — a device PIN alone cannot unwrap the persisted Vault Key.
 
-Future hardening: bind a `CryptoObject` to each key operation for per-use auth
-instead of a time-bound window.
+Secret input fields (master passphrase, recovery code, and every password-manager
+secret field) use the password input type, which excludes them from keyboard
+personalized-learning and autocorrect/suggestions, so a typed secret is never
+persisted into the IME's learned-words store.
 
 ## Screen & backup protection
 
@@ -72,8 +76,33 @@ instead of a time-bound window.
 
 ## Permissions
 
-Minimal: `INTERNET`, `USE_BIOMETRIC`, `CAMERA` (pairing scan only, requested in
-context). No storage or location permissions in Phase 1.
+Every permission is justified and — where dangerous — requested at runtime, in context,
+and optional. The app uses **no** Google Play Services and performs **no** analytics or
+telemetry.
+
+- `INTERNET`, `ACCESS_NETWORK_STATE` — talk to your self-hosted server (HTTPS-only, SPKI-pinned).
+- `USE_BIOMETRIC` — biometric-gated unlock / Keystore key use.
+- `CAMERA` — QR pairing scan only (runtime-requested at pairing; ZXing decodes on-device, nothing recorded/uploaded).
+- `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION` — **optional**, requested only when you take a photo, solely to geotag that shot. Never used for background tracking.
+- `READ_CONTACTS`, `WRITE_CONTACTS` — **optional**, only to sync the encrypted address book with a local "Ledgerline" device account you explicitly enable. Nothing is uploaded anywhere.
+- `READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO` — **optional**, only for camera-roll backup into the gallery.
+- `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC` — keep long uploads/scans alive behind a visible notification (AOSP data-sync type; no Google).
+- `POST_NOTIFICATIONS` — the foreground-service notification (Android 13+).
+
+## Current security posture
+
+Beyond the zero-knowledge core: Argon2id KDF with server-supplied bounds; libsodium
+secretbox/secretstream; **suite-tagged, canonical-JSON, Padmé-padded** sealed manifests
+(fail-closed on an unknown crypto suite); post-quantum hybrid KEM (X25519 + ML-KEM-768,
+byte-verified) for sharing crypto; per-use `CryptoObject`-bound biometric Keystore keys
+(StrongBox where available); an unlock throttle, always-on duress auto-wipe, monotonic
+idle-lock, clock-rollback guard, and an encrypted local security audit log; `FLAG_SECURE`
+app-wide; remote-wipe kill switch. Secret comparisons run in constant time via libsodium
+`sodium_memcmp`. At pairing the app performs an **advisory client-integrity check** — Android
+Keystore key attestation (proves keys are TEE/StrongBox-backed, detects an emulated keystore)
+plus lightweight root/tamper heuristics — surfaced in Settings → Security and the audit log.
+It is **never** blocking: a legitimately-rooted privacy ROM is warned, not locked out. The
+Vault Key lives in memory only and is zeroed on background/idle and when replaced.
 
 ## Revocation
 

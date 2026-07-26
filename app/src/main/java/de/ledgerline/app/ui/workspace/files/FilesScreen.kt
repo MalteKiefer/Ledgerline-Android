@@ -18,17 +18,27 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
+import androidx.compose.material.icons.automirrored.outlined.Label
+import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.RestoreFromTrash
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +71,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.FileEntry
+import de.ledgerline.app.domain.model.NamedFolder
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
@@ -79,6 +91,8 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
+    val sort by vm.sort.collectAsStateWithLifecycle()
+    val degraded by vm.degraded.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -158,6 +172,9 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     var deleteFolderId by remember { mutableStateOf<String?>(null) }
     var deleteFileEntry by remember { mutableStateOf<FileEntry?>(null) }
     var deleteForeverEntry by remember { mutableStateOf<FileEntry?>(null) }
+    var moveTarget by remember { mutableStateOf<FileEntry?>(null) }
+    var versionsTarget by remember { mutableStateOf<FileEntry?>(null) }
+    var tagsTarget by remember { mutableStateOf<FileEntry?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -182,6 +199,7 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                 ui.loading -> LoadingBox()
                 ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() })
                 else -> Column(Modifier.fillMaxSize()) {
+                    if (degraded) de.ledgerline.app.ui.workspace.common.DegradedBanner()
                     // Fixed header: trash bar in trash view, else a "Trash (N)" entry
                     // (only when the trash has something).
                     if (showTrash) {
@@ -198,7 +216,12 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                             }
                         }
                     }
-                    if (!showTrash) SearchField(query = query, onQueryChange = { vm.setQuery(it) })
+                    if (!showTrash) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) { SearchField(query = query, onQueryChange = { vm.setQuery(it) }) }
+                            SortMenu(current = sort, onSort = { vm.setSort(it) })
+                        }
+                    }
                     PullToRefreshBox(isRefreshing = ui.loading, onRefresh = { vm.refresh() }, modifier = Modifier.weight(1f)) {
                         when {
                             showTrash && ui.files.isEmpty() ->
@@ -269,9 +292,14 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                         supportingContent = { Text(humanSize(file.size)) },
                                         leadingContent = { Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null) },
                                         trailingContent = {
-                                            RowOverflow(
+                                            FileRowOverflow(
+                                                file = file,
                                                 onRename = { renameFile = file.id to file.name },
                                                 onDelete = { deleteFileEntry = file },
+                                                onFavorite = { vm.toggleFavorite(file.id) },
+                                                onMove = { moveTarget = file },
+                                                onVersions = { versionsTarget = file },
+                                                onTags = { tagsTarget = file },
                                             )
                                         },
                                         modifier = Modifier.fillMaxWidth().clickable { vm.openFile(file) },
@@ -352,6 +380,28 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
             onDismiss = { deleteForeverEntry = null },
         )
     }
+    moveTarget?.let { file ->
+        MoveFileDialog(
+            folders = vm.allFolders(),
+            current = file.folder,
+            onMove = { folderId -> vm.moveFile(file.id, folderId); moveTarget = null },
+            onDismiss = { moveTarget = null },
+        )
+    }
+    versionsTarget?.let { file ->
+        VersionsSheet(
+            file = file,
+            onRestore = { ver -> vm.restoreVersion(file.id, ver); versionsTarget = null },
+            onDismiss = { versionsTarget = null },
+        )
+    }
+    tagsTarget?.let { file ->
+        TagEditDialog(
+            initial = file.tags,
+            onSave = { tags -> vm.setTags(file.id, tags); tagsTarget = null },
+            onDismiss = { tagsTarget = null },
+        )
+    }
     if (confirmEmptyTrash) {
         ConfirmDialog(
             message = stringResource(R.string.trash_empty_confirm),
@@ -384,14 +434,56 @@ private fun FilesFab(onUpload: () -> Unit, onNewFolder: () -> Unit) {
     }
 }
 
+/** Overflow for a folder row: rename + delete. */
 @Composable
 private fun RowOverflow(onRename: () -> Unit, onDelete: () -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more)) }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.file_rename)) }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { expanded = false; onRename() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.file_delete)) }, leadingIcon = { Icon(Icons.Outlined.Delete, null) }, onClick = { expanded = false; onDelete() })
+        }
+    }
+}
+
+/** Overflow for a file row: favorite, move, versions, rename, delete. */
+@Composable
+private fun FileRowOverflow(
+    file: FileEntry,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+    onFavorite: () -> Unit,
+    onMove: () -> Unit,
+    onVersions: () -> Unit,
+    onTags: () -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
             Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more))
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(if (file.favorite) R.string.file_unfavorite else R.string.file_favorite)) },
+                leadingIcon = { Icon(if (file.favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, null) },
+                onClick = { expanded = false; onFavorite() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.file_move)) },
+                leadingIcon = { Icon(Icons.Outlined.DriveFileMove, null) },
+                onClick = { expanded = false; onMove() },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.pw_tags)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Outlined.Label, null) },
+                onClick = { expanded = false; onTags() },
+            )
+            if (file.versions.isNotEmpty()) DropdownMenuItem(
+                text = { Text(stringResource(R.string.file_versions, file.versions.size)) },
+                leadingIcon = { Icon(Icons.Outlined.History, null) },
+                onClick = { expanded = false; onVersions() },
+            )
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.file_rename)) },
                 leadingIcon = { Icon(Icons.Outlined.Edit, null) },
@@ -404,4 +496,119 @@ private fun RowOverflow(onRename: () -> Unit, onDelete: () -> Unit) {
             )
         }
     }
+}
+
+/** Compact sort-order menu (name/date/size, asc/desc). */
+@Composable
+private fun SortMenu(current: FileSort, onSort: (FileSort) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) { Icon(Icons.AutoMirrored.Outlined.Sort, stringResource(R.string.file_sort)) }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            data class Opt(val s: FileSort, val res: Int)
+            listOf(
+                Opt(FileSort.NAME_ASC, R.string.file_sort_name_asc),
+                Opt(FileSort.NAME_DESC, R.string.file_sort_name_desc),
+                Opt(FileSort.DATE_DESC, R.string.file_sort_date_desc),
+                Opt(FileSort.DATE_ASC, R.string.file_sort_date_asc),
+                Opt(FileSort.SIZE_DESC, R.string.file_sort_size_desc),
+                Opt(FileSort.SIZE_ASC, R.string.file_sort_size_asc),
+            ).forEach { o ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(o.res)) },
+                    trailingIcon = { if (o.s == current) Icon(Icons.Outlined.Check, null) },
+                    onClick = { onSort(o.s); open = false },
+                )
+            }
+        }
+    }
+}
+
+/** Pick a destination folder (root + the whole file-folder tree) to move a file into. */
+@Composable
+private fun MoveFileDialog(
+    folders: List<NamedFolder>,
+    current: String?,
+    onMove: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        title = { Text(stringResource(R.string.file_move)) },
+        text = {
+            LazyColumn {
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.file_move_root)) },
+                        leadingContent = { if (current == null) Icon(Icons.Outlined.Check, null) else Icon(Icons.Outlined.Folder, null) },
+                        modifier = Modifier.fillMaxWidth().clickable { onMove(null) },
+                    )
+                }
+                items(folders, key = { it.id }) { f ->
+                    ListItem(
+                        headlineContent = { Text(f.name) },
+                        leadingContent = { if (current == f.id) Icon(Icons.Outlined.Check, null) else Icon(Icons.Outlined.Folder, null) },
+                        modifier = Modifier.fillMaxWidth().clickable { onMove(f.id) },
+                    )
+                }
+            }
+        },
+    )
+}
+
+/** Saved file versions with restore. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun VersionsSheet(
+    file: FileEntry,
+    onRestore: (de.ledgerline.app.domain.model.FileVersion) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+            Text(stringResource(R.string.file_versions_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(16.dp))
+            file.versions.forEach { ver ->
+                ListItem(
+                    headlineContent = { Text(humanSize(ver.size)) },
+                    supportingContent = { ver.created?.let { Text(it) } },
+                    trailingContent = { TextButton(onClick = { onRestore(ver) }) { Text(stringResource(R.string.file_version_restore)) } },
+                )
+            }
+        }
+    }
+}
+
+/** Edit a file's tags: chip add (Enter/Done) + remove. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun TagEditDialog(initial: List<String>, onSave: (List<String>) -> Unit, onDismiss: () -> Unit) {
+    val tags = remember { initial.toMutableStateList() }
+    var input by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = { onSave(tags.toList()) }) { Text(stringResource(R.string.action_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        title = { Text(stringResource(R.string.pw_tags)) },
+        text = {
+            Column {
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+                    tags.toList().forEach { t ->
+                        androidx.compose.material3.InputChip(
+                            selected = false, onClick = {}, label = { Text(t) },
+                            trailingIcon = { Icon(Icons.Outlined.Close, contentDescription = "remove", modifier = Modifier.size(16.dp).clickable { tags.remove(t) }) },
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = input, onValueChange = { input = it }, singleLine = true,
+                    label = { Text(stringResource(R.string.pw_tag_add)) },
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (input.isNotBlank()) { tags.add(input.trim()); input = "" } }),
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+            }
+        },
+    )
 }

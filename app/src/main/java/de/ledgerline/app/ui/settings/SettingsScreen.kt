@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +35,9 @@ import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.GppMaybe
+import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Sync
@@ -119,9 +124,11 @@ fun SettingsContent(
     val rememberVaultDays by vm.rememberVaultDays.collectAsStateWithLifecycle()
     val duressThreshold by vm.duressThreshold.collectAsStateWithLifecycle()
     val securityEvents by vm.securityEvents.collectAsStateWithLifecycle()
+    val integrityReport by vm.integrityReport.collectAsStateWithLifecycle()
     val mapTiles by vm.mapTilesEnabled.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
     val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
+    val refreshSeconds by vm.backgroundRefreshSeconds.collectAsStateWithLifecycle()
     val offlineEnabled by vm.offlineEnabled.collectAsStateWithLifecycle()
     val filesPolicy by vm.filesPolicy.collectAsStateWithLifecycle()
     val photosPolicy by vm.photosPolicy.collectAsStateWithLifecycle()
@@ -225,6 +232,7 @@ fun SettingsContent(
                     onSetDuressThreshold = vm::setDuressThreshold,
                     securityEvents = securityEvents,
                     onClearSecurityLog = vm::clearSecurityLog,
+                    integrity = integrityReport,
                 )
 
                 SettingsRoute.OFFLINE -> OfflineSettings(
@@ -252,6 +260,8 @@ fun SettingsContent(
                     padding = innerPadding,
                     backgroundOps = backgroundOps,
                     linkChooser = linkChooser,
+                    refreshSeconds = refreshSeconds,
+                    onSetRefreshSeconds = vm::setBackgroundRefreshSeconds,
                     onSetBackgroundOps = { enabled ->
                         vm.setBackgroundOpsEnabled(enabled)
                         // Ask for POST_NOTIFICATIONS on enable (Android 13+) so the ongoing
@@ -368,6 +378,11 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             subtitle = stringResource(R.string.settings_cat_autofill_sub),
         ) { launchAutofillSettings(autofillContext) }
         CategoryRow(
+            icon = Icons.Outlined.Fingerprint,
+            title = stringResource(R.string.settings_cat_passkeys),
+            subtitle = stringResource(R.string.settings_cat_passkeys_sub),
+        ) { launchCredentialProviderSettings(autofillContext) }
+        CategoryRow(
             icon = Icons.Outlined.CloudOff,
             title = stringResource(R.string.settings_cat_offline),
             subtitle = stringResource(R.string.settings_cat_offline_sub),
@@ -410,6 +425,20 @@ private fun launchAutofillSettings(context: Context) {
         Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE)
     }
     runCatching { context.startActivity(intent) }
+}
+
+/**
+ * Opens the system Credential Manager settings so the user can enable Ledgerline as a passkey /
+ * credential provider (Android 14+). Targets our package where supported; falls back to the
+ * general screen. Best-effort — swallows ActivityNotFound on ROMs without the setting.
+ */
+private fun launchCredentialProviderSettings(context: Context) {
+    val direct = Intent("android.settings.CREDENTIAL_PROVIDER")
+        .setData(Uri.parse("package:${context.packageName}"))
+    val fallback = Intent(Settings.ACTION_SYNC_SETTINGS)
+    runCatching { context.startActivity(direct) }
+        .recoverCatching { context.startActivity(Intent("android.settings.CREDENTIAL_PROVIDER")) }
+        .recoverCatching { context.startActivity(fallback) }
 }
 
 /** A single tappable category row on a tonal surface: leading icon + title + short subtitle. */
@@ -516,8 +545,11 @@ private fun SecuritySettings(
     onSetDuressThreshold: (Int) -> Unit,
     securityEvents: List<de.ledgerline.app.core.security.SecurityLogEntry>,
     onClearSecurityLog: () -> Unit,
+    integrity: de.ledgerline.app.core.integrity.IntegrityReport?,
 ) {
     SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_integrity_title))
+        IntegrityCard(integrity)
         SectionHeader(stringResource(R.string.settings_security))
         Text(
             stringResource(R.string.settings_idle_timeout),
@@ -788,10 +820,23 @@ private fun BackgroundSettings(
     padding: PaddingValues,
     backgroundOps: Boolean,
     linkChooser: Boolean,
+    refreshSeconds: Int,
     onSetBackgroundOps: (Boolean) -> Unit,
     onSetLinkChooser: (Boolean) -> Unit,
+    onSetRefreshSeconds: (Int) -> Unit,
 ) {
     SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_refresh_title))
+        Text(
+            stringResource(R.string.settings_refresh_sub),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+        Column(Modifier.selectableGroup()) {
+            SettingsStore.BACKGROUND_REFRESH_OPTIONS.forEach { seconds ->
+                RadioRow(refreshLabel(seconds), refreshSeconds == seconds) { onSetRefreshSeconds(seconds) }
+            }
+        }
         SwitchRow(
             title = stringResource(R.string.settings_background_ops_title),
             subtitle = stringResource(R.string.settings_background_ops_subtitle),
@@ -1026,6 +1071,20 @@ private fun timeoutLabel(minutes: Int): String = when (minutes) {
 }
 
 @Composable
+private fun refreshLabel(seconds: Int): String = when (seconds) {
+    0 -> stringResource(R.string.settings_refresh_off)
+    60 -> stringResource(R.string.minutes_1)
+    300 -> stringResource(R.string.minutes_5)
+    900 -> stringResource(R.string.minutes_15)
+    1800 -> stringResource(R.string.minutes_30)
+    3600 -> stringResource(R.string.hours_1)
+    10800 -> stringResource(R.string.hours_3)
+    43200 -> stringResource(R.string.hours_12)
+    86400 -> stringResource(R.string.hours_24)
+    else -> seconds.toString()
+}
+
+@Composable
 private fun keepScreenOnLabel(minutes: Int): String = when (minutes) {
     0 -> stringResource(R.string.settings_keep_screen_on_unlimited)
     5 -> stringResource(R.string.minutes_5)
@@ -1055,4 +1114,52 @@ private fun applyLanguage(context: Context, tag: String) {
     val lm = context.getSystemService(LocaleManager::class.java)
     lm.applicationLocales =
         if (tag.isEmpty()) LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(tag)
+}
+
+/**
+ * §3.6 — informational client-integrity card: Keystore attestation level + root/tamper
+ * heuristics. Advisory only (never blocks); a rooted privacy ROM is a warning, not a lockout.
+ */
+@Composable
+private fun IntegrityCard(report: de.ledgerline.app.core.integrity.IntegrityReport?) {
+    val clean = report?.clean == true
+    val tint = if (clean) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (clean) Icons.Outlined.VerifiedUser else Icons.Outlined.GppMaybe,
+            contentDescription = null,
+            tint = tint,
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            val attest = when (report?.attestation) {
+                de.ledgerline.app.core.integrity.AttestationLevel.STRONGBOX -> stringResource(R.string.integrity_attest_strongbox)
+                de.ledgerline.app.core.integrity.AttestationLevel.TEE -> stringResource(R.string.integrity_attest_tee)
+                de.ledgerline.app.core.integrity.AttestationLevel.SOFTWARE -> stringResource(R.string.integrity_attest_software)
+                else -> stringResource(R.string.integrity_attest_unverified)
+            }
+            Text(
+                if (clean) stringResource(R.string.integrity_ok) else stringResource(R.string.integrity_warning),
+                style = MaterialTheme.typography.bodyLarge,
+                color = tint,
+            )
+            Text(
+                stringResource(R.string.integrity_attest_label, attest),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (report?.rooted == true) {
+                Text(
+                    stringResource(R.string.integrity_root_detected, report.rootReasons.joinToString(", ")),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
 }

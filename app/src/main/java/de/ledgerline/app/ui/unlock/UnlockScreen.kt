@@ -120,6 +120,9 @@ fun UnlockScreen(
                         onValueChange = { passphrase = it; vm.reset() },
                         label = { Text(stringResource(R.string.unlock_passphrase)) },
                         visualTransformation = PasswordVisualTransformation(),
+                        // §3.3 IME hardening: Password input type excludes the master passphrase
+                        // from keyboard learning/autocorrect/suggestions so it can't leak.
+                        keyboardOptions = de.ledgerline.app.ui.common.secretKeyboardOptions(),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -147,6 +150,7 @@ fun UnlockScreen(
                         onValueChange = { recoveryCode = it; vm.reset() },
                         label = { Text(stringResource(R.string.unlock_recovery_hint)) },
                         textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = FontFamily.Monospace),
+                        keyboardOptions = de.ledgerline.app.ui.common.secretKeyboardOptions(),
                         singleLine = false,
                         modifier = Modifier.fillMaxWidth(),
                     )

@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import java.util.UUID
 import javax.inject.Inject
 
 data class ContactsUi(
@@ -145,13 +144,19 @@ class ContactsViewModel @Inject constructor(
         val freed = cache.value.value?.manifest?.contacts.orEmpty()
             .filter { it.trashed }.mapNotNull { it.avatarRef }
         write { m -> ContactOps.emptyTrash(m) }
-        if (freed.isNotEmpty()) viewModelScope.launch { blobs.deleteBlobs(freed) }
+        if (freed.isNotEmpty()) viewModelScope.launch { blobs.deleteBlobs(freed); reconcileAvatars() }
     }
 
     fun deleteForever(id: String) {
         val ref = contactById(id)?.avatarRef
         write { m -> ContactOps.removeContact(m, id) }
-        if (!ref.isNullOrBlank()) viewModelScope.launch { blobs.deleteBlobs(listOf(ref)) }
+        if (!ref.isNullOrBlank()) viewModelScope.launch { blobs.deleteBlobs(listOf(ref)); reconcileAvatars() }
+    }
+
+    /** Best-effort living-set reconcile of contact avatar blobs (reclaims failed eager deletes). */
+    private suspend fun reconcileAvatars() {
+        val living = cache.value.value?.manifest?.contacts.orEmpty().mapNotNull { it.avatarRef }.filter { it.isNotBlank() }
+        blobs.reconcile(living)
     }
 
     // ---- Avatar ----
@@ -291,8 +296,31 @@ class ContactsViewModel @Inject constructor(
             if (mutate.invoke { m -> mutation(m) } is Outcome.Err) _message.value = "Save failed"
         }
 
-    private fun newId(): String = UUID.randomUUID().toString()
+    private fun newId(): String = de.ledgerline.app.core.Ids.newId()
     private fun nowIso(): String = OffsetDateTime.now(ZoneOffset.UTC).toString()
+
+    // ---- vCard import / export (RFC 6350) ----
+
+    /** All non-trashed contacts serialised as a vCard 4.0 (.vcf) document. */
+    fun exportVcf(): String {
+        val contacts = cache.value.value?.manifest?.contacts.orEmpty().filter { !it.trashed }
+        return de.ledgerline.app.core.contacts.VCard.export(contacts)
+    }
+
+    /**
+     * Parse a `.vcf` file and add each contact (fresh id + timestamp). Returns the number added via
+     * [onDone]; 0 on a parse yielding no cards. Avatars are not imported (separate encrypted blob).
+     */
+    fun importVcf(text: String, onDone: (Int) -> Unit = {}) {
+        val parsed = runCatching { de.ledgerline.app.core.contacts.VCard.parse(text) }.getOrDefault(emptyList())
+            .map { it.copy(id = newId(), updated = nowIso()) }
+        if (parsed.isEmpty()) { onDone(0); return }
+        viewModelScope.launch {
+            val ok = mutate.invoke { m -> m.copy(contacts = m.contacts + parsed) } is Outcome.Ok
+            if (!ok) _message.value = "Import failed"
+            onDone(if (ok) parsed.size else 0)
+        }
+    }
 
     private fun displayName(c: Contact): String = when {
         c.last.isNotBlank() && c.first.isNotBlank() -> "${c.last}, ${c.first}"

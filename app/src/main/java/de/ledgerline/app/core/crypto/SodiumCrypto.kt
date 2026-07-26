@@ -9,6 +9,8 @@ import com.goterl.lazysodium.interfaces.SecretStream
 import com.sun.jna.NativeLong
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,7 +23,8 @@ import javax.inject.Singleton
  */
 @Singleton
 class SodiumCrypto @Inject constructor() : Crypto {
-    private val ls = LazySodiumAndroid(SodiumAndroid())
+    private val sodium = SodiumAndroid()
+    private val ls = LazySodiumAndroid(sodium)
 
     override fun deriveKek(passphrase: ByteArray, salt: ByteArray, opsLimit: Long, memLimit: Long): ByteArray {
         require(salt.size == PwHash.SALTBYTES) { "salt must be ${PwHash.SALTBYTES} bytes" }
@@ -63,9 +66,13 @@ class SodiumCrypto @Inject constructor() : Crypto {
 
     private val lenientJson = Json { isLenient = true; ignoreUnknownKeys = true }
 
+    /** Store-v3 crypto-suite id; every sealed manifest carries it, an unknown suite fails closed. */
+    private val SUITE = 1
+
     override fun openManifest(ciphertext: String, vk: ByteArray): String? {
         return try {
             val env = lenientJson.parseToJsonElement(ciphertext) as JsonObject
+            if (unknownSuite(env)) return null // §5 fail-closed: never guess an unknown crypto stack
             val c = (env["c"] ?: return null).jsonPrimitive.content
             val n = (env["n"] ?: return null).jsonPrimitive.content
             val plain = secretBoxOpen(b64decode(c), b64decode(n), vk) ?: return null
@@ -75,17 +82,30 @@ class SodiumCrypto @Inject constructor() : Crypto {
         }
     }
 
+    /**
+     * Seal a manifest byte-exact to the web (`vault.js` `sealManifest`): canonical-JSON payload,
+     * space-padded to a `max(4096, padme(len+1))` bucket (metadata-size hiding), secretbox-sealed
+     * under VK, wrapped in the suite-tagged `{suite:1,c,n}` envelope. The incoming [json] is
+     * re-serialised through [CanonicalJson] so every module (not just files/gallery) is canonical.
+     */
     override fun sealManifest(json: String, vk: ByteArray): String {
-        val bucket = 4096
-        val target = ((json.length + 1 + bucket - 1) / bucket) * bucket   // ceil((len+1)/4096)*4096
-        val padded = json + " ".repeat(target - json.length)
+        val canonical = CanonicalJson.encode(lenientJson.parseToJsonElement(json))
+        val target = maxOf(4096L, padmeSize((canonical.length + 1).toLong())).toInt()
+        val padded = canonical + " ".repeat(target - canonical.length)
         val plain = padded.toByteArray(Charsets.UTF_8)
         val nonce = ByteArray(SecretBox.NONCEBYTES)                       // 24
         randomBytes(nonce)
         val cipher = ByteArray(plain.size + SecretBox.MACBYTES)
         check(ls.cryptoSecretBoxEasy(cipher, plain, plain.size.toLong(), nonce, vk)) { "seal failed" }
-        return """{"c":"${b64encode(cipher)}","n":"${b64encode(nonce)}"}"""
+        return """{"suite":$SUITE,"c":"${b64encode(cipher)}","n":"${b64encode(nonce)}"}"""
     }
+
+    /** True when the envelope carries a `suite` that is present and ≠ the known [SUITE]. */
+    private fun unknownSuite(env: JsonObject): Boolean {
+        val s = (env["suite"] as? JsonPrimitive)?.intOrNull ?: return false // absent → legacy-ok
+        return s != SUITE
+    }
+
 
     override fun sealValue(data: ByteArray, key: ByteArray): String {
         val nonce = ByteArray(SecretBox.NONCEBYTES)
@@ -97,9 +117,12 @@ class SodiumCrypto @Inject constructor() : Crypto {
 
     override fun openValue(cn: String, key: ByteArray): ByteArray? = try {
         val env = lenientJson.parseToJsonElement(cn) as JsonObject
-        val c = (env["c"] ?: return null).jsonPrimitive.content
-        val n = (env["n"] ?: return null).jsonPrimitive.content
-        secretBoxOpen(b64decode(c), b64decode(n), key)
+        if (unknownSuite(env)) null
+        else {
+            val c = (env["c"] ?: return null).jsonPrimitive.content
+            val n = (env["n"] ?: return null).jsonPrimitive.content
+            secretBoxOpen(b64decode(c), b64decode(n), key)
+        }
     } catch (_: Exception) {
         null
     }
@@ -108,6 +131,17 @@ class SodiumCrypto @Inject constructor() : Crypto {
         val out = ByteArray(outLen)
         check(ls.cryptoGenericHash(out, out.size, input, input.size.toLong())) { "generichash failed" }
         return out
+    }
+
+    /**
+     * Constant-time equality via libsodium `sodium_memcmp` (vetted primitive; §28). Lengths
+     * are compared first (not secret for the fixed-size fingerprints/MACs we compare); a
+     * length mismatch returns false without calling into native code. `sodium_memcmp` returns
+     * 0 iff the [len]-byte prefixes are equal, in constant time.
+     */
+    override fun constantTimeEquals(a: ByteArray, b: ByteArray): Boolean {
+        if (a.size != b.size) return false
+        return sodium.sodium_memcmp(a, b, a.size) == 0
     }
 
     /** Test-only: secretbox-seal [plaintext] with an explicit [nonce] (byte-parity fixtures). */

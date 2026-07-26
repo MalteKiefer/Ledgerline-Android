@@ -407,6 +407,17 @@ Blob-Uploads resumable nachholen. Settings: Master-Schalter „Alles offline" + 
 (Files/Gallery/Notizen/Lesezeichen/Todos), Blob-Strategie (alle/Favoriten/Thumbnails/aus),
 Wi-Fi-/Laden-Constraint, Cache-Limit + „Cache leeren" pro Modul.
 
+> **Sharded-Offline erledigt (2026-07-26):** die **sharded** Gallery- **und** Files-Stores
+> assemblen jetzt kalt-offline. Shard-/Collection-Blob-Fetches laufen cache-first + write-through
+> über `BlobDiskCache` (content-addressed Refs = unveränderlich → Cache-Hit ist immer aktuell,
+> beschleunigt auch warme Online-Loads). `assembleManifest`/`assembleFilesSlice` tragen ein
+> `allowNetwork`-Flag (online lädt+cached, offline liest nur Cache; nicht-gecachte Slices fehlen).
+> Der **Root**-Envelope wird ebenfalls gecacht (Gallery `storeCache["gallery"]`, Files neuer Key
+> `workspace_files_root`; Files-Save + `refreshStoreCache` halten ihn aktuell). Frisch geschriebene
+> Shard-Content-Blobs werden erst beim nächsten Online-Load gecacht (Uploader hält den Ciphertext
+> nicht). Tests: `OfflineStoreLoadTest.{gallery,files}_v3_online_caches_shard_blobs_then_offline_
+> assembles_them`. Behebt den früheren „Tab offline leer"-Bug (Root dekodierte flach → leer).
+
 ## 12. Share-Target (Kern-Anforderung)
 App als `ACTION_SEND`/`ACTION_SEND_MULTIPLE`-Ziel. `image/*`,`video/*` → Gallery-Import;
 alles andere → Files-Import (Ziel-Ordner wählbar). Kurzes Bestätigungs-Sheet. Offline → Queue.
@@ -489,11 +500,35 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   Logins zum Speichern an (`SecretItem` login). Manifest: Service (`BIND_AUTOFILL_SERVICE`) +
   `xml/autofill_service`; aktivieren via Settings→Autofill (`ACTION_REQUEST_SET_AUTOFILL_SERVICE`).
   Kein Klartext verlässt die App vor Auth. Strings EN/DE/RU.
-  **Offen:** Passkeys, geteilte Passwort-Vaults (PQ-Sharing, §S3), Favicon/TFA-Anzeige,
-  Inline-Autofill-Presentations (aktuell Menu-Presentation, `Dataset.Builder(RemoteViews)` ist
-  deprecated aber funktional), volle RU-Übersetzung der übrigen Passwort-UI-Strings.
-- **Öffentliche Share-Links** (Files/Gallery, `*/shares`, Key im URL-Fragment).
-- **Cross-User Shared Vaults/Ordner** (Rollen, Rotation, TOFU) + **PQ-Hybrid-KEM** (§4).
+  **Favicon + TFA-Anzeige — ERLEDIGT (2026-07-26).** `SecretAvatar` zeigt das Site-Favicon
+  (`GET /passwords/icon?domain=`, server-proxied → data-URI; `Favicons`-Decoder für PNG/JPEG,
+  SVG/ICO-Fallback auf Typ-Icon; VM cacht pro Domain) in Liste + Detail, sonst Typ-`IconChip`.
+  Detail zeigt eine „Diese Seite bietet 2FA"-Zeile für Logins **ohne** TOTP, deren Domain in der
+  `GET /passwords/tfa-directory` (2fa.directory) steht — mit „Einrichten"-Link (Doku-URL). Match
+  = Host + Parent-Domains (web `_tfaMatch`). Strings EN/DE/RU.
+  **Passkeys — ERLEDIGT (2026-07-26, on-device-Verifikation offen).** App ist WebAuthn-
+  **Credential-Provider** via Android Credential Manager (`androidx.credentials` 1.6.0). Krypto-Kern
+  (byte-exakt zu Web `passkey.js` + iOS, unit-getestet `PasskeyCryptoTest`): `core/passkey/` —
+  `P256Key` (JCA secp256r1/ES256, JWK `{kty,crv,d,x,y}`, DER-Signatur), `WebAuthnCbor` (hand-rolled
+  COSE_Key + authData create 0x5D/assert 0x1D + none-Attestation, kein CBOR-Lib), `PasskeyStore`
+  (standalone `passkey`-Item **oder** in `login.fields["passkeys"]` eingebettet; `candidates`/
+  `standaloneItem`/`attach`/`rpIdAllowed`), `PasskeyResponses`/`PasskeyRequests` (WebAuthn-JSON).
+  `LedgerlinePasskeyService` (BeginCreate→CreateEntry, BeginGet→**AuthenticationAction** da locked)
+  + `PasskeyProviderActivity` (unlock-gated wie Autofill/Share; CREATE→generieren+speichern,
+  GET→entsperren+Kandidaten enumerieren, ASSERT→signieren). Manifest `BIND_CREDENTIAL_PROVIDER_SERVICE`
+  + `xml/passkey_provider`; aktivieren via Settings→Passkeys. **Offen/best-effort:** clientDataJSON-
+  Origin für App-Caller (Browser liefern `clientDataHash`, korrekt behandelt; App-Caller-Origin
+  `https://<rpId>` provisorisch), on-device-Ceremony-Verifikation.
+  **Offen:** geteilte Passwort-Vaults (PQ-Sharing, §S3), Inline-Autofill-Presentations
+  (Menu-Presentation, `Dataset.Builder(RemoteViews)` deprecated aber funktional), volle
+  RU-Übersetzung der übrigen Passwort-UI-Strings.
+- **Sharing — KRYPTO-READY, FEATURE DEFERRED (bewusste Entscheidung, Rebuild §4.7).** Die Krypto
+  ist fertig + byte-verifiziert (`PQKEM` ML-KEM-768+X25519, `IdentityCrypto`/`IdentityRepository`
+  write-once `/vaults/keys`, `ShareCrypto` Share-Link-SK-im-Fragment — alle mit KAT/Fixture/On-Device-
+  Tests). **Ungebaut:** die REST/UI-Flows — `/vaults` (create/members/resolve-recipient/accept/rotate),
+  Shared-Vault-Store lesen/schreiben, öffentliche `*/shares`-Links, Invite/Accept/Rotate-UI, TOFU-
+  Anzeige. Nicht mit „geliefert" verwechseln. Empfohlener nächster Bau: **Shared-Vault read/accept**
+  (Krypto liegt bereit) vor dem vollen Rollen/Rotation-Epic.
 - **Passkeys/WebAuthn.**
 - **Geräte-Verwaltung + Remote-Wipe-UI**, **Notifications**, **Konto-Export/Löschen**.
 - **Explore/Maps** (Tracks, Routing), **Health-Modul**, **Invoices-Modul**.
@@ -535,13 +570,24 @@ Supply-Chain). **Bei jeder Änderung mitpflegen.**
   Data-Extraction-Rules schließen Cloud-/Device-Transfer aus.
 - **Side-Channels (teilweise):** `FLAG_SECURE` app-weit (Screenshot/Recording/Recents-Block).
   Kein Secret-Logging (R8 strippt Debug; CI-Greps). **Idle-Lock monotonic** (`IdleLocker`
-  elapsedRealtime — Wall-Clock-Sprung verschiebt Lock nicht).
+  elapsedRealtime — Wall-Clock-Sprung verschiebt Lock nicht). **IME-Härtung (2026-07-26):**
+  alle Secret-Felder (Master-Passphrase, Recovery-Code, Passwort-Manager-Secrets inkl. Custom-
+  Secret-Felder) nutzen `KeyboardType.Password` + `autoCorrectEnabled=false` (zentral
+  `ui/common/secretKeyboardOptions()`) → aus IME-Learning/Autocorrect ausgeschlossen.
+- **Client-Integrität (2026-07-26, advisory, §3.6):** `IntegritySignal`/`AndroidIntegritySignal`
+  (AOSP-only, `foss`-Baseline, via `CryptoModule` gebunden) — **Keystore-Key-Attestation** (Temp-
+  EC-Key mit `setAttestationChallenge`, Cert-Chain → KeyDescription-Extension `1.3.6.1.4.1.11129.2.1.17`
+  via BouncyCastle → `STRONGBOX`/`TEE`/`SOFTWARE`/`UNVERIFIED`) **+ Root-/Tamper-Heuristik** (su/Magisk/
+  test-keys). **Nie blockierend** (GrapheneOS-safe). Assessment bei Pairing (loggt `INTEGRITY_WARNING`
+  wenn nicht clean) + Live-Anzeige in Settings→Sicherheit (`IntegrityCard`). Test `IntegrityReportTest`.
 - **Clock-Rollback-Guard (2026-07-25):** forward-only Wall-Clock-High-Water
   (`ClockRollbackGuard`, Keystore-versiegelt); ein Rückwärts-Sprung > 5 min sperrt den
   passphrase-freien Remember-Vault-Pfad (fail-closed → Passphrase). Gate in `UnlockViewModel`.
-- **Constant-Time-Compare (2026-07-25):** `ConstantTime.equal` für Secret-Vergleiche
-  (TOFU-Fingerprints etc.). Uniformer opaquer Decrypt-Fehler: `SodiumCrypto` liefert für
-  alle Fehlermodi `null` (ununterscheidbar).
+- **Constant-Time-Compare (2026-07-25, libsodium 2026-07-26):** Secret-Vergleiche laufen über
+  `Crypto.constantTimeEquals` = libsodium `sodium_memcmp` in `SodiumCrypto` (vetted primitive;
+  `IdentityCrypto`-TOFU-Fingerprint nutzt es). `ConstantTime.equal` bleibt als pure-Kotlin-Fallback
+  (Default der Interface-Methode, für Test-Fakes). Uniformer opaquer Decrypt-Fehler: `SodiumCrypto`
+  liefert für alle Fehlermodi `null` (ununterscheidbar).
 - **Unlock-Throttle (2026-07-25):** monotoner exponentieller Lockout (`UnlockThrottle`,
   elapsedRealtime, 3 Freiversuche → 2s/4s/8s… cap 300s, **nie destruktiv**). Gate im
   `UnlockViewModel`; nur echte Passphrase-Fehler zählen. Tests `SecurityGuardsTest`.
@@ -574,11 +620,14 @@ Supply-Chain). **Bei jeder Änderung mitpflegen.**
 - **Share-Link-Krypto (2026-07-25):** `ShareCrypto` (SK im URL-Fragment, per-file-key re-wrap
   + Manifest-Seal unter SK), fixture-verifiziert (`ShareCryptoInstrumentedTest`). REST/UI = §14 R-S3/S4.
 - **Verbleibend:** Sharing-Flows (Invite/Accept/Rotate, TOFU-Map), Share-REST/UI, Passkeys — §14.
-- **Unbekannte Felder (Integrität):** Store-v3-Migration nutzt getippte Modul-Manifeste
-  (`NotesManifest` etc.). Die Top-Level-Keys sind exakt die Web-`MODULE_BLANKS` → kein
-  Verlust im Normalfall, aber ein künftig neu hinzugefügter Fremd-Key oder unbekanntes
-  **Record**-Feld würde beim Schreiben gedroppt (nur `Contact._x` erhält vCard-Extras).
-  Raw-JSON-Overlay pro Modul (wie iOS `JSONValue`) ist die verbleibende Härtung.
+- **Unbekannte Felder (Integrität) — GESCHLOSSEN (2026-07-26, Rebuild-Phase 0).** Notes/Todos/
+  Bookmarks/Contacts nutzen jetzt den **Raw-JSON-Overlay** (`WorkspaceRecordCodec`, wie
+  `FileRecordCodec`): jeder Record trägt sein originales `@Transient raw:JsonObject`, beim Save
+  werden nur die bekannten Felder web-shaped überlagert (presence-aware) → **jedes unbekannte
+  Top-Level-Record-Feld von Web/iOS überlebt** den Android-Round-Trip. Zusätzlich: Bookmark-Ordner
+  mappen `parent↔parentId` (keine flach-gedrückte Hierarchie mehr), `Contact.vatId` ergänzt,
+  `trashed` wird `false | ISO` gerendert (Timestamp nicht mehr auf bool kollabiert), IDs sind
+  32-Hex (`Ids.newId`, byte-shape wie Web). Test `WorkspaceRecordCodecTest`.
 - **Konto-Kontrolle:** Remote-Devices-Liste/-Widerruf, Notifications, Export/Löschen (`/devices`,
   `/notifications`, `/account/*`) **noch nicht in Android** (nur Web).
 
@@ -618,7 +667,9 @@ Tests grün (`PQKEMKatTest` on-JVM, `*InstrumentedTest` on-device).
   MockWebServer) fangen den Real-TLS-Pfad nicht. Erst nach First-Party-Converter + OkHttp-5-TLS-
   Review + On-Device-Pairing-Test re-adoptieren.
 - Sonst alle auf neuestem Stand (2026-07-25): AGP 9.3.1, Kotlin 2.4.10, lifecycle 2.11.0,
-  camerax 1.6.1, mockk 1.14.11, MapLibre 13.4.1, jna 5.19.1, zxing 3.5.4, BC 1.84.
+  camerax 1.6.1, mockk 1.14.11, MapLibre 13.4.1, jna 5.19.1, zxing 3.5.4, BC 1.84,
+  androidx.credentials 1.6.0 (Passkeys; 1.7.0 ist alpha → gehalten).
+  androidx.autofill 1.3.0 (Inline-Autofill-Presentations).
   (KSP 2.3.10, Hilt 2.60.1, Compose-BOM 2026.06.01 waren bereits latest.)
 
 ---
