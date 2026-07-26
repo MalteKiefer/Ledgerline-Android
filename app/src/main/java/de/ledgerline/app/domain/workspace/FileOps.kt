@@ -30,6 +30,30 @@ object FileOps {
     fun emptyTrashFiles(m: WorkspaceManifest): WorkspaceManifest =
         m.copy(files = m.files.filterNot { it.trashed })
 
+    /** Move a file into [folderId] (null = root). Unknown id = no-op. */
+    fun moveFile(m: WorkspaceManifest, id: String, folderId: String?): WorkspaceManifest =
+        update(m, id) { it.copy(folder = folderId) }
+
+    /** Toggle a file's favorite flag. Unknown id = no-op. */
+    fun toggleFavorite(m: WorkspaceManifest, id: String): WorkspaceManifest =
+        update(m, id) { it.copy(favorite = !it.favorite) }
+
+    /** Replace a file's tag list. Unknown id = no-op. */
+    fun setTags(m: WorkspaceManifest, id: String, tags: List<String>): WorkspaceManifest =
+        update(m, id) { it.copy(tags = tags) }
+
+    /**
+     * Restore a saved [version] as the file's current content: snapshot the outgoing current blob
+     * as a new version (so the restore is itself undoable), then point the file at the version's
+     * blob/key/size/mime. Unknown id = no-op.
+     */
+    fun restoreVersion(m: WorkspaceManifest, id: String, version: FileVersion, nowIso: String): WorkspaceManifest =
+        update(m, id) { f ->
+            val snapshot = FileVersion(id = "", blob = f.blob, encFileKey = f.encFileKey, size = f.size, mime = f.mime, name = f.name, created = nowIso)
+            val capped = prependVersion(f.versions.filterNot { it.blob == version.blob }, snapshot).versions
+            f.copy(blob = version.blob, encFileKey = version.encFileKey, size = version.size, mime = version.mime.ifBlank { f.mime }, versions = capped)
+        }
+
     private inline fun update(
         m: WorkspaceManifest,
         id: String,

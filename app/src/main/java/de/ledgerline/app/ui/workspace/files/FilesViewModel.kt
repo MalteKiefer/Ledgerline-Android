@@ -34,6 +34,18 @@ data class FilesUi(
     val canGoBack: Boolean = false,
 )
 
+/** File list sort orders. */
+enum class FileSort { NAME_ASC, NAME_DESC, DATE_DESC, DATE_ASC, SIZE_DESC, SIZE_ASC }
+
+private fun List<FileEntry>.sortedBy(order: FileSort): List<FileEntry> = when (order) {
+    FileSort.NAME_ASC -> sortedBy { it.name.lowercase() }
+    FileSort.NAME_DESC -> sortedByDescending { it.name.lowercase() }
+    FileSort.DATE_DESC -> sortedByDescending { it.created ?: "" }
+    FileSort.DATE_ASC -> sortedBy { it.created ?: "" }
+    FileSort.SIZE_DESC -> sortedByDescending { it.size }
+    FileSort.SIZE_ASC -> sortedBy { it.size }
+}
+
 /** State of the in-app file viewer (in-memory plaintext bytes, never persisted). */
 sealed interface ViewerState {
     data object Idle : ViewerState
@@ -66,6 +78,11 @@ class FilesViewModel @Inject constructor(
     private val stack = ArrayDeque<String?>().apply { addLast(null) }   // current folder = last
     private val _state = MutableStateFlow(FilesUi(loading = true))
     val state: StateFlow<FilesUi> = _state
+
+    /** File list sort order. */
+    private val _sort = MutableStateFlow(FileSort.NAME_ASC)
+    val sort: StateFlow<FileSort> = _sort
+    fun setSort(s: FileSort) { _sort.value = s; recompute() }
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy
@@ -146,6 +163,19 @@ class FilesViewModel @Inject constructor(
         mutate.invoke { m ->
             m.copy(files = m.files.map { if (it.id == id) it.copy(name = name) else it })
         }
+    }
+
+    /** The folders available as move targets (whole tree). */
+    fun allFolders(): List<NamedFolder> = cache.value.value?.manifest?.fileFolders.orEmpty()
+
+    fun moveFile(id: String, folderId: String?) = viewModelScope.launch { mutate.invoke { FileOps.moveFile(it, id, folderId) } }
+    fun toggleFavorite(id: String) = viewModelScope.launch { mutate.invoke { FileOps.toggleFavorite(it, id) } }
+    fun setTags(id: String, tags: List<String>) = viewModelScope.launch { mutate.invoke { FileOps.setTags(it, id, tags) } }
+
+    /** Restore a saved version as the file's current content (the outgoing blob becomes a version). */
+    fun restoreVersion(id: String, version: de.ledgerline.app.domain.model.FileVersion) = viewModelScope.launch {
+        val now = java.time.Instant.now().toString()
+        mutate.invoke { FileOps.restoreVersion(it, id, version, now) }
     }
 
     /** Soft-delete: move the file to the trash. No blobs are freed here — that only
@@ -383,7 +413,7 @@ class FilesViewModel @Inject constructor(
             ?.sortedBy { it.name.lowercase() } ?: emptyList()
         val files = allFiles
             .filter { !it.trashed && it.folder == cwd && WorkspaceSearch.matches(it, q) }
-            .sortedBy { it.name.lowercase() }
+            .sortedBy(_sort.value)
         _state.value = FilesUi(false, false, folders, files, canGoBack = stack.size > 1)
     }
 }
