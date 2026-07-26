@@ -100,6 +100,37 @@ object PasskeyStore {
         }
     }
 
+    /** A lightweight view of a passkey for in-app management (list + delete). */
+    data class PasskeyRef(val credentialIdB64: String, val rpId: String, val userName: String, val createdAt: String?)
+
+    /** The passkeys embedded in a `login` item's `fields["passkeys"]`, for display/management. */
+    fun embedded(item: SecretItem): List<PasskeyRef> {
+        if (item.type != "login") return emptyList()
+        return (item.fields["passkeys"] as? JsonArray)?.mapNotNull { e ->
+            val o = e as? JsonObject ?: return@mapNotNull null
+            val cid = o["credentialId"]?.jsonPrimitive?.content ?: return@mapNotNull null
+            PasskeyRef(
+                credentialIdB64 = cid,
+                rpId = o["rpId"]?.jsonPrimitive?.content ?: "",
+                userName = o["userName"]?.jsonPrimitive?.content ?: "",
+                createdAt = o["createdAt"]?.jsonPrimitive?.content,
+            )
+        } ?: emptyList()
+    }
+
+    /**
+     * Remove the embedded passkey with [credentialIdB64] from the `login` [loginId], preserving
+     * every other field; drops the `passkeys` key entirely when the last one is removed.
+     */
+    fun detach(loginId: String, credentialIdB64: String, items: List<SecretItem>, now: String): List<SecretItem> =
+        items.map { item ->
+            if (item.id != loginId || item.type != "login") return@map item
+            val arr = item.fields["passkeys"] as? JsonArray ?: return@map item
+            val kept = arr.filter { (it as? JsonObject)?.get("credentialId")?.jsonPrimitive?.content != credentialIdB64 }
+            val newFields = if (kept.isEmpty()) JsonObject(item.fields - "passkeys") else JsonObject(item.fields + ("passkeys" to JsonArray(kept)))
+            item.copy(fields = newFields, updated = now)
+        }
+
     // ---- helpers ---------------------------------------------------------------
 
     private fun passkeyFields(

@@ -65,6 +65,7 @@
     <string name="pw_breach_clear">Not found in known breaches</string>
     <string name="pw_breach_found">Found in %1$d breaches — change this password</string>
     <string name="pw_breach_error">Breach check unavailable</string>
+        <string name="pw_passkeys">Passkeys</string>
     <string name="pw_version_history">Version history</string>
     <string name="pw_version_restore">Restore</string>
     <string name="pw_folder">Folder</string>

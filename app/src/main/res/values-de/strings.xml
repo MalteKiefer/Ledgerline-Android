@@ -65,6 +65,7 @@
     <string name="pw_breach_clear">In bekannten Lecks nicht gefunden</string>
     <string name="pw_breach_found">In %1$d Lecks gefunden — ändere dieses Passwort</string>
     <string name="pw_breach_error">Leck-Prüfung nicht verfügbar</string>
+        <string name="pw_passkeys">Passkeys</string>
     <string name="pw_version_history">Versionsverlauf</string>
     <string name="pw_version_restore">Wiederherstellen</string>
     <string name="pw_folder">Ordner</string>
