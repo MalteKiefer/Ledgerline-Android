@@ -98,6 +98,14 @@ class WorkspaceRepository(
     private val folderRawById = java.util.concurrent.ConcurrentHashMap<String, JsonObject>()
 
     /**
+     * Files-store degraded flag: a shard blob is durably missing (404 after retries). While
+     * degraded the root MUST NOT be rewritten (that would drop the missing shard's slot and make
+     * the loss permanent) — writes are frozen and the UI can surface a non-destructive banner.
+     */
+    private val _filesDegraded = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val filesDegraded: kotlinx.coroutines.flow.StateFlow<Boolean> = _filesDegraded
+
+    /**
      * One workspace module store. [encode] serialises the module's slice of the
      * aggregate to the wire JSON that gets sealed; [merge] decodes a fetched module
      * JSON and replaces that slice in an aggregate; [changed] reports whether the
@@ -214,10 +222,10 @@ class WorkspaceRepository(
         val res = try {
             api.filesStore()
         } catch (_: Exception) {
-            priorFilesRoot = FilesShardWriter.RootState(); return emptyList<FileEntry>() to emptyList()
+            return keepCachedFiles() // transient network error: keep what we have, don't blank
         }
         if (res.code() == HttpURLConnection.HTTP_UNAUTHORIZED) throw AuthException()
-        if (!res.isSuccessful) { priorFilesRoot = FilesShardWriter.RootState(); return emptyList<FileEntry>() to emptyList() }
+        if (!res.isSuccessful) return keepCachedFiles()
 
         val body = res.body()!!
         filesVersion = body.version
@@ -228,30 +236,60 @@ class WorkspaceRepository(
         } ?: run { priorFilesRoot = FilesShardWriter.RootState(); return emptyList<FileEntry>() to emptyList() }
 
         priorFilesRoot = rootStateFrom(root)
+        _filesDegraded.value = false
         val files = if (root.shards.isNotEmpty()) {
             coroutineScope {
-                root.shards.map { s ->
-                    async {
-                        val r = api.rawFile(s.ref)
-                        check(r.isSuccessful) { "files shard ${s.ref}: http ${r.code()}" }
-                        val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), s.key, vk, crypto)
-                        filesJson.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
-                    }
-                }.awaitAll().flatten()
-            }.map { obj -> FileRecordCodec.decodeFile(obj).also { fileRawById[it.id] = obj } }
+                // Fetch every shard concurrently. A durable 404 (after retries) marks the store
+                // degraded and returns null for that shard (its descriptor is KEPT in the root, so
+                // nothing is rewritten to erase it); any OTHER failure throws (may recover).
+                root.shards.map { s -> async { fetchFilesShard(api, s, vk) } }.awaitAll()
+            }.flatMap { it ?: emptyList() }.map { obj -> FileRecordCodec.decodeFile(obj).also { fileRawById[it.id] = obj } }
         } else {
             root.files
         }
         val folders = if (root.foldersRef != null) {
-            val r = api.rawFile(root.foldersRef!!)
-            check(r.isSuccessful) { "files folders ${root.foldersRef}: http ${r.code()}" }
-            val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), root.foldersKey ?: "", vk, crypto)
-            filesJson.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
+            val desc = de.ledgerline.app.domain.model.GalleryShard(ref = root.foldersRef!!, key = root.foldersKey ?: "")
+            fetchFilesShard(api, desc, vk).orEmpty()
                 .map { obj -> FileRecordCodec.decodeFolder(obj).also { folderRawById[it.id] = obj } }
         } else {
             emptyList()
         }
         return files to folders
+    }
+
+    /**
+     * On a transient files-store fetch failure, keep the files already in the in-memory workspace
+     * cache (don't blank the tab) and leave [priorFilesRoot] intact so a later save still rebases
+     * correctly. Returns an empty slice only when nothing was ever loaded. (A persistent on-disk
+     * offline cache for the sharded files slice is a separate item — §4.4.)
+     */
+    private fun keepCachedFiles(): Pair<List<FileEntry>, List<NamedFolder>> =
+        cache.value.value?.manifest?.let { it.files to it.fileFolders } ?: (emptyList<FileEntry>() to emptyList())
+
+    /**
+     * Fetch + decrypt one files shard's records. Retries a 404 (eventually-consistent object
+     * storage can 404 a freshly-written blob) up to 3× with backoff; a persistent 404 marks the
+     * store degraded and returns null (records skipped, descriptor kept). Any non-404 error throws.
+     */
+    private suspend fun fetchFilesShard(api: LedgerlineApi, s: de.ledgerline.app.domain.model.GalleryShard, vk: ByteArray): List<JsonObject>? {
+        var attempt = 0
+        while (true) {
+            val r = try {
+                api.rawFile(s.ref)
+            } catch (e: Exception) {
+                throw e // network/other — recoverable, fail the load rather than lose data
+            }
+            if (r.isSuccessful) {
+                val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), s.key, vk, crypto)
+                return filesJson.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
+            }
+            if (r.code() == HttpURLConnection.HTTP_NOT_FOUND) {
+                if (attempt < 3) { kotlinx.coroutines.delay(500L * (1 shl attempt)); attempt++; continue }
+                _filesDegraded.value = true
+                return null // durably missing: skip records, keep the descriptor, freeze writes
+            }
+            error("files shard ${s.ref}: http ${r.code()}") // other non-2xx: recoverable → throw
+        }
     }
 
     /** Encrypt (secretstream + Padmé) + upload [bytes] as a files content blob → id + wrapped key. */
@@ -384,6 +422,9 @@ class WorkspaceRepository(
         // collection blob, reusing unchanged blobs), seal + PUT with the shards[] guard. On
         // 409, reload the winning slice, re-apply mutate, retry — same loop shape as a module.
         if (curNext.files != curBase!!.files || curNext.fileFolders != curBase!!.fileFolders) {
+            // Frozen while degraded: a shard blob is missing, so rewriting the root would drop the
+            // missing shard's slot and make the loss permanent. Reject the write loudly.
+            if (_filesDegraded.value) return Outcome.Err(ErrorKind.HTTP)
             val writer = newFilesWriter(api, vk)
             var version = filesVersion
             var attempts = 0

@@ -92,6 +92,11 @@ class GalleryRepository(
     @Volatile
     private var priorRoot: GalleryShardWriter.RootState = GalleryShardWriter.RootState()
 
+    /** Gallery degraded flag: a photo shard blob is durably missing (404 after retries). Writes are
+     *  frozen while degraded so a save never rewrites the root dropping the missing shard's slot. */
+    private val _degraded = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val degraded: kotlinx.coroutines.flow.StateFlow<Boolean> = _degraded
+
     /** The dirty-save reuse state carried by a decoded [GalleryRoot]. */
     private fun rootStateFrom(root: GalleryRoot) = GalleryShardWriter.RootState(
         shardBits = root.shardBits,
@@ -155,19 +160,13 @@ class GalleryRepository(
         priorRoot = rootStateFrom(root)
         photoRawById.clear(); albumRawById.clear(); personRawById.clear()
 
+        _degraded.value = false
         val photos = if (root.v >= 2 && root.shards.isNotEmpty()) {
-            // Fetch + decrypt + decode all shards concurrently; a failing shard throws
-            // (mirrors the web client — never silently drop photos, which a reconcile could free).
+            // Fetch + decrypt + decode all shards concurrently. A durable 404 marks the store
+            // degraded + skips that shard (descriptor kept, writes frozen); other errors throw.
             coroutineScope {
-                root.shards.map { s ->
-                    async(Dispatchers.IO) {
-                        val r = api.galleryRaw(s.ref)
-                        check(r.isSuccessful) { "gallery shard ${s.ref}: http ${r.code()}" }
-                        val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), s.key, vk, crypto)
-                        json.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
-                    }
-                }.awaitAll().flatten()
-            }.map { obj ->
+                root.shards.map { s -> async(Dispatchers.IO) { fetchGalleryShard(api, s, vk) } }.awaitAll()
+            }.flatMap { it ?: emptyList() }.map { obj ->
                 val p = GalleryRecordCodec.decodePhoto(obj)
                 photoRawById[p.id] = obj
                 p
@@ -193,6 +192,28 @@ class GalleryRepository(
             root.people
         }
         return GalleryManifest(photos = photos, albums = albums, people = people)
+    }
+
+    /**
+     * Fetch + decrypt one photo shard's records. Retries a 404 (eventually-consistent object
+     * storage) 3× with backoff; a persistent 404 marks the store degraded and returns null (records
+     * skipped, descriptor kept). Any non-404 error throws (recoverable — never lose photos).
+     */
+    private suspend fun fetchGalleryShard(api: LedgerlineApi, s: de.ledgerline.app.domain.model.GalleryShard, vk: ByteArray): List<kotlinx.serialization.json.JsonObject>? {
+        var attempt = 0
+        while (true) {
+            val r = api.galleryRaw(s.ref)
+            if (r.isSuccessful) {
+                val bytes = BlobDownloader.decrypt(r.body()!!.bytes(), s.key, vk, crypto)
+                return json.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
+            }
+            if (r.code() == HttpURLConnection.HTTP_NOT_FOUND) {
+                if (attempt < 3) { kotlinx.coroutines.delay(500L * (1 shl attempt)); attempt++; continue }
+                _degraded.value = true
+                return null
+            }
+            error("gallery shard ${s.ref}: http ${r.code()}")
+        }
     }
 
     /** Download + decrypt a collection blob (albums/people) into its raw record objects. */
@@ -238,6 +259,8 @@ class GalleryRepository(
     suspend fun save(mutate: (GalleryManifest) -> GalleryManifest): Outcome<Gallery> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        // Frozen while degraded: a shard blob is missing; rewriting the root would drop it for good.
+        if (_degraded.value) return@withContext Outcome.Err(ErrorKind.HTTP)
         val api = apiProvider(session)
 
         var base = cache.value.value
