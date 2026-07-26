@@ -511,8 +511,13 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   **Offen:** geteilte Passwort-Vaults (PQ-Sharing, §S3), Inline-Autofill-Presentations
   (Menu-Presentation, `Dataset.Builder(RemoteViews)` deprecated aber funktional), volle
   RU-Übersetzung der übrigen Passwort-UI-Strings.
-- **Öffentliche Share-Links** (Files/Gallery, `*/shares`, Key im URL-Fragment).
-- **Cross-User Shared Vaults/Ordner** (Rollen, Rotation, TOFU) + **PQ-Hybrid-KEM** (§4).
+- **Sharing — KRYPTO-READY, FEATURE DEFERRED (bewusste Entscheidung, Rebuild §4.7).** Die Krypto
+  ist fertig + byte-verifiziert (`PQKEM` ML-KEM-768+X25519, `IdentityCrypto`/`IdentityRepository`
+  write-once `/vaults/keys`, `ShareCrypto` Share-Link-SK-im-Fragment — alle mit KAT/Fixture/On-Device-
+  Tests). **Ungebaut:** die REST/UI-Flows — `/vaults` (create/members/resolve-recipient/accept/rotate),
+  Shared-Vault-Store lesen/schreiben, öffentliche `*/shares`-Links, Invite/Accept/Rotate-UI, TOFU-
+  Anzeige. Nicht mit „geliefert" verwechseln. Empfohlener nächster Bau: **Shared-Vault read/accept**
+  (Krypto liegt bereit) vor dem vollen Rollen/Rotation-Epic.
 - **Passkeys/WebAuthn.**
 - **Geräte-Verwaltung + Remote-Wipe-UI**, **Notifications**, **Konto-Export/Löschen**.
 - **Explore/Maps** (Tracks, Routing), **Health-Modul**, **Invoices-Modul**.
