@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.FlowRow
@@ -378,17 +379,21 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             .padding(padding)
             .verticalScroll(rememberScrollState()),
     ) {
+        val autofillContext = LocalContext.current
+
+        SectionHeader(stringResource(R.string.settings_group_personalization))
         CategoryRow(
             icon = Icons.Outlined.Language,
             title = stringResource(R.string.settings_cat_appearance),
             subtitle = stringResource(R.string.settings_cat_appearance_sub),
         ) { onNavigate(SettingsRoute.APPEARANCE) }
+
+        SectionHeader(stringResource(R.string.settings_group_security))
         CategoryRow(
             icon = Icons.Outlined.Lock,
             title = stringResource(R.string.settings_cat_security),
             subtitle = stringResource(R.string.settings_cat_security_sub),
         ) { onNavigate(SettingsRoute.SECURITY) }
-        val autofillContext = LocalContext.current
         CategoryRow(
             icon = Icons.Outlined.Password,
             title = stringResource(R.string.settings_cat_autofill),
@@ -399,6 +404,8 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             title = stringResource(R.string.settings_cat_passkeys),
             subtitle = stringResource(R.string.settings_cat_passkeys_sub),
         ) { launchCredentialProviderSettings(autofillContext) }
+
+        SectionHeader(stringResource(R.string.settings_group_data))
         CategoryRow(
             icon = Icons.Outlined.CloudOff,
             title = stringResource(R.string.settings_cat_offline),
@@ -414,6 +421,8 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             title = stringResource(R.string.settings_cat_backup),
             subtitle = stringResource(R.string.settings_cat_backup_sub),
         ) { onNavigate(SettingsRoute.BACKUP) }
+
+        SectionHeader(stringResource(R.string.settings_group_account))
         CategoryRow(
             icon = Icons.Outlined.AccountCircle,
             title = stringResource(R.string.settings_cat_account),
@@ -424,6 +433,7 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             title = stringResource(R.string.settings_cat_about),
             subtitle = stringResource(R.string.settings_cat_about_sub),
         ) { onNavigate(SettingsRoute.ABOUT) }
+        Spacer(Modifier.height(16.dp))
     }
 }
 

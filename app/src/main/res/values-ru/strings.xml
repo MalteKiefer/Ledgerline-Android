@@ -591,4 +591,8 @@
     <string name="home_qa_password">Пароль</string>
     <string name="home_spaces">Разделы</string>
     <string name="search_everything">Искать везде…</string>
+    <string name="settings_group_personalization">Персонализация</string>
+    <string name="settings_group_security">Безопасность и конфиденциальность</string>
+    <string name="settings_group_data">Данные и синхронизация</string>
+    <string name="settings_group_account">Аккаунт</string>
 </resources>
