@@ -579,4 +579,15 @@
     <string name="settings_device_revoke">Revoke</string>
     <string name="settings_device_wipe">Remote wipe</string>
     <string name="settings_device_wipe_pending">Wipe requested</string>
+    <string name="dest_home">Home</string>
+    <string name="home_of_quota">of %1$s</string>
+    <string name="home_vault_unlocked">Vault unlocked</string>
+    <string name="home_e2e">Encrypted end-to-end on this device</string>
+    <string name="home_quick_actions">Quick actions</string>
+    <string name="home_qa_note">New note</string>
+    <string name="home_qa_upload">Upload</string>
+    <string name="home_qa_backup">Photos</string>
+    <string name="home_qa_password">Password</string>
+    <string name="home_spaces">Spaces</string>
+    <string name="search_everything">Search everything…</string>
 </resources>

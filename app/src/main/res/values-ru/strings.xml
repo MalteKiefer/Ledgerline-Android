@@ -580,4 +580,15 @@
     <string name="settings_device_revoke">Отозвать</string>
     <string name="settings_device_wipe">Удалённая очистка</string>
     <string name="settings_device_wipe_pending">Очистка запрошена</string>
+    <string name="dest_home">Главная</string>
+    <string name="home_of_quota">из %1$s</string>
+    <string name="home_vault_unlocked">Хранилище разблокировано</string>
+    <string name="home_e2e">Сквозное шифрование на этом устройстве</string>
+    <string name="home_quick_actions">Быстрые действия</string>
+    <string name="home_qa_note">Заметка</string>
+    <string name="home_qa_upload">Загрузить</string>
+    <string name="home_qa_backup">Фото</string>
+    <string name="home_qa_password">Пароль</string>
+    <string name="home_spaces">Разделы</string>
+    <string name="search_everything">Искать везде…</string>
 </resources>
