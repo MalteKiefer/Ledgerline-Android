@@ -693,6 +693,14 @@ Tests grün (`PQKEMKatTest` on-JVM, `*InstrumentedTest` + **`CryptoKatTest`** on
   das QR-Pairing (NETWORK, obwohl der Server den Claim erhielt); Unit-Tests (Fakes + CLEARTEXT-
   MockWebServer) fangen den Real-TLS-Pfad nicht. Erst nach First-Party-Converter + OkHttp-5-TLS-
   Review + On-Device-Pairing-Test re-adoptieren.
+**Bewusste Alpha-Adoption (user-approved 2026-07-27, Ausnahme zur „nur stable"-Regel):**
+- **material3 1.5.0-alpha24** (statt BOM-stable 1.4.0) — für den **vollen Material-3-Expressive**-
+  Komponentensatz (FAB-Menu, Button-Groups, Split-Button, wavy Progress, Floating-Toolbars,
+  `motionScheme`). 100% OSS/androidx, kein Google. Explizit vom Nutzer genehmigt trotz Alpha
+  (Design-Pivot: modernes Android-Design nach Juli-2026-Standard, **nicht** mehr iOS-Nachbau).
+  Begleitartefakte: `material3-adaptive-navigation-suite:1.5.0-alpha24` (adaptive Nav Bar/Rail/
+  Drawer) + `material3.adaptive:{adaptive,adaptive-layout,adaptive-navigation}:1.3.0-rc01`
+  (`ListDetailPaneScaffold`, `currentWindowAdaptiveInfo`). Bei 1.5.0-stable zurück auf stable.
 - Sonst alle auf neuestem Stand (2026-07-25): AGP 9.3.1, Kotlin 2.4.10, lifecycle 2.11.0,
   camerax 1.6.1, mockk 1.14.11, MapLibre 13.4.1, jna 5.19.1, zxing 3.5.4, BC 1.84,
   androidx.credentials 1.6.0 (Passkeys; 1.7.0 ist alpha → gehalten).

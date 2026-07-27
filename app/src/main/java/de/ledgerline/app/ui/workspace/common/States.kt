@@ -37,10 +37,12 @@ fun RefreshableMessage(text: String, modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LoadingBox(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+        // Material 3 Expressive wavy loading indicator.
+        androidx.compose.material3.LoadingIndicator()
     }
 }
 

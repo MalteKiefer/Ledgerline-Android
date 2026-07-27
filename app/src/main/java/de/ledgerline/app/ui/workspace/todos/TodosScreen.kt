@@ -191,12 +191,17 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
                                             onDeleteForever = { deleteForeverTarget = todo.id },
                                         )
                                     } else {
-                                        TodoRow(
-                                            todo = todo,
-                                            onToggleDone = { vm.toggleDone(todo.id) },
-                                            onToggleMarked = { vm.toggleMarked(todo.id) },
-                                            onOpen = { openId = todo.id },
-                                        )
+                                        de.ledgerline.app.ui.workspace.common.SwipeToTrashBox(
+                                            onTrash = { vm.trashTodo(todo.id) },
+                                            modifier = Modifier.animateItem(),
+                                        ) {
+                                            TodoRow(
+                                                todo = todo,
+                                                onToggleDone = { vm.toggleDone(todo.id) },
+                                                onToggleMarked = { vm.toggleMarked(todo.id) },
+                                                onOpen = { openId = todo.id },
+                                            )
+                                        }
                                     }
                                 }
                             }

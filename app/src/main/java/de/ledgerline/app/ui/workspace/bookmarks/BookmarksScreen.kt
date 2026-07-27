@@ -208,14 +208,19 @@ fun BookmarksScreen(modifier: Modifier = Modifier, vm: BookmarksViewModel = hilt
                                             onDeleteForever = { deleteForeverTarget = bookmark.id },
                                         )
                                     } else {
-                                        BookmarkRow(
-                                            bookmark = bookmark,
-                                            onOpen = { detailFor = bookmark.id },
-                                            onToggleFavorite = { vm.toggleFavorite(bookmark.id) },
-                                            onToggleReadLater = { vm.toggleReadLater(bookmark.id) },
-                                            onEdit = { editorFor = EditorTarget(bookmark.id) },
-                                            onDelete = { vm.trashBookmark(bookmark.id) },
-                                        )
+                                        de.ledgerline.app.ui.workspace.common.SwipeToTrashBox(
+                                            onTrash = { vm.trashBookmark(bookmark.id) },
+                                            modifier = Modifier.animateItem(),
+                                        ) {
+                                            BookmarkRow(
+                                                bookmark = bookmark,
+                                                onOpen = { detailFor = bookmark.id },
+                                                onToggleFavorite = { vm.toggleFavorite(bookmark.id) },
+                                                onToggleReadLater = { vm.toggleReadLater(bookmark.id) },
+                                                onEdit = { editorFor = EditorTarget(bookmark.id) },
+                                                onDelete = { vm.trashBookmark(bookmark.id) },
+                                            )
+                                        }
                                     }
                                 }
                             }

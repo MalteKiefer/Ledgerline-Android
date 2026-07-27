@@ -155,13 +155,19 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
                                             note = note,
                                             onRestore = { vm.restore(note.id) },
                                             onDeleteForever = { deleteForeverTarget = note.id },
+                                            modifier = Modifier.animateItem(),
                                         )
                                     } else {
-                                        NoteRow(
-                                            note = note,
-                                            onOpen = { openId = note.id },
-                                            onDelete = { deleteTarget = note.id },
-                                        )
+                                        de.ledgerline.app.ui.workspace.common.SwipeToTrashBox(
+                                            onTrash = { vm.trashNote(note.id) },
+                                            modifier = Modifier.animateItem(),
+                                        ) {
+                                            NoteRow(
+                                                note = note,
+                                                onOpen = { openId = note.id },
+                                                onDelete = { deleteTarget = note.id },
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -202,7 +208,7 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TrashNoteRow(note: Note, onRestore: () -> Unit, onDeleteForever: () -> Unit) {
+private fun TrashNoteRow(note: Note, onRestore: () -> Unit, onDeleteForever: () -> Unit, modifier: Modifier = Modifier) {
     val untitled = stringResource(R.string.note_untitled)
     ListItem(
         headlineContent = { Text(noteRowTitle(note, untitled)) },
@@ -219,7 +225,7 @@ private fun TrashNoteRow(note: Note, onRestore: () -> Unit, onDeleteForever: () 
                 }
             }
         },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     )
 }
 
