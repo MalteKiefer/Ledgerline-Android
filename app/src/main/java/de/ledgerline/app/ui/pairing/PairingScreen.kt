@@ -51,6 +51,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
+import androidx.compose.material.icons.outlined.QrCodeScanner
+import de.ledgerline.app.ui.theme.cardSurface
 import de.ledgerline.app.domain.model.PairingState
 import de.ledgerline.app.ui.scan.QrCodeAnalyzer
 import de.ledgerline.app.ui.scan.parsePairLink
@@ -102,11 +104,14 @@ fun PairingScreen(
         }
     }
 
+    de.ledgerline.app.ui.theme.LedgerlineBackground {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        de.ledgerline.app.ui.theme.HeroIcon(androidx.compose.material.icons.Icons.Outlined.QrCodeScanner, size = 72.dp)
+        Spacer(Modifier.height(20.dp))
         Text(
             stringResource(R.string.pairing_title),
             style = MaterialTheme.typography.headlineSmall,
@@ -132,6 +137,7 @@ fun PairingScreen(
                 onAllow = { permLauncher.launch(Manifest.permission.CAMERA) },
             )
         }
+    }
     }
 }
 
@@ -165,13 +171,9 @@ private fun PairingStatus(state: PairingState, authFailed: Boolean) {
 /** Rationale card shown before the camera permission is granted. */
 @Composable
 private fun CameraRationaleCard(permanentlyDenied: Boolean, onAllow: () -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    ) {
+    run {
         Column(
-            Modifier.fillMaxWidth().padding(24.dp),
+            Modifier.fillMaxWidth().cardSurface().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(

@@ -53,6 +53,7 @@ import de.ledgerline.app.R
 import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.IconChip
 import de.ledgerline.app.ui.theme.PrimaryGradientButton
+import de.ledgerline.app.ui.theme.cardSurface
 import kotlinx.coroutines.launch
 
 /**
@@ -80,6 +81,7 @@ fun WelcomeScreen(onGetStarted: () -> Unit) {
     val scope = rememberCoroutineScope()
     val isLast = pager.currentPage >= pageCount - 1
 
+    de.ledgerline.app.ui.theme.LedgerlineBackground {
     Column(Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
         HorizontalPager(state = pager, modifier = Modifier.weight(1f)) { page ->
             when (page) {
@@ -126,6 +128,7 @@ fun WelcomeScreen(onGetStarted: () -> Unit) {
             Text(stringResource(R.string.welcome_skip))
         }
     }
+    }
 }
 
 @Composable
@@ -146,16 +149,10 @@ private fun IntroPage() {
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(32.dp))
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            Column(Modifier.padding(20.dp)) {
-                StepIndicator(1, stringResource(R.string.welcome_step_connect))
-                Spacer(Modifier.height(16.dp))
-                StepIndicator(2, stringResource(R.string.welcome_step_unlock))
-            }
+        Column(Modifier.fillMaxWidth().cardSurface().padding(20.dp)) {
+            StepIndicator(1, stringResource(R.string.welcome_step_connect))
+            Spacer(Modifier.height(16.dp))
+            StepIndicator(2, stringResource(R.string.welcome_step_unlock))
         }
     }
 }

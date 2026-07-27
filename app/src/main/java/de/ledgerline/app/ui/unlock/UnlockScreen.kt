@@ -37,6 +37,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.ui.theme.PrimaryGradientButton
+import de.ledgerline.app.ui.theme.cardSurface
 import kotlinx.coroutines.launch
 
 /**
@@ -44,6 +45,7 @@ import kotlinx.coroutines.launch
  * exactly one CryptoObject-bound app-lock biometric ([authorize]) to authorize the
  * keystore decrypt, then derives the Vault Key from the passphrase.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun UnlockScreen(
     vm: UnlockViewModel = hiltViewModel(),
@@ -63,6 +65,7 @@ fun UnlockScreen(
     // forced logout when this screen is (re-)entered.
     LaunchedEffect(Unit) { vm.onShown() }
 
+    de.ledgerline.app.ui.theme.LedgerlineBackground {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -71,7 +74,7 @@ fun UnlockScreen(
         Image(
             painter = painterResource(R.drawable.ic_ledgerline_logo),
             contentDescription = null,
-            modifier = Modifier.size(72.dp),
+            modifier = Modifier.size(88.dp),
         )
         Spacer(Modifier.height(20.dp))
         Text(
@@ -88,13 +91,9 @@ fun UnlockScreen(
         )
         Spacer(Modifier.height(32.dp))
 
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        ) {
+        run {
             Column(
-                Modifier.fillMaxWidth().padding(20.dp),
+                Modifier.fillMaxWidth().cardSurface().padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (!recoveryMode) {
@@ -175,7 +174,7 @@ fun UnlockScreen(
                 when (state) {
                     is UnlockUiState.Working -> {
                         Spacer(Modifier.height(16.dp))
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        androidx.compose.material3.LoadingIndicator()
                     }
                     is UnlockUiState.NotConfigured -> {
                         Spacer(Modifier.height(12.dp))
@@ -205,5 +204,6 @@ fun UnlockScreen(
                 }
             }
         }
+    }
     }
 }
