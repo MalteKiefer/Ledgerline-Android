@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
@@ -110,7 +111,19 @@ fun WorkspaceScaffold(
             )
         },
     ) {
-        Box(Modifier.fillMaxSize()) {
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+          // Adaptive: a navigation rail replaces the pill on medium+ width (tablets/foldables).
+          val wide = maxWidth >= 600.dp
+          Row(Modifier.fillMaxSize()) {
+            if (wide && !fullscreen.value) {
+                NavRail(
+                    current = dest,
+                    onSelect = navigate,
+                    onMenu = { scope.launch { drawerState.open() } },
+                    onSearch = { searchOpen = true },
+                )
+            }
+            Box(Modifier.weight(1f).fillMaxSize()) {
             CompositionLocalProvider(LocalFullscreen provides fullscreen) {
                 AnimatedContent(
                     targetState = dest,
@@ -161,23 +174,56 @@ fun WorkspaceScaffold(
                 }
             }
 
-            // Floating pill bar — only on primary destinations and when not in a full-screen view.
-            if (isPrimary && !fullscreen.value) {
+            // Floating pill bar — compact width only, primary destinations, not full-screen.
+            if (!wide && isPrimary && !fullscreen.value) {
                 PillNav(
                     current = dest,
                     onSelect = navigate,
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
+            } // content Box
+          } // Row
+          // Global search overlay covers everything (incl. the rail).
+          if (searchOpen) {
+              SearchScreen(
+                  onOpen = { d -> searchOpen = false; navigate(d) },
+                  onBack = { searchOpen = false },
+                  modifier = Modifier.fillMaxSize(),
+              )
+          }
+        }
+    }
+}
 
-            // Global search overlay covers everything.
-            if (searchOpen) {
-                SearchScreen(
-                    onOpen = { d -> searchOpen = false; navigate(d) },
-                    onBack = { searchOpen = false },
-                    modifier = Modifier.fillMaxSize(),
-                )
+/** Navigation rail for medium+ width: menu (drawer) + primary tabs + search. */
+@Composable
+private fun NavRail(
+    current: WorkspaceDest,
+    onSelect: (WorkspaceDest) -> Unit,
+    onMenu: () -> Unit,
+    onSearch: () -> Unit,
+) {
+    androidx.compose.material3.NavigationRail(
+        header = {
+            androidx.compose.material3.IconButton(onClick = onMenu) {
+                Icon(Icons.Outlined.Menu, stringResource(R.string.menu_more))
             }
+            androidx.compose.material3.FloatingActionButton(
+                onClick = onSearch,
+                containerColor = MaterialTheme.colorScheme.surface,
+                contentColor = Brand.accent,
+                elevation = androidx.compose.material3.FloatingActionButtonDefaults.elevation(2.dp),
+            ) { Icon(Icons.Outlined.Search, stringResource(R.string.search_everything)) }
+        },
+    ) {
+        PRIMARY_TABS.forEach { t ->
+            androidx.compose.material3.NavigationRailItem(
+                selected = current == t.dest,
+                onClick = { onSelect(t.dest) },
+                icon = { Icon(t.icon, null) },
+                label = { Text(stringResource(t.dest.labelRes)) },
+            )
         }
     }
 }
