@@ -590,4 +590,8 @@
     <string name="home_qa_password">Password</string>
     <string name="home_spaces">Spaces</string>
     <string name="search_everything">Search everything…</string>
+    <string name="settings_group_personalization">Personalization</string>
+    <string name="settings_group_security">Security &amp; privacy</string>
+    <string name="settings_group_data">Data &amp; sync</string>
+    <string name="settings_group_account">Account</string>
 </resources>
