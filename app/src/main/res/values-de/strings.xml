@@ -577,4 +577,15 @@
     <string name="settings_device_revoke">Widerrufen</string>
     <string name="settings_device_wipe">Remote-Löschung</string>
     <string name="settings_device_wipe_pending">Löschung angefordert</string>
+    <string name="dest_home">Start</string>
+    <string name="home_of_quota">von %1$s</string>
+    <string name="home_vault_unlocked">Tresor entsperrt</string>
+    <string name="home_e2e">Ende-zu-Ende verschlüsselt auf diesem Gerät</string>
+    <string name="home_quick_actions">Schnellaktionen</string>
+    <string name="home_qa_note">Neue Notiz</string>
+    <string name="home_qa_upload">Hochladen</string>
+    <string name="home_qa_backup">Fotos</string>
+    <string name="home_qa_password">Passwort</string>
+    <string name="home_spaces">Bereiche</string>
+    <string name="search_everything">Alles durchsuchen…</string>
 </resources>
