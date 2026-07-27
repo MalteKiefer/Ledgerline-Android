@@ -118,10 +118,14 @@ fun LedgerlineTheme(
         darkTheme -> LedgerlineDarkScheme
         else -> LedgerlineLightScheme
     }
-    MaterialTheme(
+    // Material 3 Expressive: opt into the expressive motion scheme (springier spatial +
+    // effects tokens) so every M3 component animates to the current Android standard.
+    @OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+    androidx.compose.material3.MaterialExpressiveTheme(
         colorScheme = scheme,
         typography = LedgerlineTypography,
         shapes = LedgerlineShapes,
+        motionScheme = androidx.compose.material3.MotionScheme.expressive(),
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
