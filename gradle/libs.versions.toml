@@ -7,6 +7,14 @@ kotlin = "2.4.10"
 ksp = "2.3.10"
 hilt = "2.60.1"
 composeBom = "2026.06.01"
+# APPROVED ALPHA (2026-07-27): material3 pinned to 1.5.0-alpha24 (ahead of the BOM's stable
+# 1.4.0) for the full Material 3 Expressive component set (FAB menu, button groups, split
+# button, wavy progress, floating toolbars, motionScheme). Deliberate, user-approved exception
+# to the "stable only" policy (§16) — 100% OSS/androidx, no Google services. Re-evaluate when
+# 1.5.0 goes stable.
+material3 = "1.5.0-alpha24"
+material3AdaptiveNav = "1.5.0-alpha24"
+material3Adaptive = "1.3.0-rc01"
 lifecycle = "2.11.0"
 navigation = "2.9.8"
 # HELD (2026-07-25): retrofit 3.0.0 + okhttp 5.4.0 broke QR pairing on-device (claim/poll
@@ -61,7 +69,11 @@ compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeB
 compose-ui = { module = "androidx.compose.ui:ui" }
 compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
-compose-material3 = { module = "androidx.compose.material3:material3" }
+compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" }
+compose-material3-adaptive-navigation-suite = { module = "androidx.compose.material3:material3-adaptive-navigation-suite", version.ref = "material3AdaptiveNav" }
+compose-material3-adaptive = { module = "androidx.compose.material3.adaptive:adaptive", version.ref = "material3Adaptive" }
+compose-material3-adaptive-layout = { module = "androidx.compose.material3.adaptive:adaptive-layout", version.ref = "material3Adaptive" }
+compose-material3-adaptive-navigation = { module = "androidx.compose.material3.adaptive:adaptive-navigation", version.ref = "material3Adaptive" }
 navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-android-compiler", version.ref = "hilt" }
