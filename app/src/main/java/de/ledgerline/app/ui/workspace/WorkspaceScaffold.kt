@@ -128,9 +128,8 @@ fun WorkspaceScaffold(
                 )
             }
             Box(Modifier.weight(1f).fillMaxSize()) {
-            // Reserve room at the bottom for the floating pill so screen FABs clear it (compact only).
-            val pillPad = if (!wide && !fullscreen.value) 88.dp else 0.dp
-            // A shared top bar for every primary surface: drawer (menu) + title + global search.
+            // Drawer is the primary navigation now (no bottom pill); a shared top bar on every
+            // surface: drawer (menu) + title + global search.
             val primaryBar: @Composable (Int) -> Unit = { titleRes ->
                 if (!fullscreen.value) {
                     AppTopBar(
@@ -165,22 +164,22 @@ fun WorkspaceScaffold(
                             },
                         ) { p -> HomeScreen(Modifier.padding(p), onOpen = navigate) }
 
-                        WorkspaceDest.Files -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_files) }) { p -> FilesScreen(Modifier.padding(p).padding(bottom = pillPad)) }
-                        WorkspaceDest.Photos -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_gallery) }) { p -> GalleryScreen(Modifier.padding(p).padding(bottom = pillPad)) }
-                        WorkspaceDest.Vault -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_passwords) }) { p -> de.ledgerline.app.ui.passwords.PasswordsScreen(Modifier.padding(p).padding(bottom = pillPad)) }
+                        WorkspaceDest.Files -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_files) }) { p -> FilesScreen(Modifier.padding(p)) }
+                        WorkspaceDest.Photos -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_gallery) }) { p -> GalleryScreen(Modifier.padding(p)) }
+                        WorkspaceDest.Vault -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_passwords) }) { p -> de.ledgerline.app.ui.passwords.PasswordsScreen(Modifier.padding(p)) }
 
                         WorkspaceDest.Notes -> AppScaffold(
                             immersive = fullscreen.value,
-                            topBar = { if (!fullscreen.value) AppTopBar(stringResource(R.string.tab_notes), onBack = { dest = lastPrimary }) },
+                            topBar = { primaryBar(R.string.tab_notes) },
                         ) { p -> NotesScreen(Modifier.padding(p)) }
 
                         WorkspaceDest.Todos -> AppScaffold(
-                            topBar = { AppTopBar(stringResource(R.string.tab_todos), onBack = { dest = lastPrimary }) },
+                            topBar = { primaryBar(R.string.tab_todos) },
                         ) { p -> TodosScreen(Modifier.padding(p)) }
 
                         WorkspaceDest.Bookmarks -> AppScaffold(
                             immersive = fullscreen.value,
-                            topBar = { if (!fullscreen.value) AppTopBar(stringResource(R.string.menu_bookmarks), onBack = { dest = lastPrimary }) },
+                            topBar = { primaryBar(R.string.menu_bookmarks) },
                         ) { p -> BookmarksScreen(Modifier.padding(p)) }
 
                         WorkspaceDest.Contacts -> ContactsScreen(onExit = { dest = lastPrimary })
@@ -194,14 +193,6 @@ fun WorkspaceScaffold(
                 }
             }
 
-            // Floating pill bar — compact width only, primary destinations, not full-screen.
-            if (!wide && isPrimary && !fullscreen.value) {
-                PillNav(
-                    current = dest,
-                    onSelect = navigate,
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                )
-            }
             } // content Box
           } // Row
           // Global search overlay covers everything (incl. the rail).
@@ -256,60 +247,6 @@ private val PRIMARY_TABS = listOf(
     PrimaryTab(WorkspaceDest.Photos, Icons.Outlined.PhotoLibrary),
     PrimaryTab(WorkspaceDest.Vault, Icons.Outlined.Lock),
 )
-
-/** The floating pill bar with the four primary destinations (centered, thumb zone). */
-@Composable
-private fun PillNav(
-    current: WorkspaceDest,
-    onSelect: (WorkspaceDest) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier
-            .navigationBarsPadding()
-            .padding(bottom = 14.dp),
-        shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp,
-        shadowElevation = 10.dp,
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Row(Modifier.padding(6.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)) {
-            PRIMARY_TABS.forEach { t -> PillItem(t, selected = current == t.dest) { onSelect(t.dest) } }
-        }
-    }
-}
-
-@Composable
-private fun PillItem(tab: PrimaryTab, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(999.dp)
-    Surface(
-        shape = shape,
-        color = androidx.compose.ui.graphics.Color.Transparent,
-        onClick = onClick,
-    ) {
-        Row(
-            Modifier
-                .then(if (selected) Modifier.background(Brand.accentGradient, shape) else Modifier)
-                .padding(horizontal = 14.dp, vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(7.dp),
-        ) {
-            Icon(
-                tab.icon,
-                contentDescription = stringResource(tab.dest.labelRes),
-                tint = if (selected) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            if (selected) {
-                Text(
-                    stringResource(tab.dest.labelRes),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = androidx.compose.ui.graphics.Color.White,
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun DrawerSheet(current: WorkspaceDest, onSearch: () -> Unit, onSelect: (WorkspaceDest) -> Unit) {
