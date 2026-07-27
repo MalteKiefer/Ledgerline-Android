@@ -60,6 +60,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonMenu
+import androidx.compose.material3.FloatingActionButtonMenuItem
+import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -612,47 +615,38 @@ private fun PhotosTab(
             }
         }
 
-        // FAB with chooser menu (upload from picker or take a photo). Hidden while selecting.
+        // Material 3 Expressive FAB menu (upload from picker or take a photo). Hidden while selecting.
         if (!selectionMode) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp),
+            @OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+            FloatingActionButtonMenu(
+                modifier = Modifier.align(Alignment.BottomEnd),
+                expanded = fabExpanded,
+                button = {
+                    ToggleFloatingActionButton(
+                        checked = fabExpanded,
+                        onCheckedChange = { fabExpanded = it },
+                    ) {
+                        Icon(
+                            if (fabExpanded) Icons.Outlined.Close else Icons.Outlined.AddPhotoAlternate,
+                            contentDescription = stringResource(R.string.gallery_add),
+                        )
+                    }
+                },
             ) {
-                FloatingActionButton(onClick = { fabExpanded = true }) {
-                    Icon(
-                        imageVector = Icons.Outlined.AddPhotoAlternate,
-                        contentDescription = stringResource(R.string.gallery_add),
-                    )
-                }
-                DropdownMenu(
-                    expanded = fabExpanded,
-                    onDismissRequest = { fabExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.gallery_upload_photos)) },
-                        leadingIcon = {
-                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null)
-                        },
-                        onClick = {
-                            fabExpanded = false
-                            vm.armLockSuppression()
-                            picker.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                            )
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.gallery_take_photo)) },
-                        leadingIcon = {
-                            Icon(Icons.Outlined.PhotoCamera, contentDescription = null)
-                        },
-                        onClick = {
-                            fabExpanded = false
-                            onOpenCamera()
-                        },
-                    )
-                }
+                FloatingActionButtonMenuItem(
+                    onClick = {
+                        fabExpanded = false
+                        vm.armLockSuppression()
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                    },
+                    icon = { Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null) },
+                    text = { Text(stringResource(R.string.gallery_upload_photos)) },
+                )
+                FloatingActionButtonMenuItem(
+                    onClick = { fabExpanded = false; onOpenCamera() },
+                    icon = { Icon(Icons.Outlined.PhotoCamera, contentDescription = null) },
+                    text = { Text(stringResource(R.string.gallery_take_photo)) },
+                )
             }
         }
 
