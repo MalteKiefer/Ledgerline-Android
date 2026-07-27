@@ -103,10 +103,11 @@ fun WorkspaceScaffold(
         drawerState = drawerState,
         gesturesEnabled = !fullscreen.value && !searchOpen,
         drawerContent = {
-            DrawerSheet(current = dest) { d ->
-                scope.launch { drawerState.close() }
-                navigate(d)
-            }
+            DrawerSheet(
+                current = dest,
+                onSearch = { scope.launch { drawerState.close() }; searchOpen = true },
+                onSelect = { d -> scope.launch { drawerState.close() }; navigate(d) },
+            )
         },
     ) {
         Box(Modifier.fillMaxSize()) {
@@ -165,7 +166,6 @@ fun WorkspaceScaffold(
                 PillNav(
                     current = dest,
                     onSelect = navigate,
-                    onSearch = { searchOpen = true },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -191,43 +191,25 @@ private val PRIMARY_TABS = listOf(
     PrimaryTab(WorkspaceDest.Vault, Icons.Outlined.Lock),
 )
 
-/** The floating pill (primary tabs) + a detached round search key. */
+/** The floating pill bar with the four primary destinations (centered, thumb zone). */
 @Composable
 private fun PillNav(
     current: WorkspaceDest,
     onSelect: (WorkspaceDest) -> Unit,
-    onSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier
+    Surface(
+        modifier = modifier
             .navigationBarsPadding()
             .padding(bottom = 14.dp),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        shape = RoundedCornerShape(999.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+        shadowElevation = 10.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 3.dp,
-            shadowElevation = 10.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        ) {
-            Row(Modifier.padding(6.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)) {
-                PRIMARY_TABS.forEach { t -> PillItem(t, selected = current == t.dest) { onSelect(t.dest) } }
-            }
-        }
-        Surface(
-            shape = RoundedCornerShape(999.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 3.dp,
-            shadowElevation = 10.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-            onClick = onSearch,
-        ) {
-            Box(Modifier.size(52.dp), contentAlignment = Alignment.Center) {
-                Icon(Icons.Outlined.Search, stringResource(R.string.search_everything), tint = Brand.accent)
-            }
+        Row(Modifier.padding(6.dp), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)) {
+            PRIMARY_TABS.forEach { t -> PillItem(t, selected = current == t.dest) { onSelect(t.dest) } }
         }
     }
 }
@@ -264,13 +246,21 @@ private fun PillItem(tab: PrimaryTab, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun DrawerSheet(current: WorkspaceDest, onSelect: (WorkspaceDest) -> Unit) {
+private fun DrawerSheet(current: WorkspaceDest, onSearch: () -> Unit, onSelect: (WorkspaceDest) -> Unit) {
     ModalDrawerSheet {
         Text(
             stringResource(R.string.app_name),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(start = 24.dp, top = 20.dp, bottom = 14.dp),
         )
+        NavigationDrawerItem(
+            icon = { Icon(Icons.Outlined.Search, null) },
+            label = { Text(stringResource(R.string.search_everything)) },
+            selected = false,
+            onClick = onSearch,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+        androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
         listOf(
             WorkspaceDest.Home to Icons.Outlined.Home,
             WorkspaceDest.Files to Icons.Outlined.Folder,
