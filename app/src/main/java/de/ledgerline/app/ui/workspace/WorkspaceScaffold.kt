@@ -124,6 +124,22 @@ fun WorkspaceScaffold(
                 )
             }
             Box(Modifier.weight(1f).fillMaxSize()) {
+            // Reserve room at the bottom for the floating pill so screen FABs clear it (compact only).
+            val pillPad = if (!wide && !fullscreen.value) 88.dp else 0.dp
+            // A shared top bar for every primary surface: drawer (menu) + title + global search.
+            val primaryBar: @Composable (Int) -> Unit = { titleRes ->
+                if (!fullscreen.value) {
+                    AppTopBar(
+                        title = stringResource(titleRes),
+                        onMenu = { scope.launch { drawerState.open() } },
+                        actions = {
+                            androidx.compose.material3.IconButton(onClick = { searchOpen = true }) {
+                                Icon(Icons.Outlined.Search, stringResource(R.string.search_everything))
+                            }
+                        },
+                    )
+                }
+            }
             CompositionLocalProvider(LocalFullscreen provides fullscreen) {
                 AnimatedContent(
                     targetState = dest,
@@ -145,9 +161,9 @@ fun WorkspaceScaffold(
                             },
                         ) { p -> HomeScreen(Modifier.padding(p), onOpen = navigate) }
 
-                        WorkspaceDest.Files -> AppScaffold(immersive = fullscreen.value, topBar = {}) { p -> FilesScreen(Modifier.padding(p)) }
-                        WorkspaceDest.Photos -> AppScaffold(immersive = fullscreen.value, topBar = {}) { p -> GalleryScreen(Modifier.padding(p)) }
-                        WorkspaceDest.Vault -> AppScaffold(immersive = fullscreen.value, topBar = {}) { p -> de.ledgerline.app.ui.passwords.PasswordsScreen(Modifier.padding(p)) }
+                        WorkspaceDest.Files -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_files) }) { p -> FilesScreen(Modifier.padding(p).padding(bottom = pillPad)) }
+                        WorkspaceDest.Photos -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_gallery) }) { p -> GalleryScreen(Modifier.padding(p).padding(bottom = pillPad)) }
+                        WorkspaceDest.Vault -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_passwords) }) { p -> de.ledgerline.app.ui.passwords.PasswordsScreen(Modifier.padding(p).padding(bottom = pillPad)) }
 
                         WorkspaceDest.Notes -> AppScaffold(
                             immersive = fullscreen.value,

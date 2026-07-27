@@ -240,22 +240,13 @@ fun GalleryScreen(
                 .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
-                SegmentedButton(
-                    selected = tab == GalleryTab.PHOTOS,
-                    onClick = { tab = GalleryTab.PHOTOS },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                ) { Text(stringResource(R.string.gallery_tab_photos), maxLines = 1) }
-                SegmentedButton(
-                    selected = tab == GalleryTab.ALBUMS,
-                    onClick = { tab = GalleryTab.ALBUMS },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                ) { Text(stringResource(R.string.gallery_tab_albums), maxLines = 1) }
-                SegmentedButton(
-                    selected = tab == GalleryTab.PEOPLE,
-                    onClick = { tab = GalleryTab.PEOPLE },
-                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                ) { Text(stringResource(R.string.gallery_tab_people), maxLines = 1) }
+            Row(
+                Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                GalleryTabChip(stringResource(R.string.gallery_tab_photos), tab == GalleryTab.PHOTOS) { tab = GalleryTab.PHOTOS }
+                GalleryTabChip(stringResource(R.string.gallery_tab_albums), tab == GalleryTab.ALBUMS) { tab = GalleryTab.ALBUMS }
+                GalleryTabChip(stringResource(R.string.gallery_tab_people), tab == GalleryTab.PEOPLE) { tab = GalleryTab.PEOPLE }
             }
             if (tab == GalleryTab.PHOTOS) {
                 IconButton(onClick = {
@@ -1337,4 +1328,14 @@ internal fun SelectableThumbCell(
             )
         }
     }
+}
+
+/** A pill-style gallery tab (Photos/Albums/People) in the redesign's chip idiom. */
+@Composable
+private fun GalleryTabChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label, maxLines = 1) },
+    )
 }
