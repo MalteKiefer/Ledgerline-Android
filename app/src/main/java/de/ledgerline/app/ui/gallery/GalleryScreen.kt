@@ -229,7 +229,8 @@ fun GalleryScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize()) {
         val degraded by vm.degraded.collectAsStateWithLifecycle()
         if (degraded) de.ledgerline.app.ui.workspace.common.DegradedBanner()
         var overflowOpen by remember { mutableStateOf(false) }
@@ -240,14 +241,7 @@ fun GalleryScreen(
                 .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                GalleryTabChip(stringResource(R.string.gallery_tab_photos), tab == GalleryTab.PHOTOS) { tab = GalleryTab.PHOTOS }
-                GalleryTabChip(stringResource(R.string.gallery_tab_albums), tab == GalleryTab.ALBUMS) { tab = GalleryTab.ALBUMS }
-                GalleryTabChip(stringResource(R.string.gallery_tab_people), tab == GalleryTab.PEOPLE) { tab = GalleryTab.PEOPLE }
-            }
+            Spacer(Modifier.weight(1f))
             if (tab == GalleryTab.PHOTOS) {
                 IconButton(onClick = {
                     searchActive = !searchActive
@@ -336,6 +330,17 @@ fun GalleryScreen(
                 onOpenPerson = { openPersonId = it },
             )
         }
+    }
+    de.ledgerline.app.ui.workspace.common.FloatingTabBar(
+        tabs = listOf(
+            stringResource(R.string.gallery_tab_photos),
+            stringResource(R.string.gallery_tab_albums),
+            stringResource(R.string.gallery_tab_people),
+        ),
+        selectedIndex = tab.ordinal,
+        onSelect = { tab = GalleryTab.entries[it] },
+        modifier = Modifier.align(Alignment.BottomCenter),
+    )
     }
 }
 
