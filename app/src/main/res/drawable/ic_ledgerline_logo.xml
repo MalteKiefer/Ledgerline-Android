@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- In-app brand mark: an indigo → violet gradient shield with a bold white
-     padlock, matching the iOS app icon and the launcher icon. -->
+<!-- In-app brand mark: an indigo → violet gradient squircle tile with a white padlock
+     whose body carries two "ledger lines" — the name (ledger) meets privacy (lock). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="96dp"
     android:height="96dp"
     android:viewportWidth="96"
     android:viewportHeight="96">
 
-    <!-- Gradient shield -->
-    <path android:pathData="M48,8 L74,19 C77,20.2 78,22 78,25 L78,50 C78,70 64,80 48,86 C32,80 18,70 18,50 L18,25 C18,22 19,20.2 22,19 Z">
+    <!-- Gradient squircle tile -->
+    <path android:pathData="M30,4 L66,4 C82,4 92,14 92,30 L92,66 C92,82 82,92 66,92 L30,92 C14,92 4,82 4,66 L4,30 C4,14 14,4 30,4 Z">
         <aapt:attr xmlns:aapt="http://schemas.android.com/aapt" name="android:fillColor">
             <gradient
                 android:type="linear"
-                android:startX="18" android:startY="8"
-                android:endX="78" android:endY="86"
+                android:startX="8" android:startY="8"
+                android:endX="88" android:endY="88"
                 android:startColor="#7066F5"
                 android:endColor="#9E70FA" />
         </aapt:attr>
@@ -25,10 +25,16 @@
         android:strokeWidth="6.5"
         android:strokeLineCap="round"
         android:fillColor="#00000000"
-        android:pathData="M39,49 v-6 a9,9 0 0 1 18,0 v6" />
+        android:pathData="M38,45 v-7 a10,10 0 0 1 20,0 v7" />
 
     <!-- Padlock body (white rounded rect) -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M36,47 h24 a5,5 0 0 1 5,5 v15 a5,5 0 0 1 -5,5 h-24 a5,5 0 0 1 -5,-5 v-15 a5,5 0 0 1 5,-5 z" />
+        android:pathData="M33,44 h30 a7,7 0 0 1 7,7 v18 a7,7 0 0 1 -7,7 h-30 a7,7 0 0 1 -7,-7 v-18 a7,7 0 0 1 7,-7 z" />
+
+    <!-- Two "ledger lines" inside the body -->
+    <path android:fillColor="#7066F5"
+        android:pathData="M39,55 h18 a2.4,2.4 0 0 1 0,4.8 h-18 a2.4,2.4 0 0 1 0,-4.8 z" />
+    <path android:fillColor="#9E70FA"
+        android:pathData="M39,63 h11 a2.4,2.4 0 0 1 0,4.8 h-11 a2.4,2.4 0 0 1 0,-4.8 z" />
 </vector>

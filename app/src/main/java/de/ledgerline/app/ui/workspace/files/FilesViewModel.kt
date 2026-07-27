@@ -182,8 +182,12 @@ class FilesViewModel @Inject constructor(
     }
 
     fun refresh() = viewModelScope.launch {
-        _state.value = _state.value.copy(loading = true, error = false)
-        if (load.invoke() is Outcome.Err) {
+        // Offline-first: only block with a spinner when there's nothing cached yet. With a warm
+        // cache, keep showing it and refresh in the background (the cache collector recomputes
+        // the list if the data changes) — no blank spinner on every entry.
+        val cold = cache.value.value == null
+        if (cold) _state.value = _state.value.copy(loading = true, error = false)
+        if (load.invoke() is Outcome.Err && cold) {
             _state.value = _state.value.copy(loading = false, error = true)
         }
         loadUsage()

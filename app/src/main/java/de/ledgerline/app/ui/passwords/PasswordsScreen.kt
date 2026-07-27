@@ -193,11 +193,7 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onOpen: (String) 
 
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            OutlinedTextField(
-                value = query, onValueChange = vm::setQuery,
-                label = { Text("Search passwords") }, singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(16.dp, 12.dp, 16.dp, 4.dp),
-            )
+            de.ledgerline.app.ui.workspace.common.SearchField(query = query, onQueryChange = vm::setQuery)
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = favOnly, onClick = { vm.toggleFavoritesOnly() }, label = { Text("Favorites") })
                 FilterChip(selected = showTrash, onClick = { vm.setShowTrash(!showTrash) }, label = { Text(if (ui.trashCount > 0) "Trash (${ui.trashCount})" else "Trash") })
