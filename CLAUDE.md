@@ -349,9 +349,19 @@ allen `*Ref`/`*Key` → `PUT /gallery/store`.
 
 ---
 
-## 8. Design-System — iOS-Look (indigo/violet, adaptiv)
+## 8. Design-System — Material 3 Expressive (indigo/violet, adaptiv)
 
-Ziel: die App trifft den **iOS-Stil** byte-nah. Tokens gespiegelt aus
+> **RICHTUNGSWECHSEL (2026-07-27, user-directed):** **kein iOS-Nachbau mehr.** Ziel ist ein
+> modernes, professionelles **Android**-Design nach dem **Juli-2026-Standard = Material 3
+> Expressive** — alle aktuellen Nav-/Stil-/Page-Elemente, 100% OSS (kein Google-Services).
+> Umgesetzt (Wave 1–2): `material3 1.5.0-alpha24` (§16), adaptive `NavigationSuiteScaffold`
+> (Bottom-Bar/Rail/Drawer je WindowSizeClass, `NavigationSuiteType.None` im Vollbild),
+> `MaterialExpressiveTheme` + expressive `MotionScheme`, wavy `LoadingIndicator`, Tab-Fade-Through,
+> `SwipeToTrashBox` (Notes/Todos/Bookmarks), Gallery-`FloatingActionButtonMenu`, Theme-Umschalter +
+> Dynamic-Color. **Offen (mit Gerät):** ListDetail-Two-Pane, Shared-Element, Dashboard, Predictive-
+> Back, M3-Settings-Rows, SearchBar überall. Die indigo/violett-Markenpalette bleibt.
+
+**(Historisch — iOS-Tokens, Palette bleibt gültig:)** Tokens waren gespiegelt aus
 `../ledgerline-ios/App/DesignSystem/{Theme,Components}.swift`.
 
 **Palette (Brand):** Akzent-Verlauf **Indigo `#7066F5` → Violett `#9E70FA`**
