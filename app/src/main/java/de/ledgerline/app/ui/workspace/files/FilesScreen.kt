@@ -99,6 +99,10 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Load/refresh the files slice on entry so it populates without a manual pull-to-refresh
+    // (the sharded files slice can come back empty on a transient first-load error).
+    LaunchedEffect(Unit) { vm.refresh() }
     val snackbar = remember { SnackbarHostState() }
 
     // The file whose bytes are currently rendered (also the export target).

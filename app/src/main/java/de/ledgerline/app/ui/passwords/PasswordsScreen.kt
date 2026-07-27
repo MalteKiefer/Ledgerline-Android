@@ -187,6 +187,10 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onOpen: (String) 
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     var picker by remember { mutableStateOf(false) }
 
+    // Load on entry (offline-first: cache shows immediately, then refreshes) so the vault
+    // is populated without a manual pull-to-refresh.
+    androidx.compose.runtime.LaunchedEffect(Unit) { vm.reload() }
+
     Box(modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             OutlinedTextField(

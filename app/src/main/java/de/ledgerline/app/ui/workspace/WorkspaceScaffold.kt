@@ -9,6 +9,10 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -310,36 +314,51 @@ private fun PillItem(tab: PrimaryTab, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun DrawerSheet(current: WorkspaceDest, onSearch: () -> Unit, onSelect: (WorkspaceDest) -> Unit) {
     ModalDrawerSheet {
-        Text(
-            stringResource(R.string.app_name),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(start = 24.dp, top = 20.dp, bottom = 14.dp),
-        )
-        NavigationDrawerItem(
-            icon = { Icon(Icons.Outlined.Search, null) },
-            label = { Text(stringResource(R.string.search_everything)) },
-            selected = false,
-            onClick = onSearch,
-            modifier = Modifier.padding(horizontal = 12.dp),
-        )
-        androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
-        listOf(
-            WorkspaceDest.Home to Icons.Outlined.Home,
-            WorkspaceDest.Files to Icons.Outlined.Folder,
-            WorkspaceDest.Photos to Icons.Outlined.PhotoLibrary,
-            WorkspaceDest.Vault to Icons.Outlined.Lock,
-        ).forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
+        androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
+            // Brand header: app name + version.
+            Row(
+                Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "v" + de.ledgerline.app.BuildConfig.VERSION_NAME,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            NavigationDrawerItem(
+                icon = { Icon(Icons.Outlined.Search, null) },
+                label = { Text(stringResource(R.string.search_everything)) },
+                selected = false,
+                onClick = onSearch,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            // Middle list scrolls if it can't fit; Settings stays pinned at the bottom.
+            androidx.compose.foundation.layout.Column(
+                Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+            ) {
+                androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
+                listOf(
+                    WorkspaceDest.Home to Icons.Outlined.Home,
+                    WorkspaceDest.Files to Icons.Outlined.Folder,
+                    WorkspaceDest.Photos to Icons.Outlined.PhotoLibrary,
+                    WorkspaceDest.Vault to Icons.Outlined.Lock,
+                ).forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
 
-        androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
-        listOf(
-            WorkspaceDest.Notes to Icons.Outlined.Description,
-            WorkspaceDest.Todos to Icons.Outlined.CheckCircle,
-            WorkspaceDest.Bookmarks to Icons.Outlined.Bookmarks,
-            WorkspaceDest.Contacts to Icons.Outlined.Contacts,
-        ).forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
-
-        androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
-        DrawerRow(WorkspaceDest.Settings, Icons.Outlined.Settings, current, onSelect)
+                androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
+                listOf(
+                    WorkspaceDest.Notes to Icons.Outlined.Description,
+                    WorkspaceDest.Todos to Icons.Outlined.CheckCircle,
+                    WorkspaceDest.Bookmarks to Icons.Outlined.Bookmarks,
+                    WorkspaceDest.Contacts to Icons.Outlined.Contacts,
+                ).forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
+            }
+            androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
+            DrawerRow(WorkspaceDest.Settings, Icons.Outlined.Settings, current, onSelect)
+            Spacer(Modifier.height(12.dp))
+        }
     }
 }
 
