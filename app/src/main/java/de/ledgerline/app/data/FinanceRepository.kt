@@ -89,6 +89,8 @@ class FinanceRepository(
     @Volatile private var priorRootRaw: JsonObject = JsonObject(emptyMap())
     // Prior invoice-shard descriptors for dirty-save reuse (unchanged shards aren't re-uploaded).
     @Volatile private var priorShards = SealedShardWriter.RootState()
+    // True when a shard failed to decode on the last load → invoice-rebuilding writes must freeze.
+    @Volatile private var degraded = false
 
     private fun api(): LedgerlineApi = apiProvider(sessionHolder.get()!!)
 
@@ -136,9 +138,14 @@ class FinanceRepository(
             folders = null,
         )
         val api = apiProvider(session)
-        val invoices = if (shards.isEmpty()) emptyList() else coroutineScope {
+        val shardResults = if (shards.isEmpty()) emptyList() else coroutineScope {
             shards.map { s -> async(Dispatchers.IO) { fetchShard(api, s, vk, allowNetwork) } }.awaitAll()
-        }.flatMap { it ?: emptyList() }.mapNotNull(FinanceRecordCodec::decodeInvoice)
+        }
+        // A null result = a shard we couldn't decode this load (durably 404 / offline-uncached).
+        // Modifying + re-sharding the invoices now would DROP that shard's records, so freeze
+        // invoice-rebuilding writes until the full set loads (collection-only writes stay safe).
+        degraded = shardResults.any { it == null }
+        val invoices = shardResults.flatMap { it ?: emptyList() }.mapNotNull(FinanceRecordCodec::decodeInvoice)
 
         val pm = fetchCollection(api, root, "payRef", "payKey", vk, allowNetwork)
             .mapNotNull(FinanceRecordCodec::decodePaymentMethod)
@@ -225,6 +232,8 @@ class FinanceRepository(
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
+        // Refuse to re-shard invoices while a shard is missing — it would drop those records.
+        if (degraded) return@withContext Outcome.Err(ErrorKind.HTTP)
         var next = mutate(base!!.manifest.invoices)
         val writer = SealedShardWriter { bytes, name -> uploadBytes(vk, bytes, name) }
 
@@ -370,6 +379,91 @@ class FinanceRepository(
                         is Outcome.Err -> return@withContext l
                     }
                     next = mutate(fresh)
+                }
+                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+            }
+        }
+        Outcome.Err(ErrorKind.HTTP)
+    }
+
+    // ---- statement import (transactions + optional invoice auto-match in ONE write) ----
+
+    data class ImportResult(val added: Int, val matched: Int)
+
+    /**
+     * Import [parsed] statement lines into [accountId]: dedupe against the account's existing bookings,
+     * create a `Transaction` per fresh line, and — when [matchInvoices] — auto-link each income line to
+     * the issued invoice it settles (marking that invoice `paid` + writing `paymentTxId`, the tx gets
+     * the `invoiceId`). Invoices AND the transactions collection are re-sealed in ONE root PUT so the
+     * link is atomic; everything else (paymentMethods, financeCategories, inline data) is preserved and
+     * guarded. 409-rebase re-derives dedupe + matches against the freshly loaded store.
+     */
+    suspend fun importStatement(accountId: String, parsed: List<de.ledgerline.app.core.finance.BankStatement.ParsedTx>, matchInvoices: Boolean): Outcome<ImportResult> = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        var base = cache.value.value
+        if (base == null) {
+            when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
+        }
+        val writer = SealedShardWriter { bytes, name -> uploadBytes(vk, bytes, name) }
+
+        repeat(5) {
+            val existing = base!!.manifest.transactions.filter { it.account == accountId && !it.trashed }
+                .map { de.ledgerline.app.core.finance.BankStatement.ParsedTx(date = it.date, amount = it.amount, currency = it.currency, counterparty = it.counterparty, purpose = it.purpose) }
+            val fresh = de.ledgerline.app.core.finance.BankStatement.dedupeTransactions(existing, parsed)
+            if (fresh.isEmpty()) return@withContext Outcome.Ok(ImportResult(0, 0))
+
+            // Only touch invoices when it's safe to re-shard the FULL set (not degraded).
+            val canMatch = matchInvoices && !degraded
+            val invoicesById = LinkedHashMap(base!!.manifest.invoices.associateBy { it.id })
+            val newTxns = ArrayList<de.ledgerline.app.domain.model.Transaction>()
+            var matched = 0
+            for (p in fresh) {
+                var tx = de.ledgerline.app.domain.model.Transaction(
+                    id = de.ledgerline.app.core.Ids.newId(), account = accountId, date = p.date, amount = p.amount,
+                    currency = p.currency, counterparty = p.counterparty, purpose = p.purpose,
+                    vatCat = de.ledgerline.app.core.finance.BankStatement.guessVatCat(p),
+                )
+                if (canMatch) {
+                    val hit = de.ledgerline.app.core.finance.InvoiceMatch.matchInvoice(p, invoicesById.values.toList())
+                    if (hit != null) {
+                        matched++
+                        tx = tx.copy(invoiceId = hit.id)
+                        val rawWithLink = JsonObject(hit.raw + ("paymentTxId" to JsonPrimitive(tx.id)))
+                        invoicesById[hit.id] = hit.copy(status = de.ledgerline.app.domain.model.InvoiceStatus.PAID, raw = rawWithLink)
+                    }
+                }
+                newTxns.add(tx)
+            }
+            val nextInvoices = invoicesById.values.toList()
+            val nextTransactions = newTxns + base!!.manifest.transactions
+
+            // Re-shard invoices ONLY when a match actually changed one; otherwise keep the prior shards
+            // verbatim (a transactions-only write, always safe even when degraded).
+            val built = if (matched > 0) writer.build(nextInvoices.map { it.id to FinanceRecordCodec.encodeInvoice(it) }, emptyList(), priorShards)
+                ?: return@withContext Outcome.Err(ErrorKind.NETWORK) else null
+            val txColl = sealCollection(vk, nextTransactions.map(FinanceRecordCodec::encodeTransaction), priorRootRaw["txRef"]?.jsonPrimitive?.contentOrNull, priorRootRaw["txHash"]?.jsonPrimitive?.contentOrNull, priorRootRaw["txKey"]?.jsonPrimitive?.contentOrNull)
+                ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+
+            val root = (if (built != null) mergeRoot(priorRootRaw, built.rootJson) else priorRootRaw).toMutableMap()
+            root["v"] = JsonPrimitive(3); root["suite"] = JsonPrimitive(1)
+            if (txColl.ref == null) { root.remove("txRef"); root.remove("txKey"); root.remove("txHash") }
+            else { root["txRef"] = JsonPrimitive(txColl.ref); root["txKey"] = JsonPrimitive(txColl.key); root["txHash"] = JsonPrimitive(txColl.hash) }
+            val rootJson = JsonObject(root)
+            val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
+            val guard = (built?.shardRefs ?: priorShards.shards.map { it.ref }) + collectionRefs(rootJson)
+            val put = try { api().invoicesStorePut(StorePutRequest(rootCipher, version, guard)) } catch (e: Exception) { return@withContext Outcome.Err(ErrorKind.NETWORK, e) }
+            when {
+                put.isSuccessful -> {
+                    version = put.body()?.version ?: (version + 1)
+                    if (built != null) priorShards = built.state
+                    priorRootRaw = rootJson
+                    if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(rootCipher, version))
+                    val store = FinanceStore(base!!.manifest.copy(invoices = nextInvoices, transactions = nextTransactions), version)
+                    cache.set(store)
+                    return@withContext Outcome.Ok(ImportResult(newTxns.size, matched))
+                }
+                put.code() == HttpURLConnection.HTTP_CONFLICT -> {
+                    when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
                 }
                 else -> return@withContext Outcome.Err(ErrorKind.HTTP)
             }

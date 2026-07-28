@@ -849,6 +849,7 @@
     <string name="finance_import_map_title">Сопоставить столбцы</string>
     <string name="finance_import_map_hint">Выберите, какой столбец CSV соответствует каждому полю. Дата и сумма обязательны.</string>
     <string name="finance_import_apply">Импортировать</string>
+    <string name="finance_import_added_matched">Импортировано проводок: %1, сопоставлено со счетами: %2</string>
     <string name="finance_import_added">Импортировано проводок: %1$d</string>
     <string name="finance_import_none">Нет новых проводок (все дубликаты)</string>
     <string name="finance_import_unreadable">Не удалось прочитать выписку</string>

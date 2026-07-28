@@ -191,30 +191,18 @@ class FinanceViewModel @Inject constructor(
         saveTransaction(t.copy(trashed = true), onDone)
 
     /**
-     * Import parsed statement lines into [accountId], deduped against that account's existing bookings.
-     * [onDone] gets the number added (0 = all duplicates, -1 = save failed).
+     * Import parsed statement lines into [accountId], deduped against that account's existing bookings
+     * and (default) auto-linked to the invoices they settle. [onDone] gets `(added, matched)`; a save
+     * failure reports `(-1, 0)`.
      */
-    fun importTransactions(parsed: List<de.ledgerline.app.core.finance.BankStatement.ParsedTx>, accountId: String, onDone: (Int) -> Unit) {
+    fun importTransactions(parsed: List<de.ledgerline.app.core.finance.BankStatement.ParsedTx>, accountId: String, matchInvoices: Boolean = true, onDone: (Int, Int) -> Unit) {
         viewModelScope.launch {
-            val existing = transactions.value.filter { it.account == accountId && !it.trashed }.map { it.toParsed() }
-            val fresh = de.ledgerline.app.core.finance.BankStatement.dedupeTransactions(existing, parsed)
-            if (fresh.isEmpty()) { onDone(0); return@launch }
-            val added = fresh.map { p ->
-                de.ledgerline.app.domain.model.Transaction(
-                    id = de.ledgerline.app.core.Ids.newId(), account = accountId, date = p.date, amount = p.amount,
-                    currency = p.currency, counterparty = p.counterparty, purpose = p.purpose,
-                    vatCat = de.ledgerline.app.core.finance.BankStatement.guessVatCat(p),
-                )
+            when (val res = repo.importStatement(accountId, parsed, matchInvoices)) {
+                is de.ledgerline.app.core.Outcome.Ok -> onDone(res.value.added, res.value.matched)
+                is de.ledgerline.app.core.Outcome.Err -> onDone(-1, 0)
             }
-            val res = repo.saveTransactions { it + added }
-            onDone(if (res is de.ledgerline.app.core.Outcome.Ok) added.size else -1)
         }
     }
-
-    private fun de.ledgerline.app.domain.model.Transaction.toParsed() =
-        de.ledgerline.app.core.finance.BankStatement.ParsedTx(
-            date = date, amount = amount, currency = currency, counterparty = counterparty, purpose = purpose,
-        )
 
     /** Currency-format a value with the invoice/company currency (fallback EUR), device locale. */
     fun money(value: Double, currency: String?): String {

@@ -848,6 +848,7 @@
     <string name="finance_import_map_title">Map columns</string>
     <string name="finance_import_map_hint">Pick which CSV column maps to each field. Date and amount are required.</string>
     <string name="finance_import_apply">Import</string>
+    <string name="finance_import_added_matched">%1 bookings imported, %2 matched to invoices</string>
     <string name="finance_import_added">%1$d bookings imported</string>
     <string name="finance_import_none">No new bookings (all duplicates)</string>
     <string name="finance_import_unreadable">Could not read this statement</string>

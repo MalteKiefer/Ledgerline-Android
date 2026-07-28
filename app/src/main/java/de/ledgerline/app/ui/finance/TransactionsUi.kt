@@ -125,7 +125,7 @@ private fun trimAmount(d: Double): String = if (d == kotlin.math.floor(d)) d.toL
  * outcome via [onResult] (count added / 0 duplicates / -1 failed / -2 unparseable).
  */
 @Composable
-fun rememberStatementImport(vm: FinanceViewModel, accountId: String, onResult: (Int) -> Unit): () -> Unit {
+fun rememberStatementImport(vm: FinanceViewModel, accountId: String, onResult: (added: Int, matched: Int) -> Unit): () -> Unit {
     val ctx = LocalContext.current
     var mapping by remember { mutableStateOf<PendingCsv?>(null) }
 
@@ -133,20 +133,20 @@ fun rememberStatementImport(vm: FinanceViewModel, accountId: String, onResult: (
         if (uri == null) return@rememberLauncherForActivityResult
         val text = runCatching { ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } }.getOrNull()
         val name = uri.lastPathSegment ?: ""
-        if (text.isNullOrBlank()) { onResult(-2); return@rememberLauncherForActivityResult }
+        if (text.isNullOrBlank()) { onResult(-2, 0); return@rememberLauncherForActivityResult }
         when (BankStatement.detectFormat(text, name)) {
-            "mt940" -> vm.importTransactions(BankStatement.parseMt940(text).transactions, accountId, onResult)
+            "mt940" -> vm.importTransactions(BankStatement.parseMt940(text).transactions, accountId, onDone = onResult)
             "csv" -> {
                 val csv = BankStatement.parseCsv(text)
                 val auto = BankStatement.detectCsvMapping(csv.header)
                 if (auto != null) {
                     val applied = BankStatement.applyCsvMapping(csv.header, csv.rows, auto.map)
-                    vm.importTransactions(applied.transactions, accountId, onResult)
+                    vm.importTransactions(applied.transactions, accountId, onDone = onResult)
                 } else {
                     mapping = PendingCsv(csv)   // ask the user to map columns
                 }
             }
-            else -> onResult(-2)
+            else -> onResult(-2, 0)
         }
     }
 
@@ -157,7 +157,7 @@ fun rememberStatementImport(vm: FinanceViewModel, accountId: String, onResult: (
             onApply = { map ->
                 mapping = null
                 val applied = BankStatement.applyCsvMapping(pending.csv.header, pending.csv.rows, map)
-                vm.importTransactions(applied.transactions, accountId, onResult)
+                vm.importTransactions(applied.transactions, accountId, onDone = onResult)
             },
         )
     }

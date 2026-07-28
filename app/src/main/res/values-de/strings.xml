@@ -846,6 +846,7 @@
     <string name="finance_import_map_title">Spalten zuordnen</string>
     <string name="finance_import_map_hint">Wähle, welche CSV-Spalte zu welchem Feld gehört. Datum und Betrag sind Pflicht.</string>
     <string name="finance_import_apply">Importieren</string>
+    <string name="finance_import_added_matched">%1 Buchungen importiert, %2 Rechnungen zugeordnet</string>
     <string name="finance_import_added">%1$d Buchungen importiert</string>
     <string name="finance_import_none">Keine neuen Buchungen (alles Duplikate)</string>
     <string name="finance_import_unreadable">Auszug konnte nicht gelesen werden</string>

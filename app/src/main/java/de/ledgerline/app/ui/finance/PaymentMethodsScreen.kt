@@ -170,8 +170,9 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
     val txns = vm.accountTransactions(initial.id)
     val exists = vm.paymentMethodById(initial.id) != null
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    val launchImport = rememberStatementImport(vm, initial.id) { added ->
+    val launchImport = rememberStatementImport(vm, initial.id) { added, matched ->
         val msg = when {
+            added > 0 && matched > 0 -> ctx.getString(R.string.finance_import_added_matched, added, matched)
             added > 0 -> ctx.getString(R.string.finance_import_added, added)
             added == 0 -> ctx.getString(R.string.finance_import_none)
             added == -2 -> ctx.getString(R.string.finance_import_unreadable)
