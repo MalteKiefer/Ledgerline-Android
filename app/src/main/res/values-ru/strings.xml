@@ -847,6 +847,7 @@
     <string name="finance_pm_note">Заметка</string>
     <string name="finance_date">Дата (ГГГГ-ММ-ДД)</string>
     <string name="finance_tx_add">Добавить проводку</string>
+    <string name="finance_tx_search">Поиск проводок</string>
     <string name="finance_tx_edit">Изменить проводку</string>
     <string name="finance_tx_amount">Сумма (− = расход)</string>
     <string name="finance_tx_counterparty">Контрагент</string>

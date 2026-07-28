@@ -166,8 +166,16 @@ private fun PaymentMethodEditScreen(initial: PaymentMethod, vm: FinanceViewModel
 @Composable
 private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit, onEditTx: (de.ledgerline.app.domain.model.Transaction) -> Unit) {
     var pm by remember(initial) { mutableStateOf(initial) }
+    var txQuery by remember { mutableStateOf("") }
     vm.transactions.collectAsStateWithLifecycle()   // recompose after import/edit
-    val txns = vm.accountTransactions(initial.id)
+    val allTxns = vm.accountTransactions(initial.id)
+    val txns = remember(allTxns, txQuery) {
+        val q = txQuery.trim().lowercase()
+        if (q.isEmpty()) allTxns else allTxns.filter {
+            it.counterparty.lowercase().contains(q) || it.purpose.lowercase().contains(q) || it.date.contains(q) ||
+                de.ledgerline.app.core.finance.AmountSearch.amountMatches(it.amount, txQuery)
+        }
+    }
     val exists = vm.paymentMethodById(initial.id) != null
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val launchImport = rememberStatementImport(vm, initial.id) { added, matched ->
@@ -242,6 +250,9 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
                     Text(stringResource(R.string.finance_pm_bookings_title), Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
                     androidx.compose.material3.TextButton(onClick = launchImport) { Text(stringResource(R.string.finance_import_action)) }
                     androidx.compose.material3.TextButton(onClick = { onEditTx(vm.newTransaction(initial.id)) }) { Text(stringResource(R.string.finance_tx_add)) }
+                }
+                if (allTxns.size > 6) {
+                    OutlinedTextField(txQuery, { txQuery = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_tx_search)) }, singleLine = true)
                 }
             }
             if (txns.isNotEmpty()) {

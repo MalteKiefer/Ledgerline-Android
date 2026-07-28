@@ -844,6 +844,7 @@
     <string name="finance_pm_note">Notiz</string>
     <string name="finance_date">Datum (JJJJ-MM-TT)</string>
     <string name="finance_tx_add">Buchung hinzufügen</string>
+    <string name="finance_tx_search">Buchungen suchen</string>
     <string name="finance_tx_edit">Buchung bearbeiten</string>
     <string name="finance_tx_amount">Betrag (− = Ausgabe)</string>
     <string name="finance_tx_counterparty">Empfänger/Zahler</string>

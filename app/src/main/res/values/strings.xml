@@ -846,6 +846,7 @@
     <string name="finance_pm_note">Note</string>
     <string name="finance_date">Date (YYYY-MM-DD)</string>
     <string name="finance_tx_add">Add booking</string>
+    <string name="finance_tx_search">Search bookings</string>
     <string name="finance_tx_edit">Edit booking</string>
     <string name="finance_tx_amount">Amount (− = expense)</string>
     <string name="finance_tx_counterparty">Counterparty</string>
