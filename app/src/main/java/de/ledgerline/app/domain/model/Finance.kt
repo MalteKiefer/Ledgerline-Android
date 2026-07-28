@@ -95,9 +95,49 @@ data class CompanyProfile(
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 
+/**
+ * A payment method (bank account, card, PayPal, cash, …) in the finance store's `paymentMethods`
+ * collection (byte-shape = web `blankPaymentMethod`). Sensitive fields are ZK — sealed client-side.
+ */
+data class PaymentMethod(
+    val id: String,
+    val type: String = "bank",          // bank | card | paypal | cash | other
+    val label: String = "",
+    val holder: String = "",
+    val iban: String = "",
+    val bic: String = "",
+    val bankName: String = "",
+    val accountNumber: String = "",
+    val url: String = "",
+    val cardNetwork: String = "visa",   // visa | mastercard | amex | other
+    val cardNumber: String = "",
+    val cardExpiry: String = "",
+    val email: String = "",
+    val note: String = "",
+    val trashed: Boolean = false,
+    val raw: JsonObject = JsonObject(emptyMap()),
+)
+
+/** A bank/account booking in the `transactions` collection (read-only in Android for now). */
+data class Transaction(
+    val id: String,
+    val account: String = "",           // the PaymentMethod.id this booking belongs to
+    val date: String = "",              // YYYY-MM-DD
+    val amount: Double = 0.0,           // signed: >0 income, <0 expense
+    val currency: String = "EUR",
+    val counterparty: String = "",
+    val purpose: String = "",
+    val vatCat: String = "",            // '', a rate ('19'), or 'private'
+    val invoiceId: String? = null,
+    val trashed: Boolean = false,
+    val raw: JsonObject = JsonObject(emptyMap()),
+)
+
 /** The decrypted `/invoices/store` slice the app consumes. `seq` = the GoBD per-year counter base. */
 data class FinanceManifest(
     val invoices: List<Invoice> = emptyList(),
+    val paymentMethods: List<PaymentMethod> = emptyList(),
+    val transactions: List<Transaction> = emptyList(),
     val seq: Int = 0,
 )
 

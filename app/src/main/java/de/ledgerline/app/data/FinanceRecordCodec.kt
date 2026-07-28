@@ -125,6 +125,69 @@ object FinanceRecordCodec {
         if (value != null) out[key] = value else out.remove(key)
     }
 
+    // ---- payment methods (decode + encode, raw overlay = no field loss) ----
+
+    fun decodePaymentMethod(o: JsonObject): de.ledgerline.app.domain.model.PaymentMethod? {
+        val id = o.str("id") ?: return null
+        return de.ledgerline.app.domain.model.PaymentMethod(
+            id = id,
+            type = o.str("type") ?: "bank",
+            label = o.str("label") ?: "",
+            holder = o.str("holder") ?: "",
+            iban = o.str("iban") ?: "",
+            bic = o.str("bic") ?: "",
+            bankName = o.str("bankName") ?: "",
+            accountNumber = o.str("accountNumber") ?: "",
+            url = o.str("url") ?: "",
+            cardNetwork = o.str("cardNetwork") ?: "visa",
+            cardNumber = o.str("cardNumber") ?: "",
+            cardExpiry = o.str("cardExpiry") ?: "",
+            email = o.str("email") ?: "",
+            note = o.str("note") ?: "",
+            trashed = o["trashed"]?.truthy() ?: false,
+            raw = o,
+        )
+    }
+
+    fun encodePaymentMethod(pm: de.ledgerline.app.domain.model.PaymentMethod): JsonObject {
+        val out = pm.raw.toMutableMap()
+        out["id"] = JsonPrimitive(pm.id)
+        out["type"] = JsonPrimitive(pm.type)
+        out["label"] = JsonPrimitive(pm.label)
+        out["holder"] = JsonPrimitive(pm.holder)
+        out["iban"] = JsonPrimitive(pm.iban)
+        out["bic"] = JsonPrimitive(pm.bic)
+        out["bankName"] = JsonPrimitive(pm.bankName)
+        out["accountNumber"] = JsonPrimitive(pm.accountNumber)
+        out["url"] = JsonPrimitive(pm.url)
+        out["cardNetwork"] = JsonPrimitive(pm.cardNetwork)
+        out["cardNumber"] = JsonPrimitive(pm.cardNumber)
+        out["cardExpiry"] = JsonPrimitive(pm.cardExpiry)
+        out["email"] = JsonPrimitive(pm.email)
+        out["note"] = JsonPrimitive(pm.note)
+        out["trashed"] = JsonPrimitive(pm.trashed)
+        return JsonObject(out)
+    }
+
+    // ---- transactions (decode only; read-only in Android) ----
+
+    fun decodeTransaction(o: JsonObject): de.ledgerline.app.domain.model.Transaction? {
+        val id = o.str("id") ?: return null
+        return de.ledgerline.app.domain.model.Transaction(
+            id = id,
+            account = o.str("account") ?: "",
+            date = o.str("date") ?: "",
+            amount = o["amount"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+            currency = o.str("currency") ?: "EUR",
+            counterparty = o.str("counterparty") ?: "",
+            purpose = o.str("purpose") ?: "",
+            vatCat = o.str("vatCat") ?: "",
+            invoiceId = o.str("invoiceId"),
+            trashed = o["trashed"]?.truthy() ?: false,
+            raw = o,
+        )
+    }
+
     fun companyFrom(dto: CompanyDto): CompanyProfile = CompanyProfile(
         name = dto.name.orEmpty(),
         address = dto.address.orEmpty(),

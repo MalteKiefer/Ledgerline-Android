@@ -18,6 +18,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MultipartBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -87,5 +88,45 @@ class FinanceRepositoryTest {
 
         // The shards[] referential guard covers the new invoice shard + the preserved collection blobs.
         assertTrue(putBody!!.shards!!.containsAll(listOf("shard1", "pay1", "tx1")))
+    }
+
+    @Test fun save_payment_methods_preserves_invoices_and_other_collections() = runBlocking {
+        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        // Root with an invoice shard + all three collections + inline partners.
+        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[{"ref":"invshard1","key":"ik","hash":"ih","count":1,"bucket":0}],"caps":{},"payRef":"pay1","payKey":"pk","payHash":"ph","txRef":"tx1","txKey":"tk","txHash":"th","catRef":"cat1","catKey":"ck","catHash":"ch","partners":[{"id":"p1","name":"ACME"}],"invoiceSeq":7}"""
+
+        var putBody: StorePutRequest? = null
+        val api = object : NotImplementedApi() {
+            override suspend fun invoicesStore(): Response<StoreResponse> = Response.success(StoreResponse("SEALED:$rootJson", 5))
+            override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse> = Response.success(de.ledgerline.app.data.remote.dto.CompanyResponse(CompanyDto()))
+            // Every blob 404s → the invoice shard + collections degrade to empty, but their descriptors survive.
+            override suspend fun rawInvoice(blob: String): Response<okhttp3.ResponseBody> =
+                Response.error(404, "".toResponseBody(null))
+            override suspend fun uploadInvoice(file: MultipartBody.Part): Response<UploadResponse> = Response.success(UploadResponse("newpay"))
+            override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> {
+                putBody = body
+                return Response.success(StoreResponse(body.ciphertext, body.version + 1))
+            }
+        }
+        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+
+        assertTrue(repo.load() is Outcome.Ok)
+        val res = repo.savePaymentMethods { list ->
+            listOf(de.ledgerline.app.domain.model.PaymentMethod(id = "pm1", type = "bank", label = "Giro", iban = "DE00")) + list
+        }
+        assertTrue(res is Outcome.Ok)
+
+        val root = Json.parseToJsonElement(putBody!!.ciphertext.removePrefix("SEALED:")).jsonObject
+        // The paymentMethods collection was re-sealed to the new blob…
+        assertEquals("newpay", root["payRef"]!!.jsonPrimitive.content)
+        // …while transactions, financeCategories, the invoice shard and inline data are untouched.
+        assertEquals("tx1", root["txRef"]!!.jsonPrimitive.content)
+        assertEquals("cat1", root["catRef"]!!.jsonPrimitive.content)
+        assertEquals("invshard1", root["shards"]!!.jsonArray[0].jsonObject["ref"]!!.jsonPrimitive.content)
+        assertEquals("ACME", root["partners"]!!.jsonArray[0].jsonObject["name"]!!.jsonPrimitive.content)
+        assertEquals(7, root["invoiceSeq"]!!.jsonPrimitive.content.toInt())
+        // The guard covers the invoice shard + the new payRef + the preserved tx/cat collections.
+        assertTrue(putBody!!.shards!!.containsAll(listOf("invshard1", "newpay", "tx1", "cat1")))
     }
 }

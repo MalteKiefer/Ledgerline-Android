@@ -6,6 +6,8 @@ import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.CanonicalJson
 import de.ledgerline.app.core.crypto.Crypto
+import de.ledgerline.app.core.crypto.GallerySharding
+import de.ledgerline.app.domain.model.PaymentMethod
 import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.offline.StoreDiskCache
@@ -106,8 +108,8 @@ class FinanceRepository(
             }
             if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(ct, body.version))
             val plain = crypto.openManifest(ct, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
-            val invoices = assemble(json.parseToJsonElement(plain).jsonObject, session, vk, allowNetwork = true)
-            val store = FinanceStore(FinanceManifest(invoices = invoices, seq = 0), version)
+            val a = assemble(json.parseToJsonElement(plain).jsonObject, session, vk, allowNetwork = true)
+            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions, seq = 0), version)
             cache.set(store)
             loadCompany()
             Outcome.Ok(store)
@@ -116,8 +118,14 @@ class FinanceRepository(
         }
     }
 
-    /** Decode the root: capture its raw + shard descriptors, then fetch + decode the invoice shards. */
-    private suspend fun assemble(root: JsonObject, session: Session, vk: ByteArray, allowNetwork: Boolean): List<Invoice> {
+    private data class Assembled(
+        val invoices: List<Invoice>,
+        val paymentMethods: List<de.ledgerline.app.domain.model.PaymentMethod>,
+        val transactions: List<de.ledgerline.app.domain.model.Transaction>,
+    )
+
+    /** Decode the root: capture its raw + shard descriptors, then fetch + decode shards + collections. */
+    private suspend fun assemble(root: JsonObject, session: Session, vk: ByteArray, allowNetwork: Boolean): Assembled {
         priorRootRaw = root
         val shards = (root["shards"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::shardOf) }
         priorShards = SealedShardWriter.RootState(
@@ -125,12 +133,40 @@ class FinanceRepository(
             shards = shards,
             folders = null,
         )
-        if (shards.isEmpty()) return emptyList()
         val api = apiProvider(session)
-        val records = coroutineScope {
+        val invoices = if (shards.isEmpty()) emptyList() else coroutineScope {
             shards.map { s -> async(Dispatchers.IO) { fetchShard(api, s, vk, allowNetwork) } }.awaitAll()
-        }.flatMap { it ?: emptyList() }
-        return records.mapNotNull(FinanceRecordCodec::decodeInvoice)
+        }.flatMap { it ?: emptyList() }.mapNotNull(FinanceRecordCodec::decodeInvoice)
+
+        val pm = fetchCollection(api, root, "payRef", "payKey", vk, allowNetwork)
+            .mapNotNull(FinanceRecordCodec::decodePaymentMethod)
+        val tx = fetchCollection(api, root, "txRef", "txKey", vk, allowNetwork)
+            .mapNotNull(FinanceRecordCodec::decodeTransaction)
+        return Assembled(invoices, pm, tx)
+    }
+
+    /**
+     * Fetch + decrypt a named collection blob (`<name>Ref`/`<name>Key`) into its record array. A
+     * missing/undecryptable blob degrades to empty (never crashes the load) — the ZK degraded-read
+     * stance; the root's raw descriptor is still preserved so a later write re-references the blob.
+     */
+    private suspend fun fetchCollection(api: LedgerlineApi, root: JsonObject, refKey: String, keyKey: String, vk: ByteArray, allowNetwork: Boolean): List<JsonObject> {
+        val ref = root[refKey]?.jsonPrimitive?.contentOrNull ?: return emptyList()
+        val key = root[keyKey]?.jsonPrimitive?.contentOrNull ?: return emptyList()
+        try {
+            val cipher = blobCache.get(ref) ?: run {
+                if (!allowNetwork) return emptyList()
+                val r = api.rawInvoice(ref)
+                if (!r.isSuccessful) return emptyList()
+                r.body()!!.bytes().also { if (offlineFlags.enabled()) blobCache.put(ref, it) }
+            }
+            val bytes = BlobDownloader.decrypt(cipher, key, vk, crypto)
+            return json.parseToJsonElement(bytes.decodeToString()).jsonArray.map { it.jsonObject }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            return emptyList()
+        }
     }
 
     private suspend fun fetchShard(api: LedgerlineApi, s: GalleryShard, vk: ByteArray, allowNetwork: Boolean): List<JsonObject>? {
@@ -164,9 +200,9 @@ class FinanceRepository(
                     crypto.openManifest(ct, vk)?.let { plain ->
                         runCatching {
                             // Offline: assemble from cached shard blobs only (no network).
-                            val invoices = assemble(json.parseToJsonElement(plain).jsonObject, session, vk, allowNetwork = false)
+                            val a = assemble(json.parseToJsonElement(plain).jsonObject, session, vk, allowNetwork = false)
                             version = env.version
-                            val store = FinanceStore(FinanceManifest(invoices = invoices), version)
+                            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions), version)
                             cache.set(store)
                             return Outcome.Ok(store)
                         }
@@ -207,7 +243,10 @@ class FinanceRepository(
                     priorShards = result.state
                     priorRootRaw = rootJson
                     if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(rootCipher, version))
-                    val store = FinanceStore(FinanceManifest(invoices = next), version)
+                    val store = FinanceStore(
+                        FinanceManifest(invoices = next, paymentMethods = base!!.manifest.paymentMethods, transactions = base!!.manifest.transactions),
+                        version,
+                    )
                     cache.set(store)
                     return@withContext Outcome.Ok(store)
                 }
@@ -224,6 +263,74 @@ class FinanceRepository(
         Outcome.Err(ErrorKind.HTTP)
     }
 
+    // ---- save payment methods (only the paymentMethods collection; every other root key preserved) ----
+
+    /**
+     * Re-seal the `paymentMethods` collection and PUT the root with only `payRef`/`payKey`/`payHash`
+     * replaced — invoices' shards, `txRef`/`catRef` collections and inline `partners`/`invoiceSeq`
+     * are carried through verbatim, and all their blob refs go into the `shards[]` guard so the
+     * server never frees them. 409-rebase like the invoice save.
+     */
+    suspend fun savePaymentMethods(mutate: (List<PaymentMethod>) -> List<PaymentMethod>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        var base = cache.value.value
+        if (base == null) {
+            when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
+        }
+        var next = mutate(base!!.manifest.paymentMethods)
+
+        repeat(5) {
+            val items = next.map(FinanceRecordCodec::encodePaymentMethod)
+            val coll = sealCollection(vk, items, priorRootRaw["payRef"]?.jsonPrimitive?.contentOrNull, priorRootRaw["payHash"]?.jsonPrimitive?.contentOrNull, priorRootRaw["payKey"]?.jsonPrimitive?.contentOrNull)
+                ?: return@withContext Outcome.Err(ErrorKind.NETWORK) // upload failed
+            val root = priorRootRaw.toMutableMap()
+            root["v"] = JsonPrimitive(3); root["suite"] = JsonPrimitive(1)
+            if (coll.ref == null) {
+                root.remove("payRef"); root.remove("payKey"); root.remove("payHash")
+            } else {
+                root["payRef"] = JsonPrimitive(coll.ref); root["payKey"] = JsonPrimitive(coll.key); root["payHash"] = JsonPrimitive(coll.hash)
+            }
+            val rootJson = JsonObject(root)
+            val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
+            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson)
+            val put = try {
+                api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
+            } catch (e: Exception) {
+                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+            }
+            when {
+                put.isSuccessful -> {
+                    version = put.body()?.version ?: (version + 1)
+                    priorRootRaw = rootJson
+                    if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(rootCipher, version))
+                    val store = FinanceStore(base!!.manifest.copy(paymentMethods = next), version)
+                    cache.set(store)
+                    return@withContext Outcome.Ok(store)
+                }
+                put.code() == HttpURLConnection.HTTP_CONFLICT -> {
+                    val fresh = when (val l = load()) {
+                        is Outcome.Ok -> { base = l.value; l.value.manifest.paymentMethods }
+                        is Outcome.Err -> return@withContext l
+                    }
+                    next = mutate(fresh)
+                }
+                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+            }
+        }
+        Outcome.Err(ErrorKind.HTTP)
+    }
+
+    /** Seal a collection array to a content blob; reuse the prior blob if the canonical bytes match. */
+    private data class Coll(val ref: String?, val key: String?, val hash: String?)
+    private suspend fun sealCollection(vk: ByteArray, items: List<JsonObject>, priorRef: String?, priorHash: String?, priorKey: String?): Coll? {
+        if (items.isEmpty()) return Coll(null, null, null)
+        val arr = JsonArray(items)
+        val hash = GallerySharding.shardHash(arr)
+        if (priorRef != null && priorHash == hash && priorKey != null) return Coll(priorRef, priorKey, hash)
+        val blob = uploadBytes(vk, CanonicalJson.bytes(arr), "collection.enc") ?: return null
+        return Coll(blob.id, blob.encFileKey, hash)
+    }
+
     /** New root = prior root with only `shardBits`/`shards`/`caps` replaced; all else preserved. */
     private fun mergeRoot(prior: JsonObject, built: JsonObject): JsonObject {
         val out = prior.toMutableMap()
@@ -235,9 +342,9 @@ class FinanceRepository(
         return JsonObject(out)
     }
 
-    /** The preserved collection blob refs (paymentMethods + transactions) for the shards[] guard. */
+    /** The preserved collection blob refs (paymentMethods/transactions/financeCategories) for the guard. */
     private fun collectionRefs(root: JsonObject): List<String> =
-        listOfNotNull(root["payRef"]?.jsonPrimitive?.contentOrNull, root["txRef"]?.jsonPrimitive?.contentOrNull)
+        listOf("payRef", "txRef", "catRef").mapNotNull { root[it]?.jsonPrimitive?.contentOrNull }
 
     private suspend fun uploadBytes(vk: ByteArray, bytes: ByteArray, name: String): UploadedBlob? {
         val enc = crypto.newContentEncryptor(vk)

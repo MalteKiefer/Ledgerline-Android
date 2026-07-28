@@ -37,6 +37,14 @@ class FinanceViewModel @Inject constructor(
         cache.value.map { it?.manifest?.invoices ?: emptyList() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    val paymentMethods: StateFlow<List<de.ledgerline.app.domain.model.PaymentMethod>> =
+        cache.value.map { it?.manifest?.paymentMethods ?: emptyList() }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val transactions: StateFlow<List<de.ledgerline.app.domain.model.Transaction>> =
+        cache.value.map { it?.manifest?.transactions ?: emptyList() }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val company: StateFlow<CompanyProfile?> = cache.company
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -135,6 +143,35 @@ class FinanceViewModel @Inject constructor(
     fun saveCompany(profile: CompanyProfile, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch { onDone(repo.saveCompany(profile)) }
     }
+
+    // ---- payment methods ----
+    fun sortedPaymentMethods(): List<de.ledgerline.app.domain.model.PaymentMethod> =
+        de.ledgerline.app.core.finance.PaymentMethods.sorted(paymentMethods.value)
+
+    fun paymentMethodById(id: String): de.ledgerline.app.domain.model.PaymentMethod? =
+        paymentMethods.value.firstOrNull { it.id == id }
+
+    fun newPaymentMethod(type: String = "bank"): de.ledgerline.app.domain.model.PaymentMethod =
+        de.ledgerline.app.core.finance.PaymentMethods.blank(de.ledgerline.app.core.Ids.newId(), type)
+
+    /** Booking count + signed balance (income − expenses) for a payment method [id]. */
+    fun accountBalance(id: String): Double =
+        transactions.value.filter { it.account == id && !it.trashed }.sumOf { it.amount }
+
+    fun accountTransactions(id: String): List<de.ledgerline.app.domain.model.Transaction> =
+        transactions.value.filter { it.account == id && !it.trashed }.sortedByDescending { it.date }
+
+    fun savePaymentMethod(pm: de.ledgerline.app.domain.model.PaymentMethod, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val res = repo.savePaymentMethods { list ->
+                if (list.any { it.id == pm.id }) list.map { if (it.id == pm.id) pm else it } else listOf(pm) + list
+            }
+            onDone(res is de.ledgerline.app.core.Outcome.Ok)
+        }
+    }
+
+    fun trashPaymentMethod(pm: de.ledgerline.app.domain.model.PaymentMethod, onDone: (Boolean) -> Unit = {}) =
+        savePaymentMethod(pm.copy(trashed = true), onDone)
 
     /** Currency-format a value with the invoice/company currency (fallback EUR), device locale. */
     fun money(value: Double, currency: String?): String {
