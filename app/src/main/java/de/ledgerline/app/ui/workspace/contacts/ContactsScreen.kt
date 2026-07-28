@@ -95,6 +95,7 @@ internal fun contactInitials(c: Contact): String {
 fun ContactsScreen(
     modifier: Modifier = Modifier,
     onExit: () -> Unit = {},
+    onMenu: (() -> Unit)? = null,
     vm: ContactsViewModel = hiltViewModel(),
 ) {
     val ui by vm.state.collectAsStateWithLifecycle()
@@ -192,7 +193,8 @@ fun ContactsScreen(
         topBar = {
             de.ledgerline.app.ui.common.AppTopBar(
                 stringResource(R.string.menu_contacts),
-                onBack = onExit,
+                onBack = if (onMenu == null) onExit else null,
+                onMenu = onMenu,
                 actions = {
                     if (syncing) {
                         CircularProgressIndicator(Modifier.size(24.dp).padding(end = 8.dp), strokeWidth = 2.dp)

@@ -7,11 +7,13 @@ import de.ledgerline.app.ui.common.TextInputDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.RestoreFromTrash
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.UploadFile
@@ -47,6 +50,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -60,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
@@ -74,10 +79,12 @@ import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.FileEntry
 import de.ledgerline.app.domain.model.NamedFolder
 import de.ledgerline.app.ui.common.copyToClipboard
+import de.ledgerline.app.ui.common.listSection
 import de.ledgerline.app.ui.common.shareTextChooser
 import de.ledgerline.app.ui.workspace.common.ErrorBox
 import de.ledgerline.app.ui.workspace.common.LoadingBox
 import de.ledgerline.app.ui.workspace.common.RefreshableMessage
+import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.workspace.common.SearchField
 import de.ledgerline.app.ui.workspace.common.TrashBar
 import de.ledgerline.app.ui.workspace.common.humanSize
@@ -85,13 +92,14 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewModel()) {
+fun FilesScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, vm: FilesViewModel = hiltViewModel()) {
     val ui by vm.state.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val viewer by vm.viewer.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val usage by vm.usage.collectAsStateWithLifecycle()
     val showTrash by vm.showTrash.collectAsStateWithLifecycle()
+    val view by vm.view.collectAsStateWithLifecycle()
     val trashCount by vm.trashCount.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val sort by vm.sort.collectAsStateWithLifecycle()
@@ -183,23 +191,30 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
     var versionsTarget by remember { mutableStateOf<FileEntry?>(null) }
     var tagsTarget by remember { mutableStateOf<FileEntry?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier,
-        // This inner Scaffold is nested inside WorkspaceScaffold, which already
-        // applied the top-bar/window insets via the passed [modifier]. Zero the
-        // inner content insets so the top inset isn't added twice (a wide gap
-        // between the app bar and the first list row).
-        contentWindowInsets = WindowInsets(0),
-        snackbarHost = { SnackbarHost(snackbar) },
-        floatingActionButton = {
-            if (!ui.loading && !ui.error && !showTrash) {
-                FilesFab(
-                    onUpload = { vm.armLockSuppression(); uploadLauncher.launch(arrayOf("*/*")) },
-                    onNewFolder = { showNewFolder = true },
+        topBar = {
+            Column {
+                de.ledgerline.app.ui.common.AppTopBar(
+                    title = stringResource(R.string.tab_files),
+                    onMenu = onMenu,
+                    actions = {
+                        IconButton(onClick = { searchActive = !searchActive; if (!searchActive) vm.setQuery("") }) {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = if (searchActive) Brand.accent else LocalContentColor.current,
+                            )
+                        }
+                        SortMenu(current = sort, onSort = { vm.setSort(it) })
+                    },
                 )
+                if (searchActive) SearchField(query = query, onQueryChange = { vm.setQuery(it) })
             }
         },
+        snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
@@ -207,40 +222,26 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                 ui.error -> ErrorBox(stringResource(R.string.ws_error), onRetry = { vm.refresh() })
                 else -> Column(Modifier.fillMaxSize()) {
                     if (degraded) de.ledgerline.app.ui.workspace.common.DegradedBanner()
-                    // Fixed header: trash bar in trash view, else a "Trash (N)" entry
-                    // (only when the trash has something).
+                    // Trash view keeps its slim empty/restore bar.
                     if (showTrash) {
                         TrashBar(
-                            onBack = { vm.setTrash(false) },
+                            onBack = { vm.setView(FilesView.BROWSE) },
                             onEmptyTrash = { confirmEmptyTrash = true },
                             emptyEnabled = ui.files.isNotEmpty(),
                         )
-                    } else if (trashCount > 0) {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-                            TextButton(onClick = { vm.setTrash(true) }) {
-                                Icon(Icons.Outlined.Delete, null, Modifier.padding(end = 4.dp).size(18.dp))
-                                Text(stringResource(R.string.trash_open, trashCount))
-                            }
-                        }
-                    }
-                    if (!showTrash) {
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.weight(1f)) { SearchField(query = query, onQueryChange = { vm.setQuery(it) }) }
-                            SortMenu(current = sort, onSort = { vm.setSort(it) })
-                        }
                     }
                     PullToRefreshBox(isRefreshing = ui.loading, onRefresh = { vm.refresh() }, modifier = Modifier.weight(1f)) {
                         when {
                             showTrash && ui.files.isEmpty() ->
                                 RefreshableMessage(stringResource(R.string.trash_empty_state))
-                            showTrash -> LazyColumn(Modifier.fillMaxSize()) {
-                                items(ui.files, key = { it.id }) { file ->
-                                    ListItem(
-                                        headlineContent = { Text(file.name) },
-                                        supportingContent = { Text(humanSize(file.size)) },
-                                        leadingContent = { Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null) },
-                                        trailingContent = {
-                                            Row {
+                            showTrash -> LazyColumn(Modifier.fillMaxSize(), contentPadding = de.ledgerline.app.ui.common.ListBottomPadding) {
+                                listSection(ui.files, key = { it.id }) { file ->
+                                    de.ledgerline.app.ui.common.LedgerRow(
+                                        title = file.name,
+                                        subtitle = humanSize(file.size),
+                                        leading = { de.ledgerline.app.ui.common.SoftIconChip(Icons.AutoMirrored.Outlined.InsertDriveFile, tint = fileTint(file.name)) },
+                                        trailing = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
                                                 IconButton(onClick = { vm.restore(file.id) }) {
                                                     Icon(Icons.Outlined.RestoreFromTrash, stringResource(R.string.action_restore))
                                                 }
@@ -249,7 +250,6 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                                 }
                                             }
                                         },
-                                        modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
                             }
@@ -257,8 +257,8 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                 RefreshableMessage(stringResource(R.string.search_no_results))
                             ui.folders.isEmpty() && ui.files.isEmpty() && !ui.canGoBack ->
                                 RefreshableMessage(stringResource(R.string.ws_empty_files))
-                            else -> LazyColumn(Modifier.fillMaxSize()) {
-                                usage?.let { u ->
+                            else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = de.ledgerline.app.ui.common.ListBottomPadding) {
+                                if (view == FilesView.BROWSE) usage?.let { u ->
                                     item {
                                         val usageText = if (u.quota <= 0) {
                                             stringResource(R.string.file_usage_unlimited, humanSize(u.used))
@@ -269,53 +269,95 @@ fun FilesScreen(modifier: Modifier = Modifier, vm: FilesViewModel = hiltViewMode
                                             usageText,
                                             style = MaterialTheme.typography.labelMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                            modifier = Modifier.fillMaxWidth().padding(start = 22.dp, end = 22.dp, top = 12.dp, bottom = 2.dp),
                                         )
                                     }
                                 }
                                 if (ui.canGoBack) item {
-                                    ListItem(
-                                        headlineContent = { Text("..") },
-                                        leadingContent = { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) },
-                                        modifier = Modifier.fillMaxWidth().clickable { vm.back() },
-                                    )
+                                    de.ledgerline.app.ui.common.ListSectionCard {
+                                        de.ledgerline.app.ui.common.LedgerRow(
+                                            title = "..",
+                                            leading = { de.ledgerline.app.ui.common.SoftIconChip(Icons.AutoMirrored.Outlined.ArrowBack, tint = Brand.tintGray) },
+                                            onClick = { vm.back() },
+                                        )
+                                    }
                                 }
-                                items(ui.folders, key = { it.id }) { f ->
-                                    ListItem(
-                                        headlineContent = { Text(f.name) },
-                                        leadingContent = { Icon(Icons.Outlined.Folder, null, tint = MaterialTheme.colorScheme.primary) },
-                                        trailingContent = {
-                                            RowOverflow(
-                                                onRename = { renameFolder = f.id to f.name },
-                                                onDelete = { deleteFolderId = f.id },
-                                                onShare = { vm.openShare(f.id, isFolder = true, f.name, f.share) },
-                                            )
-                                        },
-                                        modifier = Modifier.fillMaxWidth().clickable { vm.open(f.id) },
-                                    )
+                                if (ui.folders.isNotEmpty()) {
+                                    item { de.ledgerline.app.ui.common.SectionLabel(stringResource(R.string.files_section_folders)) }
+                                    listSection(ui.folders, key = { it.id }) { f ->
+                                        de.ledgerline.app.ui.common.LedgerRow(
+                                            title = f.name,
+                                            leading = { de.ledgerline.app.ui.common.SoftIconChip(Icons.Outlined.Folder, tint = Brand.tintBlue) },
+                                            trailing = {
+                                                RowOverflow(
+                                                    onRename = { renameFolder = f.id to f.name },
+                                                    onDelete = { deleteFolderId = f.id },
+                                                    onShare = { vm.openShare(f.id, isFolder = true, f.name, f.share) },
+                                                )
+                                            },
+                                            onClick = { vm.open(f.id) },
+                                        )
+                                    }
                                 }
-                                items(ui.files, key = { it.id }) { file ->
-                                    ListItem(
-                                        headlineContent = { Text(file.name) },
-                                        supportingContent = { Text(humanSize(file.size)) },
-                                        leadingContent = { Icon(Icons.AutoMirrored.Outlined.InsertDriveFile, null) },
-                                        trailingContent = {
-                                            FileRowOverflow(
-                                                file = file,
-                                                onRename = { renameFile = file.id to file.name },
-                                                onDelete = { deleteFileEntry = file },
-                                                onFavorite = { vm.toggleFavorite(file.id) },
-                                                onMove = { moveTarget = file },
-                                                onVersions = { versionsTarget = file },
-                                                onTags = { tagsTarget = file },
-                                                onShare = { vm.openShare(file.id, isFolder = false, file.name, file.share) },
-                                            )
-                                        },
-                                        modifier = Modifier.fillMaxWidth().clickable { vm.openFile(file) },
-                                    )
+                                if (ui.files.isNotEmpty()) {
+                                    if (ui.folders.isNotEmpty() || view == FilesView.BROWSE) {
+                                        item { de.ledgerline.app.ui.common.SectionLabel(stringResource(R.string.files_section_files)) }
+                                    }
+                                    listSection(ui.files, key = { it.id }) { file ->
+                                        de.ledgerline.app.ui.common.LedgerRow(
+                                            title = file.name,
+                                            subtitle = humanSize(file.size),
+                                            leading = { de.ledgerline.app.ui.common.SoftIconChip(Icons.AutoMirrored.Outlined.InsertDriveFile, tint = fileTint(file.name)) },
+                                            trailing = {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    if (file.favorite) Icon(Icons.Outlined.Star, contentDescription = null, tint = Brand.accent, modifier = Modifier.size(18.dp))
+                                                    FileRowOverflow(
+                                                        file = file,
+                                                        onRename = { renameFile = file.id to file.name },
+                                                        onDelete = { deleteFileEntry = file },
+                                                        onFavorite = { vm.toggleFavorite(file.id) },
+                                                        onMove = { moveTarget = file },
+                                                        onVersions = { versionsTarget = file },
+                                                        onTags = { tagsTarget = file },
+                                                        onShare = { vm.openShare(file.id, isFolder = false, file.name, file.share) },
+                                                    )
+                                                }
+                                            },
+                                            onClick = { vm.openFile(file) },
+                                        )
+                                    }
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            if (!ui.loading && !ui.error) {
+                val filesTabs = listOf(
+                    stringResource(R.string.files_tab_browse),
+                    stringResource(R.string.files_tab_recent),
+                    stringResource(R.string.files_tab_favorites),
+                    if (trashCount > 0) stringResource(R.string.files_tab_trash_n, trashCount)
+                    else stringResource(R.string.files_tab_trash),
+                )
+                de.ledgerline.app.ui.workspace.common.FloatingTabBar(
+                    tabs = filesTabs,
+                    selectedIndex = view.ordinal,
+                    onSelect = { vm.setView(FilesView.entries[it]) },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+                if (view != FilesView.TRASH) {
+                    Box(
+                        Modifier.align(Alignment.BottomEnd)
+                            .navigationBarsPadding()
+                            .padding(20.dp)
+                            .padding(bottom = 60.dp),
+                    ) {
+                        FilesFab(
+                            onUpload = { vm.armLockSuppression(); uploadLauncher.launch(arrayOf("*/*")) },
+                            onNewFolder = { showNewFolder = true },
+                        )
                     }
                 }
             }
@@ -529,6 +571,17 @@ private fun FileRowOverflow(
         }
     }
 }
+
+/** Category tint for a file's leading chip, by extension. */
+private fun fileTint(name: String): androidx.compose.ui.graphics.Color =
+    when (name.substringAfterLast('.', "").lowercase()) {
+        "pdf" -> Brand.tintOrange
+        "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "svg" -> Brand.tintViolet
+        "xls", "xlsx", "csv", "numbers" -> Brand.tintGreen
+        "doc", "docx", "txt", "md", "rtf", "pages" -> Brand.tintBlue
+        "mp4", "mov", "mkv", "avi", "webm" -> Brand.tintTeal
+        else -> Brand.tintGray
+    }
 
 /** Compact sort-order menu (name/date/size, asc/desc). */
 @Composable

@@ -40,6 +40,32 @@ class AccountRepository(
         }
     }
 
+    /** Account name + account-wide storage: [usedBytes] = files+gallery, [quotaBytes] = combined limit (null = unlimited). */
+    data class AccountSnapshot(val name: String?, val usedBytes: Long, val quotaBytes: Long?)
+
+    /**
+     * One `/me` fetch yielding both the display name and the **combined** (files + gallery) storage
+     * figures the server started exposing as `usage.quota` (web `7b2ad183`). `quotaBytes` is null
+     * when unlimited. Also honours the remote wipe flag. Null on no session / network error.
+     */
+    suspend fun snapshot(): AccountSnapshot? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val res = apiProvider(session).me()
+            if (!res.isSuccessful) return null
+            val body = res.body() ?: return null
+            if (body.wipe) authEventBus.emitWipe()
+            val u = body.usage
+            AccountSnapshot(
+                name = body.user.name,
+                usedBytes = (u?.files ?: 0L) + (u?.gallery ?: 0L),
+                quotaBytes = u?.quota,
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** The owner's paired devices, current device first. Empty on no session/failure. */
     suspend fun devices(): List<de.ledgerline.app.data.remote.dto.DeviceDto> {
         val session = sessionHolder.get() ?: return emptyList()

@@ -1,0 +1,1195 @@
+{
+  "baseUrl": "https://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/",
+  "regions": [
+    {
+      "id": "world-map",
+      "name": "World base map",
+      "path": "world/world.map"
+    },
+    {
+      "id": "europe",
+      "name": "Europe",
+      "children": [
+        {
+          "id": "eu-albania",
+          "name": "Albania",
+          "code": "AL",
+          "path": "europe/albania.map"
+        },
+        {
+          "id": "eu-andorra",
+          "name": "Andorra",
+          "code": "AD",
+          "path": "europe/andorra.map"
+        },
+        {
+          "id": "eu-austria",
+          "name": "Austria",
+          "code": "AT",
+          "path": "europe/austria.map"
+        },
+        {
+          "id": "eu-belarus",
+          "name": "Belarus",
+          "code": "BY",
+          "path": "europe/belarus.map"
+        },
+        {
+          "id": "eu-belgium",
+          "name": "Belgium",
+          "code": "BE",
+          "path": "europe/belgium.map"
+        },
+        {
+          "id": "eu-bosnia-herzegovina",
+          "name": "Bosnia Herzegovina",
+          "code": "BA",
+          "path": "europe/bosnia-herzegovina.map"
+        },
+        {
+          "id": "eu-bulgaria",
+          "name": "Bulgaria",
+          "code": "BG",
+          "path": "europe/bulgaria.map"
+        },
+        {
+          "id": "eu-croatia",
+          "name": "Croatia",
+          "code": "HR",
+          "path": "europe/croatia.map"
+        },
+        {
+          "id": "eu-cyprus",
+          "name": "Cyprus",
+          "code": "CY",
+          "path": "europe/cyprus.map"
+        },
+        {
+          "id": "eu-czech-republic",
+          "name": "Czech Republic",
+          "code": "CZ",
+          "path": "europe/czech-republic.map"
+        },
+        {
+          "id": "eu-denmark",
+          "name": "Denmark",
+          "code": "DK",
+          "path": "europe/denmark.map"
+        },
+        {
+          "id": "eu-estonia",
+          "name": "Estonia",
+          "code": "EE",
+          "path": "europe/estonia.map"
+        },
+        {
+          "id": "eu-faroe-islands",
+          "name": "Faroe Islands",
+          "code": "FO",
+          "path": "europe/faroe-islands.map"
+        },
+        {
+          "id": "eu-finland",
+          "name": "Finland",
+          "code": "FI",
+          "path": "europe/finland.map"
+        },
+        {
+          "id": "eu-georgia",
+          "name": "Georgia",
+          "code": "GE",
+          "path": "europe/georgia.map"
+        },
+        {
+          "id": "eu-greece",
+          "name": "Greece",
+          "code": "GR",
+          "path": "europe/greece.map"
+        },
+        {
+          "id": "eu-guernsey-jersey",
+          "name": "Guernsey Jersey",
+          "path": "europe/guernsey-jersey.map"
+        },
+        {
+          "id": "eu-hungary",
+          "name": "Hungary",
+          "code": "HU",
+          "path": "europe/hungary.map"
+        },
+        {
+          "id": "eu-iceland",
+          "name": "Iceland",
+          "code": "IS",
+          "path": "europe/iceland.map"
+        },
+        {
+          "id": "eu-ireland-and-northern-ireland",
+          "name": "Ireland And Northern Ireland",
+          "code": "IE",
+          "path": "europe/ireland-and-northern-ireland.map"
+        },
+        {
+          "id": "eu-isle-of-man",
+          "name": "Isle Of Man",
+          "path": "europe/isle-of-man.map"
+        },
+        {
+          "id": "eu-kosovo",
+          "name": "Kosovo",
+          "code": "XK",
+          "path": "europe/kosovo.map"
+        },
+        {
+          "id": "eu-latvia",
+          "name": "Latvia",
+          "code": "LV",
+          "path": "europe/latvia.map"
+        },
+        {
+          "id": "eu-liechtenstein",
+          "name": "Liechtenstein",
+          "code": "LI",
+          "path": "europe/liechtenstein.map"
+        },
+        {
+          "id": "eu-lithuania",
+          "name": "Lithuania",
+          "code": "LT",
+          "path": "europe/lithuania.map"
+        },
+        {
+          "id": "eu-luxembourg",
+          "name": "Luxembourg",
+          "code": "LU",
+          "path": "europe/luxembourg.map"
+        },
+        {
+          "id": "eu-macedonia",
+          "name": "Macedonia",
+          "code": "MK",
+          "path": "europe/macedonia.map"
+        },
+        {
+          "id": "eu-malta",
+          "name": "Malta",
+          "code": "MT",
+          "path": "europe/malta.map"
+        },
+        {
+          "id": "eu-moldova",
+          "name": "Moldova",
+          "code": "MD",
+          "path": "europe/moldova.map"
+        },
+        {
+          "id": "eu-monaco",
+          "name": "Monaco",
+          "code": "MC",
+          "path": "europe/monaco.map"
+        },
+        {
+          "id": "eu-montenegro",
+          "name": "Montenegro",
+          "code": "ME",
+          "path": "europe/montenegro.map"
+        },
+        {
+          "id": "eu-norway",
+          "name": "Norway",
+          "code": "NO",
+          "path": "europe/norway.map"
+        },
+        {
+          "id": "eu-poland",
+          "name": "Poland",
+          "code": "PL",
+          "path": "europe/poland.map"
+        },
+        {
+          "id": "eu-portugal",
+          "name": "Portugal",
+          "code": "PT",
+          "path": "europe/portugal.map"
+        },
+        {
+          "id": "eu-romania",
+          "name": "Romania",
+          "code": "RO",
+          "path": "europe/romania.map"
+        },
+        {
+          "id": "eu-serbia",
+          "name": "Serbia",
+          "code": "RS",
+          "path": "europe/serbia.map"
+        },
+        {
+          "id": "eu-slovakia",
+          "name": "Slovakia",
+          "code": "SK",
+          "path": "europe/slovakia.map"
+        },
+        {
+          "id": "eu-slovenia",
+          "name": "Slovenia",
+          "code": "SI",
+          "path": "europe/slovenia.map"
+        },
+        {
+          "id": "eu-sweden",
+          "name": "Sweden",
+          "code": "SE",
+          "path": "europe/sweden.map"
+        },
+        {
+          "id": "eu-switzerland",
+          "name": "Switzerland",
+          "code": "CH",
+          "path": "europe/switzerland.map"
+        },
+        {
+          "id": "eu-turkey",
+          "name": "Turkey",
+          "code": "TR",
+          "path": "europe/turkey.map"
+        },
+        {
+          "id": "eu-ukraine",
+          "name": "Ukraine",
+          "code": "UA",
+          "path": "europe/ukraine.map"
+        },
+        {
+          "id": "eu-azores",
+          "name": "Azores",
+          "path": "europe/azores.map"
+        },
+        {
+          "id": "eu-germany",
+          "name": "Germany",
+          "code": "DE",
+          "children": [
+            {
+              "id": "eu-germany-whole",
+              "name": "Germany (whole)",
+              "path": "europe/germany.map"
+            },
+            {
+              "id": "de-baden-wuerttemberg",
+              "name": "Baden Wuerttemberg",
+              "path": "europe/germany/baden-wuerttemberg.map"
+            },
+            {
+              "id": "de-bayern",
+              "name": "Bayern",
+              "path": "europe/germany/bayern.map"
+            },
+            {
+              "id": "de-berlin",
+              "name": "Berlin",
+              "path": "europe/germany/berlin.map"
+            },
+            {
+              "id": "de-brandenburg",
+              "name": "Brandenburg",
+              "path": "europe/germany/brandenburg.map"
+            },
+            {
+              "id": "de-bremen",
+              "name": "Bremen",
+              "path": "europe/germany/bremen.map"
+            },
+            {
+              "id": "de-hamburg",
+              "name": "Hamburg",
+              "path": "europe/germany/hamburg.map"
+            },
+            {
+              "id": "de-hessen",
+              "name": "Hessen",
+              "path": "europe/germany/hessen.map"
+            },
+            {
+              "id": "de-mecklenburg-vorpommern",
+              "name": "Mecklenburg Vorpommern",
+              "path": "europe/germany/mecklenburg-vorpommern.map"
+            },
+            {
+              "id": "de-niedersachsen",
+              "name": "Niedersachsen",
+              "path": "europe/germany/niedersachsen.map"
+            },
+            {
+              "id": "de-nordrhein-westfalen",
+              "name": "Nordrhein Westfalen",
+              "path": "europe/germany/nordrhein-westfalen.map"
+            },
+            {
+              "id": "de-rheinland-pfalz",
+              "name": "Rheinland Pfalz",
+              "path": "europe/germany/rheinland-pfalz.map"
+            },
+            {
+              "id": "de-saarland",
+              "name": "Saarland",
+              "path": "europe/germany/saarland.map"
+            },
+            {
+              "id": "de-sachsen",
+              "name": "Sachsen",
+              "path": "europe/germany/sachsen.map"
+            },
+            {
+              "id": "de-sachsen-anhalt",
+              "name": "Sachsen Anhalt",
+              "path": "europe/germany/sachsen-anhalt.map"
+            },
+            {
+              "id": "de-schleswig-holstein",
+              "name": "Schleswig Holstein",
+              "path": "europe/germany/schleswig-holstein.map"
+            },
+            {
+              "id": "de-thueringen",
+              "name": "Thueringen",
+              "path": "europe/germany/thueringen.map"
+            }
+          ]
+        },
+        {
+          "id": "eu-france",
+          "name": "France",
+          "code": "FR",
+          "children": [
+            {
+              "id": "eu-france-whole",
+              "name": "France (whole)",
+              "path": "europe/france.map"
+            },
+            {
+              "id": "fr-alsace",
+              "name": "Alsace",
+              "path": "europe/france/alsace.map"
+            },
+            {
+              "id": "fr-aquitaine",
+              "name": "Aquitaine",
+              "path": "europe/france/aquitaine.map"
+            },
+            {
+              "id": "fr-auvergne",
+              "name": "Auvergne",
+              "path": "europe/france/auvergne.map"
+            },
+            {
+              "id": "fr-basse-normandie",
+              "name": "Basse Normandie",
+              "path": "europe/france/basse-normandie.map"
+            },
+            {
+              "id": "fr-bourgogne",
+              "name": "Bourgogne",
+              "path": "europe/france/bourgogne.map"
+            },
+            {
+              "id": "fr-bretagne",
+              "name": "Bretagne",
+              "path": "europe/france/bretagne.map"
+            },
+            {
+              "id": "fr-centre",
+              "name": "Centre",
+              "path": "europe/france/centre.map"
+            },
+            {
+              "id": "fr-champagne-ardenne",
+              "name": "Champagne Ardenne",
+              "path": "europe/france/champagne-ardenne.map"
+            },
+            {
+              "id": "fr-corse",
+              "name": "Corse",
+              "path": "europe/france/corse.map"
+            },
+            {
+              "id": "fr-franche-comte",
+              "name": "Franche Comte",
+              "path": "europe/france/franche-comte.map"
+            },
+            {
+              "id": "fr-guadeloupe",
+              "name": "Guadeloupe",
+              "path": "europe/france/guadeloupe.map"
+            },
+            {
+              "id": "fr-guyane",
+              "name": "Guyane",
+              "path": "europe/france/guyane.map"
+            },
+            {
+              "id": "fr-haute-normandie",
+              "name": "Haute Normandie",
+              "path": "europe/france/haute-normandie.map"
+            },
+            {
+              "id": "fr-ile-de-france",
+              "name": "Ile De France",
+              "path": "europe/france/ile-de-france.map"
+            },
+            {
+              "id": "fr-languedoc-roussillon",
+              "name": "Languedoc Roussillon",
+              "path": "europe/france/languedoc-roussillon.map"
+            },
+            {
+              "id": "fr-limousin",
+              "name": "Limousin",
+              "path": "europe/france/limousin.map"
+            },
+            {
+              "id": "fr-lorraine",
+              "name": "Lorraine",
+              "path": "europe/france/lorraine.map"
+            },
+            {
+              "id": "fr-martinique",
+              "name": "Martinique",
+              "path": "europe/france/martinique.map"
+            },
+            {
+              "id": "fr-mayotte",
+              "name": "Mayotte",
+              "path": "europe/france/mayotte.map"
+            },
+            {
+              "id": "fr-midi-pyrenees",
+              "name": "Midi Pyrenees",
+              "path": "europe/france/midi-pyrenees.map"
+            },
+            {
+              "id": "fr-nord-pas-de-calais",
+              "name": "Nord Pas De Calais",
+              "path": "europe/france/nord-pas-de-calais.map"
+            },
+            {
+              "id": "fr-pays-de-la-loire",
+              "name": "Pays De La Loire",
+              "path": "europe/france/pays-de-la-loire.map"
+            },
+            {
+              "id": "fr-picardie",
+              "name": "Picardie",
+              "path": "europe/france/picardie.map"
+            },
+            {
+              "id": "fr-poitou-charentes",
+              "name": "Poitou Charentes",
+              "path": "europe/france/poitou-charentes.map"
+            },
+            {
+              "id": "fr-provence-alpes-cote-d-azur",
+              "name": "Provence Alpes Cote D Azur",
+              "path": "europe/france/provence-alpes-cote-d-azur.map"
+            },
+            {
+              "id": "fr-reunion",
+              "name": "Reunion",
+              "path": "europe/france/reunion.map"
+            },
+            {
+              "id": "fr-rhone-alpes",
+              "name": "Rhone Alpes",
+              "path": "europe/france/rhone-alpes.map"
+            }
+          ]
+        },
+        {
+          "id": "eu-uk",
+          "name": "United Kingdom",
+          "code": "GB",
+          "children": [
+            {
+              "id": "eu-uk-whole",
+              "name": "United Kingdom (whole)",
+              "path": "europe/great-britain.map"
+            },
+            {
+              "id": "uk-england",
+              "name": "England",
+              "path": "europe/united-kingdom/england.map"
+            },
+            {
+              "id": "uk-scotland",
+              "name": "Scotland",
+              "path": "europe/united-kingdom/scotland.map"
+            },
+            {
+              "id": "uk-wales",
+              "name": "Wales",
+              "path": "europe/united-kingdom/wales.map"
+            }
+          ]
+        },
+        {
+          "id": "eu-italy",
+          "name": "Italy",
+          "code": "IT",
+          "children": [
+            {
+              "id": "eu-italy-whole",
+              "name": "Italy (whole)",
+              "path": "europe/italy.map"
+            },
+            {
+              "id": "it-centro",
+              "name": "Centro",
+              "path": "europe/italy/centro.map"
+            },
+            {
+              "id": "it-isole",
+              "name": "Isole",
+              "path": "europe/italy/isole.map"
+            },
+            {
+              "id": "it-nord-est",
+              "name": "Nord Est",
+              "path": "europe/italy/nord-est.map"
+            },
+            {
+              "id": "it-nord-ovest",
+              "name": "Nord Ovest",
+              "path": "europe/italy/nord-ovest.map"
+            },
+            {
+              "id": "it-sud",
+              "name": "Sud",
+              "path": "europe/italy/sud.map"
+            }
+          ]
+        },
+        {
+          "id": "eu-spain",
+          "name": "Spain",
+          "code": "ES",
+          "children": [
+            {
+              "id": "eu-spain-whole",
+              "name": "Spain (whole)",
+              "path": "europe/spain.map"
+            },
+            {
+              "id": "es-andalucia",
+              "name": "Andalucia",
+              "path": "europe/spain/andalucia.map"
+            },
+            {
+              "id": "es-aragon",
+              "name": "Aragon",
+              "path": "europe/spain/aragon.map"
+            },
+            {
+              "id": "es-asturias",
+              "name": "Asturias",
+              "path": "europe/spain/asturias.map"
+            },
+            {
+              "id": "es-cantabria",
+              "name": "Cantabria",
+              "path": "europe/spain/cantabria.map"
+            },
+            {
+              "id": "es-castilla-la-mancha",
+              "name": "Castilla La Mancha",
+              "path": "europe/spain/castilla-la-mancha.map"
+            },
+            {
+              "id": "es-castilla-y-leon",
+              "name": "Castilla Y Leon",
+              "path": "europe/spain/castilla-y-leon.map"
+            },
+            {
+              "id": "es-cataluna",
+              "name": "Cataluna",
+              "path": "europe/spain/cataluna.map"
+            },
+            {
+              "id": "es-ceuta",
+              "name": "Ceuta",
+              "path": "europe/spain/ceuta.map"
+            },
+            {
+              "id": "es-extremadura",
+              "name": "Extremadura",
+              "path": "europe/spain/extremadura.map"
+            },
+            {
+              "id": "es-galicia",
+              "name": "Galicia",
+              "path": "europe/spain/galicia.map"
+            },
+            {
+              "id": "es-islas-baleares",
+              "name": "Islas Baleares",
+              "path": "europe/spain/islas-baleares.map"
+            },
+            {
+              "id": "es-la-rioja",
+              "name": "La Rioja",
+              "path": "europe/spain/la-rioja.map"
+            },
+            {
+              "id": "es-madrid",
+              "name": "Madrid",
+              "path": "europe/spain/madrid.map"
+            },
+            {
+              "id": "es-melilla",
+              "name": "Melilla",
+              "path": "europe/spain/melilla.map"
+            },
+            {
+              "id": "es-murcia",
+              "name": "Murcia",
+              "path": "europe/spain/murcia.map"
+            },
+            {
+              "id": "es-navarra",
+              "name": "Navarra",
+              "path": "europe/spain/navarra.map"
+            },
+            {
+              "id": "es-pais-vasco",
+              "name": "Pais Vasco",
+              "path": "europe/spain/pais-vasco.map"
+            },
+            {
+              "id": "es-valencia",
+              "name": "Valencia",
+              "path": "europe/spain/valencia.map"
+            }
+          ]
+        },
+        {
+          "id": "eu-netherlands",
+          "name": "Netherlands",
+          "code": "NL",
+          "path": "europe/netherlands.map"
+        }
+      ]
+    },
+    {
+      "id": "north-america",
+      "name": "North America",
+      "children": [
+        {
+          "id": "na-usa",
+          "name": "United States",
+          "code": "US",
+          "children": [
+            {
+              "id": "na-us-midwest",
+              "name": "Midwest (region)",
+              "path": "north-america/us-midwest.map"
+            },
+            {
+              "id": "na-us-northeast",
+              "name": "Northeast (region)",
+              "path": "north-america/us-northeast.map"
+            },
+            {
+              "id": "na-us-south",
+              "name": "South (region)",
+              "path": "north-america/us-south.map"
+            },
+            {
+              "id": "na-us-west",
+              "name": "West (region)",
+              "path": "north-america/us-west.map"
+            },
+            {
+              "id": "us-alabama",
+              "name": "Alabama",
+              "path": "north-america/us/alabama.map"
+            },
+            {
+              "id": "us-alaska-1",
+              "name": "Alaska 1",
+              "path": "north-america/us/alaska-1.map"
+            },
+            {
+              "id": "us-alaska-2",
+              "name": "Alaska 2",
+              "path": "north-america/us/alaska-2.map"
+            },
+            {
+              "id": "us-arizona",
+              "name": "Arizona",
+              "path": "north-america/us/arizona.map"
+            },
+            {
+              "id": "us-arkansas",
+              "name": "Arkansas",
+              "path": "north-america/us/arkansas.map"
+            },
+            {
+              "id": "us-california",
+              "name": "California",
+              "path": "north-america/us/california.map"
+            },
+            {
+              "id": "us-colorado",
+              "name": "Colorado",
+              "path": "north-america/us/colorado.map"
+            },
+            {
+              "id": "us-connecticut",
+              "name": "Connecticut",
+              "path": "north-america/us/connecticut.map"
+            },
+            {
+              "id": "us-delaware",
+              "name": "Delaware",
+              "path": "north-america/us/delaware.map"
+            },
+            {
+              "id": "us-district-of-columbia",
+              "name": "District Of Columbia",
+              "path": "north-america/us/district-of-columbia.map"
+            },
+            {
+              "id": "us-florida",
+              "name": "Florida",
+              "path": "north-america/us/florida.map"
+            },
+            {
+              "id": "us-georgia",
+              "name": "Georgia",
+              "code": "GE",
+              "path": "north-america/us/georgia.map"
+            },
+            {
+              "id": "us-hawaii",
+              "name": "Hawaii",
+              "path": "north-america/us/hawaii.map"
+            },
+            {
+              "id": "us-idaho",
+              "name": "Idaho",
+              "path": "north-america/us/idaho.map"
+            },
+            {
+              "id": "us-illinois",
+              "name": "Illinois",
+              "path": "north-america/us/illinois.map"
+            },
+            {
+              "id": "us-indiana",
+              "name": "Indiana",
+              "path": "north-america/us/indiana.map"
+            },
+            {
+              "id": "us-iowa",
+              "name": "Iowa",
+              "path": "north-america/us/iowa.map"
+            },
+            {
+              "id": "us-kansas",
+              "name": "Kansas",
+              "path": "north-america/us/kansas.map"
+            },
+            {
+              "id": "us-kentucky",
+              "name": "Kentucky",
+              "path": "north-america/us/kentucky.map"
+            },
+            {
+              "id": "us-louisiana",
+              "name": "Louisiana",
+              "path": "north-america/us/louisiana.map"
+            },
+            {
+              "id": "us-maine",
+              "name": "Maine",
+              "path": "north-america/us/maine.map"
+            },
+            {
+              "id": "us-maryland",
+              "name": "Maryland",
+              "path": "north-america/us/maryland.map"
+            },
+            {
+              "id": "us-massachusetts",
+              "name": "Massachusetts",
+              "path": "north-america/us/massachusetts.map"
+            },
+            {
+              "id": "us-michigan",
+              "name": "Michigan",
+              "path": "north-america/us/michigan.map"
+            },
+            {
+              "id": "us-minnesota",
+              "name": "Minnesota",
+              "path": "north-america/us/minnesota.map"
+            },
+            {
+              "id": "us-mississippi",
+              "name": "Mississippi",
+              "path": "north-america/us/mississippi.map"
+            },
+            {
+              "id": "us-missouri",
+              "name": "Missouri",
+              "path": "north-america/us/missouri.map"
+            },
+            {
+              "id": "us-montana",
+              "name": "Montana",
+              "path": "north-america/us/montana.map"
+            },
+            {
+              "id": "us-nebraska",
+              "name": "Nebraska",
+              "path": "north-america/us/nebraska.map"
+            },
+            {
+              "id": "us-nevada",
+              "name": "Nevada",
+              "path": "north-america/us/nevada.map"
+            },
+            {
+              "id": "us-new-hampshire",
+              "name": "New Hampshire",
+              "path": "north-america/us/new-hampshire.map"
+            },
+            {
+              "id": "us-new-jersey",
+              "name": "New Jersey",
+              "path": "north-america/us/new-jersey.map"
+            },
+            {
+              "id": "us-new-mexico",
+              "name": "New Mexico",
+              "path": "north-america/us/new-mexico.map"
+            },
+            {
+              "id": "us-new-york",
+              "name": "New York",
+              "path": "north-america/us/new-york.map"
+            },
+            {
+              "id": "us-north-carolina",
+              "name": "North Carolina",
+              "path": "north-america/us/north-carolina.map"
+            },
+            {
+              "id": "us-north-dakota",
+              "name": "North Dakota",
+              "path": "north-america/us/north-dakota.map"
+            },
+            {
+              "id": "us-ohio",
+              "name": "Ohio",
+              "path": "north-america/us/ohio.map"
+            },
+            {
+              "id": "us-oklahoma",
+              "name": "Oklahoma",
+              "path": "north-america/us/oklahoma.map"
+            },
+            {
+              "id": "us-oregon",
+              "name": "Oregon",
+              "path": "north-america/us/oregon.map"
+            },
+            {
+              "id": "us-pennsylvania",
+              "name": "Pennsylvania",
+              "path": "north-america/us/pennsylvania.map"
+            },
+            {
+              "id": "us-puerto-rico",
+              "name": "Puerto Rico",
+              "path": "north-america/us/puerto-rico.map"
+            },
+            {
+              "id": "us-rhode-island",
+              "name": "Rhode Island",
+              "path": "north-america/us/rhode-island.map"
+            },
+            {
+              "id": "us-south-carolina",
+              "name": "South Carolina",
+              "path": "north-america/us/south-carolina.map"
+            },
+            {
+              "id": "us-south-dakota",
+              "name": "South Dakota",
+              "path": "north-america/us/south-dakota.map"
+            },
+            {
+              "id": "us-tennessee",
+              "name": "Tennessee",
+              "path": "north-america/us/tennessee.map"
+            },
+            {
+              "id": "us-texas",
+              "name": "Texas",
+              "path": "north-america/us/texas.map"
+            },
+            {
+              "id": "us-us-virgin-islands",
+              "name": "Us Virgin Islands",
+              "path": "north-america/us/us-virgin-islands.map"
+            },
+            {
+              "id": "us-utah",
+              "name": "Utah",
+              "path": "north-america/us/utah.map"
+            },
+            {
+              "id": "us-vermont",
+              "name": "Vermont",
+              "path": "north-america/us/vermont.map"
+            },
+            {
+              "id": "us-virginia",
+              "name": "Virginia",
+              "path": "north-america/us/virginia.map"
+            },
+            {
+              "id": "us-washington",
+              "name": "Washington",
+              "path": "north-america/us/washington.map"
+            },
+            {
+              "id": "us-west-virginia",
+              "name": "West Virginia",
+              "path": "north-america/us/west-virginia.map"
+            },
+            {
+              "id": "us-wisconsin",
+              "name": "Wisconsin",
+              "path": "north-america/us/wisconsin.map"
+            },
+            {
+              "id": "us-wyoming",
+              "name": "Wyoming",
+              "path": "north-america/us/wyoming.map"
+            }
+          ]
+        },
+        {
+          "id": "na-canada",
+          "name": "Canada",
+          "code": "CA",
+          "children": [
+            {
+              "id": "na-canada-whole",
+              "name": "Canada (whole)",
+              "path": "north-america/canada.map"
+            },
+            {
+              "id": "ca-alberta",
+              "name": "Alberta",
+              "path": "north-america/canada/alberta.map"
+            },
+            {
+              "id": "ca-british-columbia",
+              "name": "British Columbia",
+              "path": "north-america/canada/british-columbia.map"
+            },
+            {
+              "id": "ca-manitoba",
+              "name": "Manitoba",
+              "path": "north-america/canada/manitoba.map"
+            },
+            {
+              "id": "ca-new-brunswick",
+              "name": "New Brunswick",
+              "path": "north-america/canada/new-brunswick.map"
+            },
+            {
+              "id": "ca-newfoundland-and-labrador",
+              "name": "Newfoundland And Labrador",
+              "path": "north-america/canada/newfoundland-and-labrador.map"
+            },
+            {
+              "id": "ca-northwest-territories",
+              "name": "Northwest Territories",
+              "path": "north-america/canada/northwest-territories.map"
+            },
+            {
+              "id": "ca-nova-scotia",
+              "name": "Nova Scotia",
+              "path": "north-america/canada/nova-scotia.map"
+            },
+            {
+              "id": "ca-nunavut",
+              "name": "Nunavut",
+              "path": "north-america/canada/nunavut.map"
+            },
+            {
+              "id": "ca-ontario",
+              "name": "Ontario",
+              "path": "north-america/canada/ontario.map"
+            },
+            {
+              "id": "ca-prince-edward-island",
+              "name": "Prince Edward Island",
+              "path": "north-america/canada/prince-edward-island.map"
+            },
+            {
+              "id": "ca-quebec",
+              "name": "Quebec",
+              "path": "north-america/canada/quebec.map"
+            },
+            {
+              "id": "ca-saskatchewan",
+              "name": "Saskatchewan",
+              "path": "north-america/canada/saskatchewan.map"
+            },
+            {
+              "id": "ca-yukon",
+              "name": "Yukon",
+              "path": "north-america/canada/yukon.map"
+            }
+          ]
+        },
+        {
+          "id": "na-mexico",
+          "name": "Mexico",
+          "code": "MX",
+          "path": "north-america/mexico.map"
+        },
+        {
+          "id": "na-greenland",
+          "name": "Greenland",
+          "code": "GL",
+          "path": "north-america/greenland.map"
+        }
+      ]
+    },
+    {
+      "id": "asia",
+      "name": "Asia",
+      "children": [
+        {
+          "id": "as-japan",
+          "name": "Japan",
+          "code": "JP",
+          "path": "asia/japan.map"
+        },
+        {
+          "id": "as-india",
+          "name": "India",
+          "code": "IN",
+          "path": "asia/india.map"
+        },
+        {
+          "id": "as-china",
+          "name": "China",
+          "code": "CN",
+          "path": "asia/china.map"
+        },
+        {
+          "id": "as-turkey",
+          "name": "Turkey",
+          "code": "TR",
+          "path": "asia/turkey.map"
+        },
+        {
+          "id": "as-south-korea",
+          "name": "South Korea",
+          "code": "KR",
+          "path": "asia/south-korea.map"
+        },
+        {
+          "id": "as-thailand",
+          "name": "Thailand",
+          "code": "TH",
+          "path": "asia/thailand.map"
+        }
+      ]
+    },
+    {
+      "id": "south-america",
+      "name": "South America",
+      "children": [
+        {
+          "id": "sa-brazil",
+          "name": "Brazil",
+          "code": "BR",
+          "path": "south-america/brazil.map"
+        },
+        {
+          "id": "sa-argentina",
+          "name": "Argentina",
+          "code": "AR",
+          "path": "south-america/argentina.map"
+        },
+        {
+          "id": "sa-chile",
+          "name": "Chile",
+          "code": "CL",
+          "path": "south-america/chile.map"
+        },
+        {
+          "id": "sa-colombia",
+          "name": "Colombia",
+          "code": "CO",
+          "path": "south-america/colombia.map"
+        }
+      ]
+    },
+    {
+      "id": "africa",
+      "name": "Africa",
+      "children": [
+        {
+          "id": "af-south-africa",
+          "name": "South Africa",
+          "code": "ZA",
+          "path": "africa/south-africa.map"
+        },
+        {
+          "id": "af-egypt",
+          "name": "Egypt",
+          "code": "EG",
+          "path": "africa/egypt.map"
+        },
+        {
+          "id": "af-morocco",
+          "name": "Morocco",
+          "code": "MA",
+          "path": "africa/morocco.map"
+        },
+        {
+          "id": "af-kenya",
+          "name": "Kenya",
+          "code": "KE",
+          "path": "africa/kenya.map"
+        }
+      ]
+    },
+    {
+      "id": "australia-oceania",
+      "name": "Australia & Oceania",
+      "children": [
+        {
+          "id": "au-australia",
+          "name": "Australia",
+          "code": "AU",
+          "path": "australia-oceania/australia.map"
+        },
+        {
+          "id": "au-new-zealand",
+          "name": "New Zealand",
+          "code": "NZ",
+          "path": "australia-oceania/new-zealand.map"
+        }
+      ]
+    }
+  ]
+}

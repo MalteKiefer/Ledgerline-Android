@@ -27,15 +27,19 @@ class OfflineStoreLoadTest {
 
     // ---- Workspace ------------------------------------------------------------
 
-    // Store v3: the repo fans out to per-module stores. This fake serves the `notes`
-    // module its [body]; other modules are empty (null ciphertext, v0). When [fail]
-    // is set every module GET throws (offline).
+    // Store v3: the repo fans out to per-module stores. This fake serves the `todos`
+    // module its [body] (notes graduated to the sharded /notes/store, so this exercises a
+    // still-monolith module); other modules are empty (null ciphertext, v0). When [fail]
+    // is set every module GET throws (offline); notesStore also throws so the notes slice
+    // has nothing to serve online either.
     private class WorkspaceApi(val body: StoreResponse?, val fail: Boolean) : NotImplementedApi() {
         override suspend fun moduleStore(module: String): Response<StoreResponse> = when {
             fail -> throw java.io.IOException("offline")
-            module == "notes" -> Response.success(body!!)
+            module == "todos" -> Response.success(body!!)
             else -> Response.success(StoreResponse(null, 0))
         }
+        override suspend fun notesStore(): Response<StoreResponse> =
+            if (fail) throw java.io.IOException("offline") else Response.success(StoreResponse(null, 0))
     }
 
     @Test fun workspace_online_writes_cache_then_offline_reads_it() = runBlocking {
@@ -43,19 +47,19 @@ class OfflineStoreLoadTest {
         val vh = VaultKeyHolder().apply { set(vk) }
         val storeCache = tmpStoreCache()
 
-        val notesJson = """{"v":3,"notes":[{"id":"n1","title":"Docs"}]}"""
-        val onlineApi = WorkspaceApi(StoreResponse("SEALED:$notesJson", 7), fail = false)
+        val todosJson = """{"v":3,"todos":[{"id":"n1","title":"Docs"}]}"""
+        val onlineApi = WorkspaceApi(StoreResponse("SEALED:$todosJson", 7), fail = false)
         val online = WorkspaceRepository(
             sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { onlineApi },
         )
 
         val first = online.load()
         assertTrue(first is Outcome.Ok)
-        // The notes module envelope is persisted with its server version + ciphertext.
-        val env = storeCache.get("workspace_notes")
+        // The todos module envelope is persisted with its server version + ciphertext.
+        val env = storeCache.get("workspace_todos")
         assertNotNull(env)
         assertEquals(7, env!!.version)
-        assertEquals("SEALED:$notesJson", env.ciphertext)
+        assertEquals("SEALED:$todosJson", env.ciphertext)
 
         // New repo instance sharing the SAME cache, but the network now fails: every
         // module (incl. the empty ones cached above) is served from disk.
@@ -66,7 +70,7 @@ class OfflineStoreLoadTest {
         val second = offline.load()
         assertTrue(second is Outcome.Ok)
         val ws = (second as Outcome.Ok).value
-        assertEquals(listOf("Docs"), ws.manifest.notes.map { it.title })
+        assertEquals(listOf("Docs"), ws.manifest.todos.map { it.title })
     }
 
     @Test fun workspace_offline_without_cache_returns_network_error() = runBlocking {

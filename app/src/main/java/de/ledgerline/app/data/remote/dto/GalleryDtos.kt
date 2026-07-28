@@ -34,6 +34,19 @@ data class ReverseResponse(
     val address: Map<String, String> = emptyMap(),
 )
 
+/**
+ * `GET /maps/route` response: snapped path geometry as `[[lat,lng],…]` (null on fallback),
+ * plus distance/duration and, when the engine supports it (GraphHopper), ascent/descent.
+ */
+@Serializable
+data class MapsRouteResponse(
+    val geometry: List<List<Double>>? = null,
+    val distanceM: Double? = null,
+    val durationS: Double? = null,
+    val ascentM: Double? = null,
+    val descentM: Double? = null,
+)
+
 /** `POST /gallery/embed-text` request: the free-text query to embed. */
 @Serializable
 data class EmbedTextRequest(val q: String)

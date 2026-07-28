@@ -146,6 +146,15 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     fun setDynamicColor(on: Boolean) { viewModelScope.launch { settingsStore.setDynamicColor(on) } }
 
+    /** Measurement units + coordinate format for the Explore/Karte/Tracker feature. */
+    val unitSystem: StateFlow<de.ledgerline.app.core.units.UnitSystem> = settingsStore.unitSystem
+        .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.core.units.UnitSystem.METRIC)
+    fun setUnitSystem(u: de.ledgerline.app.core.units.UnitSystem) { viewModelScope.launch { settingsStore.setUnitSystem(u) } }
+
+    val coordinateFormat: StateFlow<de.ledgerline.app.core.geo.CoordinateFormat> = settingsStore.coordinateFormat
+        .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.core.geo.CoordinateFormat.DD)
+    fun setCoordinateFormat(f: de.ledgerline.app.core.geo.CoordinateFormat) { viewModelScope.launch { settingsStore.setCoordinateFormat(f) } }
+
     /** Automatic background-refresh cadence in seconds (0 = off). Drives the BackgroundSync loop. */
     val backgroundRefreshSeconds: StateFlow<Int> = settingsStore.backgroundRefreshSeconds
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_BACKGROUND_REFRESH_SECONDS)
@@ -177,6 +186,10 @@ class SettingsViewModel @Inject constructor(
     /** Whether map tiles may be fetched from OpenStreetMap (privacy; default off). */
     val mapTilesEnabled: StateFlow<Boolean> = settingsStore.mapTilesEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val terrainEnabled: StateFlow<Boolean> = settingsStore.terrainEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setTerrainEnabled(on: Boolean) { viewModelScope.launch { settingsStore.setTerrainEnabled(on) } }
 
     fun setMapTilesEnabled(enabled: Boolean) {
         viewModelScope.launch { settingsStore.setMapTilesEnabled(enabled) }

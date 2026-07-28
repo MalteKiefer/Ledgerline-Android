@@ -124,7 +124,9 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun vaultKeys(): Response<de.ledgerline.app.data.remote.dto.VaultKeysResponse> = throw NotImplementedError()
     override suspend fun putVaultKeys(body: de.ledgerline.app.data.remote.dto.PublishKeysRequest): Response<Unit> = throw NotImplementedError()
     override suspend fun store(): Response<StoreResponse> = throw NotImplementedError()
-    override suspend fun moduleStore(module: String): Response<StoreResponse> = throw NotImplementedError()
+    // Empty by default (mirrors filesStore/notesStore) so a fake that doesn't exercise a module —
+    // including the notes monolith the one-time migration probes — loads it as empty, not a throw.
+    override suspend fun moduleStore(module: String): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
     override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun deleteSession(): Response<Unit> = throw NotImplementedError()
     override suspend fun rawFile(blob: String): Response<ResponseBody> = throw NotImplementedError()
@@ -166,6 +168,18 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun contactsRaw(blob: String): Response<ResponseBody> = throw NotImplementedError()
     override suspend fun deleteContactBlob(blob: String): Response<Unit> = throw NotImplementedError()
     override suspend fun galleryReverse(lat: Double, lng: Double): Response<de.ledgerline.app.data.remote.dto.ReverseResponse> = throw NotImplementedError()
+    override suspend fun mapsRoute(points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse> = throw NotImplementedError()
+    // Default to an empty sharded notes store so WorkspaceRepository.load()'s notes slice
+    // resolves to an empty list in fakes that don't exercise notes. Override where needed.
+    override suspend fun notesStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
+    override suspend fun notesStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
+    override suspend fun rawNote(blob: String): Response<ResponseBody> = throw NotImplementedError()
+    override suspend fun uploadNote(file: okhttp3.MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
+    // Likewise an empty sharded passwords store for PasswordsRepository fakes that don't exercise it.
+    override suspend fun passwordsStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
+    override suspend fun passwordsStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
+    override suspend fun rawPassword(blob: String): Response<ResponseBody> = throw NotImplementedError()
+    override suspend fun uploadPassword(file: okhttp3.MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
 }
 
 /**

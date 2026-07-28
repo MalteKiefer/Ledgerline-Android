@@ -7,7 +7,6 @@ import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.PasswordsCache
 import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.data.AccountRepository
-import de.ledgerline.app.domain.usecase.FilesUsage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -29,7 +28,6 @@ class HomeViewModel @Inject constructor(
     workspaceCache: WorkspaceCache,
     galleryCache: GalleryCache,
     passwordsCache: PasswordsCache,
-    private val filesUsage: FilesUsage,
     private val account: AccountRepository,
 ) : ViewModel() {
 
@@ -60,7 +58,11 @@ class HomeViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, Counts())
 
-    /** (used, quota) bytes, or null while loading / on failure. */
+    /**
+     * Account-wide storage (used, quota) bytes, or null while loading / on failure. `used` =
+     * files + gallery; `quota` = the server's combined limit (0 when unlimited → the ring shows
+     * "—"). From `/me` `usage`, so it covers the whole account pool, not just files.
+     */
     private val _usage = MutableStateFlow<Pair<Long, Long>?>(null)
     val usage: StateFlow<Pair<Long, Long>?> = _usage.asStateFlow()
 
@@ -68,7 +70,11 @@ class HomeViewModel @Inject constructor(
     val userName: StateFlow<String?> = _userName.asStateFlow()
 
     fun refresh() {
-        viewModelScope.launch { _usage.value = withContext(Dispatchers.IO) { filesUsage.invoke() } }
-        viewModelScope.launch { _userName.value = account.me()?.name }
+        // One /me fetch yields both the name and the combined storage figures.
+        viewModelScope.launch {
+            val snap = withContext(Dispatchers.IO) { account.snapshot() } ?: return@launch
+            _userName.value = snap.name
+            _usage.value = snap.usedBytes to (snap.quotaBytes ?: 0L)
+        }
     }
 }

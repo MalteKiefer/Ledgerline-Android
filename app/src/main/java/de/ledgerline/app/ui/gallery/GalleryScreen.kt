@@ -116,6 +116,7 @@ enum class GalleryTab { PHOTOS, ALBUMS, PEOPLE }
 @Composable
 fun GalleryScreen(
     modifier: Modifier = Modifier,
+    onMenu: (() -> Unit)? = null,
     vm: GalleryViewModel = hiltViewModel(),
     albumsVm: AlbumsViewModel = hiltViewModel(),
 ) {
@@ -235,74 +236,74 @@ fun GalleryScreen(
         if (degraded) de.ledgerline.app.ui.workspace.common.DegradedBanner()
         var overflowOpen by remember { mutableStateOf(false) }
         var searchActive by rememberSaveable { mutableStateOf(false) }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Spacer(Modifier.weight(1f))
-            if (tab == GalleryTab.PHOTOS) {
-                IconButton(onClick = {
-                    searchActive = !searchActive
-                    if (!searchActive) vm.clearSearch()
-                }) {
-                    Icon(
-                        Icons.Outlined.Search,
-                        contentDescription = stringResource(R.string.gallery_search_hint),
-                        tint = if (searchActive) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    )
+        // One unified top bar: drawer (menu) + title + the gallery's own contextual actions.
+        // No second toolbar row, and no duplicate global-search magnifier.
+        de.ledgerline.app.ui.common.AppTopBar(
+            title = stringResource(R.string.tab_gallery),
+            onMenu = onMenu,
+            actions = {
+                if (tab == GalleryTab.PHOTOS) {
+                    IconButton(onClick = {
+                        searchActive = !searchActive
+                        if (!searchActive) vm.clearSearch()
+                    }) {
+                        Icon(
+                            Icons.Outlined.Search,
+                            contentDescription = stringResource(R.string.gallery_search_hint),
+                            tint = if (searchActive) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                        )
+                    }
+                    IconButton(onClick = { vm.toggleFavoritesOnly() }) {
+                        Icon(
+                            imageVector = if (favoritesOnly) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                            contentDescription = stringResource(R.string.gallery_favorites_only),
+                            tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                        )
+                    }
                 }
-                IconButton(onClick = { vm.toggleFavoritesOnly() }) {
-                    Icon(
-                        imageVector = if (favoritesOnly) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                        contentDescription = stringResource(R.string.gallery_favorites_only),
-                        tint = if (favoritesOnly) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    )
+                Box {
+                    IconButton(onClick = { overflowOpen = true }) {
+                        Icon(
+                            Icons.Outlined.MoreVert,
+                            contentDescription = stringResource(R.string.action_more),
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = overflowOpen,
+                        onDismissRequest = { overflowOpen = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.gallery_map)) },
+                            onClick = {
+                                overflowOpen = false
+                                showMap = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.duplicates_action)) },
+                            onClick = {
+                                overflowOpen = false
+                                showDuplicates = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.jobs_action)) },
+                            onClick = {
+                                overflowOpen = false
+                                showJobs = true
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.trash_open, trashCount)) },
+                            onClick = {
+                                overflowOpen = false
+                                vm.setTrash(true)
+                            },
+                        )
+                    }
                 }
-            }
-            Box {
-                IconButton(onClick = { overflowOpen = true }) {
-                    Icon(
-                        Icons.Outlined.MoreVert,
-                        contentDescription = stringResource(R.string.action_more),
-                    )
-                }
-                DropdownMenu(
-                    expanded = overflowOpen,
-                    onDismissRequest = { overflowOpen = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.gallery_map)) },
-                        onClick = {
-                            overflowOpen = false
-                            showMap = true
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.duplicates_action)) },
-                        onClick = {
-                            overflowOpen = false
-                            showDuplicates = true
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.jobs_action)) },
-                        onClick = {
-                            overflowOpen = false
-                            showJobs = true
-                        },
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.trash_open, trashCount)) },
-                        onClick = {
-                            overflowOpen = false
-                            vm.setTrash(true)
-                        },
-                    )
-}
-            }
-        }
+            },
+        )
 
         // Search field appears only when the search icon is toggled — keeps the
         // header a single compact row otherwise.

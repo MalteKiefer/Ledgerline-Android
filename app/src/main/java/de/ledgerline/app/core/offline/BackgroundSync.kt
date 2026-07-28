@@ -41,6 +41,7 @@ class BackgroundSync @Inject constructor(
     private val accountRepository: AccountRepository,
     private val passwordsRepo: PasswordsRepository,
     private val settingsStore: SettingsStore,
+    private val offlineMapStore: de.ledgerline.app.core.map.OfflineMapStore,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     @Volatile
@@ -72,6 +73,12 @@ class BackgroundSync @Inject constructor(
         // Remote kill switch first, ungated by the offline setting — me() fires the wipe
         // event on wipe:true. Works even while locked (token only, no VK needed).
         accountRepository.me()
+        // Periodically (≤ every 12 h) check installed offline maps for newer server versions.
+        val now = System.currentTimeMillis()
+        if (now - lastMapCheck > 12L * 3600_000L) {
+            lastMapCheck = now
+            runCatching { offlineMapStore.checkUpdates() }
+        }
         if (!offlineFlags.enabled()) return
         if (vaultKeyHolder.get() != null) {
             load.invoke()
@@ -82,6 +89,8 @@ class BackgroundSync @Inject constructor(
             passwordsRepo.refreshStoreCache()
         }
     }
+
+    private var lastMapCheck = 0L
 
     private companion object {
         const val INITIAL_DELAY_MS = 20_000L

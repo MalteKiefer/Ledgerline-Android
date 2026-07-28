@@ -40,6 +40,8 @@ class ForceLogoutImpl @Inject constructor(
     private val clockGuard: de.ledgerline.app.core.security.ClockRollbackGuard,
     private val identityRepository: IdentityRepository,
     private val passwordsCache: de.ledgerline.app.core.PasswordsCache,
+    private val exploreCache: de.ledgerline.app.core.ExploreCache,
+    private val healthCache: de.ledgerline.app.core.HealthCache,
 ) : ForceLogout {
     override suspend fun invoke() {
         // In-memory first (secrets + decrypted caches).
@@ -47,6 +49,8 @@ class ForceLogoutImpl @Inject constructor(
         sessionHolder.clear()
         identityRepository.clear()
         passwordsCache.clear()
+        exploreCache.clear()
+        healthCache.clear()
         workspaceCache.clear()
         galleryCache.clear()
         thumbCache.clear()

@@ -6,7 +6,12 @@ import kotlinx.serialization.Serializable
 @Serializable data class PairClaimResponse(val status: String)
 
 /** `POST /api/v1/auth/pair/collect` — poll for approval with the same one-time code. */
-@Serializable data class PairCollectRequest(val code: String)
+@Serializable data class PairCollectRequest(
+    val code: String,
+    val install_id: String? = null,
+    val app_version: String? = null,
+    val os_version: String? = null,
+)
 
 @Serializable data class PairPollResponse(
     val status: String,
@@ -40,6 +45,9 @@ import kotlinx.serialization.Serializable
 @Serializable data class MeUsage(
     val files: Long? = null,
     val gallery: Long? = null,
+    // Combined effective storage limit in bytes (files + gallery), or null when unlimited (the
+    // server returns null whenever either dimension is uncapped → the pool has no finite cap).
+    val quota: Long? = null,
 )
 
 /** `GET /api/v1/devices` → the owner's paired devices (Sanctum tokens). */

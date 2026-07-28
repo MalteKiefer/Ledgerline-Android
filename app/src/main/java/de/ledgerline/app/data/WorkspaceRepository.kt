@@ -90,6 +90,28 @@ class WorkspaceRepository(
     private companion object {
         /** Offline-cache key for the sharded files-store **root** envelope. */
         const val FILES_ROOT_KEY = "workspace_files_root"
+        /** Offline-cache key for the sharded notes-store **root** envelope. */
+        const val NOTES_ROOT_KEY = "workspace_notes_root"
+    }
+
+    /**
+     * Notes graduated to the **sharded** `/notes/store` (Store v3, web `LLNotesStore` —
+     * prefix `/notes`, recordKey `notes`, no collections). Same content-addressed engine as
+     * files/gallery. The old monolith `/store/notes` is read once for a one-time migration
+     * (below) and then blanked, byte-exact with the web dual-read migration.
+     */
+    private val notesEngine by lazy {
+        ShardedStoreEngine(
+            crypto = crypto,
+            blobCache = blobCache,
+            storeCache = storeCache,
+            offlineFlags = offlineFlags,
+            rootCacheKey = NOTES_ROOT_KEY,
+            storeGet = { apiProvider(sessionHolder.get()!!).notesStore() },
+            storePut = { apiProvider(sessionHolder.get()!!).notesStorePut(it) },
+            rawBlob = { apiProvider(sessionHolder.get()!!).rawNote(it) },
+            uploadBlobApi = { apiProvider(sessionHolder.get()!!).uploadNote(it) },
+        )
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -128,12 +150,6 @@ class WorkspaceRepository(
     }
 
     private val specs = listOf(
-        ModuleSpec(
-            key = "notes",
-            encode = { m -> encModule { it["notes"] = arr(m.notes.map(WorkspaceRecordCodec::encodeNote)) } },
-            merge = { m, plain -> m.copy(notes = records(plain, "notes").map(WorkspaceRecordCodec::decodeNote)) },
-            changed = { a, b -> a.notes != b.notes },
-        ),
         ModuleSpec(
             key = "todos",
             encode = { m ->
@@ -350,6 +366,53 @@ class WorkspaceRepository(
         uploadBlob = { b, n -> uploadFilesBytes(api, vk, b, n) },
     )
 
+    // ---- Sharded /notes/store slice (Store v3) --------------------------------
+
+    /**
+     * Load the sharded notes slice via [notesEngine] (root → shard blobs, cache-first). While the
+     * sharded store is still empty, run the one-time monolith migration ([migrateNotesFromMonolith])
+     * so notes written by a pre-sharded client (or another mobile client) still surface. A 401
+     * surfaces as [AuthException] (forced-logout path); every other failure yields an empty slice
+     * (the engine already falls back to the offline cache).
+     */
+    private suspend fun loadNotesSlice(vk: ByteArray): List<de.ledgerline.app.domain.model.Note> {
+        val loaded = try {
+            notesEngine.load(vk)
+        } catch (_: ShardedStoreEngine.AuthException) {
+            throw AuthException()
+        }
+        var notes = loaded.records.map(WorkspaceRecordCodec::decodeNote)
+        if (notes.isEmpty()) migrateNotesFromMonolith(vk)?.let { notes = it }
+        return notes
+    }
+
+    /**
+     * One-time dual-read migration from the old monolith `/store/notes` to the sharded
+     * `/notes/store` (byte-exact with the web `migrateFromMonolith`): read the monolith, and if it
+     * still holds notes, move them into the sharded store, then blank the monolith
+     * (`{v:3,notes:[]}`) so a later "delete all" can never re-import them. Best-effort — any failure
+     * just leaves the notes where they are (the empty-sharded guard retries next load). Returns the
+     * migrated notes, or null when there was nothing to migrate.
+     */
+    private suspend fun migrateNotesFromMonolith(vk: ByteArray): List<de.ledgerline.app.domain.model.Note>? {
+        val session = sessionHolder.get() ?: return null
+        val api = apiProvider(session)
+        val res = try { api.moduleStore("notes") } catch (_: Exception) { return null }
+        if (!res.isSuccessful) return null
+        val body = res.body() ?: return null
+        val ct = body.ciphertext ?: return null
+        val plain = crypto.openManifest(ct, vk) ?: return null
+        val old = records(plain, "notes").map(WorkspaceRecordCodec::decodeNote)
+        if (old.isEmpty()) return null
+        val recs = old.map { it.id to WorkspaceRecordCodec.encodeNote(it) }
+        if (notesEngine.sealAndPut(vk, recs, emptyList(), notesEngine.version) !is ShardedStoreEngine.PutOutcome.Ok) return null
+        runCatching {
+            val empty = crypto.sealManifest(encModule { it["notes"] = arr(emptyList()) }, vk)
+            api.putModuleStore("notes", StorePutRequest(empty, body.version))
+        }
+        return old
+    }
+
     // On Dispatchers.IO: opening + JSON-decoding every module + the sharded files slice is
     // CPU/IO-heavy and must not block the caller's main thread (large stores would ANR).
     suspend fun load(): Outcome<Workspace> = withContext(Dispatchers.IO) {
@@ -359,17 +422,18 @@ class WorkspaceRepository(
         try {
             val loaded = coroutineScope {
                 val filesDeferred = async { loadFilesSlice(api, vk) }
+                val notesDeferred = async { loadNotesSlice(vk) }
                 val mods = specs.map { spec -> async { spec to fetchModule(api, spec, vk) } }.awaitAll()
-                mods to filesDeferred.await()
+                Triple(mods, filesDeferred.await(), notesDeferred.await())
             }
-            val (mods, filesSlice) = loaded
+            val (mods, filesSlice, notesSlice) = loaded
 
             var agg = WorkspaceManifest(v = 3)
             for ((spec, ml) in mods) {
                 versions[spec.key] = ml.version
                 if (ml.plain != null) agg = spec.merge(agg, ml.plain)
             }
-            agg = agg.copy(files = filesSlice.first, fileFolders = filesSlice.second)
+            agg = agg.copy(files = filesSlice.first, fileFolders = filesSlice.second, notes = notesSlice)
             Outcome.Ok(Workspace(agg, 0))
         } catch (_: AuthException) {
             // 401 → forced-logout path; never fall back to cache.
@@ -433,6 +497,12 @@ class WorkspaceRepository(
             runCatching {
                 val fr = api.filesStore()
                 if (fr.isSuccessful) fr.body()?.let { storeCache.put(FILES_ROOT_KEY, StoreEnvelope(it.ciphertext, it.version)) }
+                else all = false
+            }.onFailure { all = false }
+            // …and the sharded notes-store root.
+            runCatching {
+                val nr = api.notesStore()
+                if (nr.isSuccessful) nr.body()?.let { storeCache.put(NOTES_ROOT_KEY, StoreEnvelope(it.ciphertext, it.version)) }
                 else all = false
             }.onFailure { all = false }
             all
@@ -506,6 +576,27 @@ class WorkspaceRepository(
                         curNext = mutate(curBase!!)
                     }
                     else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+                }
+            }
+        }
+
+        // Sharded /notes/store slice: same dirty-save + 409-rebase loop as files, via [notesEngine].
+        // On 409 reload the winning notes (rebases version + priorRoot), re-apply mutate, retry.
+        if (curNext.notes != curBase!!.notes) {
+            var version = notesEngine.version
+            var attempts = 0
+            while (true) {
+                if (attempts++ >= 5) return@withContext Outcome.Err(ErrorKind.HTTP)
+                val recs = curNext.notes.map { it.id to WorkspaceRecordCodec.encodeNote(it) }
+                when (notesEngine.sealAndPut(vk, recs, emptyList(), version)) {
+                    is ShardedStoreEngine.PutOutcome.Ok -> break
+                    ShardedStoreEngine.PutOutcome.Conflict -> {
+                        val fresh = loadNotesSlice(vk)
+                        version = notesEngine.version
+                        curBase = curBase!!.copy(notes = fresh)
+                        curNext = mutate(curBase!!)
+                    }
+                    ShardedStoreEngine.PutOutcome.Error -> return@withContext Outcome.Err(ErrorKind.NETWORK)
                 }
             }
         }

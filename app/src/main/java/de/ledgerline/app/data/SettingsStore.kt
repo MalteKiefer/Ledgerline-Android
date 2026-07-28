@@ -44,6 +44,10 @@ class SettingsStore(private val context: Context) {
     private val rememberVaultKey = booleanPreferencesKey("remember_vault")
     private val rememberVaultDaysKey = intPreferencesKey("remember_vault_days")
     private val mapTilesKey = booleanPreferencesKey("map_tiles_enabled")
+    private val unitSystemKey = stringPreferencesKey("unit_system")
+    private val coordFormatKey = stringPreferencesKey("coord_format")
+    private val worldMapOfferedKey = booleanPreferencesKey("world_map_offered")
+    private val terrainKey = booleanPreferencesKey("map_terrain_enabled")
     private val duressThresholdKey = intPreferencesKey("duress_threshold")
 
     // Legacy 5a boolean keys, retained only so a stored value migrates into the new
@@ -204,6 +208,44 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setThemeMode(mode: ThemeMode) {
         context.settingsDataStore.edit { it[themeModeKey] = mode.name }
+    }
+
+    /** Measurement units for the Explore/Tracker feature. Defaults to metric. */
+    val unitSystem: Flow<de.ledgerline.app.core.units.UnitSystem> =
+        context.settingsDataStore.data.map {
+            runCatching { de.ledgerline.app.core.units.UnitSystem.valueOf(it[unitSystemKey] ?: "") }
+                .getOrDefault(de.ledgerline.app.core.units.UnitSystem.METRIC)
+        }
+
+    suspend fun setUnitSystem(u: de.ledgerline.app.core.units.UnitSystem) {
+        context.settingsDataStore.edit { it[unitSystemKey] = u.name }
+    }
+
+    /** Coordinate display format for the map/track detail. Defaults to decimal degrees. */
+    val coordinateFormat: Flow<de.ledgerline.app.core.geo.CoordinateFormat> =
+        context.settingsDataStore.data.map {
+            runCatching { de.ledgerline.app.core.geo.CoordinateFormat.valueOf(it[coordFormatKey] ?: "") }
+                .getOrDefault(de.ledgerline.app.core.geo.CoordinateFormat.DD)
+        }
+
+    suspend fun setCoordinateFormat(f: de.ledgerline.app.core.geo.CoordinateFormat) {
+        context.settingsDataStore.edit { it[coordFormatKey] = f.name }
+    }
+
+    /** Terrain relief (hillshading). Off by default (downloads DEM tiles for the viewport). */
+    val terrainEnabled: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[terrainKey] ?: false }
+
+    suspend fun setTerrainEnabled(on: Boolean) {
+        context.settingsDataStore.edit { it[terrainKey] = on }
+    }
+
+    /** Whether the one-time "download the world base map" offer has been shown. */
+    val worldMapOffered: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[worldMapOfferedKey] ?: false }
+
+    suspend fun setWorldMapOffered(v: Boolean) {
+        context.settingsDataStore.edit { it[worldMapOfferedKey] = v }
     }
 
     /** Material-You dynamic (wallpaper) color. Defaults to OFF — the hand-authored brand palette. */

@@ -101,6 +101,10 @@ data class ShareInfo(
     val hasPassword: Boolean = false,
     val expiresAt: String? = null,
     val created: String? = null,
+    // Optimistic-concurrency counter from the server (share create/update response). Sent back as
+    // `expected_version` on the next update so a concurrent edit from another device is rejected
+    // (409) rather than silently clobbered. Null for shares created before the server added it.
+    val version: Int? = null,
 )
 
 @Serializable

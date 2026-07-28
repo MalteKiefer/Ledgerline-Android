@@ -5,29 +5,45 @@ import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.PasswordsCache
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.crypto.Crypto
+import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.offline.StoreEnvelope
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
+import de.ledgerline.app.data.remote.dto.StorePutRequest
+import de.ledgerline.app.domain.model.SecretFolder
+import de.ledgerline.app.domain.model.SecretItem
 import de.ledgerline.app.domain.model.SecretsManifest
 import de.ledgerline.app.domain.model.SecretsStore
 import de.ledgerline.app.domain.model.Session
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
-import java.net.HttpURLConnection
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Reads + writes the sealed password-manager store (`GET/PUT /api/v1/store/passwords`, Store v3
- * per-module). Same optimistic-concurrency envelope as the workspace modules: 409 → reload +
- * re-apply the mutation (last-write-wins per field). Secrets are opaque to the server; all
- * crypto is client-side. The type-specific `fields` are kept as raw JSON so unknown keys survive.
+ * Reads + writes the sealed password-manager store. The web client migrated passwords off the
+ * old single-blob monolith `GET/PUT /store/passwords` onto the **Store-v3 sharded** store
+ * `GET/PUT /passwords/store` (records `secrets` bucketed into content-addressed shard blobs; a
+ * single `secretFolders` collection blob addressed by the root's `foldersRef/foldersKey/
+ * foldersHash`). Because the web BLANKS the monolith after migrating, an Android client that
+ * still read the monolith showed an EMPTY vault for anyone who opened web/extension — hence this
+ * port to [ShardedStoreEngine].
+ *
+ * Records flow through the engine as raw [JsonObject]s; [SecretRecordCodec] owns the typed
+ * codec with a **raw-overlay** so unknown web/iOS top-level keys survive a round-trip (§15).
+ * Optimistic concurrency: a 409 reloads the winning state, re-applies the mutation, retries.
+ *
+ * [load] also runs a **one-time dual-read migration**: when the sharded store is still empty and
+ * the old monolith still carries records, it moves `secrets` + `secretFolders` into the sharded
+ * store and blanks the monolith (`pwVaultMigrated`), byte-for-byte mirroring web `passwords.js`.
  */
 @Singleton
 class PasswordsRepository(
@@ -37,6 +53,7 @@ class PasswordsRepository(
     private val cache: PasswordsCache,
     private val storeCache: StoreDiskCache,
     private val offlineFlags: OfflineFlags,
+    private val blobCache: BlobDiskCache,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
     @Inject constructor(
@@ -46,104 +63,152 @@ class PasswordsRepository(
         cache: PasswordsCache,
         storeCache: StoreDiskCache,
         offlineFlags: OfflineFlags,
+        blobCache: BlobDiskCache,
     ) : this(
-        sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags,
+        sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags, blobCache,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
     private companion object {
-        const val KEY = "passwords"
+        /** Old single-blob monolith module (migrated FROM). */
         const val MODULE = "passwords"
-        /** Top-level manifest keys this repo owns; everything else is preserved verbatim. */
-        val KNOWN_KEYS = setOf("v", "secrets", "secretFolders", "pwVaultMigrated")
+        /** Offline-cache key for the sharded root envelope (distinct from the old monolith key). */
+        const val ROOT_KEY = "passwords_root"
     }
 
-    // Lenient + coercing: tolerate unknown keys, and coerce a JSON null on a non-null
-    // defaulted field (e.g. tags:null, folder present-but-null) to its default instead of
-    // throwing — web-written records vary and must never fail the whole decode.
-    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true; isLenient = true }
-    private val jsonEncoder = Json { encodeDefaults = true; explicitNulls = false }
+    /** Resolve the current session's API (session presence is guarded by load/save before use). */
+    private fun api(): LedgerlineApi = apiProvider(sessionHolder.get()!!)
 
     /**
-     * Parse the sealed plaintext into a typed manifest while capturing every foreign top-level
-     * key into [SecretsManifest.extra] so a later save preserves it (iOS parity, §15).
+     * The reusable Store-v3 sharded engine bound to `/passwords/store`. Created once so its
+     * version + prior-root state persist across load/save; each lambda resolves the current
+     * session's API so a session swap is picked up.
      */
-    private fun decodeManifest(plain: String): SecretsManifest {
-        val root = json.parseToJsonElement(plain).jsonObject
-        val typed = json.decodeFromJsonElement(SecretsManifest.serializer(), root)
-        return typed.copy(extra = JsonObject(root.filterKeys { it !in KNOWN_KEYS }))
+    private val engine: ShardedStoreEngine by lazy {
+        ShardedStoreEngine(
+            crypto = crypto,
+            blobCache = blobCache,
+            storeCache = storeCache,
+            offlineFlags = offlineFlags,
+            rootCacheKey = ROOT_KEY,
+            storeGet = { api().passwordsStore() },
+            storePut = { req -> api().passwordsStorePut(req) },
+            rawBlob = { ref -> api().rawPassword(ref) },
+            uploadBlobApi = { part -> api().uploadPassword(part) },
+        )
     }
 
-    /** Seal a manifest, re-emitting the captured foreign keys alongside our owned keys. */
-    private fun sealManifest(m: SecretsManifest, vk: ByteArray): String {
-        val owned = jsonEncoder.encodeToJsonElement(SecretsManifest.serializer(), m).jsonObject
-        val merged = JsonObject(m.extra + owned) // owned keys win on any collision
-        return crypto.sealManifest(jsonEncoder.encodeToString(JsonObject.serializer(), merged), vk)
+    // Raw record JSON captured on load so a save re-emits every foreign web/iOS field byte-exact
+    // (no loss) — the raw-overlay strategy of [SecretRecordCodec] / [FileRecordCodec].
+    private val secretRawById = java.util.concurrent.ConcurrentHashMap<String, JsonObject>()
+    private val folderRawById = java.util.concurrent.ConcurrentHashMap<String, JsonObject>()
+
+    /** Decode an engine load into typed records, (re)capturing each record's raw JSON. */
+    private fun decodeLoaded(loaded: ShardedStoreEngine.Loaded): Pair<List<SecretItem>, List<SecretFolder>> {
+        secretRawById.clear(); folderRawById.clear()
+        val secrets = loaded.records.map { obj -> SecretRecordCodec.decodeSecret(obj).also { secretRawById[it.id] = obj } }
+        val folders = loaded.folders.map { obj -> SecretRecordCodec.decodeFolder(obj).also { folderRawById[it.id] = obj } }
+        return secrets to folders
     }
 
-    // Runs on Dispatchers.IO: opening the sealed manifest (secretbox), JSON-decoding the records,
-    // and writing the ciphertext to the disk cache (kotlinx encode of a large base64 string) are all
-    // CPU/IO-heavy and MUST NOT run on the caller's main thread — otherwise a large store ANRs.
+    private fun encodeSecrets(m: SecretsManifest): List<Pair<String, JsonObject>> =
+        m.secrets.map { it.id to SecretRecordCodec.encodeSecret(it, secretRawById[it.id]) }
+
+    private fun encodeFolders(m: SecretsManifest): List<JsonObject> =
+        m.secretFolders.map { SecretRecordCodec.encodeFolder(it, folderRawById[it.id]) }
+
+    // Runs on Dispatchers.IO: opening sealed blobs (secretbox), JSON-decoding records, and the
+    // disk-cache writes are CPU/IO-heavy and must not run on the caller's main thread (ANR).
     suspend fun load(): Outcome<SecretsStore> = withContext(Dispatchers.IO) {
-        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
-        val api = apiProvider(session)
-        // Offline-first: publish the disk-cached store immediately (instant display at app start,
-        // and the only source when offline), then refresh from the network below. This makes the
-        // password list appear on unlock without waiting for a round-trip / pull-to-refresh.
-        if (cache.value.value == null && offlineFlags.enabled()) {
-            (cachedOr(Outcome.Err(ErrorKind.NETWORK), vk) as? Outcome.Ok)?.let { cache.set(it.value) }
-        }
         try {
-            val res = api.moduleStore(MODULE)
-            when {
-                res.code() == HttpURLConnection.HTTP_UNAUTHORIZED -> Outcome.Err(ErrorKind.HTTP)
-                !res.isSuccessful -> cachedOr(Outcome.Err(ErrorKind.NETWORK), vk)
-                else -> {
-                    val body = res.body()!!
-                    val manifest = body.ciphertext?.let { ct ->
-                        val plain = crypto.openManifest(ct, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
-                        decodeManifest(plain)
-                    } ?: SecretsManifest()
-                    if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
-                    val store = SecretsStore(manifest, body.version)
-                    cache.set(store)
-                    Outcome.Ok(store)
-                }
+            val loaded = engine.load(vk) // network-first; falls back to the offline cache internally
+            var (secrets, folders) = decodeLoaded(loaded)
+            // One-time migration off the old monolith while the sharded store is still empty.
+            if (secrets.isEmpty() && folders.isEmpty()) {
+                migrateFromMonolith(vk)?.let { (s, f) -> secrets = s; folders = f }
             }
+            val store = SecretsStore(SecretsManifest(secrets = secrets, secretFolders = folders), engine.version)
+            cache.set(store)
+            Outcome.Ok(store)
+        } catch (_: ShardedStoreEngine.AuthException) {
+            Outcome.Err(ErrorKind.HTTP) // 401 → forced-logout path, never fall back to cache
         } catch (e: Exception) {
-            cachedOr(Outcome.Err(ErrorKind.NETWORK, e), vk)
+            // Decrypt/decode failure inside the engine: never blank a vault that already had
+            // content — prefer the last in-memory snapshot, else surface a network error.
+            cache.value.value?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK, e)
         }
     }
 
     /**
-     * Token-only refresh of the offline cache: fetch the sealed store and write its ciphertext to
-     * disk WITHOUT decrypting (no VK needed), so a background sync keeps the offline copy current
-     * while the vault is locked. The ciphertext is opaque. No-op when offline caching is off / no
-     * session. Returns true on a successful refresh.
+     * One-time dual-read migration of the PERSONAL vault from the old single-blob monolith
+     * (`/store/passwords`) to the sharded store, byte-mirroring web `migratePasswordsFromMonolith`.
+     * Only runs while the sharded store is empty (the caller guards this) so a user who already
+     * migrated on web can't re-import stale copies. Best-effort: any failure leaves the data in the
+     * old store and returns null. Returns the moved (secrets, folders) on success.
+     */
+    private suspend fun migrateFromMonolith(vk: ByteArray): Pair<List<SecretItem>, List<SecretFolder>>? {
+        val api = api()
+        val res = try { api.moduleStore(MODULE) } catch (_: Exception) { return null }
+        if (!res.isSuccessful) return null
+        val body = res.body() ?: return null
+        val ct = body.ciphertext ?: return null
+        val plain = crypto.openManifest(ct, vk) ?: return null
+        val (secrets, folders) = try { decodeMonolith(plain) } catch (_: Exception) { return null }
+        if (secrets.isEmpty() && folders.isEmpty()) return null // nothing to move
+
+        // Move into the sharded store (raw maps were populated by decodeMonolith → no field loss).
+        val saved = commit(vk, SecretsManifest()) { m -> m.copy(secrets = secrets, secretFolders = folders) }
+        if (saved !is Outcome.Ok) return null
+
+        // Blank the monolith so a later delete-all can't re-import. Byte-shaped empty manifest,
+        // exactly web `{ v:3, secrets:[], secretFolders:[], pwVaultMigrated:true }`.
+        try {
+            val empty = crypto.sealManifest(emptyMonolithJson(), vk)
+            api.putModuleStore(MODULE, StorePutRequest(empty, body.version))
+        } catch (_: Exception) { /* the empty-sharded guard still prevents re-import this session */ }
+
+        return saved.value.manifest.secrets to saved.value.manifest.secretFolders
+    }
+
+    /** Decode the old monolith plaintext, capturing each record's raw JSON so a re-seal loses nothing. */
+    private fun decodeMonolith(plain: String): Pair<List<SecretItem>, List<SecretFolder>> {
+        val root = SecretRecordCodec.recordJson.parseToJsonElement(plain).jsonObject
+        val secrets = (root["secrets"] as? JsonArray).orEmpty()
+            .mapNotNull { it as? JsonObject }
+            .map { obj -> SecretRecordCodec.decodeSecret(obj).also { secretRawById[it.id] = obj } }
+        val folders = (root["secretFolders"] as? JsonArray).orEmpty()
+            .mapNotNull { it as? JsonObject }
+            .map { obj -> SecretRecordCodec.decodeFolder(obj).also { folderRawById[it.id] = obj } }
+        return secrets to folders
+    }
+
+    /** The byte-shaped empty monolith manifest (web parity): `{v:3,secrets:[],secretFolders:[],pwVaultMigrated:true}`. */
+    private fun emptyMonolithJson(): String = buildJsonObject {
+        put("v", 3)
+        put("secrets", JsonArray(emptyList()))
+        put("secretFolders", JsonArray(emptyList()))
+        put("pwVaultMigrated", true)
+    }.toString()
+
+    /**
+     * Token-only refresh of the offline cache: fetch the sharded **root** and write its ciphertext
+     * to disk WITHOUT decrypting (no VK needed), so a background sync keeps the offline root
+     * current while the vault is locked. Shard blobs are cached lazily on the next online load.
+     * Ciphertext is opaque. No-op when offline caching is off / no session.
      */
     suspend fun refreshStoreCache(): Boolean {
         if (!offlineFlags.enabled()) return false
         val session = sessionHolder.get() ?: return false
         return try {
-            val res = apiProvider(session).moduleStore(MODULE)
+            val res = apiProvider(session).passwordsStore()
             if (!res.isSuccessful) return false
             val body = res.body() ?: return false
-            storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
+            storeCache.put(ROOT_KEY, StoreEnvelope(body.ciphertext, body.version))
             true
         } catch (_: Exception) { false }
     }
-
-    private fun cachedOr(err: Outcome<SecretsStore>, vk: ByteArray): Outcome<SecretsStore> =
-        cachedOrStore(
-            cachingEnabled = offlineFlags.enabled(),
-            envelope = storeCache.get(KEY),
-            err = err,
-            open = { ct -> crypto.openManifest(ct, vk) },
-            decode = { plain -> decodeManifest(plain) },
-            empty = { SecretsManifest() },
-            wrap = { m, v -> SecretsStore(m, v) },
-        )
 
     /**
      * Server-assisted site favicon for [domain] → a data-URI string, or null. The server proxies
@@ -180,26 +245,58 @@ class PasswordsRepository(
         } catch (_: Exception) { emptyMap() }
     }
 
-    /** Optimistic write with 409-merge (reload → re-apply [mutate] → retry). */
-    // On Dispatchers.IO: sealing the manifest (CanonicalJson + secretbox over the whole store),
-    // JSON decode on a 409 rebase, and the disk-cache write are heavy — never on the main thread.
+    /** Optimistic write with 409-rebase (reload → re-apply [mutate] → retry). */
+    // On Dispatchers.IO: sealing shard blobs + the root (CanonicalJson + secretstream/secretbox),
+    // a 409 rebase decode, and disk-cache writes are heavy — never on the main thread.
     suspend fun save(mutate: (SecretsManifest) -> SecretsManifest): Outcome<SecretsStore> = withContext(Dispatchers.IO) {
-        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
-        val api = apiProvider(session)
-        val current = cache.value.value
-        optimisticSave(
-            cached = current?.let { it.manifest to it.version },
-            mutate = mutate,
-            fetch = { api.moduleStore(MODULE) },
-            put = { api.putModuleStore(MODULE, it) },
-            seal = { m -> sealManifest(m, vk) },
-            open = { ct -> crypto.openManifest(ct, vk) },
-            decode = { plain -> decodeManifest(plain) },
-            empty = { SecretsManifest() },
-            wrap = { m, v -> SecretsStore(m, v) },
-            onSaved = { cache.set(it) },
-            onEnvelope = { env -> if (offlineFlags.enabled()) storeCache.put(KEY, env) },
-        )
+        // Establish the base: the last in-memory manifest, else a fresh load (which also runs the
+        // one-time migration and captures the raw maps).
+        val base = cache.value.value?.manifest ?: when (val l = load()) {
+            is Outcome.Ok -> l.value.manifest
+            is Outcome.Err -> return@withContext l
+        }
+        commit(vk, base, mutate)
+    }
+
+    /**
+     * The 409-rebase seal+PUT loop over the sharded engine (mirrors the files slice in
+     * [WorkspaceRepository]). [base] is the known-current manifest; [mutate] is (re-)applied on
+     * every attempt so a concurrent writer's changes are respected. One engine seal+PUT per turn.
+     */
+    private suspend fun commit(
+        vk: ByteArray,
+        base: SecretsManifest,
+        mutate: (SecretsManifest) -> SecretsManifest,
+    ): Outcome<SecretsStore> {
+        var curNext = mutate(base)
+        var attempts = 0
+        while (true) {
+            if (attempts++ >= 5) return Outcome.Err(ErrorKind.HTTP)
+            val records = encodeSecrets(curNext)
+            val folders = encodeFolders(curNext)
+            when (val out = engine.sealAndPut(vk, records, folders, engine.version)) {
+                is ShardedStoreEngine.PutOutcome.Ok -> {
+                    val store = SecretsStore(curNext, out.newVersion)
+                    cache.set(store)
+                    return Outcome.Ok(store)
+                }
+                ShardedStoreEngine.PutOutcome.Conflict -> {
+                    // Reload the winning root (rebases engine.version + priorRoot + raw maps),
+                    // re-apply mutate onto it, retry.
+                    val loaded = try {
+                        engine.load(vk)
+                    } catch (_: ShardedStoreEngine.AuthException) {
+                        return Outcome.Err(ErrorKind.HTTP)
+                    } catch (e: Exception) {
+                        return Outcome.Err(ErrorKind.NETWORK, e)
+                    }
+                    val (s, f) = decodeLoaded(loaded)
+                    curNext = mutate(SecretsManifest(secrets = s, secretFolders = f))
+                }
+                ShardedStoreEngine.PutOutcome.Error -> return Outcome.Err(ErrorKind.NETWORK)
+            }
+        }
     }
 }

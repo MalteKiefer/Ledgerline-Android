@@ -37,6 +37,8 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.GppMaybe
@@ -97,7 +99,7 @@ import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
 /** Internal Settings destinations — a categorized landing (ROOT) plus one sub-screen per category. */
-private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, ABOUT, LICENSES }
+private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, MAPS, OFFLINE_MAPS, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, ABOUT, LICENSES }
 
 /**
  * Settings screen — a categorized landing list plus per-category sub-screens, in the
@@ -131,6 +133,7 @@ fun SettingsContent(
     val securityEvents by vm.securityEvents.collectAsStateWithLifecycle()
     val integrityReport by vm.integrityReport.collectAsStateWithLifecycle()
     val mapTiles by vm.mapTilesEnabled.collectAsStateWithLifecycle()
+    val terrain by vm.terrainEnabled.collectAsStateWithLifecycle()
     val backgroundOps by vm.backgroundOpsEnabled.collectAsStateWithLifecycle()
     val linkChooser by vm.linkChooserEnabled.collectAsStateWithLifecycle()
     val refreshSeconds by vm.backgroundRefreshSeconds.collectAsStateWithLifecycle()
@@ -148,6 +151,8 @@ fun SettingsContent(
     val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val dynamicColor by vm.dynamicColor.collectAsStateWithLifecycle()
+    val unitSystem by vm.unitSystem.collectAsStateWithLifecycle()
+    val coordinateFormat by vm.coordinateFormat.collectAsStateWithLifecycle()
     val devices by vm.devices.collectAsStateWithLifecycle()
     val backupEnabled by vm.backupEnabled.collectAsStateWithLifecycle()
     val backupAlbumIds by vm.backupAlbumIds.collectAsStateWithLifecycle()
@@ -181,6 +186,12 @@ fun SettingsContent(
     val mediaLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
+    // The offline-map manager owns its own full-screen scaffold; render it directly.
+    if (route == SettingsRoute.OFFLINE_MAPS) {
+        de.ledgerline.app.ui.explore.OfflineMapsScreen(onBack = { route = SettingsRoute.MAPS })
+        return
+    }
+
     // Back: a sub-screen returns to the landing list; the landing list exits Settings.
     BackHandler {
         if (route == SettingsRoute.ROOT) onBack() else route = SettingsRoute.ROOT
@@ -190,6 +201,8 @@ fun SettingsContent(
         SettingsRoute.ROOT -> stringResource(R.string.settings_title)
         SettingsRoute.APPEARANCE -> stringResource(R.string.settings_cat_appearance)
         SettingsRoute.SECURITY -> stringResource(R.string.settings_cat_security)
+        SettingsRoute.MAPS -> stringResource(R.string.settings_cat_maps)
+        SettingsRoute.OFFLINE_MAPS -> stringResource(R.string.offline_maps_title)
         SettingsRoute.OFFLINE -> stringResource(R.string.settings_cat_offline)
         SettingsRoute.BACKGROUND -> stringResource(R.string.settings_cat_background)
         SettingsRoute.BACKUP -> stringResource(R.string.settings_cat_backup)
@@ -223,6 +236,10 @@ fun SettingsContent(
                     onSelectTheme = vm::setThemeMode,
                     dynamicColor = dynamicColor,
                     onSetDynamicColor = vm::setDynamicColor,
+                    unitSystem = unitSystem,
+                    onSelectUnit = vm::setUnitSystem,
+                    coordinateFormat = coordinateFormat,
+                    onSelectCoord = vm::setCoordinateFormat,
                 )
 
                 SettingsRoute.SECURITY -> SecuritySettings(
@@ -238,8 +255,6 @@ fun SettingsContent(
                     biometricAvailable = vm.strongBiometricAvailable,
                     onSetRememberVault = vm::setRememberVaultEnabled,
                     onSetRememberVaultDays = vm::setRememberVaultDays,
-                    mapTiles = mapTiles,
-                    onSetMapTiles = vm::setMapTilesEnabled,
                     onLockNow = onLockNow,
                     duressThreshold = duressThreshold,
                     onSetDuressThreshold = vm::setDuressThreshold,
@@ -247,6 +262,17 @@ fun SettingsContent(
                     onClearSecurityLog = vm::clearSecurityLog,
                     integrity = integrityReport,
                 )
+
+                SettingsRoute.MAPS -> MapsSettings(
+                    padding = innerPadding,
+                    mapTiles = mapTiles,
+                    onSetMapTiles = vm::setMapTilesEnabled,
+                    terrain = terrain,
+                    onSetTerrain = vm::setTerrainEnabled,
+                    onOpenOfflineMaps = { route = SettingsRoute.OFFLINE_MAPS },
+                )
+
+                SettingsRoute.OFFLINE_MAPS -> Unit // handled by the early return above
 
                 SettingsRoute.OFFLINE -> OfflineSettings(
                     padding = innerPadding,
@@ -421,6 +447,11 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             title = stringResource(R.string.settings_cat_backup),
             subtitle = stringResource(R.string.settings_cat_backup_sub),
         ) { onNavigate(SettingsRoute.BACKUP) }
+        CategoryRow(
+            icon = Icons.Outlined.Map,
+            title = stringResource(R.string.settings_cat_maps),
+            subtitle = stringResource(R.string.settings_cat_maps_sub),
+        ) { onNavigate(SettingsRoute.MAPS) }
 
         SectionHeader(stringResource(R.string.settings_group_account))
         CategoryRow(
@@ -498,6 +529,38 @@ private val SUPPORTED_LANGUAGES = listOf(
 )
 
 @Composable
+private fun MapsSettings(
+    padding: PaddingValues,
+    mapTiles: Boolean,
+    onSetMapTiles: (Boolean) -> Unit,
+    terrain: Boolean,
+    onSetTerrain: (Boolean) -> Unit,
+    onOpenOfflineMaps: () -> Unit,
+) {
+    SubScreen(padding) {
+        SectionHeader(stringResource(R.string.settings_maps_online))
+        SwitchRow(
+            stringResource(R.string.settings_maps_tiles),
+            stringResource(R.string.settings_maps_tiles_sub),
+            mapTiles,
+            onSetMapTiles,
+        )
+        SwitchRow(
+            stringResource(R.string.settings_maps_terrain),
+            stringResource(R.string.settings_maps_terrain_sub),
+            terrain,
+            onSetTerrain,
+        )
+        SectionHeader(stringResource(R.string.settings_maps_offline))
+        CategoryRow(
+            icon = androidx.compose.material.icons.Icons.Outlined.Download,
+            title = stringResource(R.string.offline_maps_title),
+            subtitle = stringResource(R.string.settings_maps_offline_sub),
+        ) { onOpenOfflineMaps() }
+    }
+}
+
+@Composable
 private fun AppearanceSettings(
     padding: PaddingValues,
     currentLang: String,
@@ -510,6 +573,10 @@ private fun AppearanceSettings(
     onSelectTheme: (de.ledgerline.app.data.ThemeMode) -> Unit,
     dynamicColor: Boolean,
     onSetDynamicColor: (Boolean) -> Unit,
+    unitSystem: de.ledgerline.app.core.units.UnitSystem,
+    onSelectUnit: (de.ledgerline.app.core.units.UnitSystem) -> Unit,
+    coordinateFormat: de.ledgerline.app.core.geo.CoordinateFormat,
+    onSelectCoord: (de.ledgerline.app.core.geo.CoordinateFormat) -> Unit,
 ) {
     SubScreen(padding) {
         SectionHeader(stringResource(R.string.settings_theme))
@@ -532,6 +599,23 @@ private fun AppearanceSettings(
                 dynamicColor,
                 onSetDynamicColor,
             )
+        }
+
+        SectionHeader(stringResource(R.string.settings_units))
+        Column(Modifier.selectableGroup()) {
+            RadioRow(stringResource(R.string.settings_units_metric), unitSystem == de.ledgerline.app.core.units.UnitSystem.METRIC) {
+                onSelectUnit(de.ledgerline.app.core.units.UnitSystem.METRIC)
+            }
+            RadioRow(stringResource(R.string.settings_units_imperial), unitSystem == de.ledgerline.app.core.units.UnitSystem.IMPERIAL) {
+                onSelectUnit(de.ledgerline.app.core.units.UnitSystem.IMPERIAL)
+            }
+        }
+
+        SectionHeader(stringResource(R.string.settings_coord_format))
+        Column(Modifier.selectableGroup()) {
+            de.ledgerline.app.core.geo.CoordinateFormat.entries.forEach { f ->
+                RadioRow(f.name, coordinateFormat == f) { onSelectCoord(f) }
+            }
         }
 
         SectionHeader(stringResource(R.string.settings_language))
@@ -591,8 +675,6 @@ private fun SecuritySettings(
     biometricAvailable: Boolean,
     onSetRememberVault: (Boolean) -> Unit,
     onSetRememberVaultDays: (Int) -> Unit,
-    mapTiles: Boolean,
-    onSetMapTiles: (Boolean) -> Unit,
     onLockNow: () -> Unit,
     duressThreshold: Int,
     onSetDuressThreshold: (Int) -> Unit,
@@ -651,12 +733,6 @@ private fun SecuritySettings(
                 ) { onSetRememberVaultDays(days) }
             }
         }
-        SwitchRow(
-            title = stringResource(R.string.settings_map_tiles),
-            subtitle = stringResource(R.string.settings_map_tiles_note),
-            checked = mapTiles,
-            onCheckedChange = onSetMapTiles,
-        )
         OutlinedButton(
             onClick = onLockNow,
             modifier = Modifier

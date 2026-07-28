@@ -22,6 +22,8 @@ class VaultLocker @Inject constructor(
     private val metaCache: MetaCache,
     private val identityRepository: de.ledgerline.app.data.IdentityRepository,
     private val passwordsCache: de.ledgerline.app.core.PasswordsCache,
+    private val exploreCache: de.ledgerline.app.core.ExploreCache,
+    private val healthCache: de.ledgerline.app.core.HealthCache,
 ) {
     /**
      * Lock the vault: wipe the Vault Key + all in-memory decrypted state (incl. the
@@ -33,5 +35,7 @@ class VaultLocker @Inject constructor(
         galleryCache.clear(); thumbCache.clear(); metaCache.clear()
         identityRepository.clear()
         passwordsCache.clear()
+        exploreCache.clear()
+        healthCache.clear()
     }
 }

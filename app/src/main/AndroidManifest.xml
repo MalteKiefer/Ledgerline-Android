@@ -5,10 +5,14 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Location is requested at runtime only when the user takes a photo; used
-         exclusively to geotag the shot. Never used for background tracking. -->
+    <!-- Location: geotag photos, and record GPS tracks in the Explore/Tracker feature.
+         Background location powers continuous track recording behind a visible foreground
+         notification; coordinates are recorded on-device and only persisted (encrypted) on
+         save. Never sent to the server in the clear. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <!-- Optional: sync the encrypted address book with the device contacts app.
          Read/write only the local "Ledgerline" account; never uploaded anywhere. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
@@ -87,6 +91,13 @@
         <service
             android:name=".core.ops.BackgroundOpService"
             android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
+        <!-- GPS track recording: keeps location updates flowing while backgrounded, behind a
+             visible ongoing notification. AOSP LocationManager only, no Google Play Services. -->
+        <service
+            android:name=".core.tracker.TrackingService"
+            android:foregroundServiceType="location"
             android:exported="false" />
 
         <!-- Zero-knowledge Autofill provider. Structure-only in onFillRequest; the vault

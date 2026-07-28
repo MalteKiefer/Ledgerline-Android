@@ -26,7 +26,11 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun pairingRepository() = PairingRepository()
+    fun pairingRepository(@ApplicationContext ctx: Context) = PairingRepository(
+        installId = de.ledgerline.app.core.InstallId.get(ctx),
+        appVersion = de.ledgerline.app.BuildConfig.VERSION_NAME,
+        osVersion = "Android " + android.os.Build.VERSION.RELEASE,
+    )
 
     @Provides
     @Singleton

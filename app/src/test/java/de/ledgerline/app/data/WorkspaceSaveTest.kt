@@ -10,7 +10,6 @@ import de.ledgerline.app.data.remote.dto.StoreResponse
 import de.ledgerline.app.domain.model.Note
 import de.ledgerline.app.domain.model.Session
 import kotlinx.coroutines.runBlocking
-import okhttp3.ResponseBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -43,31 +42,20 @@ class WorkspaceSaveTest {
     }
 
     /**
-     * Fake per-module store API. The `notes` module: initial GET → v5 with note A;
-     * first PUT → 409; the conflict reload → v6 with A + a server-added note; second
-     * PUT → 200. All other modules are empty (null ciphertext, v0) so load succeeds
-     * and they are never PUT (unchanged).
+     * Fake sharded store API. Notes + files both live in the Store-v3 sharded stores
+     * (`/notes/store`, `/files/store`): start empty, capture each PUT + its shards[] guard.
+     * The notes monolith (`/store/notes`) is empty (base default) so the one-time migration
+     * is a no-op. All modules empty so load succeeds and unchanged modules are never PUT.
      */
     private class FakeApi : NotImplementedApi() {
-        var puts = 0
-        var notesGets = 0
-
-        override suspend fun moduleStore(module: String): Response<StoreResponse> {
-            if (module != "notes") return Response.success(StoreResponse(null, 0))
-            notesGets++
-            return if (notesGets == 1) {
-                Response.success(StoreResponse("""SEALED:{"v":3,"notes":[{"id":"n1","title":"A"}]}""", 5))
-            } else {
-                // Conflict reload: the server has since added note n2.
-                Response.success(StoreResponse("""SEALED:{"v":3,"notes":[{"id":"n1","title":"A"},{"id":"n2","title":"Server"}]}""", 6))
-            }
-        }
-
-        override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> {
-            assertEquals("notes", module)
-            puts++
-            return if (puts == 1) Response.error(409, ResponseBody.create(null, ""))
-            else Response.success(StoreResponse(body.ciphertext, body.version + 1))
+        var notesPuts = 0
+        var lastNotesShards: List<String>? = null
+        override suspend fun uploadNote(file: okhttp3.MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadResponse> =
+            Response.success(de.ledgerline.app.data.remote.dto.UploadResponse("uploaded-note-blob"))
+        override suspend fun notesStorePut(body: StorePutRequest): Response<StoreResponse> {
+            notesPuts++
+            lastNotesShards = body.shards
+            return Response.success(StoreResponse(body.ciphertext, body.version + 1))
         }
 
         // Sharded files store: start empty; capture the PUT + its shards[] guard.
@@ -83,7 +71,7 @@ class WorkspaceSaveTest {
         }
     }
 
-    @Test fun save_merges_notes_module_on_409_and_retries() = runBlocking {
+    @Test fun save_writes_notes_to_sharded_store() = runBlocking {
         val session = Session("https://h", "tok", "sha256/x", null)
         val sh = SessionHolder().apply { set(session) }
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
@@ -92,16 +80,58 @@ class WorkspaceSaveTest {
 
         val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
 
+        // A note mutation seals + PUTs the sharded /notes/store (no longer a monolith module).
         val result = repo.save { m ->
             m.copy(notes = m.notes + Note(id = "n3", title = "New"))
         }
 
         assertTrue(result is Outcome.Ok)
-        // After the 409 the repo reloads (server has A + Server) and re-applies the
-        // mutate → all three notes present (last-write-wins merge).
-        val titles = (result as Outcome.Ok).value.manifest.notes.map { it.title }.toSet()
-        assertEquals(setOf("A", "Server", "New"), titles)
-        assertEquals(2, fakeApi.puts) // 409 then success
+        assertEquals("New", (result as Outcome.Ok).value.manifest.notes.single().title)
+        assertEquals(1, fakeApi.notesPuts)
+        // The note's shard blob ref is carried in the referential-integrity guard.
+        assertTrue(fakeApi.lastNotesShards!!.contains("uploaded-note-blob"))
+    }
+
+    /**
+     * The one-time monolith→sharded migration: the old `/store/notes` still holds a note, the
+     * sharded `/notes/store` is empty. Loading moves the note into the sharded store and blanks
+     * the monolith byte-exact (`{v:3,notes:[]}`) so a later "delete all" can't re-import it.
+     */
+    @Test fun load_migrates_notes_from_monolith_to_sharded() = runBlocking {
+        val session = Session("https://h", "tok", "sha256/x", null)
+        val sh = SessionHolder().apply { set(session) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val cache = WorkspaceCache()
+
+        val fakeApi = object : NotImplementedApi() {
+            var notesPuts = 0
+            var monolithBlank: String? = null
+            var monolithVersion = -1
+            override suspend fun moduleStore(module: String): Response<StoreResponse> =
+                if (module == "notes") Response.success(StoreResponse("""SEALED:{"v":3,"notes":[{"id":"n1","title":"Legacy"}]}""", 7))
+                else Response.success(StoreResponse(null, 0))
+            override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> {
+                assertEquals("notes", module)
+                monolithBlank = body.ciphertext; monolithVersion = body.version
+                return Response.success(StoreResponse(body.ciphertext, body.version + 1))
+            }
+            override suspend fun uploadNote(file: okhttp3.MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadResponse> =
+                Response.success(de.ledgerline.app.data.remote.dto.UploadResponse("migrated-note-blob"))
+            override suspend fun notesStorePut(body: StorePutRequest): Response<StoreResponse> {
+                notesPuts++
+                return Response.success(StoreResponse(body.ciphertext, body.version + 1))
+            }
+        }
+
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
+
+        val result = repo.load()
+        assertTrue(result is Outcome.Ok)
+        assertEquals("Legacy", (result as Outcome.Ok).value.manifest.notes.single().title)
+        assertEquals(1, fakeApi.notesPuts) // moved into the sharded store
+        // Monolith blanked byte-exact at its own version.
+        assertEquals("""SEALED:{"v":3,"notes":[]}""", fakeApi.monolithBlank)
+        assertEquals(7, fakeApi.monolithVersion)
     }
 
     @Test fun save_writes_folder_mutation_to_sharded_files_store() = runBlocking {

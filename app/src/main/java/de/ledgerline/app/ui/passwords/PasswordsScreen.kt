@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Close
@@ -32,8 +34,10 @@ import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Password
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Star
@@ -42,7 +46,6 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.material.icons.outlined.Wifi
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +53,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -83,6 +88,7 @@ import de.ledgerline.app.domain.model.SecretItem
 import de.ledgerline.app.domain.model.SecretTypes
 import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
+import de.ledgerline.app.ui.common.listSection
 import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.IconChip
 
@@ -160,12 +166,12 @@ private fun typeLabel(type: String): String = when (type) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PasswordsScreen(modifier: Modifier = Modifier, vm: PasswordsViewModel = hiltViewModel()) {
+fun PasswordsScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, vm: PasswordsViewModel = hiltViewModel()) {
     var route by remember { mutableStateOf<PwRoute>(PwRoute.List) }
     BackHandler(enabled = route !is PwRoute.List) { route = PwRoute.List }
 
     when (val r = route) {
-        is PwRoute.List -> PwList(vm, modifier, onOpen = { route = PwRoute.Detail(it) }, onNew = { route = PwRoute.Edit(vm.draft(it)) })
+        is PwRoute.List -> PwList(vm, modifier, onMenu = onMenu, onOpen = { route = PwRoute.Detail(it) }, onNew = { route = PwRoute.Edit(vm.draft(it)) })
         is PwRoute.Detail -> {
             val item = vm.secretById(r.id)
             if (item == null) { route = PwRoute.List } else {
@@ -178,7 +184,7 @@ fun PasswordsScreen(modifier: Modifier = Modifier, vm: PasswordsViewModel = hilt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onOpen: (String) -> Unit, onNew: (String) -> Unit) {
+private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onMenu: (() -> Unit)?, onOpen: (String) -> Unit, onNew: (String) -> Unit) {
     val ui by vm.state.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
     val typeFilter by vm.typeFilter.collectAsStateWithLifecycle()
@@ -191,37 +197,75 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onOpen: (String) 
     // is populated without a manual pull-to-refresh.
     androidx.compose.runtime.LaunchedEffect(Unit) { vm.reload() }
 
-    Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            de.ledgerline.app.ui.workspace.common.SearchField(query = query, onQueryChange = vm::setQuery)
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = favOnly, onClick = { vm.toggleFavoritesOnly() }, label = { Text("Favorites") })
-                FilterChip(selected = showTrash, onClick = { vm.setShowTrash(!showTrash) }, label = { Text(if (ui.trashCount > 0) "Trash (${ui.trashCount})" else "Trash") })
-                if (typeFilter != null) AssistChip(onClick = { vm.setTypeFilter(null) }, label = { Text(typeLabel(typeFilter!!)) })
-                val folders by vm.folders.collectAsStateWithLifecycle()
-                val folderFilter by vm.folderFilter.collectAsStateWithLifecycle()
-                if (folders.isNotEmpty()) {
-                    var folderMenu by remember { mutableStateOf(false) }
-                    Box {
-                        FilterChip(
-                            selected = folderFilter != null,
-                            onClick = { folderMenu = true },
-                            label = { Text(folders.firstOrNull { it.id == folderFilter }?.name ?: stringResource(de.ledgerline.app.R.string.pw_folder)) },
-                            leadingIcon = { Icon(Icons.Outlined.Folder, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                        )
-                        DropdownMenu(expanded = folderMenu, onDismissRequest = { folderMenu = false }) {
-                            DropdownMenuItem(text = { Text(stringResource(de.ledgerline.app.R.string.pw_folder_none)) }, onClick = { vm.setFolderFilter(null); folderMenu = false })
-                            folders.forEach { f -> DropdownMenuItem(text = { Text(f.name) }, onClick = { vm.setFolderFilter(f.id); folderMenu = false }) }
+    val folders by vm.folders.collectAsStateWithLifecycle()
+    val folderFilter by vm.folderFilter.collectAsStateWithLifecycle()
+    var searchActive by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var overflow by remember { mutableStateOf(false) }
+
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            Column {
+                de.ledgerline.app.ui.common.AppTopBar(
+                    title = stringResource(de.ledgerline.app.R.string.tab_passwords),
+                    onMenu = onMenu,
+                    actions = {
+                        IconButton(onClick = { searchActive = !searchActive; if (!searchActive) vm.setQuery("") }) {
+                            Icon(
+                                Icons.Outlined.Search,
+                                contentDescription = null,
+                                tint = if (searchActive) Brand.accent else LocalContentColor.current,
+                            )
                         }
-                    }
+                        Box {
+                            IconButton(onClick = { overflow = true }) {
+                                Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(de.ledgerline.app.R.string.action_more))
+                            }
+                            DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(de.ledgerline.app.R.string.pw_show_favorites)) },
+                                    leadingIcon = { Icon(if (favOnly) Icons.Outlined.Star else Icons.Outlined.StarBorder, null) },
+                                    onClick = { vm.toggleFavoritesOnly(); overflow = false },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(if (ui.trashCount > 0) stringResource(de.ledgerline.app.R.string.trash_open, ui.trashCount) else stringResource(de.ledgerline.app.R.string.pw_tab_all)) },
+                                    leadingIcon = { Icon(Icons.Outlined.Delete, null) },
+                                    onClick = { vm.setShowTrash(!showTrash); overflow = false },
+                                )
+                                if (folders.isNotEmpty()) {
+                                    androidx.compose.material3.HorizontalDivider()
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(de.ledgerline.app.R.string.pw_folder_none)) },
+                                        leadingIcon = { Icon(Icons.Outlined.Folder, null) },
+                                        trailingIcon = { if (folderFilter == null) Icon(Icons.Filled.Check, null, tint = Brand.accent) },
+                                        onClick = { vm.setFolderFilter(null); overflow = false },
+                                    )
+                                    folders.forEach { f ->
+                                        DropdownMenuItem(
+                                            text = { Text(f.name) },
+                                            leadingIcon = { Icon(Icons.Outlined.Folder, null) },
+                                            trailingIcon = { if (folderFilter == f.id) Icon(Icons.Filled.Check, null, tint = Brand.accent) },
+                                            onClick = { vm.setFolderFilter(f.id); overflow = false },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+                if (searchActive) {
+                    de.ledgerline.app.ui.workspace.common.SearchField(query = query, onQueryChange = vm::setQuery)
                 }
             }
+        },
+    ) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding)) {
             androidx.compose.material3.pulltorefresh.PullToRefreshBox(
                 isRefreshing = refreshing,
                 onRefresh = vm::reload,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                modifier = Modifier.fillMaxSize(),
             ) {
-                LazyColumn(Modifier.fillMaxSize()) {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = de.ledgerline.app.ui.common.ListBottomPadding) {
                     if (ui.secrets.isEmpty()) {
                         item {
                             Box(Modifier.fillParentMaxSize().padding(24.dp), Alignment.Center) {
@@ -232,22 +276,38 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onOpen: (String) 
                             }
                         }
                     } else {
-                        items(ui.secrets, key = { it.id }) { s ->
-                            ListItem(
-                                modifier = Modifier.clickable { onOpen(s.id) },
-                                leadingContent = { SecretAvatar(s, vm) },
-                                headlineContent = { Text(s.title.ifBlank { typeLabel(s.type) }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                                supportingContent = { SecretFields.subtitle(s).takeIf { it.isNotBlank() }?.let { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
-                                trailingContent = { if (s.favorite) Icon(Icons.Outlined.Star, contentDescription = null, tint = Brand.accent) },
+                        listSection(ui.secrets, key = { it.id }) { s ->
+                            de.ledgerline.app.ui.common.LedgerRow(
+                                title = s.title.ifBlank { typeLabel(s.type) },
+                                subtitle = SecretFields.subtitle(s).takeIf { it.isNotBlank() },
+                                leading = { SecretAvatar(s, vm) },
+                                trailing = {
+                                    if (s.favorite) Icon(Icons.Outlined.Star, contentDescription = null, tint = Brand.accent, modifier = Modifier.size(18.dp))
+                                    else de.ledgerline.app.ui.common.RowChevron()
+                                },
+                                onClick = { onOpen(s.id) },
                             )
                         }
                     }
                 }
             }
-        }
-        if (!showTrash) {
-            FloatingActionButton(onClick = { picker = true }, modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp)) {
-                Icon(Icons.Filled.Add, contentDescription = stringResource(de.ledgerline.app.R.string.cd_add))
+            val vaultTabs = listOf(
+                stringResource(de.ledgerline.app.R.string.pw_tab_all),
+                stringResource(de.ledgerline.app.R.string.pw_tab_logins),
+                stringResource(de.ledgerline.app.R.string.pw_tab_cards),
+                stringResource(de.ledgerline.app.R.string.pw_tab_passkeys),
+            )
+            val vaultTabIndex = when (typeFilter) { "login" -> 1; "card" -> 2; "passkey" -> 3; else -> 0 }
+            de.ledgerline.app.ui.workspace.common.FloatingTabBar(
+                tabs = vaultTabs,
+                selectedIndex = vaultTabIndex,
+                onSelect = { vm.setTypeFilter(when (it) { 1 -> "login"; 2 -> "card"; 3 -> "passkey"; else -> null }) },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+            if (!showTrash) {
+                FloatingActionButton(onClick = { picker = true }, modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(20.dp).padding(bottom = 60.dp)) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(de.ledgerline.app.R.string.cd_add))
+                }
             }
         }
     }

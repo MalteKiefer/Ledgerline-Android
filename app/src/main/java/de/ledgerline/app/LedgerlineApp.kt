@@ -8,9 +8,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.components.SingletonComponent
 import de.ledgerline.app.core.offline.BackgroundSync
-import okhttp3.OkHttpClient
-import org.maplibre.android.MapLibre
-import org.maplibre.android.module.http.HttpRequestUtil
+import org.mapsforge.map.android.graphics.AndroidGraphicFactory
 
 @HiltAndroidApp
 class LedgerlineApp : Application() {
@@ -26,24 +24,14 @@ class LedgerlineApp : Application() {
         // One-time init so PdfBox can load its bundled font resources for rendering.
         PDFBoxResourceLoader.init(applicationContext)
 
-        // MapLibre must be initialized once before any MapView is inflated. No token is
-        // needed — we render a custom OSM raster style, not a Mapbox-hosted style.
-        MapLibre.getInstance(applicationContext)
-        // The OSM tile usage policy requires a descriptive User-Agent (osmdroid did this
-        // via Configuration.userAgentValue = packageName). MapLibre fetches tiles through
-        // its own OkHttp stack, so route that stack through an interceptor that stamps a
-        // descriptive UA on every request. Dedicated client → no telemetry, no sharing
-        // with the app's pinned API client.
-        HttpRequestUtil.setOkHttpClient(
-            OkHttpClient.Builder()
-                .addInterceptor { chain ->
-                    val req = chain.request().newBuilder()
-                        .header("User-Agent", "de.ledgerline.app")
-                        .build()
-                    chain.proceed(req)
-                }
-                .build(),
-        )
+        // mapsforge must have its graphic factory created once before any MapView/Bitmap is
+        // used. It is the app's sole map engine: offline vector (.map) rendering + the online
+        // OSM tile fallback (descriptive User-Agent set on the tile source, no telemetry).
+        AndroidGraphicFactory.createInstance(this)
+        // Coarser pinch-zoom step: fewer intermediate re-renders per gesture → snappier, bigger
+        // zoom jumps and less CPU (default ~1.05 re-renders very finely and feels sluggish).
+        org.mapsforge.map.android.input.TouchGestureHandler.DELTA_SCALE = 1.2
+
         // Keep the offline cache fresh while the process lives (ZK-safe; see BackgroundSync).
         EntryPointAccessors.fromApplication(this, AppEntryPoint::class.java).backgroundSync().start()
     }

@@ -66,7 +66,7 @@ widerrufen/verloren → neu pairen. Rate-Limit `/auth/pair`: 30/min/IP; bei `429
 |---|---|---|
 | POST | `/api/v1/auth/pair` | Code claimen |
 | POST | `/api/v1/auth/pair/collect` `{code}` | Pollen; nach Freigabe `{token,user}` (einmalig) |
-| GET | `/api/v1/me` | `{ user, usage, wipe?, prefs }` (Remote-Wipe-Flag, §Kill-Switch) |
+| GET | `/api/v1/me` | `{ user, usage:{files,gallery,quota?}, wipe?, prefs }` — `usage.quota` = kombiniertes Files+Gallery-Limit in Bytes, `null`=unbegrenzt (web `7b2ad183`); Remote-Wipe-Flag §Kill-Switch |
 | GET | `/api/v1/avatar` | IdP-Avatar streamen |
 | POST | `/api/v1/device/heartbeat` | Idle/Sync melden → Wipe-Flag |
 | DELETE | `/api/v1/auth/session` | Aktuelles Token widerrufen (Logout) |
@@ -82,9 +82,11 @@ widerrufen/verloren → neu pairen. Rate-Limit `/auth/pair`: 30/min/IP; bei `429
 Alle Payloads sind **opak** (Ciphertext / versiegeltes Manifest / KDF-Params).
 Owner-scoped (fremder Blob → `404`). **Wichtige Änderung ggü. der ersten Fassung:**
 der Monolith `GET/PUT /api/v1/store` ist **serverseitig entfernt** — die Route ist
-`/store/{module}` (`whereAlpha`), bare `/store` **404t**. Der Workspace nutzt jetzt die
-**per-Modul-Stores** (notes/todos/bookmarks/contacts, §14 R0 erledigt); Gallery **und
-Files** nutzen jetzt den v3-Sharded-Store (§14 R1 erledigt 2026-07-26).
+`/store/{module}` (`whereAlpha`), bare `/store` **404t**. Der Workspace nutzt die
+**per-Modul-Stores** (todos/bookmarks/contacts, §14 R0 erledigt); **Notes** wurde web-seitig
+auf den **sharded** `/notes/store` graduiert, **Passwords** auf `/passwords/store` — Android
+liest/schreibt beide jetzt sharded (mit One-Time-Monolith-Migration, §14 erledigt 2026-07-27).
+Gallery **und Files** nutzen den v3-Sharded-Store (§14 R1 erledigt 2026-07-26).
 
 ### Vault (Entsperren)
 - `GET /vault` → `{ configured, salt, kdf_ops, kdf_mem, wrapped_vault_key,
@@ -95,7 +97,12 @@ Files** nutzen jetzt den v3-Sharded-Store (§14 R1 erledigt 2026-07-26).
 - `PUT /store/{module}` `{ ciphertext, version, shards?[] }` → `{ version }`; **`409`**
   bei Versionskonflikt (neu laden → mergen → mit neuer `version` erneut PUT; optimistic
   concurrency, Fremd-Keys IMMER erhalten). `422 missing_shard` bei referenzieller Lücke.
-  - `module ∈ { notes, todos, bookmarks, contacts, invoices, passwords, health, sharing, explore }`.
+  - `module ∈ { todos, bookmarks, contacts, invoices, health, sharing, explore }` (monolith).
+    **`notes` + `passwords` sind NICHT mehr monolith** — sie leben jetzt in eigenen Sharded-Stores
+    (`/notes/store`, `/passwords/store`, web `LLNotesStore`/`LLPasswordsStore`); der alte
+    `/store/{notes,passwords}`-Slot wird nur noch für die One-Time-Migration gelesen + danach geblankt.
+- **Notes-Index (sharded, eigener Store):** `GET/PUT /notes/store` (recordKey `notes`, keine Collections).
+- **Passwords-Index (sharded):** `GET/PUT /passwords/store` (recordKey `secrets` + `secretFolders`-Collection = `foldersRef/Key/Hash`).
 - **Files-Index (sharded, eigener Store):** `GET/PUT /files/store`.
 - **Gallery-Index (sharded):** `GET/PUT /gallery/store`.
 - **Shared-Vault-Manifest:** `GET/PUT /vaults/{vault}/store`.
@@ -143,8 +150,12 @@ Identisches Muster je Prefix (`files`, `gallery`, `contacts`, `explore`, `vaults
   (byte-exakte sealed-manifest-Builder: file `{kind,name,files:[{name,mime,size,path,ref,key}]}`,
   gallery `{name,allowDownload,photos:[{id,t,at,w,h,cap,tR,tK,…}]}`; SK nur im `#s:`-Fragment,
   per-blob-key re-wrap unter SK). Link = `{baseUrl}/s/{token}#s:{sk}`. `update` = Re-Push (gleicher
-  Token+SK; Passwort leer = beibehalten, `clear_password` web-parity). `share`-Feld typisiert auf
-  FileEntry/NamedFolder/GalleryAlbum, presence-aware Codec-Overlay (kein Datenverlust). UI: Overflow
+  Token+SK; Passwort leer = beibehalten, `clear_password` web-parity). **Optimistic-Version-Guard
+  (2026-07-27, web `a4ec0747`):** create/update liefern `version`; Android persistiert sie in
+  `ShareInfo.version` und sendet sie als `expected_version` beim Update → 409 (loud Err) statt
+  Clobber bei Parallel-Edit (older shares ohne Version = blind path; self-heals beim Reload).
+  `share`-Feld typisiert auf FileEntry/NamedFolder/GalleryAlbum, presence-aware Codec-Overlay (kein
+  Datenverlust; `version` jetzt Teil von `ShareInfo` → wird nicht mehr gedroppt). UI: Overflow
   „Link teilen" → `ShareLinkSheet` (Passwort/Ablauf/Download-Toggle, Create/**Update**/Copy/Send/Revoke).
   Interfaces `FileSharing`/`AlbumSharing` (Hilt). Tests `ShareManifestsTest`+`ShareCodecTest`.
 - **`raw-batch` erledigt (2026-07-27):** `POST /gallery/raw-batch {blobs}` → `RawBatchFraming`
@@ -339,8 +350,11 @@ allen `*Ref`/`*Key` → `PUT /gallery/store`.
 ## 7. Tech-Stack (Ist-Stand)
 - **Kotlin** + **Jetpack Compose** (Material 3), **Hilt** DI, **Retrofit**+**OkHttp**
   (Bearer-Interceptor, SPKI-Pinning, 429-Backoff), **lazysodium** (Argon2id im
-  `Dispatcher.Default`, VK in-memory), **CameraX**+**ML Kit** (QR), **MapLibre**
-  (Galerie-Karte, geclusterte GeoJSON-Marker), **EncryptedSharedPreferences**
+  `Dispatcher.Default`, VK in-memory), **CameraX**+**ML Kit** (QR), **mapsforge**
+  (die **einzige** Karten-Engine appweit — offline `.map`-Vektor + online-OSM-Fallback;
+  MapLibre 2026-07-27 vollständig ersetzt, inkl. eigenem Grid-Clustering `PhotoClusterLayer`),
+  raw AOSP **LocationManager** (GPS-Tracker, kein Play-Services), **Foreground-Service**
+  (`location`-Typ, Track-Aufnahme-Notification), **EncryptedSharedPreferences**
   (Keystore, optional Biometric), **WorkManager** (Backup/Sync while-alive).
 - `minSdk 36`, `targetSdk 36`, `compileSdk 37`. Paket `de.ledgerline.app`.
 - Schichten: `ui/*` (Compose-Screens + ViewModels), `domain/*` (Modelle, UseCases),
@@ -502,10 +516,28 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
    shardBits,shards[],caps:{},foldersRef/Key/Hash}`; Bucket = `uint32(hexPrefix8(id)) >>> (32-shardBits)`.
 3. **Gallery-v3-Sharded schreiben** (liest heute schon v2/v3-Shards) + **Chunked Upload**
    (`upload/init|part|complete|abort`) für Dateien/Videos >64 MiB; `raw-batch` für Thumbnail-Batches.
+4. **Notes + Passwords → Sharded — ERLEDIGT (2026-07-27, on-device-Verifikation offen).** Web hat
+   `notes` (`c4d25d7c`) **und** `passwords` (`bc7f3694`) vom Monolith `/store/{module}` auf eigene
+   **Sharded-Stores** graduiert (`/notes/store`, `/passwords/store`; `LLNotesStore`/`LLPasswordsStore`)
+   **und den alten Monolith geblankt** → ein Android-Client, der weiter den Monolith las, zeigte für
+   jeden Web/Extension-Nutzer **leere Notizen/leeren Passwort-Tresor**. Behoben via generischer
+   `ShardedStoreEngine` (+ `SealedShardWriter`/`ShardRoot`, modul-agnostisch, gleiche
+   `CanonicalJson`/`GallerySharding`-Bausteine wie Files/Gallery): `WorkspaceRepository` fährt Notes
+   als Sharded-Slice (`notesEngine`, load/save/409-Rebase neben der Files-Slice), `PasswordsRepository`
+   komplett auf die Engine portiert. **Raw-Overlay-Codecs** (`WorkspaceRecordCodec.encode/decodeNote`
+   bereits vorhanden; neu `SecretRecordCodec` für `secrets`+`secretFolders`) → kein Feldverlust.
+   **One-Time-Dual-Read-Migration** byte-exakt zu Web (`migrateFromMonolith`): Monolith lesen → in
+   Sharded-Store verschieben → Monolith blanken (Notes `{v:3,notes:[]}`, Passwords
+   `{v:3,secrets:[],secretFolders:[],pwVaultMigrated:true}`), nur solange der Sharded-Store leer ist.
+   Offline-Root-Cache je Store (`workspace_notes_root`, `passwords_root`). Tests: `WorkspaceSaveTest`
+   (sharded-notes-write + monolith→sharded-migration), `SecretRecordCodecTest` (6 Raw-Overlay-Fälle).
+   **Offen:** Invoices-Modul ist web-seitig ebenfalls sharded (`d2d5180a`) — in Android noch gar nicht
+   gebaut (P1). Gallery-Original-Streaming (§oben) unverändert offen.
 
 **P1 — Feature-Paritätslücken (iOS/Web haben, Android nicht):**
-- **Passwort-Manager — GRUNDGERÜST ERLEDIGT (2026-07-26).** `store/passwords`-Modul via
-  `PasswordsRepository` (409-Merge), `SecretItem`-Model (opake `fields:JsonObject` = verlustfrei,
+- **Passwort-Manager — GRUNDGERÜST ERLEDIGT (2026-07-26; Sharded-Store 2026-07-27, s. P0-Punkt 4).**
+  `PasswordsRepository` schreibt jetzt den **sharded** `/passwords/store` (nicht mehr Monolith),
+  `SecretItem`-Model (opake `fields:JsonObject` = verlustfrei,
   9 Typen `SecretTypes`), `PasswordsViewModel` (Liste/Suche/Filter/Favoriten/Trash/Versionen),
   UI `ui/passwords/PasswordsScreen` (Liste→Detail→Edit, Typ-Picker, Live-TOTP, Reveal/Copy,
   Generator). Logik: `Totp` (RFC-6238 SHA1/6/30, gegen RFC-Vektor getestet), `PasswordStrength`
@@ -562,7 +594,47 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   (`POST /devices/{token}/wipe`); aktuelles Gerät markiert, nicht selbst-widerrufbar
   (`AccountRepository.devices/revokeDevice/wipeDevice` + `DeviceDto`). **Notifications**,
   **Konto-Export/Löschen** weiterhin offen.
-- **Explore/Maps** (Tracks, Routing), **Health-Modul**, **Invoices-Modul**.
+- **Kombinierter Speicher-Ring — ERLEDIGT (2026-07-27, web `7b2ad183`):** `/me` liefert jetzt
+  `usage.quota` (kombiniertes Files+Gallery-Limit, `null`=unbegrenzt). Der Home-Hub-Ring zeigt jetzt
+  den **kontoweiten** Verbrauch (`AccountRepository.snapshot()` = ein `/me`-Call für Name + `used`
+  (files+gallery) + `quota`) statt nur Files; unbegrenzt → „—". Test `AccountRepositoryTest`.
+- **Explore/Maps — ERLEDIGT (2026-07-27, on-device-Verifikation offen).** Neuer „Entdecken"-Tab
+  (Drawer) mit **Karte** (passiver mapsforge-Viewer + Locate-Button), **Tracker** (GPS-Aufnahme
+  hike/run/cycle) und **Tracks** (Liste + Detail mit Höhenprofil + GPX-Export). Datenschicht:
+  `store/explore`-Modul (`ExploreRepository`, 409-Merge, `{v:3,tracks,couplings,settings}`,
+  No-Data-Loss-Overlay `ExploreTrackCodec`, Suite-1/Padmé — byte-kompatibel Web/iOS). Recorder:
+  `TrackerEngine` (AOSP `LocationManager`, Punkt-Filter 0–50 m/≥1 m) + `TrackingService`
+  (Foreground `location` + Ongoing-Notification als Live-Activity-Ersatz). Stats **byte-exakt**
+  zu Web `track-parse.js` (`TrackStatsComputer`, ±5 m-Hysterese, 38 Tests). Offline-Karten:
+  `OfflineMapStore` + Region-Katalog (`assets/map-regions.json`, download.mapsforge.org) mit
+  Download/Fortschritt/Löschen. Einheiten (metrisch/imperial) + Koordinatenformat (dd/ddm/dms/
+  utm/mgrs) als Settings. `ExploreCache` bei Lock/Logout geleert. **Karte** zusätzlich: Orts-/
+  Koordinaten-**Suche** (Nominatim-Forward → recenter), **Teilen** von Ort+Koordinaten (`geo:`-URI,
+  iOS-`LocationShare`-Parität), **Reverse-Geocode-Ortschip**, **Kompass + Heading-Ausrichtung**
+  (Rotation-Vector-Sensor rotiert die Karte, Kompass-Reset), **Tourenplanung** (Wegpunkte →
+  `/maps/route` snappen → als `planned`-Track speichern), **GPX/KML-Import** (`TrackImport`,
+  namespace-agnostisch, byte-nah zu Web `track-parse.js`; inline, ohne `explore/*`-Roh-Blob).
+  **Offen (klein):** `explore/*`-Roh-Blob für exakten Re-Export importierter Dateien, FIT/KMZ-
+  Import, Hintergrund-Location-Rationale-Feinschliff.
+- **Health-Modul — ERLEDIGT (2026-07-27, on-device-Verifikation offen).** Voller ZK-Health-Client
+  auf dem monolithischen `store/health` (`{v:3,healthEntries,healthProfile,healthFasts}`, gleiche
+  Optimistic-409-Engine wie Explore via `optimisticSave`/`cachedOrStore`): `HealthRepository` +
+  `HealthCache` + `HealthRecordCodec` (Raw-Overlay → **kein Feldverlust**; unbekannte Top-Level- und
+  Per-Record-Keys überleben; Zahlen als saubere Tokens `numToken`). 6 Metriken (weight/bp/pulse/spo2/
+  temp/glucose, kanonische Einheiten kg/°C/mg-dL; Display-Konvertierung kg↔lb, °C↔°F, mg-dL↔mmol-L
+  aus `healthProfile.units`). Pure Logik byte-nah zum Web (`core/health/HealthMetrics` = computeAge/
+  computeBmi/classify/Konvertierungen, `HealthFasting` = Intervallfasten inkl. `normalizeFasts`-
+  Single-Active-Invariante, `HealthCompute` = Stats/Display/CSV). UI (`ui/health/`, M3-Expressive
+  über `Brand`/`cardSurface`): Metrik-Auswahl mit Ampel-Dot, Detail mit nativem Compose-Chart
+  (`HealthChart`, kein uPlot) + Referenzbändern + Zielgewicht-Linie + Bereichsfiltern (7d/30d/90d/1y/
+  all) + Stats + Einträgen (Edit/Delete), Intervallfasten-Karte (Live-Timer, Templates 12:12…20:4,
+  Verlauf), Stammdaten (Alter/BMI, Größe/Geburtsdatum/Geschlecht/Zielgewicht/Einheiten), CSV-Export
+  je Metrik (ACTION_SEND EXTRA_TEXT wie GPX). Drawer-Tab „Gesundheit". Cache bei Lock/Logout geleert.
+  Strings EN/DE/RU. Tests: `HealthMetricsTest`/`HealthFastingTest`/`HealthComputeTest`/
+  `HealthRecordCodecTest`/`HealthRepositoryTest` (21). **Offen (klein):** Doctor-Report/Print-PDF (Web
+  hat eine Print-Ansicht; Android macht CSV-Share), globale Einheiten-Prefs-Sync (`/preferences`;
+  Android hält die Einheiten in `healthProfile.units`, web-kompatibel), on-device-Verifikation.
+- **Invoices-Modul.**
 - Galerie-ML-Parität: semantische Suche (embed-text ist da), Duplikate, Alben-Feinschliff.
 
 **P2 — Nav-/UX-Angleichung an iOS:** Tab-Struktur (Passwords-Tab), Grouped-List +
@@ -712,7 +784,8 @@ Tests grün (`PQKEMKatTest` on-JVM, `*InstrumentedTest` + **`CryptoKatTest`** on
   Drawer) + `material3.adaptive:{adaptive,adaptive-layout,adaptive-navigation}:1.3.0-rc01`
   (`ListDetailPaneScaffold`, `currentWindowAdaptiveInfo`). Bei 1.5.0-stable zurück auf stable.
 - Sonst alle auf neuestem Stand (2026-07-25): AGP 9.3.1, Kotlin 2.4.10, lifecycle 2.11.0,
-  camerax 1.6.1, mockk 1.14.11, MapLibre 13.4.1, jna 5.19.1, zxing 3.5.4, BC 1.84,
+  camerax 1.6.1, mockk 1.14.11, **mapsforge 0.25.0** (Karten-Engine; MapLibre entfernt),
+  jna 5.19.1, zxing 3.5.4, BC 1.84,
   androidx.credentials 1.6.0 (Passkeys; 1.7.0 ist alpha → gehalten).
   androidx.autofill 1.3.0 (Inline-Autofill-Presentations).
   (KSP 2.3.10, Hilt 2.60.1, Compose-BOM 2026.06.01 waren bereits latest.)

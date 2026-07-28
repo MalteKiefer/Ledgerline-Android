@@ -134,20 +134,22 @@ class ShareRepository(
             val kind = if (isFolder) "folder" else "file"
             val sk = shareCrypto.newShareKey()
             val build = buildFileShare(manifest, id, isFolder, sk, vk) ?: return@withContext Outcome.Err(ErrorKind.HTTP)
-            val token = try {
+            val body = try {
                 val res = apiProvider(session).createFileShare(
                     ShareCreateRequest(kind, build.sealed, build.refs, allowDownload = true, expiresAt = opts.expiresAtIso, password = opts.password?.trim()?.ifBlank { null }),
                 )
                 if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.HTTP)
-                res.body()?.token ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                res.body() ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
             } catch (e: Exception) {
                 return@withContext Outcome.Err(ErrorKind.NETWORK, e)
             }
+            val token = body.token
 
             val info = ShareInfo(
                 token = token, sk = sk, kind = kind,
                 hasPassword = !opts.password.isNullOrBlank(),
                 expiresAt = opts.expiresAtIso, created = nowIso(),
+                version = body.version,
             )
             val saved = workspaceRepo.save { m -> applyFileShare(m, id, isFolder, info) }
             if (saved is Outcome.Err) return@withContext saved
@@ -172,12 +174,15 @@ class ShareRepository(
             val build = buildFileShare(manifest, id, isFolder, sk, vk) ?: return@withContext Outcome.Err(ErrorKind.HTTP)
             val newPassword = opts.password?.trim()?.ifBlank { null }
             val clearPassword = if (newPassword == null && !existing.hasPassword) true else null
-            try {
+            val newVersion = try {
                 val res = apiProvider(session).updateFileShare(
                     existing.token,
-                    de.ledgerline.app.data.remote.dto.ShareUpdateRequest(build.sealed, build.refs, allowDownload = true, expiresAt = opts.expiresAtIso, password = newPassword, clearPassword = clearPassword),
+                    de.ledgerline.app.data.remote.dto.ShareUpdateRequest(build.sealed, build.refs, allowDownload = true, expiresAt = opts.expiresAtIso, password = newPassword, clearPassword = clearPassword, expectedVersion = existing.version),
                 )
+                // A 409 means a concurrent edit from another device won the race — surface the error
+                // (loud, web parity) rather than clobber it. The stored version refreshes on reload.
                 if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.HTTP)
+                res.body()?.version ?: existing.version
             } catch (e: Exception) {
                 return@withContext Outcome.Err(ErrorKind.NETWORK, e)
             }
@@ -185,6 +190,7 @@ class ShareRepository(
             val info = existing.copy(
                 expiresAt = opts.expiresAtIso,
                 hasPassword = when { newPassword != null -> true; clearPassword == true -> false; else -> existing.hasPassword },
+                version = newVersion,
             )
             val saved = workspaceRepo.save { m -> applyFileShare(m, id, isFolder, info) }
             if (saved is Outcome.Err) return@withContext saved
@@ -266,20 +272,22 @@ class ShareRepository(
             val sk = shareCrypto.newShareKey()
             val (sealed, refs) = buildAlbumShare(manifest, albumId, sk, vk, opts.allowDownload)
                 ?: return@withContext Outcome.Err(ErrorKind.HTTP)
-            val token = try {
+            val body = try {
                 val res = apiProvider(session).createGalleryShare(
                     ShareCreateRequest(kind = null, sealed, refs, allowDownload = opts.allowDownload, expiresAt = opts.expiresAtIso, password = opts.password?.trim()?.ifBlank { null }),
                 )
                 if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.HTTP)
-                res.body()?.token ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                res.body() ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
             } catch (e: Exception) {
                 return@withContext Outcome.Err(ErrorKind.NETWORK, e)
             }
+            val token = body.token
 
             val info = ShareInfo(
                 token = token, sk = sk, allowDownload = opts.allowDownload,
                 hasPassword = !opts.password.isNullOrBlank(),
                 expiresAt = opts.expiresAtIso, created = nowIso(),
+                version = body.version,
             )
             val saved = galleryRepo.save { m -> applyAlbumShare(m, albumId, info) }
             if (saved is Outcome.Err) return@withContext saved
@@ -300,12 +308,13 @@ class ShareRepository(
                 ?: return@withContext Outcome.Err(ErrorKind.HTTP)
             val newPassword = opts.password?.trim()?.ifBlank { null }
             val clearPassword = if (newPassword == null && !existing.hasPassword) true else null
-            try {
+            val newVersion = try {
                 val res = apiProvider(session).updateGalleryShare(
                     existing.token,
-                    de.ledgerline.app.data.remote.dto.ShareUpdateRequest(sealed, refs, allowDownload = opts.allowDownload, expiresAt = opts.expiresAtIso, password = newPassword, clearPassword = clearPassword),
+                    de.ledgerline.app.data.remote.dto.ShareUpdateRequest(sealed, refs, allowDownload = opts.allowDownload, expiresAt = opts.expiresAtIso, password = newPassword, clearPassword = clearPassword, expectedVersion = existing.version),
                 )
                 if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.HTTP)
+                res.body()?.version ?: existing.version
             } catch (e: Exception) {
                 return@withContext Outcome.Err(ErrorKind.NETWORK, e)
             }
@@ -313,6 +322,7 @@ class ShareRepository(
             val info = existing.copy(
                 allowDownload = opts.allowDownload, expiresAt = opts.expiresAtIso,
                 hasPassword = when { newPassword != null -> true; clearPassword == true -> false; else -> existing.hasPassword },
+                version = newVersion,
             )
             val saved = galleryRepo.save { m -> applyAlbumShare(m, albumId, info) }
             if (saved is Outcome.Err) return@withContext saved

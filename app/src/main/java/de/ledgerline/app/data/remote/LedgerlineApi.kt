@@ -126,6 +126,36 @@ interface LedgerlineApi {
     suspend fun filesReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
 
     // Store v3 sharded files index (root pointer table + external shard/collection blobs).
+    // --- Notes sharded store + blobs (web migrated notes off the monolith, §P0) ---
+    @GET("api/v1/notes/store")
+    suspend fun notesStore(): Response<StoreResponse>
+
+    @PUT("api/v1/notes/store")
+    suspend fun notesStorePut(@Body body: StorePutRequest): Response<StoreResponse>
+
+    @GET("api/v1/notes/raw/{blob}")
+    @Streaming
+    suspend fun rawNote(@Path("blob") blob: String): Response<ResponseBody>
+
+    @Multipart
+    @POST("api/v1/notes/upload")
+    suspend fun uploadNote(@Part file: MultipartBody.Part): Response<UploadResponse>
+
+    // --- Passwords sharded store + blobs (web migrated passwords off the monolith, §P0) ---
+    @GET("api/v1/passwords/store")
+    suspend fun passwordsStore(): Response<StoreResponse>
+
+    @PUT("api/v1/passwords/store")
+    suspend fun passwordsStorePut(@Body body: StorePutRequest): Response<StoreResponse>
+
+    @GET("api/v1/passwords/raw/{blob}")
+    @Streaming
+    suspend fun rawPassword(@Path("blob") blob: String): Response<ResponseBody>
+
+    @Multipart
+    @POST("api/v1/passwords/upload")
+    suspend fun uploadPassword(@Part file: MultipartBody.Part): Response<UploadResponse>
+
     @GET("api/v1/files/store")
     suspend fun filesStore(): Response<StoreResponse>
 
@@ -212,6 +242,10 @@ interface LedgerlineApi {
         @Query("lat") lat: Double,
         @Query("lng") lng: Double,
     ): Response<ReverseResponse>
+
+    /** Snap a `lat,lng;lat,lng;…` waypoint string to a routed path (Explore tour planning). */
+    @GET("api/v1/maps/route")
+    suspend fun mapsRoute(@Query("points") points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse>
 
     // --- Contacts avatar blobs (records themselves live in the /store manifest) ---
 

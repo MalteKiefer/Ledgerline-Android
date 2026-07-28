@@ -9,6 +9,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -22,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Contacts
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
@@ -128,18 +131,17 @@ fun WorkspaceScaffold(
                 )
             }
             Box(Modifier.weight(1f).fillMaxSize()) {
-            // Drawer is the primary navigation now (no bottom pill); a shared top bar on every
-            // surface: drawer (menu) + title + global search.
-            val primaryBar: @Composable (Int) -> Unit = { titleRes ->
+            // Drawer is the primary navigation now (no bottom pill). Module screens get a single
+            // clean bar: drawer (menu) + title. Each screen owns its own in-context search/actions
+            // (no duplicated top-bar magnifier); global cross-module search lives on Home + the
+            // drawer's search row. An optional [actions] slot lets a screen fold its contextual
+            // controls into this one bar instead of adding a second toolbar underneath.
+            val primaryBar: @Composable (Int, @Composable RowScope.() -> Unit) -> Unit = { titleRes, actions ->
                 if (!fullscreen.value) {
                     AppTopBar(
                         title = stringResource(titleRes),
                         onMenu = { scope.launch { drawerState.open() } },
-                        actions = {
-                            androidx.compose.material3.IconButton(onClick = { searchOpen = true }) {
-                                Icon(Icons.Outlined.Search, stringResource(R.string.search_everything))
-                            }
-                        },
+                        actions = actions,
                     )
                 }
             }
@@ -164,25 +166,29 @@ fun WorkspaceScaffold(
                             },
                         ) { p -> HomeScreen(Modifier.padding(p), onOpen = navigate) }
 
-                        WorkspaceDest.Files -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_files) }) { p -> FilesScreen(Modifier.padding(p)) }
-                        WorkspaceDest.Photos -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_gallery) }) { p -> GalleryScreen(Modifier.padding(p)) }
-                        WorkspaceDest.Vault -> AppScaffold(immersive = fullscreen.value, topBar = { primaryBar(R.string.tab_passwords) }) { p -> de.ledgerline.app.ui.passwords.PasswordsScreen(Modifier.padding(p)) }
+                        WorkspaceDest.Files -> FilesScreen(onMenu = { scope.launch { drawerState.open() } })
+                        WorkspaceDest.Photos -> GalleryScreen(onMenu = { scope.launch { drawerState.open() } })
+                        WorkspaceDest.Vault -> de.ledgerline.app.ui.passwords.PasswordsScreen(onMenu = { scope.launch { drawerState.open() } })
 
                         WorkspaceDest.Notes -> AppScaffold(
                             immersive = fullscreen.value,
-                            topBar = { primaryBar(R.string.tab_notes) },
+                            topBar = { primaryBar(R.string.tab_notes) {} },
                         ) { p -> NotesScreen(Modifier.padding(p)) }
 
                         WorkspaceDest.Todos -> AppScaffold(
-                            topBar = { primaryBar(R.string.tab_todos) },
+                            topBar = { primaryBar(R.string.tab_todos) {} },
                         ) { p -> TodosScreen(Modifier.padding(p)) }
 
                         WorkspaceDest.Bookmarks -> AppScaffold(
                             immersive = fullscreen.value,
-                            topBar = { primaryBar(R.string.menu_bookmarks) },
+                            topBar = { primaryBar(R.string.menu_bookmarks) {} },
                         ) { p -> BookmarksScreen(Modifier.padding(p)) }
 
-                        WorkspaceDest.Contacts -> ContactsScreen(onExit = { dest = lastPrimary })
+                        WorkspaceDest.Contacts -> ContactsScreen(onMenu = { scope.launch { drawerState.open() } })
+
+                        WorkspaceDest.Explore -> de.ledgerline.app.ui.explore.ExploreScreen(onMenu = { scope.launch { drawerState.open() } })
+
+                        WorkspaceDest.Health -> de.ledgerline.app.ui.health.HealthScreen(onMenu = { scope.launch { drawerState.open() } })
 
                         WorkspaceDest.Settings -> SettingsContent(
                             onLockNow = onLockNow,
@@ -290,6 +296,8 @@ private fun DrawerSheet(current: WorkspaceDest, onSearch: () -> Unit, onSelect: 
                     WorkspaceDest.Todos to Icons.Outlined.CheckCircle,
                     WorkspaceDest.Bookmarks to Icons.Outlined.Bookmarks,
                     WorkspaceDest.Contacts to Icons.Outlined.Contacts,
+                    WorkspaceDest.Explore to Icons.Outlined.Map,
+                    WorkspaceDest.Health to Icons.Outlined.MonitorHeart,
                 ).forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
             }
             androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))

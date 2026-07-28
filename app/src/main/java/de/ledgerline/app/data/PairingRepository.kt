@@ -20,7 +20,11 @@ import java.security.cert.X509Certificate
  * over an unpinned but HTTPS + system-CA-validated connection, and the leaf SPKI
  * is captured from the TLS handshake to return as the TOFU pin.
  */
-class PairingRepository : PairingGateway {
+class PairingRepository(
+    private val installId: String = "",
+    private val appVersion: String = "",
+    private val osVersion: String = "",
+) : PairingGateway {
 
     private fun api(baseUrl: String) = NetworkFactory.create(baseUrl, tokenProvider = { null }, pin = null)
 
@@ -38,7 +42,14 @@ class PairingRepository : PairingGateway {
 
     override suspend fun poll(baseUrl: String, code: String): PollResult {
         return try {
-            val res = api(baseUrl).pollPair(de.ledgerline.app.data.remote.dto.PairCollectRequest(code))
+            val res = api(baseUrl).pollPair(
+                de.ledgerline.app.data.remote.dto.PairCollectRequest(
+                    code = code,
+                    install_id = installId.ifBlank { null },
+                    app_version = appVersion.ifBlank { null },
+                    os_version = osVersion.ifBlank { null },
+                ),
+            )
             when {
                 res.code() == HttpURLConnection.HTTP_GONE -> PollResult.Gone
                 res.code() == 429 -> PollResult.RateLimited

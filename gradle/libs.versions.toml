@@ -54,9 +54,9 @@ documentfile = "1.1.0"
 # duplicate-clashes with the transitive bcutil on the classpath. Re-evaluate when BC
 # fixes the packaging (tracked, dependency-currency policy §17).
 bouncycastle = "1.84"
-# MapLibre GL Android (BSD-2/3, libre — no Google, no Mapbox, no API key, no telemetry).
-maplibre = "13.4.1"
-maplibreAnnotation = "3.0.2"
+# mapsforge — offline vector maps (.map files) + rendering engine (LGPL, 100% OSS, no Google).
+# Powers the Explore/Karte/Tracker feature and (per user directive) all app maps.
+mapsforge = "0.25.0"
 
 [libraries]
 androidx-core = { module = "androidx.core:core-ktx", version = "1.19.0" }
@@ -111,8 +111,11 @@ androidx-documentfile = { module = "androidx.documentfile:documentfile", version
 bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk15to18", version.ref = "bouncycastle" }
 bouncycastle-bcpkix = { module = "org.bouncycastle:bcpkix-jdk15to18", version.ref = "bouncycastle" }
 bouncycastle-bcutil = { module = "org.bouncycastle:bcutil-jdk15to18", version.ref = "bouncycastle" }
-maplibre = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
-maplibre-annotation = { module = "org.maplibre.gl:android-plugin-annotation-v9", version.ref = "maplibreAnnotation" }
+mapsforge-map-android = { module = "org.mapsforge:mapsforge-map-android", version.ref = "mapsforge" }
+mapsforge-map = { module = "org.mapsforge:mapsforge-map", version.ref = "mapsforge" }
+mapsforge-map-reader = { module = "org.mapsforge:mapsforge-map-reader", version.ref = "mapsforge" }
+mapsforge-themes = { module = "org.mapsforge:mapsforge-themes", version.ref = "mapsforge" }
+mapsforge-core = { module = "org.mapsforge:mapsforge-core", version.ref = "mapsforge" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

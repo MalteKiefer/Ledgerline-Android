@@ -28,8 +28,11 @@ data class ShareUpdateRequest(
     @SerialName("expires_at") val expiresAt: String? = null,
     val password: String? = null,
     @SerialName("clear_password") val clearPassword: Boolean? = null,
+    // Optimistic concurrency: the version this update expects the server row to be at. Omitted for
+    // shares created before the server carried a version (server then keeps the blind path).
+    @SerialName("expected_version") val expectedVersion: Int? = null,
 )
 
-/** `{ "token": "<22-char>" }` — the created/updated share's public token. */
+/** `{ "token": "<22-char>", "version": N }` — the created/updated share's public token + row version. */
 @Serializable
-data class ShareTokenResponse(val token: String)
+data class ShareTokenResponse(val token: String, val version: Int? = null)

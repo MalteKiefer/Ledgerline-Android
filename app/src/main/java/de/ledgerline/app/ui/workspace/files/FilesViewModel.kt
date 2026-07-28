@@ -37,6 +37,10 @@ data class FilesUi(
 /** File list sort orders. */
 enum class FileSort { NAME_ASC, NAME_DESC, DATE_DESC, DATE_ASC, SIZE_DESC, SIZE_ASC }
 
+/** Top-level view the Files screen shows, driven by the floating tab bar.
+ *  BROWSE = folder tree; RECENT = all files newest-first; FAVORITES = starred; TRASH = trashed. */
+enum class FilesView { BROWSE, RECENT, FAVORITES, TRASH }
+
 private fun List<FileEntry>.sortedBy(order: FileSort): List<FileEntry> = when (order) {
     FileSort.NAME_ASC -> sortedBy { it.name.lowercase() }
     FileSort.NAME_DESC -> sortedByDescending { it.name.lowercase() }
@@ -141,9 +145,18 @@ class FilesViewModel @Inject constructor(
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy
 
-    /** When true, the list shows only trashed files (the trash view). */
+    /** When true, the list shows only trashed files (the trash view). Derived from [view]. */
     private val _showTrash = MutableStateFlow(false)
     val showTrash: StateFlow<Boolean> = _showTrash
+
+    /** Top-level view selected in the floating tab bar. */
+    private val _view = MutableStateFlow(FilesView.BROWSE)
+    val view: StateFlow<FilesView> = _view
+    fun setView(v: FilesView) {
+        _view.value = v
+        _showTrash.value = (v == FilesView.TRASH)
+        recompute()
+    }
 
     /** Number of trashed files across all folders (drives the "Trash (N)" affordance). */
     private val _trashCount = MutableStateFlow(0)
@@ -244,12 +257,9 @@ class FilesViewModel @Inject constructor(
 
     // ---- Trash view ----
 
-    fun setTrash(show: Boolean) {
-        _showTrash.value = show
-        recompute()
-    }
+    fun setTrash(show: Boolean) = setView(if (show) FilesView.TRASH else FilesView.BROWSE)
 
-    fun toggleTrash() = setTrash(!_showTrash.value)
+    fun toggleTrash() = setTrash(_view.value != FilesView.TRASH)
 
     fun setQuery(q: String) {
         _query.value = q
@@ -467,20 +477,36 @@ class FilesViewModel @Inject constructor(
         val m = cache.value.value?.manifest
         val allFiles = m?.files.orEmpty()
         _trashCount.value = allFiles.count { it.trashed }
-        if (_showTrash.value) {
-            // Trash view: ALL trashed files across every folder, by name. No folders / no "..".
-            val files = allFiles.filter { it.trashed }.sortedBy { it.name.lowercase() }
-            _state.value = FilesUi(false, false, emptyList(), files, canGoBack = false)
-            return
-        }
-        val cwd = stack.last()
         val q = _query.value
-        val folders = m?.fileFolders
-            ?.filter { it.parent == cwd && WorkspaceSearch.matches(it, q) }
-            ?.sortedBy { it.name.lowercase() } ?: emptyList()
-        val files = allFiles
-            .filter { !it.trashed && it.folder == cwd && WorkspaceSearch.matches(it, q) }
-            .sortedBy(_sort.value)
-        _state.value = FilesUi(false, false, folders, files, canGoBack = stack.size > 1)
+        when (_view.value) {
+            FilesView.TRASH -> {
+                // Trash view: ALL trashed files across every folder, by name. No folders / no "..".
+                // The search query intentionally does not filter the trash view.
+                val files = allFiles.filter { it.trashed }.sortedBy { it.name.lowercase() }
+                _state.value = FilesUi(false, false, emptyList(), files, canGoBack = false)
+            }
+            FilesView.RECENT -> {
+                // Flat, newest-first across all folders.
+                val files = allFiles.filter { !it.trashed && WorkspaceSearch.matches(it, q) }
+                    .sortedByDescending { it.created ?: "" }
+                _state.value = FilesUi(false, false, emptyList(), files, canGoBack = false)
+            }
+            FilesView.FAVORITES -> {
+                // Flat, all starred files across all folders.
+                val files = allFiles.filter { !it.trashed && it.favorite && WorkspaceSearch.matches(it, q) }
+                    .sortedBy(_sort.value)
+                _state.value = FilesUi(false, false, emptyList(), files, canGoBack = false)
+            }
+            FilesView.BROWSE -> {
+                val cwd = stack.last()
+                val folders = m?.fileFolders
+                    ?.filter { it.parent == cwd && WorkspaceSearch.matches(it, q) }
+                    ?.sortedBy { it.name.lowercase() } ?: emptyList()
+                val files = allFiles
+                    .filter { !it.trashed && it.folder == cwd && WorkspaceSearch.matches(it, q) }
+                    .sortedBy(_sort.value)
+                _state.value = FilesUi(false, false, folders, files, canGoBack = stack.size > 1)
+            }
+        }
     }
 }

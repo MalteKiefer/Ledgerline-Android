@@ -158,8 +158,12 @@ dependencies {
     // raster style JSON (same tile source as the old osmdroid setup). The annotation
     // plugin (SymbolManager) provides marker pins. UA + tile HTTP client wired in
     // LedgerlineApp. android-sdk 13.x defaults to the Vulkan backend (fine at minSdk 36).
-    implementation(libs.maplibre)
-    implementation(libs.maplibre.annotation)
+    // mapsforge — the app's sole map engine: offline vector maps + render engine (OSS, no Google).
+    implementation(libs.mapsforge.map.android)
+    implementation(libs.mapsforge.map)
+    implementation(libs.mapsforge.map.reader)
+    implementation(libs.mapsforge.themes)
+    implementation(libs.mapsforge.core)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
