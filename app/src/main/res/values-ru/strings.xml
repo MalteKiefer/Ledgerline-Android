@@ -776,4 +776,19 @@
     <string name="finance_vat">НДС</string>
     <string name="finance_gross">Итого</string>
     <string name="finance_note">Заметка</string>
+    <string name="finance_new">Новый счёт</string>
+    <string name="finance_edit">Изменить счёт</string>
+    <string name="finance_issue">Выставить счёт</string>
+    <string name="finance_mark_paid">Отметить оплаченным</string>
+    <string name="finance_customer_name">Компания / имя</string>
+    <string name="finance_customer_attn">Вниманию</string>
+    <string name="finance_customer_address">Адрес</string>
+    <string name="finance_customer_email">Эл. почта</string>
+    <string name="finance_customer_vatid">ИНН/VAT</string>
+    <string name="finance_currency">Валюта</string>
+    <string name="finance_line_desc">Описание</string>
+    <string name="finance_line_qty">Кол-во</string>
+    <string name="finance_line_price">Цена</string>
+    <string name="finance_line_vat">НДС %</string>
+    <string name="finance_add_line">Добавить позицию</string>
 </resources>

@@ -82,6 +82,9 @@ data class CompanyProfile(
     val currency: String = "EUR",
     val paymentTermsDays: Int = 14,
     val footerText: String = "",
+    /** Invoice-number template (web `number_format`, default `YYYY-NNNN`) + the GoBD floor. */
+    val numberFormat: String = "YYYY-NNNN",
+    val nextNumber: Int = 1,
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 

@@ -775,4 +775,19 @@
     <string name="finance_vat">VAT</string>
     <string name="finance_gross">Total</string>
     <string name="finance_note">Note</string>
+    <string name="finance_new">New invoice</string>
+    <string name="finance_edit">Edit invoice</string>
+    <string name="finance_issue">Issue invoice</string>
+    <string name="finance_mark_paid">Mark as paid</string>
+    <string name="finance_customer_name">Company / name</string>
+    <string name="finance_customer_attn">Attention</string>
+    <string name="finance_customer_address">Address</string>
+    <string name="finance_customer_email">Email</string>
+    <string name="finance_customer_vatid">VAT ID</string>
+    <string name="finance_currency">Currency</string>
+    <string name="finance_line_desc">Description</string>
+    <string name="finance_line_qty">Qty</string>
+    <string name="finance_line_price">Unit price</string>
+    <string name="finance_line_vat">VAT %</string>
+    <string name="finance_add_line">Add item</string>
 </resources>

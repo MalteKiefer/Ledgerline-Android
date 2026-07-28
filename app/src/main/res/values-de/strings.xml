@@ -773,4 +773,19 @@
     <string name="finance_vat">MwSt.</string>
     <string name="finance_gross">Gesamt</string>
     <string name="finance_note">Notiz</string>
+    <string name="finance_new">Neue Rechnung</string>
+    <string name="finance_edit">Rechnung bearbeiten</string>
+    <string name="finance_issue">Rechnung ausstellen</string>
+    <string name="finance_mark_paid">Als bezahlt markieren</string>
+    <string name="finance_customer_name">Firma / Name</string>
+    <string name="finance_customer_attn">z. Hd.</string>
+    <string name="finance_customer_address">Adresse</string>
+    <string name="finance_customer_email">E-Mail</string>
+    <string name="finance_customer_vatid">USt-IdNr.</string>
+    <string name="finance_currency">Währung</string>
+    <string name="finance_line_desc">Beschreibung</string>
+    <string name="finance_line_qty">Menge</string>
+    <string name="finance_line_price">Einzelpreis</string>
+    <string name="finance_line_vat">MwSt. %</string>
+    <string name="finance_add_line">Position hinzufügen</string>
 </resources>

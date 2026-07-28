@@ -181,6 +181,8 @@ open class NotImplementedApi : LedgerlineApi {
     // Likewise an empty sharded passwords store for PasswordsRepository fakes that don't exercise it.
     override suspend fun passwordsStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
     override suspend fun invoicesStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
+    override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
+    override suspend fun uploadInvoice(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
     override suspend fun rawInvoice(blob: String): Response<ResponseBody> = throw NotImplementedError()
     override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyDto> = throw NotImplementedError()
     override suspend fun passwordsStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()

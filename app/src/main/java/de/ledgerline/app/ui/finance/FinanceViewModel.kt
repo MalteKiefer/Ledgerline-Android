@@ -78,6 +78,52 @@ class FinanceViewModel @Inject constructor(
 
     fun totals(inv: Invoice) = InvoiceMath.totals(inv)
 
+    // ---- write ----
+
+    /** A blank draft with the company defaults + one empty line (web `newInvoice`). */
+    fun newDraft(): Invoice {
+        val c = company.value
+        val today = java.time.LocalDate.now()
+        val due = today.plusDays((c?.paymentTermsDays ?: 14).toLong())
+        return Invoice(
+            id = de.ledgerline.app.core.Ids.newId(),
+            status = de.ledgerline.app.domain.model.InvoiceStatus.DRAFT,
+            issueDate = today.toString(),
+            dueDate = due.toString(),
+            currency = c?.currency ?: "EUR",
+            lines = listOf(de.ledgerline.app.domain.model.InvoiceLine(vatRate = 19.0)),
+        )
+    }
+
+    /** Insert or update [inv] in the store; [onDone] gets whether it persisted. */
+    fun save(inv: Invoice, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val res = repo.save { list ->
+                if (list.any { it.id == inv.id }) list.map { if (it.id == inv.id) inv else it }
+                else listOf(inv) + list
+            }
+            onDone(res is de.ledgerline.app.core.Outcome.Ok)
+        }
+    }
+
+    /**
+     * Issue a draft: assign a gapless GoBD number (per-year seq → template) and mark it `sent`. The
+     * seq derives from the current invoices + the company floor, so it never collides with another
+     * device's number after the store's 409-rebase.
+     */
+    fun issue(inv: Invoice, onDone: (Boolean) -> Unit = {}) {
+        val c = company.value
+        val year = InvoiceMath.invoiceYear(inv).ifBlank { java.time.LocalDate.now().year.toString() }
+        val seq = InvoiceMath.nextSeqForYear(invoices.value, year, c?.nextNumber ?: 1)
+        val number = InvoiceMath.formatNumber(c?.numberFormat, seq, inv.issueDate)
+        save(inv.copy(seq = seq, number = number, status = de.ledgerline.app.domain.model.InvoiceStatus.SENT), onDone)
+    }
+
+    fun setStatus(inv: Invoice, status: de.ledgerline.app.domain.model.InvoiceStatus, onDone: (Boolean) -> Unit = {}) =
+        save(inv.copy(status = status), onDone)
+
+    fun trash(inv: Invoice, onDone: (Boolean) -> Unit = {}) = save(inv.copy(trashed = true), onDone)
+
     /** Currency-format a value with the invoice/company currency (fallback EUR), device locale. */
     fun money(value: Double, currency: String?): String {
         val cur = currency?.takeIf { it.isNotBlank() } ?: company.value?.currency ?: "EUR"

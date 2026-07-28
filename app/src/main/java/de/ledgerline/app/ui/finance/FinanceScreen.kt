@@ -17,7 +17,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -62,16 +65,18 @@ internal fun statusLabel(s: InvoiceStatus): String = stringResource(
 @Composable
 fun FinanceScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, vm: FinanceViewModel = hiltViewModel()) {
     var openId by remember { mutableStateOf<String?>(null) }
+    var editing by remember { mutableStateOf<Invoice?>(null) }
+    val editingInv = editing
     val current = openId?.let { vm.invoiceById(it) }
-    if (current != null) {
-        InvoiceDetailScreen(current, vm, onBack = { openId = null })
-    } else {
-        FinanceList(vm, modifier, onMenu = onMenu, onOpen = { openId = it })
+    when {
+        editingInv != null -> InvoiceEditScreen(editingInv, vm, onCancel = { editing = null }, onSaved = { editing = null; openId = null })
+        current != null -> InvoiceDetailScreen(current, vm, onBack = { openId = null }, onEdit = { editing = current })
+        else -> FinanceList(vm, modifier, onMenu = onMenu, onOpen = { openId = it }, onNew = { editing = vm.newDraft() })
     }
 }
 
 @Composable
-private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() -> Unit)?, onOpen: (String) -> Unit) {
+private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() -> Unit)?, onOpen: (String) -> Unit, onNew: () -> Unit) {
     val invoices by vm.invoices.collectAsStateWithLifecycle()
     val year by vm.year.collectAsStateWithLifecycle()
     val years = remember(invoices) { (vm.years() + year).distinct().sortedDescending() }
@@ -82,9 +87,10 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
         modifier = modifier,
         topBar = { AppTopBar(title = stringResource(R.string.dest_finance), onMenu = onMenu) },
     ) { pad ->
+        Box(Modifier.fillMaxSize().padding(pad)) {
         Column(
-            Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp).padding(bottom = 24.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp).padding(bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Spacer(Modifier.size(4.dp))
@@ -113,13 +119,11 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
                     }
                 }
             }
-
-            Text(
-                stringResource(R.string.finance_readonly_note),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+        }
+        FloatingActionButton(
+            onClick = onNew,
+            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
+        ) { Icon(Icons.Outlined.Add, stringResource(R.string.finance_new)) }
         }
     }
 }

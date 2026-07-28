@@ -660,21 +660,30 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   `HealthRecordCodecTest`/`HealthRepositoryTest` (21). **Offen (klein):** Doctor-Report/Print-PDF (Web
   hat eine Print-Ansicht; Android macht CSV-Share), globale Einheiten-Prefs-Sync (`/preferences`;
   Android hält die Einheiten in `healthProfile.units`, web-kompatibel), on-device-Verifikation.
-- **Finance / Invoices — READ-ONLY MVP ERLEDIGT (2026-07-28, on-device verifiziert).** Neuer Drawer-Tab
-  „Finanzen" liest die versiegelten Rechnungen aus dem **sharded** `/invoices/store` (via
-  `ShardedStoreEngine`, invoices = Record-Shards) + das nicht-geheime `/company`-Profil. Bausteine:
+- **Finance / Invoices — READ + WRITE ERLEDIGT (2026-07-28, Read on-device verifiziert).** Neuer Drawer-Tab
+  „Finanzen" liest **und schreibt** die versiegelten Rechnungen im **sharded** `/invoices/store`
+  + das nicht-geheime `/company`-Profil. **Write ohne Datenverlust:** der sharded Root trägt zwei
+  Collection-Blobs (`payRef`/`txRef` = paymentMethods/transactions) + Inline-Keys (`partners`,
+  `financeCategories`, `invoiceSeq`) — die `FinanceRepository` re-shardet NUR die Rechnungen und macht
+  ein **Root-Level-Raw-Overlay** (nur `shardBits`/`shards` ersetzt, ALLE anderen Root-Keys verbatim
+  erhalten; deren Blob-Refs kommen in den `shards[]`-Guard, damit der Server sie nie freigibt) +
+  409-Rebase. Create/Edit/Issue/Mark-Paid/Trash: FAB→`InvoiceEditScreen` (Empfänger, Datumsfelder,
+  Positionen-Editor mit Live-Totals, Notiz), Detail-Aktionen. **Ausstellen** vergibt eine gapless
+  GoBD-Nummer (`InvoiceMath.nextSeqForYear`→`formatNumber`, seq pro Rechnung). Test
+  `FinanceRepositoryTest` beweist die Collection-Erhaltung (payRef/txRef/partners überleben + im Guard).
+  **Offen (Finance):** payment-methods/transactions-Editor, VAT-Return-Statistik, ZUGFeRD/Factur-X-Export,
+  e-invoice-XML-Import, Client-PDF-Import, Bankauszug-Import, Company-Profil-Editor, Datepicker/
+  Currency-Dropdown-Feinschliff (heute Textfelder). Bausteine:
   `domain/model/Finance` (Invoice/InvoiceLine/InvoiceCustomer/CompanyProfile, Raw-Overlay = kein
   Feldverlust), `core/finance/InvoiceMath` (byte-nah zu `invoices.js`/`invoice-numbering.js` —
   `totals` net/vatByRate/vat/gross, GoBD-Nummerierung `nextSeqForYear`/`formatNumber`/`duplicateNumbers`,
-  `yearKpis`), `FinanceRepository` (read-only) + `FinanceCache`, `CompanyDto`/`invoicesStore`/
-  `rawInvoice`/`company` in `LedgerlineApi`. UI: Rechnungsliste je Jahr mit Paid/Offen/Count-KPIs →
-  Detail (Empfänger, Positionen, Netto/MwSt-je-Satz/Gesamt), M3-Karten, €-Format, EN/DE/RU. Test
-  `InvoiceMathTest`. **On-device verifiziert:** echte Rechnungen entschlüsseln, Totals korrekt
-  (900 net ×19% → 1.071 brutto). **Bewusst READ-ONLY:** der sharded Root trägt zwei Collection-Blobs
-  (paymentMethods + transactions), die die Engine beim Save NICHT erhält → Re-Seal würde sie droppen.
-  Create/Edit erst nach Multi-Collection-Write. **Offen (Finance):** Schreiben (Anlegen/Bearbeiten +
-  GoBD-Nummer vergeben), payment-methods/transactions-UI, VAT-Return-Statistik, ZUGFeRD/Factur-X-Export,
-  e-invoice-XML-Import, Client-PDF-Import, Bankauszug-Import, Company-Profil-Editor.
+  `yearKpis`), `FinanceRepository` (read+write, Root-Level-Raw-Overlay) + `FinanceCache`,
+  `FinanceRecordCodec` (decode+encode raw-overlay, `numToken` byte-stabile Zahlen → Dirty-Save-Reuse),
+  `CompanyDto`/`invoicesStore`/`invoicesStorePut`/`rawInvoice`/`uploadInvoice`/`company` in
+  `LedgerlineApi`. UI (`ui/finance/`): Liste je Jahr + KPIs → Detail (Empfänger, Positionen,
+  Netto/MwSt-je-Satz/Gesamt, Aktionen) + `InvoiceEditScreen` (FAB/Edit). M3-Karten, €-Format, EN/DE/RU.
+  Tests `InvoiceMathTest` + `FinanceRepositoryTest` (Collection-Erhaltung). **On-device (Read) verifiziert:**
+  echte Rechnungen entschlüsseln, Totals korrekt (900 net ×19% → 1.071 brutto).
 - Galerie-ML-Parität: semantische Suche (embed-text ist da), Duplikate, Alben-Feinschliff.
 
 **P2 — Nav-/UX-Angleichung an iOS:** Tab-Struktur (Passwords-Tab), Grouped-List +

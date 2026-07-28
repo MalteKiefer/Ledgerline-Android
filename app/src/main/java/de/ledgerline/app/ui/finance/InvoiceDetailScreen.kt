@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,12 +29,25 @@ import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.cardSurface
 
-/** Read-only invoice detail: recipient, line items, and computed totals in grouped cards. */
+/** Invoice detail: recipient, line items, computed totals — with edit/issue/paid/delete actions. */
 @Composable
-fun InvoiceDetailScreen(inv: Invoice, vm: FinanceViewModel, onBack: () -> Unit) {
+fun InvoiceDetailScreen(inv: Invoice, vm: FinanceViewModel, onBack: () -> Unit, onEdit: () -> Unit) {
     val totals = vm.totals(inv)
     AppScaffold(
-        topBar = { AppTopBar(title = inv.number ?: stringResource(R.string.finance_no_number), onBack = onBack) },
+        topBar = {
+            AppTopBar(
+                title = inv.number ?: stringResource(R.string.finance_no_number),
+                onBack = onBack,
+                actions = {
+                    androidx.compose.material3.IconButton(onClick = onEdit) {
+                        androidx.compose.material3.Icon(Icons.Outlined.Edit, stringResource(R.string.finance_edit))
+                    }
+                    androidx.compose.material3.IconButton(onClick = { vm.trash(inv) { onBack() } }) {
+                        androidx.compose.material3.Icon(Icons.Outlined.Delete, stringResource(R.string.action_delete))
+                    }
+                },
+            )
+        },
     ) { pad ->
         Column(
             Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState())
@@ -86,6 +102,15 @@ fun InvoiceDetailScreen(inv: Invoice, vm: FinanceViewModel, onBack: () -> Unit) 
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 TotalLine(stringResource(R.string.finance_gross), vm.money(totals.gross, inv.currency), bold = true)
+            }
+
+            // Status transitions.
+            when (inv.status) {
+                de.ledgerline.app.domain.model.InvoiceStatus.DRAFT ->
+                    de.ledgerline.app.ui.theme.PrimaryGradientButton(stringResource(R.string.finance_issue), onClick = { vm.issue(inv) { onBack() } })
+                de.ledgerline.app.domain.model.InvoiceStatus.SENT ->
+                    de.ledgerline.app.ui.theme.SecondaryBrandButton(stringResource(R.string.finance_mark_paid), onClick = { vm.setStatus(inv, de.ledgerline.app.domain.model.InvoiceStatus.PAID) { onBack() } })
+                else -> {}
             }
 
             if (inv.note.isNotBlank()) {

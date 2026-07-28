@@ -153,9 +153,16 @@ interface LedgerlineApi {
     @GET("api/v1/invoices/store")
     suspend fun invoicesStore(): Response<StoreResponse>
 
+    @PUT("api/v1/invoices/store")
+    suspend fun invoicesStorePut(@Body body: StorePutRequest): Response<StoreResponse>
+
     @GET("api/v1/invoices/raw/{blob}")
     @Streaming
     suspend fun rawInvoice(@Path("blob") blob: String): Response<ResponseBody>
+
+    @Multipart
+    @POST("api/v1/invoices/upload")
+    suspend fun uploadInvoice(@Part file: MultipartBody.Part): Response<UploadResponse>
 
     @GET("api/v1/company")
     suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyDto>
