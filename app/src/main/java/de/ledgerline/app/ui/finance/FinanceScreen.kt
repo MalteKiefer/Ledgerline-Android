@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -68,18 +69,21 @@ fun FinanceScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, v
     var openId by remember { mutableStateOf<String?>(null) }
     var editing by remember { mutableStateOf<Invoice?>(null) }
     var editCompany by remember { mutableStateOf(false) }
+    var showStats by remember { mutableStateOf(false) }
     val editingInv = editing
     val current = openId?.let { vm.invoiceById(it) }
+    val year by vm.year.collectAsStateWithLifecycle()
     when {
         editCompany -> CompanyEditScreen(vm, onBack = { editCompany = false })
+        showStats -> FinanceStatsScreen(vm, year, onBack = { showStats = false })
         editingInv != null -> InvoiceEditScreen(editingInv, vm, onCancel = { editing = null }, onSaved = { editing = null; openId = null })
         current != null -> InvoiceDetailScreen(current, vm, onBack = { openId = null }, onEdit = { editing = current })
-        else -> FinanceList(vm, modifier, onMenu = onMenu, onOpen = { openId = it }, onNew = { editing = vm.newDraft() }, onCompany = { editCompany = true })
+        else -> FinanceList(vm, modifier, onMenu = onMenu, onOpen = { openId = it }, onNew = { editing = vm.newDraft() }, onCompany = { editCompany = true }, onStats = { showStats = true })
     }
 }
 
 @Composable
-private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() -> Unit)?, onOpen: (String) -> Unit, onNew: () -> Unit, onCompany: () -> Unit) {
+private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() -> Unit)?, onOpen: (String) -> Unit, onNew: () -> Unit, onCompany: () -> Unit, onStats: () -> Unit) {
     val invoices by vm.invoices.collectAsStateWithLifecycle()
     val year by vm.year.collectAsStateWithLifecycle()
     val years = remember(invoices) { (vm.years() + year).distinct().sortedDescending() }
@@ -93,6 +97,9 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
                 title = stringResource(R.string.dest_finance),
                 onMenu = onMenu,
                 actions = {
+                    androidx.compose.material3.IconButton(onClick = onStats) {
+                        Icon(Icons.Outlined.QueryStats, stringResource(R.string.finance_stats_action))
+                    }
                     androidx.compose.material3.IconButton(onClick = onCompany) {
                         Icon(androidx.compose.material.icons.Icons.Outlined.Business, stringResource(R.string.finance_company))
                     }
