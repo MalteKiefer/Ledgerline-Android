@@ -154,16 +154,39 @@ private fun PaymentMethod.currencyOrNull(): String? = null   // accounts have no
 
 @Composable
 private fun PaymentMethodEditScreen(initial: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit) {
+    var txEditing by remember { mutableStateOf<de.ledgerline.app.domain.model.Transaction?>(null) }
+    val editingTx = txEditing
+    if (editingTx != null) {
+        TransactionEditScreen(editingTx, vm, onBack = { txEditing = null })
+        return
+    }
+    PaymentMethodEditBody(initial, vm, onBack = onBack, onEditTx = { txEditing = it })
+}
+
+@Composable
+private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit, onEditTx: (de.ledgerline.app.domain.model.Transaction) -> Unit) {
     var pm by remember(initial) { mutableStateOf(initial) }
+    vm.transactions.collectAsStateWithLifecycle()   // recompose after import/edit
     val txns = vm.accountTransactions(initial.id)
+    val exists = vm.paymentMethodById(initial.id) != null
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val launchImport = rememberStatementImport(vm, initial.id) { added ->
+        val msg = when {
+            added > 0 -> ctx.getString(R.string.finance_import_added, added)
+            added == 0 -> ctx.getString(R.string.finance_import_none)
+            added == -2 -> ctx.getString(R.string.finance_import_unreadable)
+            else -> ctx.getString(R.string.finance_import_failed)
+        }
+        android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show()
+    }
 
     AppScaffold(
         topBar = {
             AppTopBar(
-                title = stringResource(if (vm.paymentMethodById(initial.id) != null) R.string.finance_pm_edit else R.string.finance_pm_add),
+                title = stringResource(if (exists) R.string.finance_pm_edit else R.string.finance_pm_add),
                 onBack = onBack,
                 actions = {
-                    if (vm.paymentMethodById(initial.id) != null) {
+                    if (exists) {
                         IconButton(onClick = { vm.trashPaymentMethod(pm) { if (it) onBack() } }) {
                             Icon(Icons.Outlined.Delete, stringResource(R.string.action_delete))
                         }
@@ -212,13 +235,19 @@ private fun PaymentMethodEditScreen(initial: PaymentMethod, vm: FinanceViewModel
                 onClick = { vm.savePaymentMethod(pm.trimmed()) { if (it) onBack() } },
             )
 
-            // Read-only bookings for this account.
+            // Bookings for this account: import a statement, add manually, edit each.
+            if (exists) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.finance_pm_bookings_title), Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    androidx.compose.material3.TextButton(onClick = launchImport) { Text(stringResource(R.string.finance_import_action)) }
+                    androidx.compose.material3.TextButton(onClick = { onEditTx(vm.newTransaction(initial.id)) }) { Text(stringResource(R.string.finance_tx_add)) }
+                }
+            }
             if (txns.isNotEmpty()) {
-                Text(stringResource(R.string.finance_pm_bookings_title), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
                 Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {
-                    txns.take(50).forEachIndexed { i, t ->
+                    txns.take(200).forEachIndexed { i, t ->
                         if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().clickable { onEditTx(t) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(t.counterparty.ifBlank { t.purpose.ifBlank { "—" } }, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                                 Text(t.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

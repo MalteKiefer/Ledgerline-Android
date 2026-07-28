@@ -833,6 +833,23 @@
     <string name="finance_pm_card_exp">Gültig bis (MM/JJ)</string>
     <string name="finance_pm_url">URL</string>
     <string name="finance_pm_note">Notiz</string>
+    <string name="finance_date">Datum (JJJJ-MM-TT)</string>
+    <string name="finance_tx_add">Buchung hinzufügen</string>
+    <string name="finance_tx_edit">Buchung bearbeiten</string>
+    <string name="finance_tx_amount">Betrag (− = Ausgabe)</string>
+    <string name="finance_tx_counterparty">Empfänger/Zahler</string>
+    <string name="finance_tx_purpose">Verwendungszweck</string>
+    <string name="finance_tx_vatcat">USt-Kategorie</string>
+    <string name="finance_tx_vat_none">Offen</string>
+    <string name="finance_tx_vat_private">Privat</string>
+    <string name="finance_import_action">Import</string>
+    <string name="finance_import_map_title">Spalten zuordnen</string>
+    <string name="finance_import_map_hint">Wähle, welche CSV-Spalte zu welchem Feld gehört. Datum und Betrag sind Pflicht.</string>
+    <string name="finance_import_apply">Importieren</string>
+    <string name="finance_import_added">%1$d Buchungen importiert</string>
+    <string name="finance_import_none">Keine neuen Buchungen (alles Duplikate)</string>
+    <string name="finance_import_unreadable">Auszug konnte nicht gelesen werden</string>
+    <string name="finance_import_failed">Import fehlgeschlagen</string>
     <string name="finance_company_bic">BIC</string>
     <string name="finance_company_bank">Bankname</string>
     <string name="finance_company_vatrate">Standard-USt-Satz (%)</string>

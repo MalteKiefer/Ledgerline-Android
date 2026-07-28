@@ -323,6 +323,60 @@ class FinanceRepository(
         Outcome.Err(ErrorKind.HTTP)
     }
 
+    /**
+     * Re-seal the `transactions` collection and PUT the root with only `txRef`/`txKey`/`txHash`
+     * replaced — everything else (invoices' shards, paymentMethods, financeCategories, inline data)
+     * is preserved verbatim and guarded. 409-rebase. Mirrors [savePaymentMethods].
+     */
+    suspend fun saveTransactions(mutate: (List<de.ledgerline.app.domain.model.Transaction>) -> List<de.ledgerline.app.domain.model.Transaction>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        var base = cache.value.value
+        if (base == null) {
+            when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
+        }
+        var next = mutate(base!!.manifest.transactions)
+
+        repeat(5) {
+            val items = next.map(FinanceRecordCodec::encodeTransaction)
+            val coll = sealCollection(vk, items, priorRootRaw["txRef"]?.jsonPrimitive?.contentOrNull, priorRootRaw["txHash"]?.jsonPrimitive?.contentOrNull, priorRootRaw["txKey"]?.jsonPrimitive?.contentOrNull)
+                ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+            val root = priorRootRaw.toMutableMap()
+            root["v"] = JsonPrimitive(3); root["suite"] = JsonPrimitive(1)
+            if (coll.ref == null) {
+                root.remove("txRef"); root.remove("txKey"); root.remove("txHash")
+            } else {
+                root["txRef"] = JsonPrimitive(coll.ref); root["txKey"] = JsonPrimitive(coll.key); root["txHash"] = JsonPrimitive(coll.hash)
+            }
+            val rootJson = JsonObject(root)
+            val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
+            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson)
+            val put = try {
+                api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
+            } catch (e: Exception) {
+                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+            }
+            when {
+                put.isSuccessful -> {
+                    version = put.body()?.version ?: (version + 1)
+                    priorRootRaw = rootJson
+                    if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(rootCipher, version))
+                    val store = FinanceStore(base!!.manifest.copy(transactions = next), version)
+                    cache.set(store)
+                    return@withContext Outcome.Ok(store)
+                }
+                put.code() == HttpURLConnection.HTTP_CONFLICT -> {
+                    val fresh = when (val l = load()) {
+                        is Outcome.Ok -> { base = l.value; l.value.manifest.transactions }
+                        is Outcome.Err -> return@withContext l
+                    }
+                    next = mutate(fresh)
+                }
+                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+            }
+        }
+        Outcome.Err(ErrorKind.HTTP)
+    }
+
     /** Seal a collection array to a content blob; reuse the prior blob if the canonical bytes match. */
     private data class Coll(val ref: String?, val key: String?, val hash: String?)
     private suspend fun sealCollection(vk: ByteArray, items: List<JsonObject>, priorRef: String?, priorHash: String?, priorKey: String?): Coll? {

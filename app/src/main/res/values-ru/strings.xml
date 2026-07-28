@@ -836,6 +836,23 @@
     <string name="finance_pm_card_exp">Действ. до (ММ/ГГ)</string>
     <string name="finance_pm_url">URL</string>
     <string name="finance_pm_note">Заметка</string>
+    <string name="finance_date">Дата (ГГГГ-ММ-ДД)</string>
+    <string name="finance_tx_add">Добавить проводку</string>
+    <string name="finance_tx_edit">Изменить проводку</string>
+    <string name="finance_tx_amount">Сумма (− = расход)</string>
+    <string name="finance_tx_counterparty">Контрагент</string>
+    <string name="finance_tx_purpose">Назначение</string>
+    <string name="finance_tx_vatcat">Категория НДС</string>
+    <string name="finance_tx_vat_none">Не задано</string>
+    <string name="finance_tx_vat_private">Личное</string>
+    <string name="finance_import_action">Импорт</string>
+    <string name="finance_import_map_title">Сопоставить столбцы</string>
+    <string name="finance_import_map_hint">Выберите, какой столбец CSV соответствует каждому полю. Дата и сумма обязательны.</string>
+    <string name="finance_import_apply">Импортировать</string>
+    <string name="finance_import_added">Импортировано проводок: %1$d</string>
+    <string name="finance_import_none">Нет новых проводок (все дубликаты)</string>
+    <string name="finance_import_unreadable">Не удалось прочитать выписку</string>
+    <string name="finance_import_failed">Ошибка импорта</string>
     <string name="finance_company_bic">BIC</string>
     <string name="finance_company_bank">Название банка</string>
     <string name="finance_company_vatrate">Ставка НДС по умолчанию (%)</string>

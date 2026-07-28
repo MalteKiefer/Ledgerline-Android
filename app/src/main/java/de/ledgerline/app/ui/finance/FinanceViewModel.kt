@@ -173,6 +173,49 @@ class FinanceViewModel @Inject constructor(
     fun trashPaymentMethod(pm: de.ledgerline.app.domain.model.PaymentMethod, onDone: (Boolean) -> Unit = {}) =
         savePaymentMethod(pm.copy(trashed = true), onDone)
 
+    // ---- transactions (manual edit + statement import) ----
+    fun newTransaction(account: String) = de.ledgerline.app.domain.model.Transaction(
+        id = de.ledgerline.app.core.Ids.newId(), account = account, date = java.time.LocalDate.now().toString(),
+    )
+
+    fun saveTransaction(t: de.ledgerline.app.domain.model.Transaction, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val res = repo.saveTransactions { list ->
+                if (list.any { it.id == t.id }) list.map { if (it.id == t.id) t else it } else listOf(t) + list
+            }
+            onDone(res is de.ledgerline.app.core.Outcome.Ok)
+        }
+    }
+
+    fun trashTransaction(t: de.ledgerline.app.domain.model.Transaction, onDone: (Boolean) -> Unit = {}) =
+        saveTransaction(t.copy(trashed = true), onDone)
+
+    /**
+     * Import parsed statement lines into [accountId], deduped against that account's existing bookings.
+     * [onDone] gets the number added (0 = all duplicates, -1 = save failed).
+     */
+    fun importTransactions(parsed: List<de.ledgerline.app.core.finance.BankStatement.ParsedTx>, accountId: String, onDone: (Int) -> Unit) {
+        viewModelScope.launch {
+            val existing = transactions.value.filter { it.account == accountId && !it.trashed }.map { it.toParsed() }
+            val fresh = de.ledgerline.app.core.finance.BankStatement.dedupeTransactions(existing, parsed)
+            if (fresh.isEmpty()) { onDone(0); return@launch }
+            val added = fresh.map { p ->
+                de.ledgerline.app.domain.model.Transaction(
+                    id = de.ledgerline.app.core.Ids.newId(), account = accountId, date = p.date, amount = p.amount,
+                    currency = p.currency, counterparty = p.counterparty, purpose = p.purpose,
+                    vatCat = de.ledgerline.app.core.finance.BankStatement.guessVatCat(p),
+                )
+            }
+            val res = repo.saveTransactions { it + added }
+            onDone(if (res is de.ledgerline.app.core.Outcome.Ok) added.size else -1)
+        }
+    }
+
+    private fun de.ledgerline.app.domain.model.Transaction.toParsed() =
+        de.ledgerline.app.core.finance.BankStatement.ParsedTx(
+            date = date, amount = amount, currency = currency, counterparty = counterparty, purpose = purpose,
+        )
+
     /** Currency-format a value with the invoice/company currency (fallback EUR), device locale. */
     fun money(value: Double, currency: String?): String {
         val cur = currency?.takeIf { it.isNotBlank() } ?: company.value?.currency ?: "EUR"

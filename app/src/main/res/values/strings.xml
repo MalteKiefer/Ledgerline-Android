@@ -835,6 +835,23 @@
     <string name="finance_pm_card_exp">Expiry (MM/YY)</string>
     <string name="finance_pm_url">URL</string>
     <string name="finance_pm_note">Note</string>
+    <string name="finance_date">Date (YYYY-MM-DD)</string>
+    <string name="finance_tx_add">Add booking</string>
+    <string name="finance_tx_edit">Edit booking</string>
+    <string name="finance_tx_amount">Amount (− = expense)</string>
+    <string name="finance_tx_counterparty">Counterparty</string>
+    <string name="finance_tx_purpose">Purpose</string>
+    <string name="finance_tx_vatcat">VAT category</string>
+    <string name="finance_tx_vat_none">Undecided</string>
+    <string name="finance_tx_vat_private">Private</string>
+    <string name="finance_import_action">Import</string>
+    <string name="finance_import_map_title">Map columns</string>
+    <string name="finance_import_map_hint">Pick which CSV column maps to each field. Date and amount are required.</string>
+    <string name="finance_import_apply">Import</string>
+    <string name="finance_import_added">%1$d bookings imported</string>
+    <string name="finance_import_none">No new bookings (all duplicates)</string>
+    <string name="finance_import_unreadable">Could not read this statement</string>
+    <string name="finance_import_failed">Import failed</string>
     <string name="finance_company_bic">BIC</string>
     <string name="finance_company_bank">Bank name</string>
     <string name="finance_company_vatrate">Default VAT rate (%)</string>

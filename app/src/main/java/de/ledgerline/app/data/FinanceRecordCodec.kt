@@ -169,7 +169,22 @@ object FinanceRecordCodec {
         return JsonObject(out)
     }
 
-    // ---- transactions (decode only; read-only in Android) ----
+    // ---- transactions (decode + encode, raw overlay = no field loss) ----
+
+    fun encodeTransaction(t: de.ledgerline.app.domain.model.Transaction): JsonObject {
+        val out = t.raw.toMutableMap()
+        out["id"] = JsonPrimitive(t.id)
+        out["account"] = JsonPrimitive(t.account)
+        out["date"] = JsonPrimitive(t.date)
+        out["amount"] = numToken(t.amount)
+        out["currency"] = JsonPrimitive(t.currency)
+        out["counterparty"] = JsonPrimitive(t.counterparty)
+        out["purpose"] = JsonPrimitive(t.purpose)
+        out["vatCat"] = JsonPrimitive(t.vatCat)
+        setOrNull(out, "invoiceId", t.invoiceId?.let { JsonPrimitive(it) })
+        out["trashed"] = JsonPrimitive(t.trashed)
+        return JsonObject(out)
+    }
 
     fun decodeTransaction(o: JsonObject): de.ledgerline.app.domain.model.Transaction? {
         val id = o.str("id") ?: return null
