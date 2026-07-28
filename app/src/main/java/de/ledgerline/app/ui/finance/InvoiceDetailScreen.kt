@@ -12,7 +12,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.getValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,12 +37,26 @@ import de.ledgerline.app.ui.theme.cardSurface
 @Composable
 fun InvoiceDetailScreen(inv: Invoice, vm: FinanceViewModel, onBack: () -> Unit, onEdit: () -> Unit) {
     val totals = vm.totals(inv)
+    val ctx = LocalContext.current
+    val company by vm.company.collectAsStateWithLifecycle()
     AppScaffold(
         topBar = {
             AppTopBar(
                 title = inv.number ?: stringResource(R.string.finance_no_number),
                 onBack = onBack,
                 actions = {
+                    androidx.compose.material3.IconButton(onClick = {
+                        val xml = de.ledgerline.app.core.finance.ZugferdXml.build(inv, company ?: de.ledgerline.app.domain.model.CompanyProfile(), totals)
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "application/xml"
+                            putExtra(android.content.Intent.EXTRA_TITLE, de.ledgerline.app.core.finance.ZugferdXml.filename(inv))
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, de.ledgerline.app.core.finance.ZugferdXml.filename(inv))
+                            putExtra(android.content.Intent.EXTRA_TEXT, xml)
+                        }
+                        runCatching { ctx.startActivity(android.content.Intent.createChooser(send, ctx.getString(R.string.finance_export_xml))) }
+                    }) {
+                        androidx.compose.material3.Icon(Icons.Outlined.Description, stringResource(R.string.finance_export_xml))
+                    }
                     androidx.compose.material3.IconButton(onClick = onEdit) {
                         androidx.compose.material3.Icon(Icons.Outlined.Edit, stringResource(R.string.finance_edit))
                     }

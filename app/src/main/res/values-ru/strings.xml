@@ -778,6 +778,7 @@
     <string name="finance_note">Заметка</string>
     <string name="finance_new">Новый счёт</string>
     <string name="finance_edit">Изменить счёт</string>
+    <string name="finance_export_xml">Экспорт э-счёта (XML)</string>
     <string name="finance_issue">Выставить счёт</string>
     <string name="finance_mark_paid">Отметить оплаченным</string>
     <string name="finance_customer_name">Компания / имя</string>

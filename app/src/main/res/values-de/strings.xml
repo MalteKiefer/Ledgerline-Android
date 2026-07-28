@@ -775,6 +775,7 @@
     <string name="finance_note">Notiz</string>
     <string name="finance_new">Neue Rechnung</string>
     <string name="finance_edit">Rechnung bearbeiten</string>
+    <string name="finance_export_xml">E-Rechnung exportieren (XML)</string>
     <string name="finance_issue">Rechnung ausstellen</string>
     <string name="finance_mark_paid">Als bezahlt markieren</string>
     <string name="finance_customer_name">Firma / Name</string>
