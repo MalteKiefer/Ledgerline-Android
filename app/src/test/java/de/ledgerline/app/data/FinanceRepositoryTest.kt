@@ -61,7 +61,7 @@ class FinanceRepositoryTest {
         var putBody: StorePutRequest? = null
         val api = object : NotImplementedApi() {
             override suspend fun invoicesStore(): Response<StoreResponse> = Response.success(StoreResponse("SEALED:$rootJson", 5))
-            override suspend fun company(): Response<CompanyDto> = Response.success(CompanyDto())
+            override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse> = Response.success(de.ledgerline.app.data.remote.dto.CompanyResponse(CompanyDto()))
             override suspend fun uploadInvoice(file: MultipartBody.Part): Response<UploadResponse> = Response.success(UploadResponse("shard1"))
             override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> {
                 putBody = body

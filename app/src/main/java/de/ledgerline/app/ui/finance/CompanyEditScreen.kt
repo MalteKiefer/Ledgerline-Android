@@ -45,7 +45,6 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
     var vatId by remember(c) { mutableStateOf(c.vatId) }
     var taxNumber by remember(c) { mutableStateOf(c.taxNumber) }
     var iban by remember(c) { mutableStateOf(c.iban) }
-    var currency by remember(c) { mutableStateOf(c.currency) }
     var terms by remember(c) { mutableStateOf(c.paymentTermsDays.toString()) }
     var numberFormat by remember(c) { mutableStateOf(c.numberFormat) }
     var nextNumber by remember(c) { mutableStateOf(c.nextNumber.toString()) }
@@ -70,7 +69,6 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
             }
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.finance_company_defaults), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
-                Field(currency, { currency = it }, R.string.finance_currency)
                 NumField(terms, { terms = it }, R.string.finance_company_terms)
                 Field(numberFormat, { numberFormat = it }, R.string.finance_company_numfmt)
                 NumField(nextNumber, { nextNumber = it }, R.string.finance_company_nextnr)
@@ -81,7 +79,7 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                     c.copy(
                         name = name.trim(), address = address.trim(), email = email.trim(), phone = phone.trim(),
                         vatId = vatId.trim(), taxNumber = taxNumber.trim(), iban = iban.trim(),
-                        currency = currency.trim().ifBlank { "EUR" }, paymentTermsDays = terms.trim().toIntOrNull() ?: 14,
+                        paymentTermsDays = terms.trim().toIntOrNull() ?: 14,
                         numberFormat = numberFormat.trim().ifBlank { "YYYY-NNNN" }, nextNumber = nextNumber.trim().toIntOrNull() ?: 1,
                         footerText = footer.trim(),
                     ),

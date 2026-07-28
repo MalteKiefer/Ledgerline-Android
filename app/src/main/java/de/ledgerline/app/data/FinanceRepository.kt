@@ -256,7 +256,7 @@ class FinanceRepository(
         return try {
             val res = apiProvider(session).company()
             if (!res.isSuccessful) return null
-            val c = res.body()?.let(FinanceRecordCodec::companyFrom) ?: return null
+            val c = res.body()?.company?.let(FinanceRecordCodec::companyFrom) ?: return null
             cache.setCompany(c)
             c
         } catch (_: Exception) { null }
@@ -268,7 +268,7 @@ class FinanceRepository(
         try {
             val res = apiProvider(session).companyPut(FinanceRecordCodec.companyToDto(profile))
             if (!res.isSuccessful) return@withContext false
-            cache.setCompany(res.body()?.let(FinanceRecordCodec::companyFrom) ?: profile)
+            cache.setCompany(res.body()?.company?.let(FinanceRecordCodec::companyFrom) ?: profile)
             true
         } catch (_: Exception) { false }
     }

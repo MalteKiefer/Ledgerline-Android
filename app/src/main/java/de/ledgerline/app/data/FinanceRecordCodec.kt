@@ -131,9 +131,9 @@ object FinanceRecordCodec {
         email = dto.email.orEmpty(),
         phone = dto.phone.orEmpty(),
         vatId = dto.vatId.orEmpty(),
-        taxNumber = dto.taxNumber.orEmpty(),
+        taxNumber = dto.taxId.orEmpty(),
         iban = dto.iban.orEmpty(),
-        currency = dto.currency ?: "EUR",
+        currency = "EUR", // the company has no currency field; invoices carry their own
         paymentTermsDays = dto.paymentTermsDays ?: 14,
         footerText = dto.footerText.orEmpty(),
         numberFormat = dto.numberFormat?.ifBlank { null } ?: "YYYY-NNNN",
@@ -142,7 +142,7 @@ object FinanceRecordCodec {
 
     fun companyToDto(c: CompanyProfile): CompanyDto = CompanyDto(
         name = c.name, address = c.address, email = c.email, phone = c.phone,
-        vatId = c.vatId, taxNumber = c.taxNumber, iban = c.iban, currency = c.currency,
+        vatId = c.vatId, taxId = c.taxNumber, iban = c.iban,
         paymentTermsDays = c.paymentTermsDays, footerText = c.footerText,
         numberFormat = c.numberFormat, nextNumber = c.nextNumber,
     )

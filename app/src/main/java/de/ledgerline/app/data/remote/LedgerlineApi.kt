@@ -165,10 +165,10 @@ interface LedgerlineApi {
     suspend fun uploadInvoice(@Part file: MultipartBody.Part): Response<UploadResponse>
 
     @GET("api/v1/company")
-    suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyDto>
+    suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse>
 
     @PUT("api/v1/company")
-    suspend fun companyPut(@Body body: de.ledgerline.app.data.remote.dto.CompanyDto): Response<de.ledgerline.app.data.remote.dto.CompanyDto>
+    suspend fun companyPut(@Body body: de.ledgerline.app.data.remote.dto.CompanyDto): Response<de.ledgerline.app.data.remote.dto.CompanyResponse>
 
     // --- Passwords sharded store + blobs (web migrated passwords off the monolith, §P0) ---
     @GET("api/v1/passwords/store")
