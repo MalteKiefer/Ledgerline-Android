@@ -15,6 +15,7 @@ import de.ledgerline.app.core.offline.StoreEnvelope
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
+import de.ledgerline.app.data.remote.dto.CompanyDto
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.domain.model.CompanyProfile
 import de.ledgerline.app.domain.model.FinanceManifest
@@ -78,6 +79,7 @@ class FinanceRepository(
 
     private companion object {
         const val KEY = "invoices_root"
+        const val COMPANY_KEY = "invoices_company"
     }
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -204,6 +206,7 @@ class FinanceRepository(
                             version = env.version
                             val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions), version)
                             cache.set(store)
+                            loadCompanyCached(vk)
                             return Outcome.Ok(store)
                         }
                     }
@@ -360,13 +363,31 @@ class FinanceRepository(
 
     suspend fun loadCompany(): CompanyProfile? {
         val session = sessionHolder.get() ?: return null
+        val vk = vaultKeyHolder.get()
         return try {
             val res = apiProvider(session).company()
-            if (!res.isSuccessful) return null
-            val c = res.body()?.company?.let(FinanceRecordCodec::companyFrom) ?: return null
+            if (!res.isSuccessful) return loadCompanyCached(vk)
+            val dto = res.body()?.company ?: return loadCompanyCached(vk)
+            val c = FinanceRecordCodec.companyFrom(dto)
             cache.setCompany(c)
+            // Cache the (non-secret) company profile SEALED under VK so it's available offline.
+            if (offlineFlags.enabled() && vk != null) runCatching {
+                storeCache.put(COMPANY_KEY, StoreEnvelope(crypto.sealManifest(json.encodeToString(CompanyDto.serializer(), dto), vk), 0))
+            }
             c
-        } catch (_: Exception) { null }
+        } catch (_: Exception) { loadCompanyCached(vk) }
+    }
+
+    /** Restore the company profile from the sealed offline cache (transient error / offline). */
+    private fun loadCompanyCached(vk: ByteArray?): CompanyProfile? {
+        if (!offlineFlags.enabled() || vk == null) return cache.company.value
+        return runCatching {
+            storeCache.get(COMPANY_KEY)?.ciphertext?.let { ct ->
+                crypto.openManifest(ct, vk)?.let { plain ->
+                    FinanceRecordCodec.companyFrom(json.decodeFromString(CompanyDto.serializer(), plain)).also { cache.setCompany(it) }
+                }
+            }
+        }.getOrNull() ?: cache.company.value
     }
 
     /** Update the non-secret company profile (`PUT /company`), then cache the server echo. */

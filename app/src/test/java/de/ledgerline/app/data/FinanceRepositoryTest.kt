@@ -129,4 +129,29 @@ class FinanceRepositoryTest {
         // The guard covers the invoice shard + the new payRef + the preserved tx/cat collections.
         assertTrue(putBody!!.shards!!.containsAll(listOf("invshard1", "newpay", "tx1", "cat1")))
     }
+
+    @Test fun company_profile_is_cached_for_offline() = runBlocking {
+        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        var online = true
+        val api = object : NotImplementedApi() {
+            override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse> {
+                if (!online) throw java.io.IOException("offline")
+                return Response.success(de.ledgerline.app.data.remote.dto.CompanyResponse(CompanyDto(name = "IntellyTec GmbH", vatId = "DE123")))
+            }
+        }
+        val store = tmpStoreCache()   // the sealed disk cache shared across "app restarts"
+
+        // Online: profile loads and is sealed into the offline cache.
+        val repo1 = FinanceRepository(sh, vh, crypto, FinanceCache(), store, FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        assertEquals("IntellyTec GmbH", repo1.loadCompany()?.name)
+
+        // Restart offline (fresh in-memory cache, same disk): the network throws but the sealed
+        // disk cache still yields the profile.
+        online = false
+        val repo2 = FinanceRepository(sh, vh, crypto, FinanceCache(), store, FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        val cached = repo2.loadCompany()
+        assertEquals("IntellyTec GmbH", cached?.name)
+        assertEquals("DE123", cached?.vatId)
+    }
 }
