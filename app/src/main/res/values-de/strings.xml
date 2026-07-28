@@ -776,7 +776,7 @@
     <string name="finance_new">Neue Rechnung</string>
     <string name="finance_edit">Rechnung bearbeiten</string>
     <string name="finance_export_xml">E-Rechnung exportieren (XML)</string>
-    <string name="finance_import_xml">E-Rechnung importieren (XML)</string>
+    <string name="finance_import_xml">Rechnung importieren (XML/PDF)</string>
     <string name="finance_import_xml_bad">Keine erkennbare E-Rechnung (XML)</string>
     <string name="finance_issue">Rechnung ausstellen</string>
     <string name="finance_mark_paid">Als bezahlt markieren</string>

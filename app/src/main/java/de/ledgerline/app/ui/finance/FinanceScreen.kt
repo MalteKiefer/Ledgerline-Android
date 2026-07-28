@@ -98,10 +98,14 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        val text = runCatching { ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } }.getOrNull()
-        val parsed = text?.let { de.ledgerline.app.core.finance.EInvoiceXml.parse(it) }
-        if (parsed != null) onImported(vm.invoiceFromEInvoice(parsed))
-        else android.widget.Toast.makeText(ctx, ctx.getString(R.string.finance_import_xml_bad), android.widget.Toast.LENGTH_SHORT).show()
+        val bytes = runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+        val name = uri.lastPathSegment?.substringAfterLast('/') ?: "invoice"
+        val mime = ctx.contentResolver.getType(uri) ?: "application/octet-stream"
+        if (bytes == null) { android.widget.Toast.makeText(ctx, ctx.getString(R.string.finance_import_xml_bad), android.widget.Toast.LENGTH_SHORT).show(); return@rememberLauncherForActivityResult }
+        vm.importInvoiceDocument(bytes, name, mime) { inv ->
+            if (inv != null) onImported(inv)
+            else android.widget.Toast.makeText(ctx, ctx.getString(R.string.finance_import_xml_bad), android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
     val invoices by vm.invoices.collectAsStateWithLifecycle()
     val year by vm.year.collectAsStateWithLifecycle()

@@ -140,6 +140,43 @@ class FinanceViewModel @Inject constructor(
         }.ifEmpty { listOf(de.ledgerline.app.domain.model.InvoiceLine()) },
     )
 
+    /** Build a draft invoice from OCR'd receipt/invoice text (fields best-effort; user reviews). */
+    fun invoiceFromOcrText(text: String): Invoice {
+        val a = de.ledgerline.app.core.finance.ReceiptOcr.analyze(text)
+        return Invoice(
+            id = de.ledgerline.app.core.Ids.newId(),
+            number = a.number.ifBlank { null },
+            status = de.ledgerline.app.domain.model.InvoiceStatus.DRAFT,
+            issueDate = a.date.ifBlank { java.time.LocalDate.now().toString() },
+            currency = a.currency.ifBlank { "EUR" },
+            customer = de.ledgerline.app.domain.model.InvoiceCustomer(name = a.merchant),
+            lines = listOf(de.ledgerline.app.domain.model.InvoiceLine(
+                desc = a.merchant.ifBlank { "Rechnung" }, qty = 1.0,
+                unitPrice = a.total ?: 0.0, vatRate = a.vat.toDoubleOrNull() ?: 0.0,
+            )),
+        )
+    }
+
+    /**
+     * Import a document as an invoice draft: an embedded/standalone e-invoice XML is parsed exactly
+     * ([EInvoiceXml]); a PDF/image is OCR'd on the server and its fields recognised ([ReceiptOcr]).
+     * [onResult] gets the draft (never auto-saved) or null if nothing usable.
+     */
+    fun importInvoiceDocument(bytes: ByteArray, name: String, mime: String, onResult: (Invoice?) -> Unit) {
+        viewModelScope.launch {
+            val asText = runCatching { String(bytes, Charsets.UTF_8) }.getOrNull() ?: ""
+            if (de.ledgerline.app.core.finance.EInvoiceXml.looksLikeEInvoiceXml(asText)) {
+                onResult(de.ledgerline.app.core.finance.EInvoiceXml.parse(asText)?.let(::invoiceFromEInvoice)); return@launch
+            }
+            val isPdfOrImg = mime.contains("pdf", true) || mime.startsWith("image/") || name.endsWith(".pdf", true)
+            if (isPdfOrImg) {
+                val text = repo.ocrDocument(bytes, name, mime)
+                onResult(text?.let { invoiceFromOcrText(it) }); return@launch
+            }
+            onResult(null)
+        }
+    }
+
     /** Insert or update [inv] in the store; [onDone] gets whether it persisted. */
     fun save(inv: Invoice, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch {

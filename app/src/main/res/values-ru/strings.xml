@@ -779,7 +779,7 @@
     <string name="finance_new">Новый счёт</string>
     <string name="finance_edit">Изменить счёт</string>
     <string name="finance_export_xml">Экспорт э-счёта (XML)</string>
-    <string name="finance_import_xml">Импорт э-счёта (XML)</string>
+    <string name="finance_import_xml">Импорт счёта (XML/PDF)</string>
     <string name="finance_import_xml_bad">Не распознан XML э-счёта</string>
     <string name="finance_issue">Выставить счёт</string>
     <string name="finance_mark_paid">Отметить оплаченным</string>
