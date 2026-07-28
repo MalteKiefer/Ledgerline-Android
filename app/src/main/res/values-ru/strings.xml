@@ -795,6 +795,7 @@
     <string name="finance_line_vat">НДС %</string>
     <string name="finance_add_line">Добавить позицию</string>
     <string name="finance_company">Профиль компании</string>
+    <string name="finance_company_logo">Логотип компании</string>
     <string name="finance_company_identity">Данные компании</string>
     <string name="finance_company_defaults">Настройки счёта</string>
     <string name="finance_company_phone">Телефон</string>

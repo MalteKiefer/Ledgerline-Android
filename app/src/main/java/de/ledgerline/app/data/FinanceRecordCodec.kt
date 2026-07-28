@@ -221,6 +221,7 @@ object FinanceRecordCodec {
         footerText = dto.footerText.orEmpty(),
         numberFormat = dto.numberFormat?.ifBlank { null } ?: "YYYY-NNNN",
         nextNumber = dto.nextNumber ?: 1,
+        hasLogo = dto.hasLogo ?: false,
     )
 
     fun companyToDto(c: CompanyProfile): CompanyDto = CompanyDto(

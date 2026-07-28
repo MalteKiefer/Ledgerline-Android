@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -60,6 +62,14 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
     val thisYear = java.time.LocalDate.now().year.toString()
     val numberingLocked = invoices.any { !it.trashed && it.seq != null && it.issueDate.startsWith(thisYear) }
 
+    // Load the stored logo (if any) for a preview.
+    var logo by remember(c) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    androidx.compose.runtime.LaunchedEffect(c.hasLogo) {
+        if (c.hasLogo) vm.loadCompanyLogo { bytes ->
+            logo = bytes?.let { runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() }
+        }
+    }
+
     AppScaffold(
         topBar = { AppTopBar(title = stringResource(R.string.finance_company), onBack = onBack) },
     ) { pad ->
@@ -67,6 +77,14 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
             Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            logo?.let { bmp ->
+                androidx.compose.foundation.Image(
+                    bitmap = bmp,
+                    contentDescription = stringResource(R.string.finance_company_logo),
+                    modifier = Modifier.fillMaxWidth().height(88.dp),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                )
+            }
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.finance_company_identity), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
                 Field(name, { name = it }, R.string.finance_customer_name)

@@ -546,6 +546,15 @@ class FinanceRepository(
         }.getOrNull() ?: cache.company.value
     }
 
+    /** Fetch the stored company-logo image bytes (non-secret, streamed from `GET /company/logo`). */
+    suspend fun companyLogo(): ByteArray? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        runCatching {
+            val r = apiProvider(session).companyLogo()
+            if (r.isSuccessful) r.body()?.bytes() else null
+        }.getOrNull()
+    }
+
     /** Update the non-secret company profile (`PUT /company`), then cache the server echo. */
     suspend fun saveCompany(profile: CompanyProfile): Boolean = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext false

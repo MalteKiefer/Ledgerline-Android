@@ -165,6 +165,11 @@ class FinanceViewModel @Inject constructor(
         viewModelScope.launch { onDone(repo.saveCompany(profile)) }
     }
 
+    /** Fetch the company logo image bytes (or null) — for the company editor preview. */
+    fun loadCompanyLogo(onResult: (ByteArray?) -> Unit) {
+        viewModelScope.launch { onResult(repo.companyLogo()) }
+    }
+
     // ---- payment methods ----
     fun sortedPaymentMethods(): List<de.ledgerline.app.domain.model.PaymentMethod> =
         de.ledgerline.app.core.finance.PaymentMethods.sorted(paymentMethods.value)

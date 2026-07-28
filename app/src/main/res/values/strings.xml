@@ -794,6 +794,7 @@
     <string name="finance_line_vat">VAT %</string>
     <string name="finance_add_line">Add item</string>
     <string name="finance_company">Company profile</string>
+    <string name="finance_company_logo">Company logo</string>
     <string name="finance_company_identity">Business identity</string>
     <string name="finance_company_defaults">Invoice defaults</string>
     <string name="finance_company_phone">Phone</string>

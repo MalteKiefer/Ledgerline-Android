@@ -92,6 +92,8 @@ data class CompanyProfile(
     /** Invoice-number template (web `number_format`, default `YYYY-NNNN`) + the GoBD floor. */
     val numberFormat: String = "YYYY-NNNN",
     val nextNumber: Int = 1,
+    /** Whether a company logo is stored server-side (streamed from `GET /company/logo`). */
+    val hasLogo: Boolean = false,
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 

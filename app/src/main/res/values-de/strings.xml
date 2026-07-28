@@ -792,6 +792,7 @@
     <string name="finance_line_vat">MwSt. %</string>
     <string name="finance_add_line">Position hinzufügen</string>
     <string name="finance_company">Firmenprofil</string>
+    <string name="finance_company_logo">Firmenlogo</string>
     <string name="finance_company_identity">Firmendaten</string>
     <string name="finance_company_defaults">Rechnungs-Voreinstellungen</string>
     <string name="finance_company_phone">Telefon</string>

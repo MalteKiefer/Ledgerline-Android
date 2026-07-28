@@ -26,6 +26,7 @@ data class CompanyDto(
     @SerialName("invoice_default_vat_rate") val defaultVatRate: Double? = null,
     @SerialName("invoice_payment_methods") val paymentMethods: String? = null,
     @SerialName("invoice_payment_terms_text") val paymentTermsText: String? = null,
+    @SerialName("has_logo") val hasLogo: Boolean? = null,
 )
 
 /** GET/PUT `/company` wrapper: `{ "company": { … } }`. */

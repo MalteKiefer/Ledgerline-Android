@@ -164,8 +164,19 @@ interface LedgerlineApi {
     @POST("api/v1/invoices/upload")
     suspend fun uploadInvoice(@Part file: MultipartBody.Part): Response<UploadResponse>
 
+    @POST("api/v1/invoices/raw-batch")
+    @Streaming
+    suspend fun invoicesRawBatch(@Body body: ReconcileRequest): Response<ResponseBody>
+
+    @POST("api/v1/invoices/blobs/reconcile")
+    suspend fun invoicesReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
+
     @GET("api/v1/company")
     suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse>
+
+    @GET("api/v1/company/logo")
+    @Streaming
+    suspend fun companyLogo(): Response<ResponseBody>
 
     @PUT("api/v1/company")
     suspend fun companyPut(@Body body: de.ledgerline.app.data.remote.dto.CompanyDto): Response<de.ledgerline.app.data.remote.dto.CompanyResponse>
