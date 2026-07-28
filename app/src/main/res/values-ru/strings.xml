@@ -817,6 +817,11 @@
     <string name="finance_stats_monthly">Выручка нетто по месяцам</string>
     <string name="finance_stats_by_customer">Выручка по клиентам</string>
     <string name="finance_stats_customer_count">счетов: %1$d</string>
+    <string name="finance_stats_vat_payable_title">НДС к уплате (из проводок)</string>
+    <string name="finance_stats_output_vat">НДС с доходов</string>
+    <string name="finance_stats_input_vat">Входящий НДС (расходы)</string>
+    <string name="finance_stats_vat_payable">К уплате</string>
+    <string name="finance_stats_vat_undecided">проводок без категории НДС: %1</string>
     <string name="finance_pm_title">Способы оплаты</string>
     <string name="finance_pm_add">Добавить способ оплаты</string>
     <string name="finance_pm_edit">Изменить способ оплаты</string>

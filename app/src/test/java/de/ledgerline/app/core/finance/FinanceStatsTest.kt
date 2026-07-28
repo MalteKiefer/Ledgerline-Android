@@ -95,6 +95,33 @@ class FinanceStatsTest {
         assertNull(FinanceStats.statsKpis(only, 2026).growthPct)
     }
 
+    @Test fun gross_to_net_vat() {
+        val (net, vat) = FinanceStats.grossToNetVat(119.0, 19.0)
+        assertEquals(100.0, net, 0.001)
+        assertEquals(19.0, vat, 0.001)
+        val (n0, v0) = FinanceStats.grossToNetVat(50.0, 0.0)
+        assertEquals(50.0, n0, 0.001); assertEquals(0.0, v0, 0.001)
+    }
+
+    @Test fun account_vat_summary_output_minus_input() {
+        val txns = listOf(
+            de.ledgerline.app.domain.model.Transaction(id = "1", date = "2026-01-10", amount = 1190.0, vatCat = "19"),  // income
+            de.ledgerline.app.domain.model.Transaction(id = "2", date = "2026-02-10", amount = -119.0, vatCat = "19"),  // expense
+            de.ledgerline.app.domain.model.Transaction(id = "3", date = "2026-03-10", amount = -107.0, vatCat = "7"),   // expense 7%
+            de.ledgerline.app.domain.model.Transaction(id = "4", date = "2026-04-10", amount = 500.0, vatCat = "private"),
+            de.ledgerline.app.domain.model.Transaction(id = "5", date = "2026-05-10", amount = -80.0, vatCat = ""),     // undecided
+            de.ledgerline.app.domain.model.Transaction(id = "6", date = "2026-06-10", amount = -9.0, vatCat = "19", trashed = true), // ignored
+        )
+        val s = FinanceStats.accountVatSummary(txns)
+        assertEquals(190.0, s.outputVat, 0.001)          // 1190 gross @19% → 190 VAT
+        assertEquals(26.0, s.inputVat, 0.001)            // 19 (119@19%) + 7 (107@7%)
+        assertEquals(164.0, s.payable, 0.001)            // 190 − 26
+        assertEquals(500.0, s.privateSum, 0.001)
+        assertEquals(1, s.undecided)
+        assertEquals(listOf("19"), s.income.map { it.rate })
+        assertEquals(listOf("19", "7"), s.expense.map { it.rate })   // sorted rate desc
+    }
+
     @Test fun empty_year_is_zero() {
         val r = FinanceStats.vatReturn(sample, 2099)
         assertEquals(0, r.count)

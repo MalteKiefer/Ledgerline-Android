@@ -88,6 +88,11 @@ class FinanceViewModel @Inject constructor(
     fun monthlyRevenue(y: Int) = de.ledgerline.app.core.finance.FinanceStats.monthlyRevenue(invoices.value, y)
     fun statsKpis(y: Int) = de.ledgerline.app.core.finance.FinanceStats.statsKpis(invoices.value, y)
 
+    /** Output/input VAT (USt-Zahllast) from the year [y]'s bookings across all accounts. */
+    fun accountVat(y: Int) = de.ledgerline.app.core.finance.FinanceStats.accountVatSummary(
+        transactions.value.filter { it.date.take(4) == y.toString() },
+    )
+
     fun invoiceById(id: String): Invoice? = invoices.value.firstOrNull { it.id == id }
 
     fun totals(inv: Invoice) = InvoiceMath.totals(inv)

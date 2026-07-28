@@ -42,6 +42,7 @@ import de.ledgerline.app.ui.theme.cardSurface
 fun FinanceStatsScreen(vm: FinanceViewModel, year: Int, onBack: () -> Unit) {
     val kpis = vm.statsKpis(year)
     val vat = vm.vatReturn(year)
+    val accountVat = vm.accountVat(year)
     val monthly = vm.monthlyRevenue(year)
     val customers = vm.revenueByCustomer(year)
 
@@ -97,6 +98,22 @@ fun FinanceStatsScreen(vm: FinanceViewModel, year: Int, onBack: () -> Unit) {
                             Text("Q${q.q}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(vm.money(q.net, null), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, maxLines = 1)
                         }
+                    }
+                }
+            }
+
+            // VAT payable from bookings (Umsatzsteuer-Zahllast), if any categorised bookings exist.
+            if (accountVat.outputVat != 0.0 || accountVat.inputVat != 0.0 || accountVat.undecided > 0) {
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.finance_stats_vat_payable_title), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    TotalRow(stringResource(R.string.finance_stats_output_vat), vm.money(accountVat.outputVat, null))
+                    TotalRow(stringResource(R.string.finance_stats_input_vat), vm.money(accountVat.inputVat, null))
+                    TotalRow(stringResource(R.string.finance_stats_vat_payable), vm.money(accountVat.payable, null), bold = true)
+                    if (accountVat.undecided > 0) {
+                        Text(
+                            stringResource(R.string.finance_stats_vat_undecided, accountVat.undecided),
+                            style = MaterialTheme.typography.bodySmall, color = Color(0xFFE2915A),
+                        )
                     }
                 }
             }

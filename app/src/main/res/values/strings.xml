@@ -816,6 +816,11 @@
     <string name="finance_stats_monthly">Monthly net revenue</string>
     <string name="finance_stats_by_customer">Revenue by customer</string>
     <string name="finance_stats_customer_count">%1$d invoices</string>
+    <string name="finance_stats_vat_payable_title">VAT payable (from bookings)</string>
+    <string name="finance_stats_output_vat">Output VAT (income)</string>
+    <string name="finance_stats_input_vat">Input VAT (expenses)</string>
+    <string name="finance_stats_vat_payable">Payable</string>
+    <string name="finance_stats_vat_undecided">%1 bookings without a VAT category</string>
     <string name="finance_pm_title">Payment methods</string>
     <string name="finance_pm_add">Add payment method</string>
     <string name="finance_pm_edit">Edit payment method</string>

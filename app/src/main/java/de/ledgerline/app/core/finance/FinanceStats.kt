@@ -2,6 +2,8 @@ package de.ledgerline.app.core.finance
 
 import de.ledgerline.app.domain.model.Invoice
 import de.ledgerline.app.domain.model.InvoiceStatus
+import de.ledgerline.app.domain.model.Transaction
+import kotlin.math.abs
 import kotlin.math.roundToLong
 
 /**
@@ -110,6 +112,55 @@ object FinanceStats {
         /** Year-over-year net growth in percent, or null if the previous year had no revenue. */
         val growthPct: Double?,
     )
+
+    /** Split a gross amount into net + VAT for a given VAT rate (percent) — web `grossToNetVat`. */
+    fun grossToNetVat(gross: Double, ratePercent: Double): Pair<Double, Double> {
+        val net = if (ratePercent > 0) gross / (1 + ratePercent / 100.0) else gross
+        return round2(net) to round2(gross - net)
+    }
+
+    data class VatBucket(val rate: String, val net: Double, val vat: Double)
+    data class AccountVat(
+        val income: List<VatBucket>,
+        val expense: List<VatBucket>,
+        val outputVat: Double,      // VAT collected on income
+        val inputVat: Double,       // VAT paid on expenses (Vorsteuer)
+        val payable: Double,        // output − input (the USt payable / refund)
+        val privateSum: Double,     // deposits/withdrawals, excluded from VAT
+        val undecided: Int,         // bookings with no VAT category yet
+    )
+
+    /**
+     * VAT summary of a set of [transactions] by category (web `accountVatSummary`): income (amount>0)
+     * and expenses (amount<0) grouped by rate; `private` and undecided (`''`) rows are reported apart
+     * and excluded. `outputVat` = VAT on income, `inputVat` = Vorsteuer on expenses, `payable` = diff.
+     */
+    fun accountVatSummary(transactions: List<Transaction>): AccountVat {
+        val income = LinkedHashMap<String, DoubleArray>()   // rate -> [net, vat]
+        val expense = LinkedHashMap<String, DoubleArray>()
+        var privateSum = 0.0; var undecided = 0; var outputVat = 0.0; var inputVat = 0.0
+        for (tx in transactions) {
+            if (tx.trashed) continue
+            val cat = tx.vatCat
+            val gross = abs(tx.amount)
+            if (cat == "private") { privateSum += gross; continue }
+            if (cat.isEmpty()) { undecided++; continue }
+            val rate = cat.toDoubleOrNull() ?: run { undecided++; continue }
+            val (net, vat) = grossToNetVat(gross, rate)
+            val bucket = if (tx.amount >= 0) income else expense
+            val acc = bucket.getOrPut(cat) { doubleArrayOf(0.0, 0.0) }
+            acc[0] += net; acc[1] += vat
+            if (tx.amount >= 0) outputVat += vat else inputVat += vat
+        }
+        fun rows(map: Map<String, DoubleArray>) = map.entries
+            .map { VatBucket(it.key, round2(it.value[0]), round2(it.value[1])) }
+            .sortedByDescending { it.rate.toDoubleOrNull() ?: 0.0 }
+        return AccountVat(
+            income = rows(income), expense = rows(expense),
+            outputVat = round2(outputVat), inputVat = round2(inputVat), payable = round2(outputVat - inputVat),
+            privateSum = round2(privateSum), undecided = undecided,
+        )
+    }
 
     /** Headline KPIs for a [year] incl. year-over-year net growth vs the previous year (web `yearKpis`). */
     fun statsKpis(invoices: List<Invoice>, year: Int): StatsKpis {

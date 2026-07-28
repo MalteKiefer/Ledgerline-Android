@@ -814,6 +814,11 @@
     <string name="finance_stats_monthly">Nettoumsatz pro Monat</string>
     <string name="finance_stats_by_customer">Umsatz nach Kunde</string>
     <string name="finance_stats_customer_count">%1$d Rechnungen</string>
+    <string name="finance_stats_vat_payable_title">USt-Zahllast (aus Buchungen)</string>
+    <string name="finance_stats_output_vat">Umsatzsteuer (Einnahmen)</string>
+    <string name="finance_stats_input_vat">Vorsteuer (Ausgaben)</string>
+    <string name="finance_stats_vat_payable">Zahllast</string>
+    <string name="finance_stats_vat_undecided">%1 Buchungen ohne USt-Kategorie</string>
     <string name="finance_pm_title">Zahlungsmethoden</string>
     <string name="finance_pm_add">Zahlungsmethode hinzufügen</string>
     <string name="finance_pm_edit">Zahlungsmethode bearbeiten</string>
