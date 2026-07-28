@@ -18,6 +18,7 @@ enum class WorkspaceDest(val labelRes: Int) {
     Contacts(R.string.menu_contacts),
     Explore(R.string.dest_explore),
     Health(R.string.dest_health),
+    Finance(R.string.dest_finance),
     Settings(R.string.settings_title);
 
     companion object {

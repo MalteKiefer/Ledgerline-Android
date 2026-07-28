@@ -149,6 +149,17 @@ interface LedgerlineApi {
     @POST("api/v1/notes/upload")
     suspend fun uploadNote(@Part file: MultipartBody.Part): Response<UploadResponse>
 
+    // --- Finance / invoices sharded store + blobs + non-secret company profile ---
+    @GET("api/v1/invoices/store")
+    suspend fun invoicesStore(): Response<StoreResponse>
+
+    @GET("api/v1/invoices/raw/{blob}")
+    @Streaming
+    suspend fun rawInvoice(@Path("blob") blob: String): Response<ResponseBody>
+
+    @GET("api/v1/company")
+    suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyDto>
+
     // --- Passwords sharded store + blobs (web migrated passwords off the monolith, §P0) ---
     @GET("api/v1/passwords/store")
     suspend fun passwordsStore(): Response<StoreResponse>

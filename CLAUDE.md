@@ -660,7 +660,21 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   `HealthRecordCodecTest`/`HealthRepositoryTest` (21). **Offen (klein):** Doctor-Report/Print-PDF (Web
   hat eine Print-Ansicht; Android macht CSV-Share), globale Einheiten-Prefs-Sync (`/preferences`;
   Android hält die Einheiten in `healthProfile.units`, web-kompatibel), on-device-Verifikation.
-- **Invoices-Modul.**
+- **Finance / Invoices — READ-ONLY MVP ERLEDIGT (2026-07-28, on-device verifiziert).** Neuer Drawer-Tab
+  „Finanzen" liest die versiegelten Rechnungen aus dem **sharded** `/invoices/store` (via
+  `ShardedStoreEngine`, invoices = Record-Shards) + das nicht-geheime `/company`-Profil. Bausteine:
+  `domain/model/Finance` (Invoice/InvoiceLine/InvoiceCustomer/CompanyProfile, Raw-Overlay = kein
+  Feldverlust), `core/finance/InvoiceMath` (byte-nah zu `invoices.js`/`invoice-numbering.js` —
+  `totals` net/vatByRate/vat/gross, GoBD-Nummerierung `nextSeqForYear`/`formatNumber`/`duplicateNumbers`,
+  `yearKpis`), `FinanceRepository` (read-only) + `FinanceCache`, `CompanyDto`/`invoicesStore`/
+  `rawInvoice`/`company` in `LedgerlineApi`. UI: Rechnungsliste je Jahr mit Paid/Offen/Count-KPIs →
+  Detail (Empfänger, Positionen, Netto/MwSt-je-Satz/Gesamt), M3-Karten, €-Format, EN/DE/RU. Test
+  `InvoiceMathTest`. **On-device verifiziert:** echte Rechnungen entschlüsseln, Totals korrekt
+  (900 net ×19% → 1.071 brutto). **Bewusst READ-ONLY:** der sharded Root trägt zwei Collection-Blobs
+  (paymentMethods + transactions), die die Engine beim Save NICHT erhält → Re-Seal würde sie droppen.
+  Create/Edit erst nach Multi-Collection-Write. **Offen (Finance):** Schreiben (Anlegen/Bearbeiten +
+  GoBD-Nummer vergeben), payment-methods/transactions-UI, VAT-Return-Statistik, ZUGFeRD/Factur-X-Export,
+  e-invoice-XML-Import, Client-PDF-Import, Bankauszug-Import, Company-Profil-Editor.
 - Galerie-ML-Parität: semantische Suche (embed-text ist da), Duplikate, Alben-Feinschliff.
 
 **P2 — Nav-/UX-Angleichung an iOS:** Tab-Struktur (Passwords-Tab), Grouped-List +

@@ -42,6 +42,7 @@ class VaultLockerTest {
             passwordsCache = de.ledgerline.app.core.PasswordsCache(),
             exploreCache = de.ledgerline.app.core.ExploreCache(),
             healthCache = de.ledgerline.app.core.HealthCache(),
+            financeCache = de.ledgerline.app.core.FinanceCache(),
         )
 
         locker.lock()

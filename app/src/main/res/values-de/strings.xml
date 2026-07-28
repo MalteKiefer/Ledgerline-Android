@@ -752,4 +752,25 @@
     <string name="health_fast_delete_confirm">Dieses Fasten löschen?</string>
     <string name="health_disclaimer">Nur zur Information — keine medizinische Beratung.</string>
     <string name="health_csv_shared">Gesundheitsdaten exportiert</string>
+    <!-- Finanzen / Rechnungen -->
+    <string name="dest_finance">Finanzen</string>
+    <string name="finance_empty">Keine Rechnungen für dieses Jahr.</string>
+    <string name="finance_readonly_note">Rechnungen sind auf Android vorerst nur lesbar — anlegen und bearbeiten in der Web-App.</string>
+    <string name="finance_kpi_paid">Bezahlt</string>
+    <string name="finance_kpi_outstanding">Offen</string>
+    <string name="finance_kpi_count">Rechnungen</string>
+    <string name="finance_status">Status</string>
+    <string name="finance_status_draft">Entwurf</string>
+    <string name="finance_status_sent">Offen</string>
+    <string name="finance_status_paid">Bezahlt</string>
+    <string name="finance_no_number">Keine Nummer (Entwurf)</string>
+    <string name="finance_no_customer">Kein Empfänger</string>
+    <string name="finance_issue_date">Rechnungsdatum</string>
+    <string name="finance_due_date">Fällig am</string>
+    <string name="finance_recipient">Empfänger</string>
+    <string name="finance_items">Positionen</string>
+    <string name="finance_net">Netto</string>
+    <string name="finance_vat">MwSt.</string>
+    <string name="finance_gross">Gesamt</string>
+    <string name="finance_note">Notiz</string>
 </resources>

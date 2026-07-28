@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.MonitorHeart
+import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
@@ -190,6 +191,8 @@ fun WorkspaceScaffold(
 
                         WorkspaceDest.Health -> de.ledgerline.app.ui.health.HealthScreen(onMenu = { scope.launch { drawerState.open() } })
 
+                        WorkspaceDest.Finance -> de.ledgerline.app.ui.finance.FinanceScreen(onMenu = { scope.launch { drawerState.open() } })
+
                         WorkspaceDest.Settings -> SettingsContent(
                             onLockNow = onLockNow,
                             onDisconnected = onDisconnected,
@@ -298,6 +301,7 @@ private fun DrawerSheet(current: WorkspaceDest, onSearch: () -> Unit, onSelect: 
                     WorkspaceDest.Contacts to Icons.Outlined.Contacts,
                     WorkspaceDest.Explore to Icons.Outlined.Map,
                     WorkspaceDest.Health to Icons.Outlined.MonitorHeart,
+                    WorkspaceDest.Finance to Icons.Outlined.ReceiptLong,
                 ).forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
             }
             androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))

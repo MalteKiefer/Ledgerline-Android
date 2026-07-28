@@ -755,4 +755,25 @@
     <string name="health_fast_delete_confirm">Удалить это голодание?</string>
     <string name="health_disclaimer">Только для информации — не медицинская рекомендация.</string>
     <string name="health_csv_shared">Данные здоровья экспортированы</string>
+    <!-- Финансы / счета -->
+    <string name="dest_finance">Финансы</string>
+    <string name="finance_empty">Нет счетов за этот год.</string>
+    <string name="finance_readonly_note">Счета на Android пока только для чтения — создавайте и редактируйте в веб-приложении.</string>
+    <string name="finance_kpi_paid">Оплачено</string>
+    <string name="finance_kpi_outstanding">Не оплачено</string>
+    <string name="finance_kpi_count">Счета</string>
+    <string name="finance_status">Статус</string>
+    <string name="finance_status_draft">Черновик</string>
+    <string name="finance_status_sent">Не оплачен</string>
+    <string name="finance_status_paid">Оплачен</string>
+    <string name="finance_no_number">Без номера (черновик)</string>
+    <string name="finance_no_customer">Нет получателя</string>
+    <string name="finance_issue_date">Дата выставления</string>
+    <string name="finance_due_date">Срок оплаты</string>
+    <string name="finance_recipient">Получатель</string>
+    <string name="finance_items">Позиции</string>
+    <string name="finance_net">Нетто</string>
+    <string name="finance_vat">НДС</string>
+    <string name="finance_gross">Итого</string>
+    <string name="finance_note">Заметка</string>
 </resources>
