@@ -135,11 +135,47 @@ data class Transaction(
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 
+/** A manual "hand" expense bundled in a cost project (web `project.expenses[]`). */
+data class ProjectExpense(
+    val id: String,
+    val amount: Double = 0.0,
+    val date: String = "",
+    val note: String = "",
+    val raw: JsonObject = JsonObject(emptyMap()),
+)
+
+/**
+ * A nestable cost project bundling receipts + manual expenses (finance store `projects` collection).
+ * `kind` separates business vs private projects (web `92ba1eb4`); totals roll up through `parentId`.
+ */
+data class Project(
+    val id: String,
+    val name: String = "",
+    val parentId: String? = null,
+    val note: String = "",
+    val kind: String = "business",       // business | private
+    val expenses: List<ProjectExpense> = emptyList(),
+    val created: String = "",
+    val raw: JsonObject = JsonObject(emptyMap()),
+)
+
+/** A receipt/document bundled on a transaction (inline `tx.receipts[]`; read-only in Android for now). */
+data class Receipt(
+    val id: String,
+    val name: String = "",
+    val total: Double? = null,
+    val projectId: String? = null,
+    val sig: String? = null,
+    val blob: String? = null,
+    val raw: JsonObject = JsonObject(emptyMap()),
+)
+
 /** The decrypted `/invoices/store` slice the app consumes. `seq` = the GoBD per-year counter base. */
 data class FinanceManifest(
     val invoices: List<Invoice> = emptyList(),
     val paymentMethods: List<PaymentMethod> = emptyList(),
     val transactions: List<Transaction> = emptyList(),
+    val projects: List<Project> = emptyList(),
     val seq: Int = 0,
 )
 

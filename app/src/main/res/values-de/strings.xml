@@ -866,4 +866,17 @@
     <string name="finance_company_terms_text">Zahlungsbedingungen-Text</string>
     <string name="finance_company_methods">Zahlungsmethoden</string>
     <string name="finance_company_numbering_locked">Die Nummerierung ist gesperrt, da dieses Jahr bereits Rechnungen bestehen (GoBD). Zum Neustart der Nummernfolge den Zyklus des laufenden Jahres unter Finanzen zurücksetzen — dabei werden die Rechnungen dieses Jahres gelöscht.</string>
+    <string name="finance_projects">Projekte</string>
+    <string name="finance_projects_empty">Noch keine Kostenprojekte.</string>
+    <string name="finance_project_new">Neues Projekt</string>
+    <string name="finance_project_edit">Projekt bearbeiten</string>
+    <string name="finance_project_untitled">Ohne Titel</string>
+    <string name="finance_project_name">Projektname</string>
+    <string name="finance_project_business">Geschäftlich</string>
+    <string name="finance_project_private">Privat</string>
+    <string name="finance_project_total_rolled">Gesamt (inkl. Teilprojekte)</string>
+    <string name="finance_project_total_own">Eigene Summe</string>
+    <string name="finance_project_expenses">Manuelle Ausgaben</string>
+    <string name="finance_project_receipts">Zugeordnete Belege</string>
+    <string name="finance_project_subprojects">Teilprojekte</string>
 </resources>

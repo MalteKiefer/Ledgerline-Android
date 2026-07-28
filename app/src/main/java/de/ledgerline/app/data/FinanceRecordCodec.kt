@@ -203,6 +203,68 @@ object FinanceRecordCodec {
         )
     }
 
+    // ---- projects + expenses (decode + encode, raw overlay = no field loss) ----
+
+    fun decodeProject(o: JsonObject): de.ledgerline.app.domain.model.Project? {
+        val id = o.str("id") ?: return null
+        return de.ledgerline.app.domain.model.Project(
+            id = id,
+            name = o.str("name") ?: "",
+            parentId = o.str("parentId"),
+            note = o.str("note") ?: "",
+            kind = o.str("kind") ?: "business",
+            expenses = (o["expenses"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::decodeExpense) },
+            created = o.str("created") ?: "",
+            raw = o,
+        )
+    }
+
+    private fun decodeExpense(o: JsonObject) = de.ledgerline.app.domain.model.ProjectExpense(
+        id = o.str("id") ?: "",
+        amount = o["amount"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+        date = o.str("date") ?: "",
+        note = o.str("note") ?: "",
+        raw = o,
+    )
+
+    fun encodeProject(p: de.ledgerline.app.domain.model.Project): JsonObject {
+        val out = p.raw.toMutableMap()
+        out["id"] = JsonPrimitive(p.id)
+        out["name"] = JsonPrimitive(p.name)
+        setOrNull(out, "parentId", p.parentId?.let { JsonPrimitive(it) } ?: JsonNull)
+        out["note"] = JsonPrimitive(p.note)
+        out["kind"] = JsonPrimitive(p.kind)
+        out["expenses"] = JsonArray(p.expenses.map(::encodeExpense))
+        if (p.created.isNotEmpty()) out["created"] = JsonPrimitive(p.created)
+        return JsonObject(out)
+    }
+
+    private fun encodeExpense(e: de.ledgerline.app.domain.model.ProjectExpense): JsonObject {
+        val out = e.raw.toMutableMap()
+        out["id"] = JsonPrimitive(e.id)
+        out["amount"] = numToken(e.amount)
+        out["date"] = JsonPrimitive(e.date)
+        out["note"] = JsonPrimitive(e.note)
+        return JsonObject(out)
+    }
+
+    /** Decode the inline `tx.receipts[]` of a transaction's raw JSON (read-only; edits go via the tx). */
+    fun decodeReceipts(txRaw: JsonObject): List<de.ledgerline.app.domain.model.Receipt> =
+        (txRaw["receipts"] as? JsonArray).orEmpty().mapNotNull { el ->
+            (el as? JsonObject)?.let { o ->
+                val id = o.str("id") ?: return@let null
+                de.ledgerline.app.domain.model.Receipt(
+                    id = id,
+                    name = o.str("name") ?: "",
+                    total = o["total"]?.jsonPrimitive?.doubleOrNull,
+                    projectId = o.str("projectId"),
+                    sig = o.str("sig"),
+                    blob = o.str("blob") ?: o.str("ref"),
+                    raw = o,
+                )
+            }
+        }
+
     fun companyFrom(dto: CompanyDto): CompanyProfile = CompanyProfile(
         name = dto.name.orEmpty(),
         address = dto.address.orEmpty(),

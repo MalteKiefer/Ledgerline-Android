@@ -113,7 +113,7 @@ class FinanceRepository(
             if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(ct, body.version))
             val plain = crypto.openManifest(ct, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
             val a = assemble(json.parseToJsonElement(plain).jsonObject, session, vk, allowNetwork = true)
-            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions, seq = 0), version)
+            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions, projects = a.projects, seq = 0), version)
             cache.set(store)
             loadCompany()
             Outcome.Ok(store)
@@ -126,6 +126,7 @@ class FinanceRepository(
         val invoices: List<Invoice>,
         val paymentMethods: List<de.ledgerline.app.domain.model.PaymentMethod>,
         val transactions: List<de.ledgerline.app.domain.model.Transaction>,
+        val projects: List<de.ledgerline.app.domain.model.Project>,
     )
 
     /** Decode the root: capture its raw + shard descriptors, then fetch + decode shards + collections. */
@@ -151,7 +152,9 @@ class FinanceRepository(
             .mapNotNull(FinanceRecordCodec::decodePaymentMethod)
         val tx = fetchCollection(api, root, "txRef", "txKey", vk, allowNetwork)
             .mapNotNull(FinanceRecordCodec::decodeTransaction)
-        return Assembled(invoices, pm, tx)
+        val proj = fetchCollection(api, root, "projRef", "projKey", vk, allowNetwork)
+            .mapNotNull(FinanceRecordCodec::decodeProject)
+        return Assembled(invoices, pm, tx, proj)
     }
 
     /**
@@ -211,7 +214,7 @@ class FinanceRepository(
                             // Offline: assemble from cached shard blobs only (no network).
                             val a = assemble(json.parseToJsonElement(plain).jsonObject, session, vk, allowNetwork = false)
                             version = env.version
-                            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions), version)
+                            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions, projects = a.projects), version)
                             cache.set(store)
                             loadCompanyCached(vk)
                             return Outcome.Ok(store)
@@ -255,10 +258,7 @@ class FinanceRepository(
                     priorShards = result.state
                     priorRootRaw = rootJson
                     if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(rootCipher, version))
-                    val store = FinanceStore(
-                        FinanceManifest(invoices = next, paymentMethods = base!!.manifest.paymentMethods, transactions = base!!.manifest.transactions),
-                        version,
-                    )
+                    val store = FinanceStore(base!!.manifest.copy(invoices = next), version)
                     cache.set(store)
                     return@withContext Outcome.Ok(store)
                 }
@@ -464,6 +464,56 @@ class FinanceRepository(
                 }
                 put.code() == HttpURLConnection.HTTP_CONFLICT -> {
                     when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
+                }
+                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+            }
+        }
+        Outcome.Err(ErrorKind.HTTP)
+    }
+
+    /**
+     * Re-seal the `projects` collection and PUT the root with only `projRef`/`projKey`/`projHash`
+     * replaced — everything else preserved + guarded, 409-rebase. Mirrors [savePaymentMethods].
+     */
+    suspend fun saveProjects(mutate: (List<de.ledgerline.app.domain.model.Project>) -> List<de.ledgerline.app.domain.model.Project>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        var base = cache.value.value
+        if (base == null) {
+            when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
+        }
+        var next = mutate(base!!.manifest.projects)
+
+        repeat(5) {
+            val items = next.map(FinanceRecordCodec::encodeProject)
+            val coll = sealCollection(vk, items, priorRootRaw["projRef"]?.jsonPrimitive?.contentOrNull, priorRootRaw["projHash"]?.jsonPrimitive?.contentOrNull, priorRootRaw["projKey"]?.jsonPrimitive?.contentOrNull)
+                ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+            val root = priorRootRaw.toMutableMap()
+            root["v"] = JsonPrimitive(3); root["suite"] = JsonPrimitive(1)
+            if (coll.ref == null) { root.remove("projRef"); root.remove("projKey"); root.remove("projHash") }
+            else { root["projRef"] = JsonPrimitive(coll.ref); root["projKey"] = JsonPrimitive(coll.key); root["projHash"] = JsonPrimitive(coll.hash) }
+            val rootJson = JsonObject(root)
+            val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
+            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson)
+            val put = try {
+                api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
+            } catch (e: Exception) {
+                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+            }
+            when {
+                put.isSuccessful -> {
+                    version = put.body()?.version ?: (version + 1)
+                    priorRootRaw = rootJson
+                    if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(rootCipher, version))
+                    val store = FinanceStore(base!!.manifest.copy(projects = next), version)
+                    cache.set(store)
+                    return@withContext Outcome.Ok(store)
+                }
+                put.code() == HttpURLConnection.HTTP_CONFLICT -> {
+                    val fresh = when (val l = load()) {
+                        is Outcome.Ok -> { base = l.value; l.value.manifest.projects }
+                        is Outcome.Err -> return@withContext l
+                    }
+                    next = mutate(fresh)
                 }
                 else -> return@withContext Outcome.Err(ErrorKind.HTTP)
             }

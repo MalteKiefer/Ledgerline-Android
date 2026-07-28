@@ -868,4 +868,17 @@
     <string name="finance_company_terms_text">Payment terms text</string>
     <string name="finance_company_methods">Payment methods</string>
     <string name="finance_company_numbering_locked">Numbering is locked — this year already has issued invoices (GoBD). Reset the current year\'s cycle under Finance to restart, which deletes this year\'s invoices.</string>
+    <string name="finance_projects">Projects</string>
+    <string name="finance_projects_empty">No cost projects yet.</string>
+    <string name="finance_project_new">New project</string>
+    <string name="finance_project_edit">Edit project</string>
+    <string name="finance_project_untitled">Untitled</string>
+    <string name="finance_project_name">Project name</string>
+    <string name="finance_project_business">Business</string>
+    <string name="finance_project_private">Private</string>
+    <string name="finance_project_total_rolled">Total (incl. sub-projects)</string>
+    <string name="finance_project_total_own">Own total</string>
+    <string name="finance_project_expenses">Manual expenses</string>
+    <string name="finance_project_receipts">Bundled receipts</string>
+    <string name="finance_project_subprojects">Sub-projects</string>
 </resources>

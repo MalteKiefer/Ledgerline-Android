@@ -869,4 +869,17 @@
     <string name="finance_company_terms_text">Текст условий оплаты</string>
     <string name="finance_company_methods">Способы оплаты</string>
     <string name="finance_company_numbering_locked">Нумерация заблокирована — в этом году уже есть выставленные счета (GoBD). Чтобы начать заново, сбросьте цикл текущего года в разделе «Финансы» — счета этого года будут удалены.</string>
+    <string name="finance_projects">Проекты</string>
+    <string name="finance_projects_empty">Пока нет проектов затрат.</string>
+    <string name="finance_project_new">Новый проект</string>
+    <string name="finance_project_edit">Изменить проект</string>
+    <string name="finance_project_untitled">Без названия</string>
+    <string name="finance_project_name">Название проекта</string>
+    <string name="finance_project_business">Бизнес</string>
+    <string name="finance_project_private">Личное</string>
+    <string name="finance_project_total_rolled">Итого (с подпроектами)</string>
+    <string name="finance_project_total_own">Своя сумма</string>
+    <string name="finance_project_expenses">Ручные расходы</string>
+    <string name="finance_project_receipts">Прикреплённые чеки</string>
+    <string name="finance_project_subprojects">Подпроекты</string>
 </resources>

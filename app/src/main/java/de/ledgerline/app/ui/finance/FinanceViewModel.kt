@@ -45,6 +45,10 @@ class FinanceViewModel @Inject constructor(
         cache.value.map { it?.manifest?.transactions ?: emptyList() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    val projects: StateFlow<List<de.ledgerline.app.domain.model.Project>> =
+        cache.value.map { it?.manifest?.projects ?: emptyList() }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val company: StateFlow<CompanyProfile?> = cache.company
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -215,6 +219,47 @@ class FinanceViewModel @Inject constructor(
 
     fun trashTransaction(t: de.ledgerline.app.domain.model.Transaction, onDone: (Boolean) -> Unit = {}) =
         saveTransaction(t.copy(trashed = true), onDone)
+
+    // ---- cost projects ----
+    private val FP = de.ledgerline.app.core.finance.FinanceProjects
+
+    /** All receipts (inline on transactions) paired with their booking, for project totals. */
+    fun allReceipts(): List<de.ledgerline.app.core.finance.FinanceProjects.ReceiptRef> =
+        transactions.value.filter { !it.trashed }.flatMap { tx ->
+            de.ledgerline.app.data.FinanceRecordCodec.decodeReceipts(tx.raw)
+                .map { de.ledgerline.app.core.finance.FinanceProjects.ReceiptRef(it, tx) }
+        }
+
+    fun projectTree() = FP.projectTree(projects.value)
+    fun projectById(id: String) = projects.value.firstOrNull { it.id == id }
+    fun projectRolledTotal(id: String) = FP.rolledTotal(projects.value, id, allReceipts())
+    fun projectOwnTotal(p: de.ledgerline.app.domain.model.Project) = FP.ownTotal(p, allReceipts())
+
+    fun newProject(parentId: String?, kind: String = "business") = de.ledgerline.app.domain.model.Project(
+        id = de.ledgerline.app.core.Ids.newId(), parentId = parentId, kind = kind, created = java.time.LocalDate.now().toString(),
+    )
+
+    fun saveProject(p: de.ledgerline.app.domain.model.Project, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val res = repo.saveProjects { list ->
+                if (list.any { it.id == p.id }) list.map { if (it.id == p.id) p else it } else listOf(p) + list
+            }
+            onDone(res is de.ledgerline.app.core.Outcome.Ok)
+        }
+    }
+
+    /** Delete a project and all its descendants (bundled receipts are kept, just un-referenced). */
+    fun deleteProject(p: de.ledgerline.app.domain.model.Project, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val res = repo.saveProjects { list ->
+                val kill = (FP.descendantIds(list, p.id) + p.id).toSet()
+                list.filter { it.id !in kill }
+            }
+            onDone(res is de.ledgerline.app.core.Outcome.Ok)
+        }
+    }
+
+    fun money2(value: Double): String = money(value, null)
 
     /**
      * Import parsed statement lines into [accountId], deduped against that account's existing bookings
