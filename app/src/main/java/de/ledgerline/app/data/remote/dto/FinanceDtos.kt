@@ -32,3 +32,15 @@ data class CompanyDto(
 /** GET/PUT `/company` wrapper: `{ "company": { … } }`. */
 @Serializable
 data class CompanyResponse(val company: CompanyDto? = null)
+
+/**
+ * `POST /api/v1/invoices/ocr` response — server-side OCR of a receipt (transient cleartext, ZK-parity
+ * with `/gallery/process`). `text` is line-structured; recognition runs client-side (`ReceiptOcr`).
+ * See docs spec `ledgerline-server-ocr-spec.md`. Optional endpoint: absent → manual entry.
+ */
+@Serializable
+data class OcrResponse(
+    val text: String = "",
+    val source: String? = null,   // "pdf-text" | "ocr"
+    val pages: Int? = null,
+)

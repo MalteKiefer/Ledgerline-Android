@@ -244,9 +244,17 @@ class FinanceViewModel @Inject constructor(
             val current = receiptsOf(tx)
             if (current.any { it.sig == sig }) { onDone(null); return@launch }
             val up = repo.uploadReceiptDocument(bytes) ?: run { onDone(false); return@launch }
-            val r = de.ledgerline.app.domain.model.Receipt(
+            var r = de.ledgerline.app.domain.model.Receipt(
                 id = de.ledgerline.app.core.Ids.newId(), name = name, mime = mime, sig = sig, blob = up.first, key = up.second,
             )
+            // Best-effort server-side OCR → pre-fill total/category/name/currency (manual if unavailable).
+            repo.ocrDocument(bytes, name, mime)?.let { text ->
+                val a = de.ledgerline.app.core.finance.ReceiptOcr.analyze(text)
+                val niceName = a.merchant.ifBlank { null }?.let { m -> if (a.number.isNotBlank()) "$m ${a.number}" else m } ?: name
+                r = r.copy(
+                    name = niceName, total = a.total, category = a.category,
+                )
+            }
             saveTransaction(tx.withReceipts(current + r)) { ok -> onDone(if (ok) true else false) }
         }
     }

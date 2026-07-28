@@ -171,6 +171,11 @@ interface LedgerlineApi {
     @POST("api/v1/invoices/blobs/reconcile")
     suspend fun invoicesReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
 
+    /** Server-side receipt OCR (transient cleartext; returns line-structured text). Optional endpoint. */
+    @Multipart
+    @POST("api/v1/invoices/ocr")
+    suspend fun invoicesOcr(@Part file: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.OcrResponse>
+
     @GET("api/v1/company")
     suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse>
 

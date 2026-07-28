@@ -187,6 +187,7 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun invoicesRawBatch(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<okhttp3.ResponseBody> = throw NotImplementedError()
     override suspend fun invoicesReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
     override suspend fun companyLogo(): Response<okhttp3.ResponseBody> = throw NotImplementedError()
+    override suspend fun invoicesOcr(file: okhttp3.MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.OcrResponse> = throw NotImplementedError()
     override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse> = throw NotImplementedError()
     override suspend fun companyPut(body: de.ledgerline.app.data.remote.dto.CompanyDto): Response<de.ledgerline.app.data.remote.dto.CompanyResponse> = throw NotImplementedError()
     override suspend fun passwordsStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()

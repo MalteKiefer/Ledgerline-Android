@@ -37,6 +37,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import java.io.ByteArrayInputStream
 import java.net.HttpURLConnection
@@ -663,6 +664,21 @@ class FinanceRepository(
     suspend fun uploadReceiptDocument(bytes: ByteArray): Pair<String, String>? = withContext(Dispatchers.IO) {
         val vk = vaultKeyHolder.get() ?: return@withContext null
         uploadBytes(vk, bytes, "receipt.enc")?.let { it.id to it.encFileKey }
+    }
+
+    /**
+     * Best-effort **server-side OCR** of a receipt (transient cleartext, ZK-parity with `/gallery/process`):
+     * POSTs the raw bytes to `/invoices/ocr`, returns the line-structured text or null. Never stored; if
+     * the endpoint is absent/errors, returns null and the caller falls back to manual entry.
+     */
+    suspend fun ocrDocument(bytes: ByteArray, name: String, mime: String): String? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        runCatching {
+            val body = okhttp3.RequestBody.create(mime.toMediaTypeOrNull(), bytes)
+            val part = MultipartBody.Part.createFormData("file", name, body)
+            val r = apiProvider(session).invoicesOcr(part)
+            if (r.isSuccessful) r.body()?.text?.takeIf { it.isNotBlank() } else null
+        }.getOrNull()
     }
 
     /** Fetch + decrypt a receipt document's bytes (in-memory; the caller renders it, no plaintext cache). */
