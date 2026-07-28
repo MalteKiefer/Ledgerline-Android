@@ -293,6 +293,18 @@ fun MapsforgeMap(
     val mapView = remember {
         MapView(context).also { mv ->
             mv.isClickable = true
+            // While a drag/pinch is in progress on the map, tell ancestor gesture handlers (the
+            // navigation drawer's horizontal swipe, any scroll container) NOT to intercept — else a
+            // sideways pan is stolen and opens the drawer / stutters instead of moving the map. The
+            // listener returns false so mapsforge's own onTouchEvent still runs the pan/zoom.
+            mv.setOnTouchListener { v, ev ->
+                when (ev.actionMasked) {
+                    android.view.MotionEvent.ACTION_DOWN -> v.parent?.requestDisallowInterceptTouchEvent(true)
+                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL ->
+                        v.parent?.requestDisallowInterceptTouchEvent(false)
+                }
+                false
+            }
             mv.mapScaleBar.isVisible = false
             mv.setBuiltInZoomControls(false)
             // Allow the full zoom range so pinch-out works even past a downloaded region's
