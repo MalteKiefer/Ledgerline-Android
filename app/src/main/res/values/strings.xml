@@ -778,6 +778,8 @@
     <string name="finance_new">New invoice</string>
     <string name="finance_edit">Edit invoice</string>
     <string name="finance_export_xml">Export e-invoice (XML)</string>
+    <string name="finance_import_xml">Import e-invoice (XML)</string>
+    <string name="finance_import_xml_bad">Not a recognisable e-invoice XML</string>
     <string name="finance_issue">Issue invoice</string>
     <string name="finance_mark_paid">Mark as paid</string>
     <string name="finance_customer_name">Company / name</string>

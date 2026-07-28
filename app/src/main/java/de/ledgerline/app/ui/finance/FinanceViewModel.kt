@@ -116,6 +116,22 @@ class FinanceViewModel @Inject constructor(
         )
     }
 
+    /** Build a draft invoice from a parsed e-invoice XML (user reviews it in the editor before saving). */
+    fun invoiceFromEInvoice(p: de.ledgerline.app.core.finance.EInvoiceXml.ParsedEInvoice): Invoice = Invoice(
+        id = de.ledgerline.app.core.Ids.newId(),
+        number = p.number,
+        status = de.ledgerline.app.domain.model.InvoiceStatus.DRAFT,
+        issueDate = p.issueDate ?: java.time.LocalDate.now().toString(),
+        dueDate = p.dueDate ?: "",
+        currency = p.currency,
+        customer = de.ledgerline.app.domain.model.InvoiceCustomer(
+            name = p.customer.name, address = p.customer.address, vatId = p.customer.vatId, email = p.customer.email,
+        ),
+        lines = p.lines.map {
+            de.ledgerline.app.domain.model.InvoiceLine(desc = it.desc, qty = it.qty, unit = it.unit, unitPrice = it.unitPrice, vatRate = it.vatRate)
+        }.ifEmpty { listOf(de.ledgerline.app.domain.model.InvoiceLine()) },
+    )
+
     /** Insert or update [inv] in the store; [onDone] gets whether it persisted. */
     fun save(inv: Invoice, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch {

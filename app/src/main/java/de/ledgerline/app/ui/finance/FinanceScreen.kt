@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material.icons.outlined.FileOpen
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -81,12 +82,20 @@ fun FinanceScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, v
         showPayments -> PaymentMethodsScreen(vm, onBack = { showPayments = false })
         editingInv != null -> InvoiceEditScreen(editingInv, vm, onCancel = { editing = null }, onSaved = { editing = null; openId = null })
         current != null -> InvoiceDetailScreen(current, vm, onBack = { openId = null }, onEdit = { editing = current })
-        else -> FinanceList(vm, modifier, onMenu = onMenu, onOpen = { openId = it }, onNew = { editing = vm.newDraft() }, onCompany = { editCompany = true }, onStats = { showStats = true }, onPayments = { showPayments = true })
+        else -> FinanceList(vm, modifier, onMenu = onMenu, onOpen = { openId = it }, onNew = { editing = vm.newDraft() }, onCompany = { editCompany = true }, onStats = { showStats = true }, onPayments = { showPayments = true }, onImported = { editing = it })
     }
 }
 
 @Composable
-private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() -> Unit)?, onOpen: (String) -> Unit, onNew: () -> Unit, onCompany: () -> Unit, onStats: () -> Unit, onPayments: () -> Unit) {
+private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() -> Unit)?, onOpen: (String) -> Unit, onNew: () -> Unit, onCompany: () -> Unit, onStats: () -> Unit, onPayments: () -> Unit, onImported: (Invoice) -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val text = runCatching { ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } }.getOrNull()
+        val parsed = text?.let { de.ledgerline.app.core.finance.EInvoiceXml.parse(it) }
+        if (parsed != null) onImported(vm.invoiceFromEInvoice(parsed))
+        else android.widget.Toast.makeText(ctx, ctx.getString(R.string.finance_import_xml_bad), android.widget.Toast.LENGTH_SHORT).show()
+    }
     val invoices by vm.invoices.collectAsStateWithLifecycle()
     val year by vm.year.collectAsStateWithLifecycle()
     val years = remember(invoices) { (vm.years() + year).distinct().sortedDescending() }
@@ -100,6 +109,9 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
                 title = stringResource(R.string.dest_finance),
                 onMenu = onMenu,
                 actions = {
+                    androidx.compose.material3.IconButton(onClick = { importLauncher.launch(arrayOf("text/xml", "application/xml", "*/*")) }) {
+                        Icon(Icons.Outlined.FileOpen, stringResource(R.string.finance_import_xml))
+                    }
                     androidx.compose.material3.IconButton(onClick = onPayments) {
                         Icon(Icons.Outlined.AccountBalanceWallet, stringResource(R.string.finance_pm_title))
                     }
