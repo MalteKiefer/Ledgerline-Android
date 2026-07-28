@@ -45,10 +45,20 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
     var vatId by remember(c) { mutableStateOf(c.vatId) }
     var taxNumber by remember(c) { mutableStateOf(c.taxNumber) }
     var iban by remember(c) { mutableStateOf(c.iban) }
+    var bic by remember(c) { mutableStateOf(c.bic) }
+    var bankName by remember(c) { mutableStateOf(c.bankName) }
+    var vatRate by remember(c) { mutableStateOf(trimNum(c.defaultVatRate)) }
     var terms by remember(c) { mutableStateOf(c.paymentTermsDays.toString()) }
+    var termsText by remember(c) { mutableStateOf(c.paymentTermsText) }
+    var methods by remember(c) { mutableStateOf(c.paymentMethods) }
     var numberFormat by remember(c) { mutableStateOf(c.numberFormat) }
     var nextNumber by remember(c) { mutableStateOf(c.nextNumber.toString()) }
     var footer by remember(c) { mutableStateOf(c.footerText) }
+
+    // GoBD: the sequence is locked once this year already has issued invoices (web parity).
+    val invoices by vm.invoices.collectAsStateWithLifecycle()
+    val thisYear = java.time.LocalDate.now().year.toString()
+    val numberingLocked = invoices.any { !it.trashed && it.seq != null && it.issueDate.startsWith(thisYear) }
 
     AppScaffold(
         topBar = { AppTopBar(title = stringResource(R.string.finance_company), onBack = onBack) },
@@ -66,12 +76,23 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                 Field(vatId, { vatId = it }, R.string.finance_customer_vatid)
                 Field(taxNumber, { taxNumber = it }, R.string.finance_company_taxnr)
                 Field(iban, { iban = it }, R.string.finance_company_iban)
+                Field(bic, { bic = it }, R.string.finance_company_bic)
+                Field(bankName, { bankName = it }, R.string.finance_company_bank)
             }
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.finance_company_defaults), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                Field(numberFormat, { numberFormat = it }, R.string.finance_company_numfmt, enabled = !numberingLocked)
+                NumField(nextNumber, { nextNumber = it }, R.string.finance_company_nextnr, enabled = !numberingLocked)
+                if (numberingLocked) {
+                    Text(
+                        stringResource(R.string.finance_company_numbering_locked),
+                        style = MaterialTheme.typography.bodySmall, color = Brand.accent,
+                    )
+                }
+                NumField(vatRate, { vatRate = it }, R.string.finance_company_vatrate, decimal = true)
                 NumField(terms, { terms = it }, R.string.finance_company_terms)
-                Field(numberFormat, { numberFormat = it }, R.string.finance_company_numfmt)
-                NumField(nextNumber, { nextNumber = it }, R.string.finance_company_nextnr)
+                Field(termsText, { termsText = it }, R.string.finance_company_terms_text)
+                Field(methods, { methods = it }, R.string.finance_company_methods)
                 Field(footer, { footer = it }, R.string.finance_company_footer)
             }
             PrimaryGradientButton(stringResource(R.string.action_save), onClick = {
@@ -79,7 +100,10 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                     c.copy(
                         name = name.trim(), address = address.trim(), email = email.trim(), phone = phone.trim(),
                         vatId = vatId.trim(), taxNumber = taxNumber.trim(), iban = iban.trim(),
+                        bic = bic.trim(), bankName = bankName.trim(),
+                        defaultVatRate = vatRate.replace(',', '.').trim().toDoubleOrNull() ?: 19.0,
                         paymentTermsDays = terms.trim().toIntOrNull() ?: 14,
+                        paymentTermsText = termsText.trim(), paymentMethods = methods.trim(),
                         numberFormat = numberFormat.trim().ifBlank { "YYYY-NNNN" }, nextNumber = nextNumber.trim().toIntOrNull() ?: 1,
                         footerText = footer.trim(),
                     ),
@@ -91,14 +115,22 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun Field(value: String, onChange: (String) -> Unit, labelRes: Int) {
-    OutlinedTextField(value, onChange, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(labelRes)) }, singleLine = true)
+private fun Field(value: String, onChange: (String) -> Unit, labelRes: Int, enabled: Boolean = true) {
+    OutlinedTextField(
+        value, onChange, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(labelRes)) },
+        singleLine = true, enabled = enabled,
+    )
 }
 
 @Composable
-private fun NumField(value: String, onChange: (String) -> Unit, labelRes: Int) {
+private fun NumField(value: String, onChange: (String) -> Unit, labelRes: Int, enabled: Boolean = true, decimal: Boolean = false) {
     OutlinedTextField(
         value, onChange, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(labelRes)) }, singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        enabled = enabled,
+        keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number),
     )
 }
+
+/** Show a whole VAT rate as `19`, a fractional one as `7.5` (no trailing `.0`). */
+private fun trimNum(d: Double): String =
+    if (d == kotlin.math.floor(d)) d.toLong().toString() else d.toString()

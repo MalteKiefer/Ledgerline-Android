@@ -798,4 +798,10 @@
     <string name="finance_company_numfmt">Nummernformat (z. B. YYYY-NNNN)</string>
     <string name="finance_company_nextnr">Nächste Nummer</string>
     <string name="finance_company_footer">Rechnungs-Fußzeile</string>
+    <string name="finance_company_bic">BIC</string>
+    <string name="finance_company_bank">Bankname</string>
+    <string name="finance_company_vatrate">Standard-USt-Satz (%)</string>
+    <string name="finance_company_terms_text">Zahlungsbedingungen-Text</string>
+    <string name="finance_company_methods">Zahlungsmethoden</string>
+    <string name="finance_company_numbering_locked">Die Nummerierung ist gesperrt, da dieses Jahr bereits Rechnungen bestehen (GoBD). Zum Neustart der Nummernfolge den Zyklus des laufenden Jahres unter Finanzen zurücksetzen — dabei werden die Rechnungen dieses Jahres gelöscht.</string>
 </resources>

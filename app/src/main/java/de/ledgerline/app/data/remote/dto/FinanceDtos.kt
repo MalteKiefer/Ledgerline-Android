@@ -24,6 +24,8 @@ data class CompanyDto(
     @SerialName("invoice_payment_terms_days") val paymentTermsDays: Int? = null,
     @SerialName("invoice_footer_text") val footerText: String? = null,
     @SerialName("invoice_default_vat_rate") val defaultVatRate: Double? = null,
+    @SerialName("invoice_payment_methods") val paymentMethods: String? = null,
+    @SerialName("invoice_payment_terms_text") val paymentTermsText: String? = null,
 )
 
 /** GET/PUT `/company` wrapper: `{ "company": { … } }`. */

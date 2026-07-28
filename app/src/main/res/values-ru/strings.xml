@@ -801,4 +801,10 @@
     <string name="finance_company_numfmt">Формат номера (напр. YYYY-NNNN)</string>
     <string name="finance_company_nextnr">Следующий номер</string>
     <string name="finance_company_footer">Нижний колонтитул счёта</string>
+    <string name="finance_company_bic">BIC</string>
+    <string name="finance_company_bank">Название банка</string>
+    <string name="finance_company_vatrate">Ставка НДС по умолчанию (%)</string>
+    <string name="finance_company_terms_text">Текст условий оплаты</string>
+    <string name="finance_company_methods">Способы оплаты</string>
+    <string name="finance_company_numbering_locked">Нумерация заблокирована — в этом году уже есть выставленные счета (GoBD). Чтобы начать заново, сбросьте цикл текущего года в разделе «Финансы» — счета этого года будут удалены.</string>
 </resources>

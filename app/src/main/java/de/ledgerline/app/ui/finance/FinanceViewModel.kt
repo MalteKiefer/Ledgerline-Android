@@ -91,7 +91,9 @@ class FinanceViewModel @Inject constructor(
             issueDate = today.toString(),
             dueDate = due.toString(),
             currency = c?.currency ?: "EUR",
-            lines = listOf(de.ledgerline.app.domain.model.InvoiceLine(vatRate = 19.0)),
+            note = c?.paymentTermsText.orEmpty(),
+            footer = c?.footerText.orEmpty(),
+            lines = listOf(de.ledgerline.app.domain.model.InvoiceLine(vatRate = c?.defaultVatRate ?: 19.0)),
         )
     }
 

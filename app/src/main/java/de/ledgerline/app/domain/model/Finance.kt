@@ -79,8 +79,15 @@ data class CompanyProfile(
     val vatId: String = "",
     val taxNumber: String = "",
     val iban: String = "",
+    val bic: String = "",
+    val bankName: String = "",
     val currency: String = "EUR",
+    /** Default VAT rate (%) pre-filled on new invoice lines (web `invoice_default_vat_rate`). */
+    val defaultVatRate: Double = 19.0,
     val paymentTermsDays: Int = 14,
+    /** Free-text payment terms + accepted payment methods printed on the invoice. */
+    val paymentTermsText: String = "",
+    val paymentMethods: String = "",
     val footerText: String = "",
     /** Invoice-number template (web `number_format`, default `YYYY-NNNN`) + the GoBD floor. */
     val numberFormat: String = "YYYY-NNNN",

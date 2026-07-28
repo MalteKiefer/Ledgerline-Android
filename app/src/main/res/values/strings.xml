@@ -800,4 +800,10 @@
     <string name="finance_company_numfmt">Number format (e.g. YYYY-NNNN)</string>
     <string name="finance_company_nextnr">Next number</string>
     <string name="finance_company_footer">Invoice footer</string>
+    <string name="finance_company_bic">BIC</string>
+    <string name="finance_company_bank">Bank name</string>
+    <string name="finance_company_vatrate">Default VAT rate (%)</string>
+    <string name="finance_company_terms_text">Payment terms text</string>
+    <string name="finance_company_methods">Payment methods</string>
+    <string name="finance_company_numbering_locked">Numbering is locked — this year already has issued invoices (GoBD). Reset the current year\'s cycle under Finance to restart, which deletes this year\'s invoices.</string>
 </resources>
