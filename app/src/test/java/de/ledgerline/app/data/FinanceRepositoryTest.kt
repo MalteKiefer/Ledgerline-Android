@@ -186,6 +186,29 @@ class FinanceRepositoryTest {
         assertTrue(putBody!!.shards!!.containsAll(listOf("invshard1", "newpart", "pay1", "tx1", "cat1", "proj1")))
     }
 
+    @Test fun receipt_document_blobs_stay_in_the_guard() = runBlocking {
+        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[],"caps":{},"txRef":"tx1","txKey":"tk","txHash":"th"}"""
+        var putBody: StorePutRequest? = null
+        val api = object : NotImplementedApi() {
+            override suspend fun invoicesStore(): Response<StoreResponse> = Response.success(StoreResponse("SEALED:$rootJson", 5))
+            override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse> = Response.success(de.ledgerline.app.data.remote.dto.CompanyResponse(CompanyDto()))
+            override suspend fun rawInvoice(blob: String): Response<okhttp3.ResponseBody> = Response.error(404, "".toResponseBody(null))
+            override suspend fun uploadInvoice(file: MultipartBody.Part): Response<UploadResponse> = Response.success(UploadResponse("newtx"))
+            override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> { putBody = body; return Response.success(StoreResponse(body.ciphertext, body.version + 1)) }
+        }
+        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        assertTrue(repo.load() is Outcome.Ok)
+
+        // A booking carrying a receipt whose document is content blob "rcptblob".
+        val rawWithReceipt = Json.parseToJsonElement("""{"id":"t1","receipts":[{"id":"r1","blob":"rcptblob","key":"k"}]}""").jsonObject
+        val tx = de.ledgerline.app.domain.model.Transaction(id = "t1", account = "a", date = "2026-06-01", amount = -9.0, raw = rawWithReceipt)
+        assertTrue(repo.saveTransactions { listOf(tx) } is Outcome.Ok)
+        // The receipt document blob is declared live so the server never frees it.
+        assertTrue(putBody!!.shards!!.contains("rcptblob"))
+    }
+
     @Test fun company_profile_is_cached_for_offline() = runBlocking {
         val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }

@@ -266,22 +266,40 @@ object FinanceRecordCodec {
         return JsonObject(out)
     }
 
-    /** Decode the inline `tx.receipts[]` of a transaction's raw JSON (read-only; edits go via the tx). */
+    /** Decode the inline `tx.receipts[]` of a transaction's raw JSON. */
     fun decodeReceipts(txRaw: JsonObject): List<de.ledgerline.app.domain.model.Receipt> =
-        (txRaw["receipts"] as? JsonArray).orEmpty().mapNotNull { el ->
-            (el as? JsonObject)?.let { o ->
-                val id = o.str("id") ?: return@let null
-                de.ledgerline.app.domain.model.Receipt(
-                    id = id,
-                    name = o.str("name") ?: "",
-                    total = o["total"]?.jsonPrimitive?.doubleOrNull,
-                    projectId = o.str("projectId"),
-                    sig = o.str("sig"),
-                    blob = o.str("blob") ?: o.str("ref"),
-                    raw = o,
-                )
-            }
-        }
+        (txRaw["receipts"] as? JsonArray).orEmpty().mapNotNull { el -> (el as? JsonObject)?.let(::decodeReceipt) }
+
+    fun decodeReceipt(o: JsonObject): de.ledgerline.app.domain.model.Receipt? {
+        val id = o.str("id") ?: return null
+        return de.ledgerline.app.domain.model.Receipt(
+            id = id,
+            name = o.str("name") ?: "",
+            mime = o.str("mime") ?: "application/octet-stream",
+            total = o["total"]?.jsonPrimitive?.doubleOrNull,
+            projectId = o.str("projectId"),
+            category = o.str("category") ?: "",
+            sig = o.str("sig"),
+            blob = o.str("blob") ?: o.str("ref"),
+            key = o.str("key"),
+            raw = o,
+        )
+    }
+
+    /** Encode a receipt back to JSON (raw-overlay so web/OCR fields survive an Android edit). */
+    fun encodeReceipt(r: de.ledgerline.app.domain.model.Receipt): JsonObject {
+        val out = r.raw.toMutableMap()
+        out["id"] = JsonPrimitive(r.id)
+        out["name"] = JsonPrimitive(r.name)
+        out["mime"] = JsonPrimitive(r.mime)
+        setOrNull(out, "total", r.total?.let { numToken(it) })
+        setOrNull(out, "projectId", r.projectId?.let { JsonPrimitive(it) })
+        if (r.category.isNotEmpty() || r.raw.containsKey("category")) out["category"] = JsonPrimitive(r.category)
+        setOrNull(out, "sig", r.sig?.let { JsonPrimitive(it) })
+        setOrNull(out, "blob", r.blob?.let { JsonPrimitive(it) })
+        setOrNull(out, "key", r.key?.let { JsonPrimitive(it) })
+        return JsonObject(out)
+    }
 
     fun companyFrom(dto: CompanyDto): CompanyProfile = CompanyProfile(
         name = dto.name.orEmpty(),

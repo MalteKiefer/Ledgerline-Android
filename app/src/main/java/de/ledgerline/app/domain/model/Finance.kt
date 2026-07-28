@@ -168,14 +168,22 @@ data class Partner(
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 
-/** A receipt/document bundled on a transaction (inline `tx.receipts[]`; read-only in Android for now). */
+/**
+ * A receipt/document bundled on a transaction (inline `tx.receipts[]`). The document itself is a ZK
+ * content blob (`blob` id + `key` = sealed encFileKey, uploaded via `/invoices/upload`, same format
+ * as file blobs); `total`/`projectId`/`category` are the bookkeeping metadata. Byte-shape = web.
+ */
 data class Receipt(
     val id: String,
     val name: String = "",
+    val mime: String = "application/octet-stream",
     val total: Double? = null,
     val projectId: String? = null,
+    val category: String = "",
     val sig: String? = null,
     val blob: String? = null,
+    /** Sealed per-blob content key (`{c,n}` JSON string), used to decrypt the document. */
+    val key: String? = null,
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 

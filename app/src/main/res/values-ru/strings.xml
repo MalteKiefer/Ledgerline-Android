@@ -889,4 +889,11 @@
     <string name="finance_partner_edit">Изменить партнёра</string>
     <string name="finance_partner_name">Имя</string>
     <string name="finance_partner_category">Категория по умолчанию</string>
+    <string name="finance_receipts">Чеки</string>
+    <string name="finance_receipt">Чек</string>
+    <string name="finance_receipt_attach">Прикрепить</string>
+    <string name="finance_receipt_added">Чек прикреплён</string>
+    <string name="finance_receipt_dupe">Уже прикреплён</string>
+    <string name="finance_receipt_total">Распознанная сумма</string>
+    <string name="finance_receipt_no_preview">Предпросмотр для этого типа файла недоступен.</string>
 </resources>

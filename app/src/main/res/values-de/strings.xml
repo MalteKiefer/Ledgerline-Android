@@ -886,4 +886,11 @@
     <string name="finance_partner_edit">Partner bearbeiten</string>
     <string name="finance_partner_name">Name</string>
     <string name="finance_partner_category">Standard-Kategorie</string>
+    <string name="finance_receipts">Belege</string>
+    <string name="finance_receipt">Beleg</string>
+    <string name="finance_receipt_attach">Anhängen</string>
+    <string name="finance_receipt_added">Beleg angehängt</string>
+    <string name="finance_receipt_dupe">Bereits angehängt</string>
+    <string name="finance_receipt_total">Erkannter Betrag</string>
+    <string name="finance_receipt_no_preview">Für diesen Dateityp ist keine Vorschau verfügbar.</string>
 </resources>

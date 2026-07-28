@@ -249,7 +249,7 @@ class FinanceRepository(
                 ?: return@withContext Outcome.Err(ErrorKind.NETWORK) // a shard upload failed
             val rootJson = mergeRoot(priorRootRaw, result.rootJson)
             val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
-            val guard = result.shardRefs + collectionRefs(priorRootRaw)
+            val guard = result.shardRefs + collectionRefs(priorRootRaw) + receiptBlobs(base!!.manifest.transactions)
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
@@ -307,7 +307,7 @@ class FinanceRepository(
             }
             val rootJson = JsonObject(root)
             val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
-            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson)
+            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson) + receiptBlobs(base!!.manifest.transactions)
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
@@ -361,7 +361,7 @@ class FinanceRepository(
             }
             val rootJson = JsonObject(root)
             val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
-            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson)
+            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson) + receiptBlobs(next)
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
@@ -453,7 +453,7 @@ class FinanceRepository(
             else { root["txRef"] = JsonPrimitive(txColl.ref); root["txKey"] = JsonPrimitive(txColl.key); root["txHash"] = JsonPrimitive(txColl.hash) }
             val rootJson = JsonObject(root)
             val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
-            val guard = (built?.shardRefs ?: priorShards.shards.map { it.ref }) + collectionRefs(rootJson)
+            val guard = (built?.shardRefs ?: priorShards.shards.map { it.ref }) + collectionRefs(rootJson) + receiptBlobs(nextTransactions)
             val put = try { api().invoicesStorePut(StorePutRequest(rootCipher, version, guard)) } catch (e: Exception) { return@withContext Outcome.Err(ErrorKind.NETWORK, e) }
             when {
                 put.isSuccessful -> {
@@ -496,7 +496,7 @@ class FinanceRepository(
             else { root["projRef"] = JsonPrimitive(coll.ref); root["projKey"] = JsonPrimitive(coll.key); root["projHash"] = JsonPrimitive(coll.hash) }
             val rootJson = JsonObject(root)
             val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
-            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson)
+            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson) + receiptBlobs(base!!.manifest.transactions)
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
@@ -543,7 +543,7 @@ class FinanceRepository(
             else { root["partRef"] = JsonPrimitive(coll.ref); root["partKey"] = JsonPrimitive(coll.key); root["partHash"] = JsonPrimitive(coll.hash) }
             val rootJson = JsonObject(root)
             val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
-            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson)
+            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson) + receiptBlobs(base!!.manifest.transactions)
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
@@ -605,6 +605,10 @@ class FinanceRepository(
         root.entries.filter { it.key.endsWith("Ref") }
             .mapNotNull { (it.value as? JsonPrimitive)?.contentOrNull?.takeIf { s -> s.isNotBlank() } }
 
+    /** Every receipt-document blob referenced inline by the transactions — must stay in the guard. */
+    private fun receiptBlobs(txns: List<de.ledgerline.app.domain.model.Transaction>): List<String> =
+        txns.flatMap { FinanceRecordCodec.decodeReceipts(it.raw).mapNotNull { r -> r.blob } }
+
     private suspend fun uploadBytes(vk: ByteArray, bytes: ByteArray, name: String): UploadedBlob? {
         val enc = crypto.newContentEncryptor(vk)
         val reqBody = EncryptedUpload.body(enc, crypto.contentChunkSize, bytes.size.toLong()) { ByteArrayInputStream(bytes) }
@@ -653,6 +657,23 @@ class FinanceRepository(
             val r = apiProvider(session).companyLogo()
             if (r.isSuccessful) r.body()?.bytes() else null
         }.getOrNull()
+    }
+
+    /** Encrypt + upload a receipt document → (blob id, sealed content key). Same blob format as files. */
+    suspend fun uploadReceiptDocument(bytes: ByteArray): Pair<String, String>? = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext null
+        uploadBytes(vk, bytes, "receipt.enc")?.let { it.id to it.encFileKey }
+    }
+
+    /** Fetch + decrypt a receipt document's bytes (in-memory; the caller renders it, no plaintext cache). */
+    suspend fun downloadReceipt(blob: String, key: String): ByteArray? = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext null
+        val cipher = blobCache.get(blob) ?: run {
+            val r = try { api().rawInvoice(blob) } catch (_: Exception) { return@withContext null }
+            if (!r.isSuccessful) return@withContext null
+            r.body()!!.bytes().also { if (offlineFlags.enabled()) blobCache.put(blob, it) }
+        }
+        runCatching { BlobDownloader.decrypt(cipher, key, vk, crypto) }.getOrNull()
     }
 
     /** Update the non-secret company profile (`PUT /company`), then cache the server echo. */

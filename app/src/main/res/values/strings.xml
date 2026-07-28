@@ -888,4 +888,11 @@
     <string name="finance_partner_edit">Edit partner</string>
     <string name="finance_partner_name">Name</string>
     <string name="finance_partner_category">Default category</string>
+    <string name="finance_receipts">Receipts</string>
+    <string name="finance_receipt">Receipt</string>
+    <string name="finance_receipt_attach">Attach</string>
+    <string name="finance_receipt_added">Receipt attached</string>
+    <string name="finance_receipt_dupe">Already attached</string>
+    <string name="finance_receipt_total">Recognised total</string>
+    <string name="finance_receipt_no_preview">No preview available for this file type.</string>
 </resources>

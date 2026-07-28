@@ -224,6 +224,53 @@ class FinanceViewModel @Inject constructor(
     fun trashTransaction(t: de.ledgerline.app.domain.model.Transaction, onDone: (Boolean) -> Unit = {}) =
         saveTransaction(t.copy(trashed = true), onDone)
 
+    // ---- receipts (documents attached to a booking; ZK content blobs) ----
+    fun receiptsOf(tx: de.ledgerline.app.domain.model.Transaction): List<de.ledgerline.app.domain.model.Receipt> =
+        de.ledgerline.app.data.FinanceRecordCodec.decodeReceipts(tx.raw)
+
+    private fun de.ledgerline.app.domain.model.Transaction.withReceipts(receipts: List<de.ledgerline.app.domain.model.Receipt>): de.ledgerline.app.domain.model.Transaction {
+        val arr = kotlinx.serialization.json.JsonArray(receipts.map { de.ledgerline.app.data.FinanceRecordCodec.encodeReceipt(it) })
+        return copy(raw = kotlinx.serialization.json.JsonObject(raw + ("receipts" to arr)))
+    }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    /** Attach a document to [tx]: dedupe by content hash, encrypt+upload, store the receipt inline.
+     *  [onDone]: true = added, false = failed, null = duplicate (already attached). */
+    fun attachReceipt(tx: de.ledgerline.app.domain.model.Transaction, bytes: ByteArray, name: String, mime: String, onDone: (Boolean?) -> Unit) {
+        viewModelScope.launch {
+            val sig = sha256Hex(bytes)
+            val current = receiptsOf(tx)
+            if (current.any { it.sig == sig }) { onDone(null); return@launch }
+            val up = repo.uploadReceiptDocument(bytes) ?: run { onDone(false); return@launch }
+            val r = de.ledgerline.app.domain.model.Receipt(
+                id = de.ledgerline.app.core.Ids.newId(), name = name, mime = mime, sig = sig, blob = up.first, key = up.second,
+            )
+            saveTransaction(tx.withReceipts(current + r)) { ok -> onDone(if (ok) true else false) }
+        }
+    }
+
+    /** Fetch a receipt's decrypted document bytes for the in-app viewer (never written to disk here). */
+    fun loadReceipt(r: de.ledgerline.app.domain.model.Receipt, onResult: (ByteArray?) -> Unit) {
+        val blob = r.blob; val key = r.key
+        if (blob == null || key == null) { onResult(null); return }
+        viewModelScope.launch { onResult(repo.downloadReceipt(blob, key)) }
+    }
+
+    /** Suspend variant of [loadReceipt] for the in-app viewer (decode off the main thread). */
+    suspend fun loadReceiptBytes(r: de.ledgerline.app.domain.model.Receipt): ByteArray? {
+        val blob = r.blob ?: return null
+        val key = r.key ?: return null
+        return repo.downloadReceipt(blob, key)
+    }
+
+    fun updateReceipt(tx: de.ledgerline.app.domain.model.Transaction, r: de.ledgerline.app.domain.model.Receipt, onDone: (Boolean) -> Unit = {}) =
+        saveTransaction(tx.withReceipts(receiptsOf(tx).map { if (it.id == r.id) r else it }), onDone)
+
+    fun deleteReceipt(tx: de.ledgerline.app.domain.model.Transaction, r: de.ledgerline.app.domain.model.Receipt, onDone: (Boolean) -> Unit = {}) =
+        saveTransaction(tx.withReceipts(receiptsOf(tx).filter { it.id != r.id }), onDone)
+
     // ---- cost projects ----
     private val FP = de.ledgerline.app.core.finance.FinanceProjects
 
