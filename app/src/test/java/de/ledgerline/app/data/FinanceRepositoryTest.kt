@@ -57,7 +57,7 @@ class FinanceRepositoryTest {
     @Test fun save_preserves_payment_and_transaction_collections() = runBlocking {
         val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
-        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[],"caps":{},"payRef":"pay1","payKey":"pk","payHash":"ph","txRef":"tx1","txKey":"tk","txHash":"th","partners":[{"id":"p1","name":"ACME"}]}"""
+        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[],"caps":{},"payRef":"pay1","payKey":"pk","payHash":"ph","txRef":"tx1","txKey":"tk","txHash":"th","partRef":"part1","partKey":"prk","partHash":"prh","projRef":"proj1","projKey":"pjk","projHash":"pjh","partners":[{"id":"p1","name":"ACME"}]}"""
 
         var putBody: StorePutRequest? = null
         val api = object : NotImplementedApi() {
@@ -82,19 +82,21 @@ class FinanceRepositoryTest {
         val root = Json.parseToJsonElement(putBody!!.ciphertext.removePrefix("SEALED:")).jsonObject
         assertEquals("pay1", root["payRef"]!!.jsonPrimitive.content)
         assertEquals("tx1", root["txRef"]!!.jsonPrimitive.content)
+        assertEquals("part1", root["partRef"]!!.jsonPrimitive.content)   // partners collection preserved
+        assertEquals("proj1", root["projRef"]!!.jsonPrimitive.content)   // projects collection preserved
         assertEquals("ACME", root["partners"]!!.jsonArray[0].jsonObject["name"]!!.jsonPrimitive.content)
         // The invoices were re-sharded (a new shard blob) and the root points at it.
         assertTrue(root["shards"]!!.jsonArray.isNotEmpty())
 
         // The shards[] referential guard covers the new invoice shard + the preserved collection blobs.
-        assertTrue(putBody!!.shards!!.containsAll(listOf("shard1", "pay1", "tx1")))
+        assertTrue(putBody!!.shards!!.containsAll(listOf("shard1", "pay1", "tx1", "part1", "proj1")))
     }
 
     @Test fun save_payment_methods_preserves_invoices_and_other_collections() = runBlocking {
         val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
         // Root with an invoice shard + all three collections + inline partners.
-        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[{"ref":"invshard1","key":"ik","hash":"ih","count":1,"bucket":0}],"caps":{},"payRef":"pay1","payKey":"pk","payHash":"ph","txRef":"tx1","txKey":"tk","txHash":"th","catRef":"cat1","catKey":"ck","catHash":"ch","partners":[{"id":"p1","name":"ACME"}],"invoiceSeq":7}"""
+        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[{"ref":"invshard1","key":"ik","hash":"ih","count":1,"bucket":0}],"caps":{},"payRef":"pay1","payKey":"pk","payHash":"ph","txRef":"tx1","txKey":"tk","txHash":"th","catRef":"cat1","catKey":"ck","catHash":"ch","partRef":"part1","partKey":"prk","partHash":"prh","projRef":"proj1","projKey":"pjk","projHash":"pjh","partners":[{"id":"p1","name":"ACME"}],"invoiceSeq":7}"""
 
         var putBody: StorePutRequest? = null
         val api = object : NotImplementedApi() {
@@ -127,13 +129,13 @@ class FinanceRepositoryTest {
         assertEquals("ACME", root["partners"]!!.jsonArray[0].jsonObject["name"]!!.jsonPrimitive.content)
         assertEquals(7, root["invoiceSeq"]!!.jsonPrimitive.content.toInt())
         // The guard covers the invoice shard + the new payRef + the preserved tx/cat collections.
-        assertTrue(putBody!!.shards!!.containsAll(listOf("invshard1", "newpay", "tx1", "cat1")))
+        assertTrue(putBody!!.shards!!.containsAll(listOf("invshard1", "newpay", "tx1", "cat1", "part1", "proj1")))
     }
 
     @Test fun save_transactions_preserves_invoices_and_other_collections() = runBlocking {
         val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
-        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[{"ref":"invshard1","key":"ik","hash":"ih","count":1,"bucket":0}],"caps":{},"payRef":"pay1","payKey":"pk","payHash":"ph","txRef":"tx1","txKey":"tk","txHash":"th","catRef":"cat1","catKey":"ck","catHash":"ch","partners":[{"id":"p1","name":"ACME"}]}"""
+        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[{"ref":"invshard1","key":"ik","hash":"ih","count":1,"bucket":0}],"caps":{},"payRef":"pay1","payKey":"pk","payHash":"ph","txRef":"tx1","txKey":"tk","txHash":"th","catRef":"cat1","catKey":"ck","catHash":"ch","partRef":"part1","partKey":"prk","partHash":"prh","projRef":"proj1","projKey":"pjk","projHash":"pjh","partners":[{"id":"p1","name":"ACME"}]}"""
 
         var putBody: StorePutRequest? = null
         val api = object : NotImplementedApi() {
@@ -156,7 +158,7 @@ class FinanceRepositoryTest {
         assertEquals("pay1", root["payRef"]!!.jsonPrimitive.content)          // methods untouched
         assertEquals("cat1", root["catRef"]!!.jsonPrimitive.content)
         assertEquals("invshard1", root["shards"]!!.jsonArray[0].jsonObject["ref"]!!.jsonPrimitive.content)
-        assertTrue(putBody!!.shards!!.containsAll(listOf("invshard1", "newtx", "pay1", "cat1")))
+        assertTrue(putBody!!.shards!!.containsAll(listOf("invshard1", "newtx", "pay1", "cat1", "part1", "proj1")))
     }
 
     @Test fun company_profile_is_cached_for_offline() = runBlocking {

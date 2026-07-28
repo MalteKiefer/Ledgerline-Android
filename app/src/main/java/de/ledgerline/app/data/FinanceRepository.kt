@@ -493,9 +493,17 @@ class FinanceRepository(
         return JsonObject(out)
     }
 
-    /** The preserved collection blob refs (paymentMethods/transactions/financeCategories) for the guard. */
+    /**
+     * EVERY collection blob ref the root points at, for the `shards[]` referential guard. The web
+     * finance store declares collections `paymentMethods`/`transactions`/`partners`/`financeCategories`/
+     * `projects` as `payRef`/`txRef`/`partRef`/`catRef`/`projRef` — and warns that a client which omits
+     * ANY of them drops that collection's blob (server frees it as an orphan → data loss). We detect
+     * them generically (any root key ending in `Ref` with a non-blank string value), so a NEW web
+     * collection is guarded automatically even before Android has UI for it.
+     */
     private fun collectionRefs(root: JsonObject): List<String> =
-        listOf("payRef", "txRef", "catRef").mapNotNull { root[it]?.jsonPrimitive?.contentOrNull }
+        root.entries.filter { it.key.endsWith("Ref") }
+            .mapNotNull { (it.value as? JsonPrimitive)?.contentOrNull?.takeIf { s -> s.isNotBlank() } }
 
     private suspend fun uploadBytes(vk: ByteArray, bytes: ByteArray, name: String): UploadedBlob? {
         val enc = crypto.newContentEncryptor(vk)
