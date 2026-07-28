@@ -1,5 +1,6 @@
 package de.ledgerline.app.ui.health
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,9 +83,12 @@ internal fun FastingCard(
             }
             SecondaryBrandButton(stringResource(R.string.health_fast_stop), onClick = { onStop(active) })
         } else {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 HealthFasting.TEMPLATES.forEach { t ->
-                    AssistChip(onClick = { onStart(t.targetHours) }, label = { Text(t.key) }, modifier = Modifier.weight(1f))
+                    AssistChip(onClick = { onStart(t.targetHours) }, label = { Text(t.key, maxLines = 1) })
                 }
             }
             PrimaryGradientButton(stringResource(R.string.health_fast_start), onClick = { onStart(16) })

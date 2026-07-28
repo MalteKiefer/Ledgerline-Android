@@ -79,11 +79,11 @@ fun HomeScreen(
                 )
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        if (quota > 0) humanSize(used) else "—",
+                        humanSize(used),
                         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                     )
                     Text(
-                        if (quota > 0) stringResource(R.string.home_of_quota, humanSize(quota)) else "",
+                        if (quota > 0) stringResource(R.string.home_of_quota, humanSize(quota)) else stringResource(R.string.home_unlimited),
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -136,12 +136,21 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun QuickAction(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(
-        modifier.cardSurface().clickable(onClick = onClick).padding(vertical = 14.dp),
+        modifier
+            .cardSurface(padded = false)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Icon(icon, null, tint = Brand.accent, modifier = Modifier.size(26.dp))
         Spacer(Modifier.size(6.dp))
-        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
     }
 }
 

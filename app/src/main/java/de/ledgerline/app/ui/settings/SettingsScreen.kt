@@ -150,7 +150,6 @@ fun SettingsContent(
     val contactSort by vm.contactSort.collectAsStateWithLifecycle()
     val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
-    val dynamicColor by vm.dynamicColor.collectAsStateWithLifecycle()
     val displayPrefs by vm.displayPrefs.collectAsStateWithLifecycle()
     val coordinateFormat by vm.coordinateFormat.collectAsStateWithLifecycle()
     val devices by vm.devices.collectAsStateWithLifecycle()
@@ -234,8 +233,6 @@ fun SettingsContent(
                     onSelectDateFormat = vm::setDateFormat,
                     themeMode = themeMode,
                     onSelectTheme = vm::setThemeMode,
-                    dynamicColor = dynamicColor,
-                    onSetDynamicColor = vm::setDynamicColor,
                     prefs = displayPrefs,
                     onSetPrefs = vm::setDisplayPrefs,
                     coordinateFormat = coordinateFormat,
@@ -571,8 +568,6 @@ private fun AppearanceSettings(
     onSelectDateFormat: (DateFormatPref) -> Unit,
     themeMode: de.ledgerline.app.data.ThemeMode,
     onSelectTheme: (de.ledgerline.app.data.ThemeMode) -> Unit,
-    dynamicColor: Boolean,
-    onSetDynamicColor: (Boolean) -> Unit,
     prefs: de.ledgerline.app.core.prefs.DisplayPrefs,
     onSetPrefs: (de.ledgerline.app.core.prefs.DisplayPrefs) -> Unit,
     coordinateFormat: de.ledgerline.app.core.geo.CoordinateFormat,
@@ -591,16 +586,6 @@ private fun AppearanceSettings(
                 onSelectTheme(de.ledgerline.app.data.ThemeMode.DARK)
             }
         }
-        // Material You wallpaper colors are only available on Android 12+.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            SwitchRow(
-                stringResource(R.string.settings_dynamic_color),
-                stringResource(R.string.settings_dynamic_color_sub),
-                dynamicColor,
-                onSetDynamicColor,
-            )
-        }
-
         SectionHeader(stringResource(R.string.settings_units))
         PrefChoiceRow(stringResource(R.string.settings_pref_distance), listOf("km" to "km", "mi" to "mi"), prefs.distance) { onSetPrefs(prefs.copy(distance = it)) }
         PrefChoiceRow(stringResource(R.string.settings_pref_elevation), listOf("m" to "m", "ft" to "ft"), prefs.elevation) { onSetPrefs(prefs.copy(elevation = it)) }

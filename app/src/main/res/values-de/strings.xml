@@ -596,6 +596,7 @@
     <string name="settings_device_wipe">Remote-Löschung</string>
     <string name="settings_device_wipe_pending">Löschung angefordert</string>
     <string name="dest_home">Start</string>
+    <string name="home_unlimited">Unbegrenzt</string>
     <string name="dest_explore">Entdecken</string>
     <string name="explore_tab_map">Karte</string>
     <string name="explore_tab_tracker">Tracker</string>

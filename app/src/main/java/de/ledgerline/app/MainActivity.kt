@@ -81,7 +81,10 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // MASVS-STORAGE: block screenshots, screen recording, recents preview.
-        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        // Debug builds allow screenshots (design review); release always blocks.
+        if (!de.ledgerline.app.BuildConfig.DEBUG) {
+            window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        }
         // The app follows the system light/dark setting; pick the system-bar icon
         // style to match so the clock/notification icons stay legible on the
         // transparent bars in both modes.
@@ -152,7 +155,6 @@ class MainActivity : FragmentActivity() {
             // Resolve the theme from the user's setting (System/Light/Dark) + dynamic-color opt-in,
             // reactively so a change in Settings applies immediately.
             val themeMode by settingsStore.themeMode.collectAsState(initial = de.ledgerline.app.data.ThemeMode.SYSTEM)
-            val dynamicColor by settingsStore.dynamicColor.collectAsState(initial = false)
             val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
             val dark = when (themeMode) {
                 de.ledgerline.app.data.ThemeMode.LIGHT -> false
@@ -164,7 +166,7 @@ class MainActivity : FragmentActivity() {
                 androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
                     .isAppearanceLightStatusBars = !dark
             }
-            LedgerlineTheme(darkTheme = dark, dynamicColor = dynamicColor) {
+            LedgerlineTheme(darkTheme = dark) {
                 val link by pairLink.collectAsState()
                 // One shared factory for both CryptoObject-bound biometric authorizers.
                 val auth = VaultAuthorizers(

@@ -105,19 +105,14 @@ private val LedgerlineLightScheme = lightColorScheme(
 @Composable
 fun LedgerlineTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    // Dynamic (Material You / wallpaper) color is opt-in and only on Android 12+; otherwise the
-    // hand-authored brand scheme is used so every M3 role stays intentional.
-    val scheme = when {
-        dynamicColor && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S ->
-            if (darkTheme) androidx.compose.material3.dynamicDarkColorScheme(context)
-            else androidx.compose.material3.dynamicLightColorScheme(context)
-        darkTheme -> LedgerlineDarkScheme
-        else -> LedgerlineLightScheme
-    }
+    // Ledgerline is a strongly-branded ZK app: the indigo/violet identity (iOS/web parity) is the
+    // whole design system, so the palette is ALWAYS the hand-authored brand scheme. Material-You /
+    // dynamic (wallpaper) color is deliberately NOT used — a wallpaper's hue (e.g. a green photo)
+    // recolours only the M3-default components (FABs, chips, buttons, loading, drawer selection)
+    // while the hard-branded pills/gradients stay indigo, which reads as a broken two-accent app.
+    val scheme = if (darkTheme) LedgerlineDarkScheme else LedgerlineLightScheme
     // Material 3 Expressive: opt into the expressive motion scheme (springier spatial +
     // effects tokens) so every M3 component animates to the current Android standard.
     @OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)

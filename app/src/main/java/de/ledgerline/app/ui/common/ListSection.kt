@@ -260,4 +260,4 @@ fun RowMeta(text: String) {
 }
 
 /** Standard bottom content padding for a list so its last rows clear the floating tab pill. */
-val ListBottomPadding = PaddingValues(bottom = 104.dp)
+val ListBottomPadding = PaddingValues(bottom = 132.dp)

@@ -599,6 +599,7 @@
     <string name="settings_device_wipe">Удалённая очистка</string>
     <string name="settings_device_wipe_pending">Очистка запрошена</string>
     <string name="dest_home">Главная</string>
+    <string name="home_unlimited">Безлимит</string>
     <string name="dest_explore">Обзор</string>
     <string name="explore_tab_map">Карта</string>
     <string name="explore_tab_tracker">Трекер</string>

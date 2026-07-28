@@ -176,8 +176,6 @@ fun HealthScreen(
             FloatingActionButton(
                 onClick = { editorEntry = null; editorOpen = true },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp),
-                containerColor = Brand.accent,
-                contentColor = Color.White,
             ) { Icon(Icons.Outlined.Add, stringResource(R.string.health_add)) }
         }
     }
