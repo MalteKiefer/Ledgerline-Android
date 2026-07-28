@@ -671,9 +671,11 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   Positionen-Editor mit Live-Totals, Notiz), Detail-Aktionen. **Ausstellen** vergibt eine gapless
   GoBD-Nummer (`InvoiceMath.nextSeqForYear`→`formatNumber`, seq pro Rechnung). Test
   `FinanceRepositoryTest` beweist die Collection-Erhaltung (payRef/txRef/partners überleben + im Guard).
+  **Company-Profil-Editor + Datepicker (2026-07-28):** `CompanyEditScreen` (`GET/PUT /company`, Top-Bar-
+  Business-Icon → Firmendaten + Rechnungs-Voreinstellungen inkl. `number_format`/`next_number`);
+  `InvoiceEditScreen` nutzt jetzt Material3-Datepicker für Rechnungs-/Fälligkeitsdatum.
   **Offen (Finance):** payment-methods/transactions-Editor, VAT-Return-Statistik, ZUGFeRD/Factur-X-Export,
-  e-invoice-XML-Import, Client-PDF-Import, Bankauszug-Import, Company-Profil-Editor, Datepicker/
-  Currency-Dropdown-Feinschliff (heute Textfelder). Bausteine:
+  e-invoice-XML-Import, Client-PDF-Import, Bankauszug-Import, Currency-Dropdown-Feinschliff. Bausteine:
   `domain/model/Finance` (Invoice/InvoiceLine/InvoiceCustomer/CompanyProfile, Raw-Overlay = kein
   Feldverlust), `core/finance/InvoiceMath` (byte-nah zu `invoices.js`/`invoice-numbering.js` —
   `totals` net/vatByRate/vat/gross, GoBD-Nummerierung `nextSeqForYear`/`formatNumber`/`duplicateNumbers`,

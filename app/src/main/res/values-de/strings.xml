@@ -788,4 +788,14 @@
     <string name="finance_line_price">Einzelpreis</string>
     <string name="finance_line_vat">MwSt. %</string>
     <string name="finance_add_line">Position hinzufügen</string>
+    <string name="finance_company">Firmenprofil</string>
+    <string name="finance_company_identity">Firmendaten</string>
+    <string name="finance_company_defaults">Rechnungs-Voreinstellungen</string>
+    <string name="finance_company_phone">Telefon</string>
+    <string name="finance_company_taxnr">Steuernummer</string>
+    <string name="finance_company_iban">IBAN</string>
+    <string name="finance_company_terms">Zahlungsziel (Tage)</string>
+    <string name="finance_company_numfmt">Nummernformat (z. B. YYYY-NNNN)</string>
+    <string name="finance_company_nextnr">Nächste Nummer</string>
+    <string name="finance_company_footer">Rechnungs-Fußzeile</string>
 </resources>

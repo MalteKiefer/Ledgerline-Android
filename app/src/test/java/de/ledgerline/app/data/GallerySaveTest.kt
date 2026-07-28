@@ -66,6 +66,7 @@ class GallerySaveTest {
         override suspend fun uploadInvoice(file: okhttp3.MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadResponse> = throw NotImplementedError()
         override suspend fun rawInvoice(blob: String): Response<okhttp3.ResponseBody> = throw NotImplementedError()
         override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyDto> = throw NotImplementedError()
+    override suspend fun companyPut(body: de.ledgerline.app.data.remote.dto.CompanyDto): Response<de.ledgerline.app.data.remote.dto.CompanyDto> = throw NotImplementedError()
         override suspend fun passwordsStorePut(body: de.ledgerline.app.data.remote.dto.StorePutRequest): Response<de.ledgerline.app.data.remote.dto.StoreResponse> = throw NotImplementedError()
         override suspend fun rawPassword(blob: String): Response<okhttp3.ResponseBody> = throw NotImplementedError()
         override suspend fun uploadPassword(file: okhttp3.MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadResponse> = throw NotImplementedError()

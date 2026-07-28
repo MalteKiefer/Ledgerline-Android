@@ -167,6 +167,9 @@ interface LedgerlineApi {
     @GET("api/v1/company")
     suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyDto>
 
+    @PUT("api/v1/company")
+    suspend fun companyPut(@Body body: de.ledgerline.app.data.remote.dto.CompanyDto): Response<de.ledgerline.app.data.remote.dto.CompanyDto>
+
     // --- Passwords sharded store + blobs (web migrated passwords off the monolith, §P0) ---
     @GET("api/v1/passwords/store")
     suspend fun passwordsStore(): Response<StoreResponse>

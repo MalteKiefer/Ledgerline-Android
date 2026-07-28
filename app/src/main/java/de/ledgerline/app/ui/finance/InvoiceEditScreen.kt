@@ -104,8 +104,8 @@ fun InvoiceEditScreen(inv: Invoice, vm: FinanceViewModel, onCancel: () -> Unit, 
 
             // Dates + currency
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Field(issueDate, { issueDate = it }, R.string.finance_issue_date)
-                Field(dueDate, { dueDate = it }, R.string.finance_due_date)
+                DateField(issueDate, { issueDate = it }, R.string.finance_issue_date)
+                DateField(dueDate, { dueDate = it }, R.string.finance_due_date)
                 Field(currency, { currency = it }, R.string.finance_currency)
             }
 
@@ -150,6 +150,36 @@ fun InvoiceEditScreen(inv: Invoice, vm: FinanceViewModel, onCancel: () -> Unit, 
 @Composable
 private fun Field(value: String, onChange: (String) -> Unit, labelRes: Int) {
     OutlinedTextField(value, onChange, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(labelRes)) }, singleLine = true)
+}
+
+/** A read-only `YYYY-MM-DD` field that opens a Material date picker. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun DateField(iso: String, onChange: (String) -> Unit, labelRes: Int) {
+    var show by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = iso, onValueChange = {}, readOnly = true, modifier = Modifier.fillMaxWidth(),
+        label = { Text(stringResource(labelRes)) },
+        trailingIcon = { TextButton(onClick = { show = true }) { Text("…") } },
+    )
+    if (show) {
+        val initial = runCatching {
+            java.time.LocalDate.parse(iso).atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+        }.getOrNull()
+        val state = androidx.compose.material3.rememberDatePickerState(initialSelectedDateMillis = initial)
+        androidx.compose.material3.DatePickerDialog(
+            onDismissRequest = { show = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let {
+                        onChange(java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate().toString())
+                    }
+                    show = false
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = { TextButton(onClick = { show = false }) { Text(stringResource(R.string.action_cancel)) } },
+        ) { androidx.compose.material3.DatePicker(state = state) }
+    }
 }
 
 @Composable

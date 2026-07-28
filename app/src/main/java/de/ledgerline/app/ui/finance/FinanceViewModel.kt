@@ -124,6 +124,10 @@ class FinanceViewModel @Inject constructor(
 
     fun trash(inv: Invoice, onDone: (Boolean) -> Unit = {}) = save(inv.copy(trashed = true), onDone)
 
+    fun saveCompany(profile: CompanyProfile, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch { onDone(repo.saveCompany(profile)) }
+    }
+
     /** Currency-format a value with the invoice/company currency (fallback EUR), device locale. */
     fun money(value: Double, currency: String?): String {
         val cur = currency?.takeIf { it.isNotBlank() } ?: company.value?.currency ?: "EUR"

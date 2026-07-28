@@ -140,6 +140,13 @@ object FinanceRecordCodec {
         nextNumber = dto.nextNumber ?: 1,
     )
 
+    fun companyToDto(c: CompanyProfile): CompanyDto = CompanyDto(
+        name = c.name, address = c.address, email = c.email, phone = c.phone,
+        vatId = c.vatId, taxNumber = c.taxNumber, iban = c.iban, currency = c.currency,
+        paymentTermsDays = c.paymentTermsDays, footerText = c.footerText,
+        numberFormat = c.numberFormat, nextNumber = c.nextNumber,
+    )
+
     // ---- helpers ----
     private fun JsonObject.str(key: String): String? =
         this[key]?.let { if (it is JsonNull) null else it.jsonPrimitive.contentOrNull }?.takeIf { it.isNotEmpty() }

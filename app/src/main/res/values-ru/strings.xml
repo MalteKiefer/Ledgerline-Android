@@ -791,4 +791,14 @@
     <string name="finance_line_price">Цена</string>
     <string name="finance_line_vat">НДС %</string>
     <string name="finance_add_line">Добавить позицию</string>
+    <string name="finance_company">Профиль компании</string>
+    <string name="finance_company_identity">Данные компании</string>
+    <string name="finance_company_defaults">Настройки счёта</string>
+    <string name="finance_company_phone">Телефон</string>
+    <string name="finance_company_taxnr">Налоговый номер</string>
+    <string name="finance_company_iban">IBAN</string>
+    <string name="finance_company_terms">Срок оплаты (дни)</string>
+    <string name="finance_company_numfmt">Формат номера (напр. YYYY-NNNN)</string>
+    <string name="finance_company_nextnr">Следующий номер</string>
+    <string name="finance_company_footer">Нижний колонтитул счёта</string>
 </resources>

@@ -262,6 +262,17 @@ class FinanceRepository(
         } catch (_: Exception) { null }
     }
 
+    /** Update the non-secret company profile (`PUT /company`), then cache the server echo. */
+    suspend fun saveCompany(profile: CompanyProfile): Boolean = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext false
+        try {
+            val res = apiProvider(session).companyPut(FinanceRecordCodec.companyToDto(profile))
+            if (!res.isSuccessful) return@withContext false
+            cache.setCompany(res.body()?.let(FinanceRecordCodec::companyFrom) ?: profile)
+            true
+        } catch (_: Exception) { false }
+    }
+
     // ---- helpers ----
 
     private fun shardOf(o: JsonObject): GalleryShard? {
