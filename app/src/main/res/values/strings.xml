@@ -881,4 +881,10 @@
     <string name="finance_project_expenses">Manual expenses</string>
     <string name="finance_project_receipts">Bundled receipts</string>
     <string name="finance_project_subprojects">Sub-projects</string>
+    <string name="finance_partners">Business partners</string>
+    <string name="finance_partners_empty">No partners yet.</string>
+    <string name="finance_partner_new">New partner</string>
+    <string name="finance_partner_edit">Edit partner</string>
+    <string name="finance_partner_name">Name</string>
+    <string name="finance_partner_category">Default category</string>
 </resources>

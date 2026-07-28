@@ -49,6 +49,10 @@ class FinanceViewModel @Inject constructor(
         cache.value.map { it?.manifest?.projects ?: emptyList() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    val partners: StateFlow<List<de.ledgerline.app.domain.model.Partner>> =
+        cache.value.map { it?.manifest?.partners ?: emptyList() }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val company: StateFlow<CompanyProfile?> = cache.company
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -260,6 +264,27 @@ class FinanceViewModel @Inject constructor(
     }
 
     fun money2(value: Double): String = money(value, null)
+
+    // ---- business partners ----
+    fun sortedPartners() = partners.value.sortedBy { it.name.lowercase() }
+    fun partnerById(id: String) = partners.value.firstOrNull { it.id == id }
+    fun newPartner() = de.ledgerline.app.domain.model.Partner(id = de.ledgerline.app.core.Ids.newId())
+
+    fun savePartner(p: de.ledgerline.app.domain.model.Partner, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val res = repo.savePartners { list ->
+                if (list.any { it.id == p.id }) list.map { if (it.id == p.id) p else it } else listOf(p) + list
+            }
+            onDone(res is de.ledgerline.app.core.Outcome.Ok)
+        }
+    }
+
+    fun deletePartner(p: de.ledgerline.app.domain.model.Partner, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val res = repo.savePartners { list -> list.filter { it.id != p.id } }
+            onDone(res is de.ledgerline.app.core.Outcome.Ok)
+        }
+    }
 
     /**
      * Import parsed statement lines into [accountId], deduped against that account's existing bookings

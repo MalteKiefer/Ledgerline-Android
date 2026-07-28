@@ -113,7 +113,7 @@ class FinanceRepository(
             if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(ct, body.version))
             val plain = crypto.openManifest(ct, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
             val a = assemble(json.parseToJsonElement(plain).jsonObject, session, vk, allowNetwork = true)
-            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions, projects = a.projects, seq = 0), version)
+            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions, projects = a.projects, partners = a.partners, seq = 0), version)
             cache.set(store)
             loadCompany()
             Outcome.Ok(store)
@@ -127,6 +127,7 @@ class FinanceRepository(
         val paymentMethods: List<de.ledgerline.app.domain.model.PaymentMethod>,
         val transactions: List<de.ledgerline.app.domain.model.Transaction>,
         val projects: List<de.ledgerline.app.domain.model.Project>,
+        val partners: List<de.ledgerline.app.domain.model.Partner>,
     )
 
     /** Decode the root: capture its raw + shard descriptors, then fetch + decode shards + collections. */
@@ -154,7 +155,9 @@ class FinanceRepository(
             .mapNotNull(FinanceRecordCodec::decodeTransaction)
         val proj = fetchCollection(api, root, "projRef", "projKey", vk, allowNetwork)
             .mapNotNull(FinanceRecordCodec::decodeProject)
-        return Assembled(invoices, pm, tx, proj)
+        val part = fetchCollection(api, root, "partRef", "partKey", vk, allowNetwork)
+            .mapNotNull(FinanceRecordCodec::decodePartner)
+        return Assembled(invoices, pm, tx, proj, part)
     }
 
     /**
@@ -214,7 +217,7 @@ class FinanceRepository(
                             // Offline: assemble from cached shard blobs only (no network).
                             val a = assemble(json.parseToJsonElement(plain).jsonObject, session, vk, allowNetwork = false)
                             version = env.version
-                            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions, projects = a.projects), version)
+                            val store = FinanceStore(FinanceManifest(invoices = a.invoices, paymentMethods = a.paymentMethods, transactions = a.transactions, projects = a.projects, partners = a.partners), version)
                             cache.set(store)
                             loadCompanyCached(vk)
                             return Outcome.Ok(store)
@@ -511,6 +514,53 @@ class FinanceRepository(
                 put.code() == HttpURLConnection.HTTP_CONFLICT -> {
                     val fresh = when (val l = load()) {
                         is Outcome.Ok -> { base = l.value; l.value.manifest.projects }
+                        is Outcome.Err -> return@withContext l
+                    }
+                    next = mutate(fresh)
+                }
+                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+            }
+        }
+        Outcome.Err(ErrorKind.HTTP)
+    }
+
+    /** Re-seal the `partners` collection (partRef) — everything else preserved + guarded, 409-rebase. */
+    suspend fun savePartners(mutate: (List<de.ledgerline.app.domain.model.Partner>) -> List<de.ledgerline.app.domain.model.Partner>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        var base = cache.value.value
+        if (base == null) {
+            when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
+        }
+        var next = mutate(base!!.manifest.partners)
+
+        repeat(5) {
+            val items = next.map(FinanceRecordCodec::encodePartner)
+            val coll = sealCollection(vk, items, priorRootRaw["partRef"]?.jsonPrimitive?.contentOrNull, priorRootRaw["partHash"]?.jsonPrimitive?.contentOrNull, priorRootRaw["partKey"]?.jsonPrimitive?.contentOrNull)
+                ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+            val root = priorRootRaw.toMutableMap()
+            root["v"] = JsonPrimitive(3); root["suite"] = JsonPrimitive(1)
+            if (coll.ref == null) { root.remove("partRef"); root.remove("partKey"); root.remove("partHash") }
+            else { root["partRef"] = JsonPrimitive(coll.ref); root["partKey"] = JsonPrimitive(coll.key); root["partHash"] = JsonPrimitive(coll.hash) }
+            val rootJson = JsonObject(root)
+            val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
+            val guard = priorShards.shards.map { it.ref } + collectionRefs(rootJson)
+            val put = try {
+                api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
+            } catch (e: Exception) {
+                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+            }
+            when {
+                put.isSuccessful -> {
+                    version = put.body()?.version ?: (version + 1)
+                    priorRootRaw = rootJson
+                    if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(rootCipher, version))
+                    val store = FinanceStore(base!!.manifest.copy(partners = next), version)
+                    cache.set(store)
+                    return@withContext Outcome.Ok(store)
+                }
+                put.code() == HttpURLConnection.HTTP_CONFLICT -> {
+                    val fresh = when (val l = load()) {
+                        is Outcome.Ok -> { base = l.value; l.value.manifest.partners }
                         is Outcome.Err -> return@withContext l
                     }
                     next = mutate(fresh)

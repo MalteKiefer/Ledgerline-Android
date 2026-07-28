@@ -159,6 +159,15 @@ data class Project(
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 
+/** A business partner (merchant/client) in the finance store's `partners` collection (partRef). */
+data class Partner(
+    val id: String,
+    val name: String = "",
+    val category: String = "",       // the learned booking category for this merchant
+    val note: String = "",
+    val raw: JsonObject = JsonObject(emptyMap()),
+)
+
 /** A receipt/document bundled on a transaction (inline `tx.receipts[]`; read-only in Android for now). */
 data class Receipt(
     val id: String,
@@ -176,6 +185,7 @@ data class FinanceManifest(
     val paymentMethods: List<PaymentMethod> = emptyList(),
     val transactions: List<Transaction> = emptyList(),
     val projects: List<Project> = emptyList(),
+    val partners: List<Partner> = emptyList(),
     val seq: Int = 0,
 )
 

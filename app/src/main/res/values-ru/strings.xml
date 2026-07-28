@@ -882,4 +882,10 @@
     <string name="finance_project_expenses">Ручные расходы</string>
     <string name="finance_project_receipts">Прикреплённые чеки</string>
     <string name="finance_project_subprojects">Подпроекты</string>
+    <string name="finance_partners">Партнёры</string>
+    <string name="finance_partners_empty">Пока нет партнёров.</string>
+    <string name="finance_partner_new">Новый партнёр</string>
+    <string name="finance_partner_edit">Изменить партнёра</string>
+    <string name="finance_partner_name">Имя</string>
+    <string name="finance_partner_category">Категория по умолчанию</string>
 </resources>

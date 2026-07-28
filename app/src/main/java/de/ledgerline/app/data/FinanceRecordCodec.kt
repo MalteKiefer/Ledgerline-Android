@@ -248,6 +248,24 @@ object FinanceRecordCodec {
         return JsonObject(out)
     }
 
+    // ---- partners (decode + encode, raw overlay) ----
+
+    fun decodePartner(o: JsonObject): de.ledgerline.app.domain.model.Partner? {
+        val id = o.str("id") ?: return null
+        return de.ledgerline.app.domain.model.Partner(
+            id = id, name = o.str("name") ?: "", category = o.str("category") ?: "", note = o.str("note") ?: "", raw = o,
+        )
+    }
+
+    fun encodePartner(p: de.ledgerline.app.domain.model.Partner): JsonObject {
+        val out = p.raw.toMutableMap()
+        out["id"] = JsonPrimitive(p.id)
+        out["name"] = JsonPrimitive(p.name)
+        out["category"] = JsonPrimitive(p.category)
+        out["note"] = JsonPrimitive(p.note)
+        return JsonObject(out)
+    }
+
     /** Decode the inline `tx.receipts[]` of a transaction's raw JSON (read-only; edits go via the tx). */
     fun decodeReceipts(txRaw: JsonObject): List<de.ledgerline.app.domain.model.Receipt> =
         (txRaw["receipts"] as? JsonArray).orEmpty().mapNotNull { el ->

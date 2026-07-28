@@ -23,6 +23,8 @@ import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.FileOpen
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.QueryStats
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -75,6 +77,7 @@ fun FinanceScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, v
     var showStats by remember { mutableStateOf(false) }
     var showPayments by remember { mutableStateOf(false) }
     var showProjects by remember { mutableStateOf(false) }
+    var showPartners by remember { mutableStateOf(false) }
     val editingInv = editing
     val current = openId?.let { vm.invoiceById(it) }
     val year by vm.year.collectAsStateWithLifecycle()
@@ -83,14 +86,15 @@ fun FinanceScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, v
         showStats -> FinanceStatsScreen(vm, year, onBack = { showStats = false })
         showPayments -> PaymentMethodsScreen(vm, onBack = { showPayments = false })
         showProjects -> ProjectsScreen(vm, onBack = { showProjects = false })
+        showPartners -> PartnersScreen(vm, onBack = { showPartners = false })
         editingInv != null -> InvoiceEditScreen(editingInv, vm, onCancel = { editing = null }, onSaved = { editing = null; openId = null })
         current != null -> InvoiceDetailScreen(current, vm, onBack = { openId = null }, onEdit = { editing = current })
-        else -> FinanceList(vm, modifier, onMenu = onMenu, onOpen = { openId = it }, onNew = { editing = vm.newDraft() }, onCompany = { editCompany = true }, onStats = { showStats = true }, onPayments = { showPayments = true }, onProjects = { showProjects = true }, onImported = { editing = it })
+        else -> FinanceList(vm, modifier, onMenu = onMenu, onOpen = { openId = it }, onNew = { editing = vm.newDraft() }, onCompany = { editCompany = true }, onStats = { showStats = true }, onPayments = { showPayments = true }, onProjects = { showProjects = true }, onPartners = { showPartners = true }, onImported = { editing = it })
     }
 }
 
 @Composable
-private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() -> Unit)?, onOpen: (String) -> Unit, onNew: () -> Unit, onCompany: () -> Unit, onStats: () -> Unit, onPayments: () -> Unit, onProjects: () -> Unit, onImported: (Invoice) -> Unit) {
+private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() -> Unit)?, onOpen: (String) -> Unit, onNew: () -> Unit, onCompany: () -> Unit, onStats: () -> Unit, onPayments: () -> Unit, onProjects: () -> Unit, onPartners: () -> Unit, onImported: (Invoice) -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -112,20 +116,21 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
                 title = stringResource(R.string.dest_finance),
                 onMenu = onMenu,
                 actions = {
-                    androidx.compose.material3.IconButton(onClick = { importLauncher.launch(arrayOf("text/xml", "application/xml", "*/*")) }) {
-                        Icon(Icons.Outlined.FileOpen, stringResource(R.string.finance_import_xml))
-                    }
-                    androidx.compose.material3.IconButton(onClick = onProjects) {
-                        Icon(Icons.Outlined.AccountTree, stringResource(R.string.finance_projects))
+                    androidx.compose.material3.IconButton(onClick = onStats) {
+                        Icon(Icons.Outlined.QueryStats, stringResource(R.string.finance_stats_action))
                     }
                     androidx.compose.material3.IconButton(onClick = onPayments) {
                         Icon(Icons.Outlined.AccountBalanceWallet, stringResource(R.string.finance_pm_title))
                     }
-                    androidx.compose.material3.IconButton(onClick = onStats) {
-                        Icon(Icons.Outlined.QueryStats, stringResource(R.string.finance_stats_action))
+                    var menu by remember { mutableStateOf(false) }
+                    androidx.compose.material3.IconButton(onClick = { menu = true }) {
+                        Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more))
                     }
-                    androidx.compose.material3.IconButton(onClick = onCompany) {
-                        Icon(androidx.compose.material.icons.Icons.Outlined.Business, stringResource(R.string.finance_company))
+                    androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.finance_projects)) }, leadingIcon = { Icon(Icons.Outlined.AccountTree, null) }, onClick = { menu = false; onProjects() })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.finance_partners)) }, leadingIcon = { Icon(Icons.Outlined.Groups, null) }, onClick = { menu = false; onPartners() })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.finance_import_xml)) }, leadingIcon = { Icon(Icons.Outlined.FileOpen, null) }, onClick = { menu = false; importLauncher.launch(arrayOf("text/xml", "application/xml", "*/*")) })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.finance_company)) }, leadingIcon = { Icon(Icons.Outlined.Business, null) }, onClick = { menu = false; onCompany() })
                     }
                 },
             )

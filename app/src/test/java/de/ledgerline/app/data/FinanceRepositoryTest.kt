@@ -161,6 +161,31 @@ class FinanceRepositoryTest {
         assertTrue(putBody!!.shards!!.containsAll(listOf("invshard1", "newtx", "pay1", "cat1", "part1", "proj1")))
     }
 
+    @Test fun save_partners_reseals_partRef_and_preserves_the_rest() = runBlocking {
+        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[{"ref":"invshard1","key":"ik","hash":"ih","count":1,"bucket":0}],"caps":{},"payRef":"pay1","payKey":"pk","payHash":"ph","txRef":"tx1","txKey":"tk","txHash":"th","catRef":"cat1","catKey":"ck","catHash":"ch","partRef":"part1","partKey":"prk","partHash":"prh","projRef":"proj1","projKey":"pjk","projHash":"pjh"}"""
+        var putBody: StorePutRequest? = null
+        val api = object : NotImplementedApi() {
+            override suspend fun invoicesStore(): Response<StoreResponse> = Response.success(StoreResponse("SEALED:$rootJson", 5))
+            override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse> = Response.success(de.ledgerline.app.data.remote.dto.CompanyResponse(CompanyDto()))
+            override suspend fun rawInvoice(blob: String): Response<okhttp3.ResponseBody> = Response.error(404, "".toResponseBody(null))
+            override suspend fun uploadInvoice(file: MultipartBody.Part): Response<UploadResponse> = Response.success(UploadResponse("newpart"))
+            override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> { putBody = body; return Response.success(StoreResponse(body.ciphertext, body.version + 1)) }
+        }
+        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+
+        assertTrue(repo.load() is Outcome.Ok)
+        assertTrue(repo.savePartners { listOf(de.ledgerline.app.domain.model.Partner(id = "pt1", name = "ACME", category = "Software")) + it } is Outcome.Ok)
+
+        val root = Json.parseToJsonElement(putBody!!.ciphertext.removePrefix("SEALED:")).jsonObject
+        assertEquals("newpart", root["partRef"]!!.jsonPrimitive.content)
+        assertEquals("proj1", root["projRef"]!!.jsonPrimitive.content)
+        assertEquals("tx1", root["txRef"]!!.jsonPrimitive.content)
+        assertEquals("cat1", root["catRef"]!!.jsonPrimitive.content)
+        assertTrue(putBody!!.shards!!.containsAll(listOf("invshard1", "newpart", "pay1", "tx1", "cat1", "proj1")))
+    }
+
     @Test fun company_profile_is_cached_for_offline() = runBlocking {
         val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
