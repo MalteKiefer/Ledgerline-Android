@@ -12,10 +12,10 @@ class MeasureFormatterTest {
         assertEquals("7.67 mi", MeasureFormatter.distance(12340.0, UnitSystem.IMPERIAL))
     }
     @Test fun elevation_metric() {
-        assertEquals("820 m", MeasureFormatter.elevation(820.0, UnitSystem.METRIC))
+        assertEquals("820 m", MeasureFormatter.elevation(820.0, feet = false))
     }
     @Test fun elevation_imperial() {
-        assertEquals("2690 ft", MeasureFormatter.elevation(820.0, UnitSystem.IMPERIAL))
+        assertEquals("2690 ft", MeasureFormatter.elevation(820.0, feet = true))
     }
     @Test fun pace_metric() {
         assertEquals("5'33\"/km", MeasureFormatter.pace(3.0, UnitSystem.METRIC))

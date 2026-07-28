@@ -80,6 +80,12 @@
     <string name="pw_tags">Tags</string>
     <string name="pw_tag_add">Tag hinzufügen</string>
     <string name="pw_custom_fields">Eigene Felder</string>
+    <string name="action_close">Schließen</string>
+    <string name="pw_details">Details</string>
+    <string name="pw_security">Sicherheit</string>
+    <string name="pw_website">Website</string>
+    <string name="pw_totp">Einmalcode</string>
+    <string name="cd_large_view">Groß anzeigen</string>
     <string name="pw_custom_label">Bezeichnung</string>
     <string name="pw_custom_value">Wert</string>
     <string name="pw_custom_add">Feld hinzufügen</string>
@@ -631,6 +637,8 @@
     <string name="stat_pace">Pace</string>
     <string name="stat_speed">Tempo</string>
     <string name="stat_ascent">Anstieg</string>
+    <string name="stat_calories">Kalorien</string>
+    <string name="stat_calories_value">%1$d kcal</string>
     <string name="track_export_gpx">GPX exportieren</string>
     <string name="track_stat_total_time">Gesamtzeit</string>
     <string name="track_stat_moving_time">Bewegungszeit</string>
@@ -640,6 +648,9 @@
     <string name="track_stat_avg">Durchschnitt</string>
     <string name="track_stat_max_speed">Max. Tempo</string>
     <string name="settings_units">Einheiten</string>
+    <string name="settings_pref_distance">Distanz</string>
+    <string name="settings_pref_elevation">Höhe</string>
+    <string name="settings_clock">Uhr</string>
     <string name="settings_units_metric">Metrisch (km, m)</string>
     <string name="settings_units_imperial">Imperial (mi, ft)</string>
     <string name="settings_coord_format">Koordinatenformat</string>

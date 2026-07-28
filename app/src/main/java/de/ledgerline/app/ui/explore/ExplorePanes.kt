@@ -309,6 +309,7 @@ private fun HeadingSensor(enabled: Boolean, onHeading: (Float) -> Unit) {
 fun TrackerPane(vm: ExploreViewModel, onlineEnabled: Boolean, onRequestPermission: () -> Unit) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val UNIT by vm.unit.collectAsStateWithLifecycle()
+    val elevFeet by vm.elevationFeet.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val controller = rememberMapsforgeController()
     val offline = remember { vm.offlineMaps() }
@@ -353,7 +354,7 @@ fun TrackerPane(vm: ExploreViewModel, onlineEnabled: Boolean, onRequestPermissio
                     } else {
                         StatCell(stringResource(R.string.stat_pace), MeasureFormatter.pace(s?.avgSpeedMps ?: 0.0, UNIT))
                     }
-                    StatCell(stringResource(R.string.stat_ascent), MeasureFormatter.elevation(s?.ascentM ?: 0.0, UNIT))
+                    StatCell(stringResource(R.string.stat_ascent), MeasureFormatter.elevation(s?.ascentM ?: 0.0, elevFeet))
                 }
 
                 if (ui.state == RecordingState.IDLE) {

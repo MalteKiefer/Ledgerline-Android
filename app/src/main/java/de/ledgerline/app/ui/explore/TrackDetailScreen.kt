@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -70,6 +71,8 @@ import org.mapsforge.map.android.graphics.AndroidGraphicFactory
 fun TrackDetailScreen(
     track: ExploreTrack,
     unit: UnitSystem,
+    elevationFeet: Boolean,
+    calories: Long?,
     onBack: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -86,6 +89,8 @@ fun TrackDetailScreen(
     LaunchedEffect(track.id) {
         val coords = track.points.map { it.lat to it.lng }
         controller.setTrack(coords)
+        // Direction-of-travel arrows along the route (web parity).
+        controller.setDirectionArrows(de.ledgerline.app.core.explore.TrackArrows.compute(track.points), de.ledgerline.app.ui.theme.Brand.accent.toArgb())
         val bb = track.bbox
         if (bb != null) {
             controller.fitBounds(bb.minLat, bb.minLng, bb.maxLat, bb.maxLng)
@@ -136,13 +141,14 @@ fun TrackDetailScreen(
             ElevationProfileSection(
                 track = track,
                 unit = unit,
+                elevationFeet = elevationFeet,
                 onHover = { distM ->
                     val coord = TrackGeometry.interpolateAtDistance(track.points, distM)
                     controller.setMarkers(coord?.let { listOf(it) } ?: emptyList(), hoverBitmap)
                 },
             )
 
-            StatsGrid(track = track, unit = unit)
+            StatsGrid(track = track, unit = unit, elevationFeet = elevationFeet, calories = calories)
 
             Spacer(Modifier.height(24.dp))
         }
@@ -175,6 +181,7 @@ private fun TrackDetailOverflow(onDelete: () -> Unit) {
 private fun ElevationProfileSection(
     track: ExploreTrack,
     unit: UnitSystem,
+    elevationFeet: Boolean,
     onHover: (Double) -> Unit,
 ) {
     val profile: List<ElevationSample> = remember(track.id) {
@@ -226,7 +233,7 @@ private fun ElevationProfileSection(
                         val distM = minX + frac * (maxX - minX)
                         val ele = elevationAt(distM)
                         readout = MeasureFormatter.distance(distM, unit) +
-                            "  ·  " + MeasureFormatter.elevation(ele, unit)
+                            "  ·  " + MeasureFormatter.elevation(ele, elevationFeet)
                         onHover(distM)
                     }
                     detectHorizontalDragGestures(
@@ -279,16 +286,16 @@ private fun ElevationProfileSection(
 
 /** Two-column grid of labelled stat cells in a single grouped card. */
 @Composable
-private fun StatsGrid(track: ExploreTrack, unit: UnitSystem) {
+private fun StatsGrid(track: ExploreTrack, unit: UnitSystem, elevationFeet: Boolean, calories: Long?) {
     val s = track.stats
     val cells = buildList {
         add(stringResource(R.string.stat_distance) to MeasureFormatter.distance(s?.distanceM ?: 0.0, unit))
         add(stringResource(R.string.track_stat_total_time) to MeasureFormatter.duration(s?.durationTotalS ?: 0.0))
         add(stringResource(R.string.track_stat_moving_time) to MeasureFormatter.duration(s?.durationMovingS ?: 0.0))
-        add(stringResource(R.string.stat_ascent) to MeasureFormatter.elevation(s?.ascentM ?: 0.0, unit))
-        add(stringResource(R.string.track_stat_descent) to MeasureFormatter.elevation(s?.descentM ?: 0.0, unit))
-        s?.minEleM?.let { add(stringResource(R.string.track_stat_min_ele) to MeasureFormatter.elevation(it, unit)) }
-        s?.maxEleM?.let { add(stringResource(R.string.track_stat_max_ele) to MeasureFormatter.elevation(it, unit)) }
+        add(stringResource(R.string.stat_ascent) to MeasureFormatter.elevation(s?.ascentM ?: 0.0, elevationFeet))
+        add(stringResource(R.string.track_stat_descent) to MeasureFormatter.elevation(s?.descentM ?: 0.0, elevationFeet))
+        s?.minEleM?.let { add(stringResource(R.string.track_stat_min_ele) to MeasureFormatter.elevation(it, elevationFeet)) }
+        s?.maxEleM?.let { add(stringResource(R.string.track_stat_max_ele) to MeasureFormatter.elevation(it, elevationFeet)) }
         val avg = if (track.activity == "cycle") {
             MeasureFormatter.speed(s?.avgSpeedMps ?: 0.0, unit)
         } else {
@@ -296,6 +303,7 @@ private fun StatsGrid(track: ExploreTrack, unit: UnitSystem) {
         }
         add(stringResource(R.string.track_stat_avg) to avg)
         add(stringResource(R.string.track_stat_max_speed) to MeasureFormatter.speed(s?.maxSpeedMps ?: 0.0, unit))
+        calories?.let { add(stringResource(R.string.stat_calories) to stringResource(R.string.stat_calories_value, it.toInt())) }
     }
 
     ListSectionCard {

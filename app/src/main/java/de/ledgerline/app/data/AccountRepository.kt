@@ -14,13 +14,46 @@ import javax.inject.Singleton
 class AccountRepository(
     private val sessionHolder: SessionHolder,
     private val authEventBus: AuthEventBus,
+    private val prefsSink: de.ledgerline.app.core.prefs.DisplayPrefsSink,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
-    @Inject constructor(sessionHolder: SessionHolder, authEventBus: AuthEventBus) : this(
+    @Inject constructor(sessionHolder: SessionHolder, authEventBus: AuthEventBus, prefsSink: de.ledgerline.app.core.prefs.DisplayPrefsSink) : this(
         sessionHolder,
         authEventBus,
+        prefsSink,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
+
+    /** Mirror the server's display preferences into local settings (source of truth = server). */
+    private suspend fun adoptPrefs(dto: de.ledgerline.app.data.remote.dto.DisplayPrefsDto?) {
+        dto ?: return
+        prefsSink.setDisplayPrefs(
+            de.ledgerline.app.core.prefs.DisplayPrefs(
+                distance = dto.distance ?: "km",
+                elevation = dto.elevation ?: "m",
+                weight = dto.weight ?: "kg",
+                temp = dto.temp ?: "c",
+                glucose = dto.glucose ?: "mgdl",
+                timeFormat = dto.timeFormat ?: "24h",
+            ),
+        )
+    }
+
+    /** Push updated display preferences to the server, then persist locally (optimistic). */
+    suspend fun pushPreferences(prefs: de.ledgerline.app.core.prefs.DisplayPrefs): Boolean {
+        prefsSink.setDisplayPrefs(prefs)
+        val session = sessionHolder.get() ?: return false
+        return try {
+            apiProvider(session).putPreferences(
+                de.ledgerline.app.data.remote.dto.DisplayPrefsDto(
+                    distance = prefs.distance, elevation = prefs.elevation, weight = prefs.weight,
+                    temp = prefs.temp, glucose = prefs.glucose, timeFormat = prefs.timeFormat,
+                ),
+            ).isSuccessful
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     /**
      * Current account (name/email/groups). Null on no session, network error, or failure.
@@ -34,6 +67,7 @@ class AccountRepository(
             if (!res.isSuccessful) return null
             val body = res.body()
             if (body?.wipe == true) authEventBus.emitWipe()
+            adoptPrefs(body?.preferences)
             body?.user
         } catch (_: Exception) {
             null
@@ -55,6 +89,7 @@ class AccountRepository(
             if (!res.isSuccessful) return null
             val body = res.body() ?: return null
             if (body.wipe) authEventBus.emitWipe()
+            adoptPrefs(body.preferences)
             val u = body.usage
             AccountSnapshot(
                 name = body.user.name,

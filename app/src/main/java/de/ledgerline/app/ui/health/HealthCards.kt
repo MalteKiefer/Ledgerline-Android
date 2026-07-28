@@ -40,6 +40,7 @@ internal fun FastingCard(
     active: HealthFast?,
     history: List<HealthFast>,
     nowMs: Long,
+    is12h: Boolean,
     onStart: (Int) -> Unit,
     onStop: (HealthFast) -> Unit,
     onEditFast: (HealthFast) -> Unit,
@@ -101,7 +102,7 @@ internal fun FastingCard(
                             HealthFasting.formatDuration(p.elapsed) + " · " + HealthFasting.templateLabel(f.targetHours),
                             style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
                         )
-                        Text(formatEntryTime(f.start), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(formatEntryTime(f.start, is12h), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     if (p.reached) {
                         Box(Modifier.size(8.dp)) // reached marker handled by text below on small screens

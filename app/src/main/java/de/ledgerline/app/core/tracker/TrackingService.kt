@@ -50,7 +50,7 @@ class TrackingService : Service() {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
         )
         if (collectJob == null) {
-            serviceScope.launch { settings.unitSystem.collect { unit = it } }
+            serviceScope.launch { settings.displayPrefs.collect { unit = if (it.imperialDistance) UnitSystem.IMPERIAL else UnitSystem.METRIC } }
             collectJob = serviceScope.launch {
                 engine.ui.collect { ui ->
                     if (ui.state == RecordingState.IDLE) {

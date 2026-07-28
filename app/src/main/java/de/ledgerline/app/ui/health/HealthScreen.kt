@@ -87,6 +87,7 @@ fun HealthScreen(
     val range by vm.chartRange.collectAsStateWithLifecycle()
     val now by vm.now.collectAsStateWithLifecycle()
     val toast by vm.toast.collectAsStateWithLifecycle()
+    val is12h by vm.is12h.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var editorEntry by remember { mutableStateOf<HealthEntry?>(null) }
@@ -142,6 +143,7 @@ fun HealthScreen(
                     units = units,
                     range = range,
                     nowMs = now,
+                    is12h = is12h,
                     weightGoalKg = manifest.profile.weightGoalKg,
                     onRange = vm::setRange,
                     onEdit = { editorEntry = it; editorOpen = true },
@@ -151,6 +153,7 @@ fun HealthScreen(
                     active = HealthFasting.activeFast(manifest.fasts),
                     history = manifest.fasts.filter { !it.end.isNullOrEmpty() }.sortedByDescending { it.start },
                     nowMs = now,
+                    is12h = is12h,
                     onStart = vm::startFast,
                     onStop = { confirmStopFast = it },
                     onEditFast = { fastEditor = it },
@@ -192,9 +195,8 @@ fun HealthScreen(
     if (masterOpen) {
         MasterDataSheet(
             profile = manifest.profile,
-            units = units,
             onDismiss = { masterOpen = false },
-            onSave = { updated, newUnits -> vm.saveProfile { updated.copy(units = newUnits, raw = it.raw) }; masterOpen = false },
+            onSave = { updated -> vm.saveProfile { updated.copy(units = it.units, raw = it.raw) }; masterOpen = false },
         )
     }
 
@@ -285,6 +287,7 @@ private fun MetricDetailCard(
     units: de.ledgerline.app.domain.model.HealthUnits,
     range: String,
     nowMs: Long,
+    is12h: Boolean,
     weightGoalKg: Double?,
     onRange: (String) -> Unit,
     onEdit: (HealthEntry) -> Unit,
@@ -335,6 +338,7 @@ private fun MetricDetailCard(
                 entry = e,
                 display = HealthCompute.displayValue(key, e.v, e.v2, units),
                 unit = unit,
+                is12h = is12h,
                 onEdit = { onEdit(e) },
                 onDelete = { onDelete(e) },
             )
@@ -351,14 +355,14 @@ private fun StatCell(label: String, value: String?) {
 }
 
 @Composable
-private fun EntryRow(key: String, entry: HealthEntry, display: String, unit: String, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun EntryRow(key: String, entry: HealthEntry, display: String, unit: String, is12h: Boolean, onEdit: () -> Unit, onDelete: () -> Unit) {
     val status = HealthMetrics.classify(key, entry.v, entry.v2)
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(StatusColors[status]!!))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text("$display $unit", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-            val meta = formatEntryTime(entry.ts) + if (entry.note.isNotBlank()) " · ${entry.note}" else ""
+            val meta = formatEntryTime(entry.ts, is12h) + if (entry.note.isNotBlank()) " · ${entry.note}" else ""
             Text(meta, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
         IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, stringResource(R.string.health_edit), modifier = Modifier.size(18.dp)) }
@@ -424,9 +428,9 @@ private fun referenceBands(key: String, units: de.ledgerline.app.domain.model.He
     }
 }
 
-internal fun formatEntryTime(iso: String): String = try {
-    Instant.parse(iso).atZone(ZoneId.systemDefault())
-        .format(DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm"))
+internal fun formatEntryTime(iso: String, is12h: Boolean = false): String = try {
+    val pattern = if (is12h) "d MMM yyyy, h:mm a" else "d MMM yyyy, HH:mm"
+    Instant.parse(iso).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern(pattern))
 } catch (_: Exception) { iso }
 
 /** Share a metric's CSV via ACTION_SEND EXTRA_TEXT (no FileProvider needed, like the GPX export). */

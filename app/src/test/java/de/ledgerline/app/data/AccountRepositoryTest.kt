@@ -15,12 +15,16 @@ import retrofit2.Response
 /** `AccountRepository.snapshot()`: the combined (files+gallery) storage figures from `/me`. */
 class AccountRepositoryTest {
 
+    private val fakeSink = object : de.ledgerline.app.core.prefs.DisplayPrefsSink {
+        override suspend fun setDisplayPrefs(prefs: de.ledgerline.app.core.prefs.DisplayPrefs) {}
+    }
+
     private fun repo(body: MeResponse): AccountRepository {
         val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
         val api = object : NotImplementedApi() {
             override suspend fun me(): Response<MeResponse> = Response.success(body)
         }
-        return AccountRepository(sh, AuthEventBus(), apiProvider = { api })
+        return AccountRepository(sh, AuthEventBus(), fakeSink, apiProvider = { api })
     }
 
     @Test fun snapshot_sums_files_and_gallery_and_keeps_quota() = runBlocking {
@@ -44,5 +48,26 @@ class AccountRepositoryTest {
         val snap = repo(MeResponse(user = MeUser(name = "Ada"), usage = null)).snapshot()
         assertEquals(0L, snap!!.usedBytes)
         assertNull(snap.quotaBytes)
+    }
+
+    @Test fun me_adopts_server_display_preferences() = runBlocking {
+        var captured: de.ledgerline.app.core.prefs.DisplayPrefs? = null
+        val sink = object : de.ledgerline.app.core.prefs.DisplayPrefsSink {
+            override suspend fun setDisplayPrefs(prefs: de.ledgerline.app.core.prefs.DisplayPrefs) { captured = prefs }
+        }
+        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
+        val api = object : NotImplementedApi() {
+            override suspend fun me() = Response.success(
+                MeResponse(
+                    user = MeUser(name = "Ada"),
+                    preferences = de.ledgerline.app.data.remote.dto.DisplayPrefsDto(distance = "mi", temp = "f", timeFormat = "12h"),
+                ),
+            )
+        }
+        AccountRepository(sh, AuthEventBus(), sink, apiProvider = { api }).me()
+        assertEquals("mi", captured!!.distance)
+        assertEquals("f", captured!!.temp)
+        assertEquals("12h", captured!!.timeFormat)
+        assertEquals("kg", captured!!.weight) // unspecified → default
     }
 }

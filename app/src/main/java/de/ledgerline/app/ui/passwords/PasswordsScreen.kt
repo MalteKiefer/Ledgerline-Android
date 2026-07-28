@@ -4,7 +4,13 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.ZoomIn
+import androidx.compose.material3.AssistChip
+import androidx.compose.ui.text.withStyle
+import de.ledgerline.app.ui.theme.cardSurface
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -125,7 +131,7 @@ private fun typeTint(type: String): Color = when (type) {
  * async + cached in the ViewModel, so a missing/slow icon simply shows the type chip.
  */
 @Composable
-private fun SecretAvatar(item: SecretItem, vm: PasswordsViewModel) {
+private fun SecretAvatar(item: SecretItem, vm: PasswordsViewModel, size: androidx.compose.ui.unit.Dp = Brand.chipSize) {
     val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, item.id, item.icon) {
         value = vm.iconFor(item)
     }
@@ -136,12 +142,12 @@ private fun SecretAvatar(item: SecretItem, vm: PasswordsViewModel) {
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(Brand.chipSize)
+                .size(size)
                 .clip(androidx.compose.foundation.shape.RoundedCornerShape(Brand.chipRadius))
                 .background(Color.White),
         )
     } else {
-        IconChip(typeIcon(item.type), tint = typeTint(item.type))
+        IconChip(typeIcon(item.type), tint = typeTint(item.type), size = size)
     }
 }
 
@@ -351,20 +357,133 @@ private fun PwDetail(item: SecretItem, vm: PasswordsViewModel, onBack: () -> Uni
             Modifier.padding(pad).fillMaxSize()
                 .verticalScroll(androidx.compose.foundation.rememberScrollState())
                 .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            (SecretTypes.fields[item.type] ?: emptyList()).forEach { key ->
-                when (key) {
-                    "urls" -> SecretFields.urls(item).forEach { u -> FieldRow(fieldLabel("urls"), u, secret = false, context) }
-                    "totp" -> SecretFields.str(item, "totp").takeIf { it.isNotBlank() }?.let { TotpRow(it, context) }
-                    else -> SecretFields.str(item, key).takeIf { it.isNotBlank() }?.let { v -> FieldRow(fieldLabel(key), v, secret = SecretTypes.isSecretKey(key), context) }
+            PwHeaderCard(item, vm)
+            SecurityCard(item, vm, context)
+
+            // Scalar type fields (URLs + TOTP handled in their own cards) → one grouped card.
+            val scalar = (SecretTypes.fields[item.type] ?: emptyList())
+                .filter { it != "urls" && it != "totp" && SecretFields.str(item, it).isNotBlank() }
+            if (scalar.isNotEmpty()) {
+                DetailCard(de.ledgerline.app.R.string.pw_details) {
+                    scalar.forEachIndexed { i, key ->
+                        if (i > 0) RowDivider()
+                        ValueRow(fieldLabel(key), SecretFields.str(item, key), secret = SecretTypes.isSecretKey(key), context = context)
+                    }
                 }
             }
-            item.custom.forEach { c -> FieldRow(c.label.ifBlank { "Field" }, c.value, secret = c.kind == "secret", context) }
-            vm.tfaSetupUrl(item)?.let { url -> TfaOfferRow(url, context) }
-            if (SecretFields.str(item, "password").isNotBlank()) BreachRow(item, vm)
+
+            val urls = SecretFields.urls(item)
+            if (urls.isNotEmpty()) {
+                DetailCard(de.ledgerline.app.R.string.pw_website) {
+                    urls.forEachIndexed { i, u ->
+                        if (i > 0) RowDivider()
+                        ValueRow(fieldLabel("urls"), u, secret = false, isUrl = true, context = context)
+                    }
+                }
+            }
+
+            SecretFields.str(item, "totp").takeIf { it.isNotBlank() }?.let { TotpCard(it, context) }
+
+            if (item.custom.isNotEmpty()) {
+                DetailCard(de.ledgerline.app.R.string.pw_custom_fields) {
+                    item.custom.forEachIndexed { i, c ->
+                        if (i > 0) RowDivider()
+                        ValueRow(c.label.ifBlank { "Field" }, c.value, secret = c.kind == "secret", isUrl = c.kind == "url", multiline = c.kind == "multiline", context = context)
+                    }
+                }
+            }
+
+            if (item.tags.isNotEmpty()) TagsCard(item.tags)
             PasskeysSection(item, vm)
             if (item.versions.isNotEmpty()) VersionHistory(item, vm)
         }
+    }
+}
+
+/** Identity header: favicon/type avatar + title + type name + favourite marker, in a card. */
+@Composable
+private fun PwHeaderCard(item: SecretItem, vm: PasswordsViewModel) {
+    Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
+        SecretAvatar(item, vm, size = 48.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.title.ifBlank { typeLabel(item.type) },
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                maxLines = 2,
+            )
+            Text(typeLabel(item.type), style = androidx.compose.material3.MaterialTheme.typography.bodySmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (item.favorite) Icon(Icons.Outlined.Star, contentDescription = null, tint = Brand.tintOrange)
+    }
+}
+
+/** A titled grouped card holding [content] value rows separated by [RowDivider]s. */
+@Composable
+private fun DetailCard(headerRes: Int, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {
+        Text(
+            stringResource(headerRes),
+            style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+            color = Brand.accent,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 2.dp),
+        )
+        content()
+        Spacer(Modifier.height(6.dp))
+    }
+}
+
+/** A hairline divider between rows, indented to the value column. */
+@Composable
+private fun RowDivider() {
+    androidx.compose.material3.HorizontalDivider(
+        Modifier.padding(horizontal = 16.dp),
+        color = androidx.compose.material3.MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+    )
+}
+
+/**
+ * The 1Password-style security summary for a login/password: strength meter, breach check, and the
+ * "site offers 2FA" hint. Renders nothing when there's no password and no 2FA offer.
+ */
+@Composable
+private fun SecurityCard(item: SecretItem, vm: PasswordsViewModel, context: android.content.Context) {
+    val password = SecretFields.str(item, "password")
+    val tfaUrl = vm.tfaSetupUrl(item)
+    if (password.isBlank() && tfaUrl == null) return
+    Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(stringResource(de.ledgerline.app.R.string.pw_security), style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = Brand.accent)
+        if (password.isNotBlank()) {
+            StrengthBar(password)
+            BreachRow(item, vm)
+        }
+        tfaUrl?.let { TfaOfferRow(it, context) }
+    }
+}
+
+/** URLs and other tappable-link cards reuse [ValueRow] with isUrl=true. */
+@Composable
+private fun TagsCard(tags: List<String>) {
+    Column(Modifier.fillMaxWidth().cardSurface()) {
+        Text(stringResource(de.ledgerline.app.R.string.pw_tags), style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = Brand.accent, modifier = Modifier.padding(bottom = 8.dp))
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(androidx.compose.foundation.rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            tags.forEach { t -> AssistChip(onClick = {}, label = { Text(t) }) }
+        }
+    }
+}
+
+/** TOTP card: the live code, a countdown ring, and a copy button. */
+@Composable
+private fun TotpCard(secret: String, context: android.content.Context) {
+    Column(Modifier.fillMaxWidth().cardSurface()) {
+        Text(stringResource(de.ledgerline.app.R.string.pw_totp), style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = Brand.accent, modifier = Modifier.padding(bottom = 6.dp))
+        TotpRow(secret, context)
     }
 }
 
@@ -377,10 +496,11 @@ private fun PwDetail(item: SecretItem, vm: PasswordsViewModel, onBack: () -> Uni
 private fun PasskeysSection(item: SecretItem, vm: PasswordsViewModel) {
     val passkeys = remember(item) { de.ledgerline.app.core.passkey.PasskeyStore.embedded(item) }
     if (passkeys.isEmpty()) return
-    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+    Column(Modifier.fillMaxWidth().cardSurface()) {
         Text(
             stringResource(de.ledgerline.app.R.string.pw_passkeys),
-            style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+            style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+            color = Brand.accent,
         )
         passkeys.forEach { pk ->
             ListItem(
@@ -402,7 +522,7 @@ private fun PasskeysSection(item: SecretItem, vm: PasswordsViewModel) {
 private fun BreachRow(item: SecretItem, vm: PasswordsViewModel) {
     var state by remember(item.id) { mutableStateOf<Int?>(-1) } // -1 = not checked, null = failed/none
     var loading by remember(item.id) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
+    Column(Modifier.fillMaxWidth()) {
         when {
             state == -1 -> TextButton(onClick = {
                 loading = true; vm.checkBreach(item) { c -> state = c; loading = false }
@@ -439,8 +559,8 @@ private fun StrengthBar(pw: String) {
 /** Saved version history with restore. */
 @Composable
 private fun VersionHistory(item: SecretItem, vm: PasswordsViewModel) {
-    Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
-        Text(stringResource(de.ledgerline.app.R.string.pw_version_history), style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
+    Column(Modifier.fillMaxWidth().cardSurface()) {
+        Text(stringResource(de.ledgerline.app.R.string.pw_version_history), style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = Brand.accent)
         item.versions.take(20).forEach { ver ->
             ListItem(
                 headlineContent = { Text(ver.title.ifBlank { "—" }) },
@@ -460,7 +580,6 @@ private fun TfaOfferRow(setupUrl: String, context: android.content.Context) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 16.dp)
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(Brand.chipRadius))
             .background(Brand.tintTeal.copy(alpha = 0.14f))
             .padding(12.dp),
@@ -481,23 +600,107 @@ private fun TfaOfferRow(setupUrl: String, context: android.content.Context) {
     }
 }
 
+/**
+ * A labelled value row (1Password-style): a caption label above the value; secrets are masked with
+ * a reveal toggle + a "show large" button (opens a char-colour-coded full-screen reading view);
+ * URLs open in the browser; every row has a copy button. Copies route through [SecureClipboard]
+ * (sensitive + auto-clear for secrets).
+ */
 @Composable
-private fun FieldRow(label: String, value: String, secret: Boolean, context: android.content.Context) {
+private fun ValueRow(
+    label: String,
+    value: String,
+    secret: Boolean,
+    context: android.content.Context,
+    isUrl: Boolean = false,
+    multiline: Boolean = false,
+) {
     var revealed by remember { mutableStateOf(!secret) }
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(label, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+    var large by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(label, style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(2.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                if (revealed) value else "•".repeat(minOf(value.length, 12)),
-                modifier = Modifier.weight(1f), maxLines = if (revealed) Int.MAX_VALUE else 1,
-                style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                text = if (secret && !revealed) "•".repeat(minOf(maxOf(value.length, 8), 20)) else value,
+                modifier = Modifier.weight(1f),
+                maxLines = if (multiline || revealed) Int.MAX_VALUE else 1,
+                color = if (isUrl) Brand.accent else androidx.compose.material3.MaterialTheme.colorScheme.onSurface,
+                style = if (secret) androidx.compose.material3.MaterialTheme.typography.bodyLarge.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace) else androidx.compose.material3.MaterialTheme.typography.bodyLarge,
             )
-            if (secret) IconButton(onClick = { revealed = !revealed }) {
-                Icon(if (revealed) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, contentDescription = stringResource(de.ledgerline.app.R.string.cd_reveal))
+            if (isUrl) {
+                IconButton(onClick = {
+                    runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(value.ensureScheme()))) }
+                }) { Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null) }
+            }
+            if (secret) {
+                IconButton(onClick = { revealed = !revealed }) {
+                    Icon(if (revealed) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, contentDescription = stringResource(de.ledgerline.app.R.string.cd_reveal))
+                }
+                IconButton(onClick = { large = true }) {
+                    Icon(Icons.Outlined.ZoomIn, contentDescription = stringResource(de.ledgerline.app.R.string.cd_large_view))
+                }
             }
             IconButton(onClick = { if (secret) SecureClipboard.copySensitive(context, label, value) else SecureClipboard.copyPlain(context, label, value) }) {
                 Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(de.ledgerline.app.R.string.cd_copy))
             }
+        }
+    }
+    if (large) LargeSecretDialog(label, value, context) { large = false }
+}
+
+/** Prefix a bare host with https:// so it opens as a URL. */
+private fun String.ensureScheme(): String = if (contains("://")) this else "https://$this"
+
+/**
+ * Full-screen, easy-to-read rendering of a secret: large monospace with each character colour-coded
+ * (digits = accent, letters = normal, symbols = orange) so it's unambiguous to read aloud. Read-only.
+ */
+@Composable
+private fun LargeSecretDialog(label: String, value: String, context: android.content.Context, onDismiss: () -> Unit) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(Brand.cardRadius))
+                .background(androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(label, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = colorizeSecret(value),
+                style = androidx.compose.material3.MaterialTheme.typography.headlineMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(20.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextButton(onClick = onDismiss) { Text(stringResource(de.ledgerline.app.R.string.action_close)) }
+                androidx.compose.material3.FilledTonalButton(onClick = { SecureClipboard.copySensitive(context, label, value) }) {
+                    Icon(Icons.Outlined.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(de.ledgerline.app.R.string.cd_copy))
+                }
+            }
+        }
+    }
+}
+
+/** Colour each character of a secret: digits accent, symbols orange, letters default. */
+@Composable
+private fun colorizeSecret(value: String): androidx.compose.ui.text.AnnotatedString {
+    val accent = Brand.accent
+    val symbol = Brand.tintOrange
+    val letter = androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+    return androidx.compose.ui.text.buildAnnotatedString {
+        value.forEach { ch ->
+            val c = when {
+                ch.isDigit() -> accent
+                ch.isLetter() -> letter
+                else -> symbol
+            }
+            withStyle(androidx.compose.ui.text.SpanStyle(color = c)) { append(ch.toString()) }
         }
     }
 }
@@ -510,15 +713,26 @@ private fun TotpRow(secret: String, context: android.content.Context) {
     }
     val code = remember(tick, secret) { de.ledgerline.app.core.passwords.Totp.code(secret) }
     val remaining = de.ledgerline.app.core.passwords.Totp.secondsRemaining(tick)
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text(fieldLabel("totp"), style = androidx.compose.material3.MaterialTheme.typography.labelMedium, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            val display = code?.let { it.substring(0, 3) + " " + it.substring(3) } ?: "——— ———"
-            Text(display, modifier = Modifier.weight(1f), style = androidx.compose.material3.MaterialTheme.typography.headlineSmall, color = Brand.accent)
-            Text("${remaining}s", style = androidx.compose.material3.MaterialTheme.typography.labelLarge, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
-            IconButton(onClick = { code?.let { SecureClipboard.copySensitive(context, "TOTP", it) } }) {
-                Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(de.ledgerline.app.R.string.cd_copy_code))
-            }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        val display = code?.let { it.substring(0, 3) + " " + it.substring(3) } ?: "——— ———"
+        Text(
+            display,
+            modifier = Modifier.weight(1f),
+            style = androidx.compose.material3.MaterialTheme.typography.headlineSmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+            color = Brand.accent,
+        )
+        Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+            androidx.compose.material3.CircularProgressIndicator(
+                progress = { remaining / 30f },
+                modifier = Modifier.size(28.dp),
+                strokeWidth = 3.dp,
+                color = if (remaining <= 5) androidx.compose.material3.MaterialTheme.colorScheme.error else Brand.accent,
+                trackColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
+            )
+            Text("$remaining", style = androidx.compose.material3.MaterialTheme.typography.labelSmall, color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        IconButton(onClick = { code?.let { SecureClipboard.copySensitive(context, "TOTP", it) } }) {
+            Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(de.ledgerline.app.R.string.cd_copy_code))
         }
     }
 }

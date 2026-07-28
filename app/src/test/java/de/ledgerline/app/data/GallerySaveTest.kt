@@ -52,6 +52,7 @@ class GallerySaveTest {
     // All other methods throw NotImplementedError.
     private class FakeApi(val manifestJson: String) : LedgerlineApi {
         var puts = 0
+        var lastReconcile: List<String>? = null
 
         override suspend fun galleryReverse(lat: Double, lng: Double): Response<de.ledgerline.app.data.remote.dto.ReverseResponse> = throw NotImplementedError()
         override suspend fun mapsRoute(points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse> = throw NotImplementedError()
@@ -79,6 +80,7 @@ class GallerySaveTest {
         override suspend fun claimPair(b: PairClaimRequest): Response<PairClaimResponse> = throw NotImplementedError()
         override suspend fun pollPair(body: de.ledgerline.app.data.remote.dto.PairCollectRequest): Response<PairPollResponse> = throw NotImplementedError()
         override suspend fun me(): Response<de.ledgerline.app.data.remote.dto.MeResponse> = throw NotImplementedError()
+        override suspend fun putPreferences(body: de.ledgerline.app.data.remote.dto.DisplayPrefsDto): Response<Unit> = throw NotImplementedError()
     override suspend fun devices(): Response<de.ledgerline.app.data.remote.dto.DevicesResponse> = throw NotImplementedError()
         override suspend fun revokeDevice(token: String): Response<Unit> = throw NotImplementedError()
         override suspend fun wipeDevice(token: String): Response<Unit> = throw NotImplementedError()
@@ -93,6 +95,10 @@ class GallerySaveTest {
         override suspend fun moduleStore(module: String): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun filesReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
+        override suspend fun galleryReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> {
+            lastReconcile = body.blobs
+            return Response.success(de.ledgerline.app.data.remote.dto.ReconcileResponse(0, 0))
+        }
         override suspend fun filesStore(): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun filesStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun createFileShare(body: de.ledgerline.app.data.remote.dto.ShareCreateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse> = throw NotImplementedError()
@@ -161,5 +167,22 @@ class GallerySaveTest {
         assertEquals(setOf("existing", "new"), photoIds)
         assertEquals(2, fakeApi.puts)   // 409 then success
         assertEquals(6, result.value.version)
+    }
+
+    @Test fun load_reconciles_referenced_blobs() = runBlocking {
+        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val json = """{"v":1,"photos":[{"id":"p1","originalRef":"o1","thumbRef":"t1","metaRef":"m1"}],"albums":[],"people":[]}"""
+        val fakeApi = FakeApi(json)
+        val fakeUpload = object : de.ledgerline.app.domain.usecase.GalleryUploadApi {
+            override suspend fun uploadBytes(bytes: ByteArray, name: String) = Outcome.Ok(UploadedBlob("b", "k", bytes.size.toLong()))
+            override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream) = Outcome.Ok(UploadedBlob("b", "k", size))
+            override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
+        }
+        val repo = GalleryRepository(sh, vh, fakeCrypto, GalleryCache(), tmpStoreCache(), FakeOfflineFlags(), fakeUpload, de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
+
+        assertTrue(repo.load() is Outcome.Ok)
+        // The living-set POSTed to the server covers every referenced blob (so nothing live is freed).
+        assertEquals(setOf("o1", "t1", "m1"), fakeApi.lastReconcile?.toSet())
     }
 }

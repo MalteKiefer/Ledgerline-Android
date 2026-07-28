@@ -45,6 +45,7 @@ class MapsforgeController {
     internal var mapView: MapView? = null
     private var track: Polyline? = null
     private val markers = mutableListOf<Marker>()
+    private val arrowMarkers = mutableListOf<Marker>()
     private var clusterLayer: Layer? = null
     private var searchPin: Marker? = null
 
@@ -77,6 +78,7 @@ class MapsforgeController {
     fun setTrack(points: List<Pair<Double, Double>>) {
         val mv = mapView ?: return
         track?.let { mv.layerManager.layers.remove(it) }
+        arrowMarkers.forEach { mv.layerManager.layers.remove(it) }; arrowMarkers.clear()
         if (points.size < 2) { track = null; mv.invalidate(); return }
         val paint = AndroidGraphicFactory.INSTANCE.createPaint().apply {
             color = Brand.accent.toArgb()
@@ -145,6 +147,47 @@ class MapsforgeController {
         canvas.drawCircle(size / 2, size / 2, size / 2 - 4, ring)
         return bmp
     }
+
+    /**
+     * Draw non-interactive direction-of-travel arrows along the track (each rotated to its local
+     * bearing). Cleared with the track. [colorArgb] tints the arrowheads.
+     */
+    fun setDirectionArrows(arrows: List<de.ledgerline.app.core.explore.TrackArrows.Arrow>, colorArgb: Int) {
+        val mv = mapView ?: return
+        arrowMarkers.forEach { mv.layerManager.layers.remove(it) }; arrowMarkers.clear()
+        arrows.forEach { a ->
+            val bmp = arrowBitmap(a.bearingDeg.toFloat(), colorArgb) ?: return@forEach
+            val m = Marker(LatLong(a.lat, a.lng), bmp, 0, 0)
+            arrowMarkers.add(m)
+            mv.layerManager.layers.add(m)
+        }
+        mv.invalidate()
+    }
+
+    /** A small filled triangle pointing up, rotated [bearingDeg] clockwise, as a mapsforge bitmap. */
+    private fun arrowBitmap(bearingDeg: Float, colorArgb: Int): org.mapsforge.core.graphics.Bitmap? = runCatching {
+        val size = 30
+        val bmp = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(bmp)
+        c.save()
+        c.rotate(bearingDeg, size / 2f, size / 2f)
+        val halo = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(230, 255, 255, 255); style = android.graphics.Paint.Style.FILL
+        }
+        val fill = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = colorArgb; style = android.graphics.Paint.Style.FILL
+        }
+        fun triangle(inset: Float) = android.graphics.Path().apply {
+            moveTo(size / 2f, 6f - inset)
+            lineTo(size / 2f - (7f + inset), size / 2f + 5f + inset)
+            lineTo(size / 2f + (7f + inset), size / 2f + 5f + inset)
+            close()
+        }
+        c.drawPath(triangle(1.5f), halo)
+        c.drawPath(triangle(0f), fill)
+        c.restore()
+        org.mapsforge.map.android.graphics.AndroidBitmap(bmp)
+    }.getOrNull()
 
     /** Replace the set of point markers. */
     fun setMarkers(points: List<Pair<Double, Double>>, bitmap: org.mapsforge.core.graphics.Bitmap?) {

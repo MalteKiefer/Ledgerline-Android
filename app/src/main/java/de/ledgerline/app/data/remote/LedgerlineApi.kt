@@ -51,6 +51,10 @@ interface LedgerlineApi {
     @GET("api/v1/me")
     suspend fun me(): Response<MeResponse>
 
+    /** Update the global display preferences (units + clock). Partial patch accepted. */
+    @POST("api/v1/preferences")
+    suspend fun putPreferences(@Body body: de.ledgerline.app.data.remote.dto.DisplayPrefsDto): Response<Unit>
+
     // Password-manager enrichment (nothing stored server-side).
     @GET("api/v1/passwords/breach")
     @Streaming
@@ -124,6 +128,10 @@ interface LedgerlineApi {
     // Living-set reconcile: the server frees any files blob not in this list (24h grace).
     @POST("api/v1/files/blobs/reconcile")
     suspend fun filesReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
+
+    // Living-set reconcile for gallery blobs (reclaims orphaned photo/shard blobs, 24h grace).
+    @POST("api/v1/gallery/blobs/reconcile")
+    suspend fun galleryReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
 
     // Store v3 sharded files index (root pointer table + external shard/collection blobs).
     // --- Notes sharded store + blobs (web migrated notes off the monolith, §P0) ---

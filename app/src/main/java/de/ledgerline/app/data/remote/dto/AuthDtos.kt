@@ -1,5 +1,6 @@
 package de.ledgerline.app.data.remote.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable data class PairClaimRequest(val code: String, val device_name: String)
@@ -32,6 +33,18 @@ import kotlinx.serialization.Serializable
     val usage: MeUsage? = null,
     /** Remote kill switch: the owner flagged this device to wipe its local state. */
     val wipe: Boolean = false,
+    /** Global display preferences (units + clock), mirrored from the server (web `fd490ce3`). */
+    val preferences: DisplayPrefsDto? = null,
+)
+
+/** Global non-secret display preferences (units + 12/24h clock). Also the `POST /preferences` body. */
+@Serializable data class DisplayPrefsDto(
+    val distance: String? = null,
+    val elevation: String? = null,
+    val weight: String? = null,
+    val temp: String? = null,
+    val glucose: String? = null,
+    @SerialName("time_format") val timeFormat: String? = null,
 )
 
 @Serializable data class MeUser(

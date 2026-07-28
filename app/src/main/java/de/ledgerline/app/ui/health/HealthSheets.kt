@@ -126,17 +126,13 @@ internal fun MeasurementEditorSheet(
 @Composable
 internal fun MasterDataSheet(
     profile: HealthProfile,
-    units: HealthUnits,
     onDismiss: () -> Unit,
-    onSave: (HealthProfile, HealthUnits) -> Unit,
+    onSave: (HealthProfile) -> Unit,
 ) {
     var birthdate by remember { mutableStateOf(profile.birthdate) }
     var height by remember { mutableStateOf(profile.heightCm?.let { fmtNum(it) } ?: "") }
     var sex by remember { mutableStateOf(profile.sex) }
     var goal by remember { mutableStateOf(profile.weightGoalKg?.let { fmtNum(it) } ?: "") }
-    var uWeight by remember { mutableStateOf(units.weight) }
-    var uTemp by remember { mutableStateOf(units.temp) }
-    var uGlucose by remember { mutableStateOf(units.glucose) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -166,11 +162,6 @@ internal fun MasterDataSheet(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             )
 
-            Text(stringResource(R.string.health_units), style = MaterialTheme.typography.labelLarge)
-            UnitToggle(stringResource(R.string.health_unit_weight), listOf("kg" to "kg", "lb" to "lb"), uWeight) { uWeight = it }
-            UnitToggle(stringResource(R.string.health_unit_temp), listOf("c" to "°C", "f" to "°F"), uTemp) { uTemp = it }
-            UnitToggle(stringResource(R.string.health_unit_glucose), listOf("mgdl" to "mg/dL", "mmoll" to "mmol/L"), uGlucose) { uGlucose = it }
-
             PrimaryGradientButton(stringResource(R.string.action_save), onClick = {
                 onSave(
                     profile.copy(
@@ -179,7 +170,6 @@ internal fun MasterDataSheet(
                         sex = sex,
                         weightGoalKg = goal.trim().replace(',', '.').toDoubleOrNull(),
                     ),
-                    HealthUnits(weight = uWeight, glucose = uGlucose, temp = uTemp),
                 )
             })
             Spacer(Modifier.height(4.dp))
@@ -190,16 +180,6 @@ internal fun MasterDataSheet(
 @Composable
 private fun sexChip(labelRes: Int, value: String, current: String, onSelect: (String) -> Unit) {
     FilterChip(selected = current == value, onClick = { onSelect(value) }, label = { Text(stringResource(labelRes)) })
-}
-
-@Composable
-private fun UnitToggle(label: String, options: List<Pair<String, String>>, current: String, onSelect: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(96.dp))
-        options.forEach { (v, disp) ->
-            FilterChip(selected = current == v, onClick = { onSelect(v) }, label = { Text(disp) })
-        }
-    }
 }
 
 // ---- Fast editor -----------------------------------------------------------

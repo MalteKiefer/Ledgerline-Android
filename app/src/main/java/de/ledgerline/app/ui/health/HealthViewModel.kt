@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -36,15 +37,23 @@ import javax.inject.Inject
 class HealthViewModel @Inject constructor(
     private val repo: HealthRepository,
     cache: HealthCache,
+    private val settings: de.ledgerline.app.data.SettingsStore,
+    private val account: de.ledgerline.app.data.AccountRepository,
 ) : ViewModel() {
 
     val manifest: StateFlow<HealthManifest> =
         cache.value.map { it?.manifest ?: HealthManifest() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, HealthManifest())
 
+    /** Display units now come from the global display preferences (server-synced), not the profile. */
     val units: StateFlow<HealthUnits> =
-        cache.value.map { it?.manifest?.profile?.units ?: HealthUnits() }
+        settings.displayPrefs.map { it.healthUnits() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, HealthUnits())
+
+    /** 12/24h clock preference for time displays. */
+    val is12h: StateFlow<Boolean> =
+        settings.displayPrefs.map { it.is12h }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
@@ -83,6 +92,22 @@ class HealthViewModel @Inject constructor(
             _loading.value = true
             _error.value = repo.load() is Outcome.Err && manifest.value.entries.isEmpty()
             _loading.value = false
+            seedUnitPrefs()
+        }
+    }
+
+    /**
+     * One-time migration (web `_seedUnitPrefs`): if this vault's sealed `healthProfile.units` chose
+     * non-default units while the global display prefs are still all-default, adopt them so nothing
+     * silently switches when units moved from the health profile to the global appearance prefs.
+     */
+    private suspend fun seedUnitPrefs() {
+        val u = manifest.value.profile.units
+        val cur = settings.displayPrefs.first()
+        val globalDefault = cur.weight == "kg" && cur.temp == "c" && cur.glucose == "mgdl"
+        val hasCustom = u.weight == "lb" || u.temp == "f" || u.glucose == "mmoll"
+        if (globalDefault && hasCustom) {
+            account.pushPreferences(cur.copy(weight = u.weight, temp = u.temp, glucose = u.glucose))
         }
     }
 
@@ -138,8 +163,6 @@ class HealthViewModel @Inject constructor(
     fun saveProfile(update: (HealthProfile) -> HealthProfile) {
         viewModelScope.launch { repo.save { m -> m.copy(profile = update(m.profile)) } }
     }
-
-    fun setUnits(units: HealthUnits) = saveProfile { it.copy(units = units) }
 
     /** Derived age from birthdate (whole years), or null. */
     fun age(): Int? = HealthMetrics.computeAge(manifest.value.profile.birthdate, LocalDate.now())

@@ -113,6 +113,7 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun claimPair(body: PairClaimRequest): Response<PairClaimResponse> = throw NotImplementedError()
     override suspend fun pollPair(body: de.ledgerline.app.data.remote.dto.PairCollectRequest): Response<PairPollResponse> = throw NotImplementedError()
     override suspend fun me(): Response<de.ledgerline.app.data.remote.dto.MeResponse> = throw NotImplementedError()
+    override suspend fun putPreferences(body: de.ledgerline.app.data.remote.dto.DisplayPrefsDto): Response<Unit> = throw NotImplementedError()
     override suspend fun devices(): Response<de.ledgerline.app.data.remote.dto.DevicesResponse> = throw NotImplementedError()
     override suspend fun revokeDevice(token: String): Response<Unit> = throw NotImplementedError()
     override suspend fun wipeDevice(token: String): Response<Unit> = throw NotImplementedError()
@@ -141,6 +142,8 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun galleryUploadAbort(body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
     override suspend fun deleteBlob(blob: String): Response<Unit> = throw NotImplementedError()
     override suspend fun filesReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
+    // Default to a benign success so a gallery load's best-effort reconcile-on-load is a no-op in fakes.
+    override suspend fun galleryReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = Response.success(de.ledgerline.app.data.remote.dto.ReconcileResponse(0, 0))
     // Default to an empty sharded files store so WorkspaceRepository.load()'s files slice
     // resolves to an empty list in fakes that don't exercise files. Override where needed.
     override suspend fun filesStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))

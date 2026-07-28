@@ -151,7 +151,7 @@ fun SettingsContent(
     val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val dynamicColor by vm.dynamicColor.collectAsStateWithLifecycle()
-    val unitSystem by vm.unitSystem.collectAsStateWithLifecycle()
+    val displayPrefs by vm.displayPrefs.collectAsStateWithLifecycle()
     val coordinateFormat by vm.coordinateFormat.collectAsStateWithLifecycle()
     val devices by vm.devices.collectAsStateWithLifecycle()
     val backupEnabled by vm.backupEnabled.collectAsStateWithLifecycle()
@@ -236,8 +236,8 @@ fun SettingsContent(
                     onSelectTheme = vm::setThemeMode,
                     dynamicColor = dynamicColor,
                     onSetDynamicColor = vm::setDynamicColor,
-                    unitSystem = unitSystem,
-                    onSelectUnit = vm::setUnitSystem,
+                    prefs = displayPrefs,
+                    onSetPrefs = vm::setDisplayPrefs,
                     coordinateFormat = coordinateFormat,
                     onSelectCoord = vm::setCoordinateFormat,
                 )
@@ -573,8 +573,8 @@ private fun AppearanceSettings(
     onSelectTheme: (de.ledgerline.app.data.ThemeMode) -> Unit,
     dynamicColor: Boolean,
     onSetDynamicColor: (Boolean) -> Unit,
-    unitSystem: de.ledgerline.app.core.units.UnitSystem,
-    onSelectUnit: (de.ledgerline.app.core.units.UnitSystem) -> Unit,
+    prefs: de.ledgerline.app.core.prefs.DisplayPrefs,
+    onSetPrefs: (de.ledgerline.app.core.prefs.DisplayPrefs) -> Unit,
     coordinateFormat: de.ledgerline.app.core.geo.CoordinateFormat,
     onSelectCoord: (de.ledgerline.app.core.geo.CoordinateFormat) -> Unit,
 ) {
@@ -602,14 +602,14 @@ private fun AppearanceSettings(
         }
 
         SectionHeader(stringResource(R.string.settings_units))
-        Column(Modifier.selectableGroup()) {
-            RadioRow(stringResource(R.string.settings_units_metric), unitSystem == de.ledgerline.app.core.units.UnitSystem.METRIC) {
-                onSelectUnit(de.ledgerline.app.core.units.UnitSystem.METRIC)
-            }
-            RadioRow(stringResource(R.string.settings_units_imperial), unitSystem == de.ledgerline.app.core.units.UnitSystem.IMPERIAL) {
-                onSelectUnit(de.ledgerline.app.core.units.UnitSystem.IMPERIAL)
-            }
-        }
+        PrefChoiceRow(stringResource(R.string.settings_pref_distance), listOf("km" to "km", "mi" to "mi"), prefs.distance) { onSetPrefs(prefs.copy(distance = it)) }
+        PrefChoiceRow(stringResource(R.string.settings_pref_elevation), listOf("m" to "m", "ft" to "ft"), prefs.elevation) { onSetPrefs(prefs.copy(elevation = it)) }
+        PrefChoiceRow(stringResource(R.string.health_unit_weight), listOf("kg" to "kg", "lb" to "lb"), prefs.weight) { onSetPrefs(prefs.copy(weight = it)) }
+        PrefChoiceRow(stringResource(R.string.health_unit_temp), listOf("c" to "°C", "f" to "°F"), prefs.temp) { onSetPrefs(prefs.copy(temp = it)) }
+        PrefChoiceRow(stringResource(R.string.health_unit_glucose), listOf("mgdl" to "mg/dL", "mmoll" to "mmol/L"), prefs.glucose) { onSetPrefs(prefs.copy(glucose = it)) }
+
+        SectionHeader(stringResource(R.string.settings_clock))
+        PrefChoiceRow(stringResource(R.string.settings_clock), listOf("24h" to "24 h", "12h" to "12 h"), prefs.timeFormat) { onSetPrefs(prefs.copy(timeFormat = it)) }
 
         SectionHeader(stringResource(R.string.settings_coord_format))
         Column(Modifier.selectableGroup()) {
@@ -1232,6 +1232,25 @@ private fun RadioRow(label: String, selected: Boolean, enabled: Boolean = true, 
     ) {
         RadioButton(selected = selected, onClick = null, enabled = enabled)
         Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+/** A labelled row of segmented options (e.g. km/mi) for the display-preference toggles. */
+@Composable
+private fun PrefChoiceRow(label: String, options: List<Pair<String, String>>, current: String, onSelect: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        options.forEach { (value, disp) ->
+            androidx.compose.material3.FilterChip(
+                selected = current == value,
+                onClick = { onSelect(value) },
+                label = { Text(disp) },
+            )
+        }
     }
 }
 

@@ -598,6 +598,25 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   `usage.quota` (kombiniertes Files+Gallery-Limit, `null`=unbegrenzt). Der Home-Hub-Ring zeigt jetzt
   den **kontoweiten** Verbrauch (`AccountRepository.snapshot()` = ein `/me`-Call für Name + `used`
   (files+gallery) + `quota`) statt nur Files; unbegrenzt → „—". Test `AccountRepositoryTest`.
+- **Globale Anzeige-Präferenzen — ERLEDIGT (2026-07-28, web `fd490ce3`).** Einheiten (distance km/mi,
+  elevation m/ft, weight kg/lb, temp c/f, glucose mgdl/mmoll) + 12/24h-Uhr sind jetzt **globale,
+  server-synchronisierte** Prefs (`core/prefs/DisplayPrefs`, in `SettingsStore` persistiert; seed aus
+  altem `unit_system`). Sync: `GET /me.preferences` → `AccountRepository.adoptPrefs`, `POST
+  /api/v1/preferences` → `pushPreferences`. Angewandt: Explore (distance/speed/pace aus `distance`,
+  elevation aus `elevation` — `MeasureFormatter.elevation` nimmt jetzt `feet:Boolean`), Health
+  (Einheiten aus den globalen Prefs statt `healthProfile.units`; One-Time-Seed aus profile.units;
+  Toggles aus dem Health-Stammdaten-Sheet nach Settings→Darstellung verschoben) + 12/24h in den
+  Health-Zeiten. Settings→Darstellung: granulare Unit- + Clock-Toggles. Tests `DisplayPrefsTest`,
+  `AccountRepositoryTest` (adopt). **Offen:** 12/24h nur in Health angewandt (andere Screens =
+  System-Format).
+- **Galerie-Integrität — ERLEDIGT (2026-07-28, web `cdff0af7`+`4fff782b`).** (1) **Reconcile-on-load:**
+  `POST /gallery/blobs/reconcile` (neu in `LedgerlineApi`) meldet nach jedem Online-Load die live-set
+  aller referenzierten Blobs (per-Foto-Renditions + Face-Crops + Person-Crops + Shard-/Collection-Refs)
+  → Server gibt Orphans frei (24h-Grace); behebt das „~3,3 GB verwaiste Blobs nach alles-gelöscht"-Leck.
+  NUR im Online-Vollload-Pfad (nie offline/partiell — würde live Blobs freigeben). (2) **Self-Heal:**
+  ein permanent fehlender Shard (404) fror bisher Writes ein; jetzt re-sealt der Load den Root aus nur
+  den geladenen Records (toter Shard raus), löst die degraded-Freeze (`healDegraded`, best-effort).
+  Test `GallerySaveTest.load_reconciles_referenced_blobs`.
 - **Explore/Maps — ERLEDIGT (2026-07-27, on-device-Verifikation offen).** Neuer „Entdecken"-Tab
   (Drawer) mit **Karte** (passiver mapsforge-Viewer + Locate-Button), **Tracker** (GPS-Aufnahme
   hike/run/cycle) und **Tracks** (Liste + Detail mit Höhenprofil + GPX-Export). Datenschicht:
@@ -614,6 +633,13 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   (Rotation-Vector-Sensor rotiert die Karte, Kompass-Reset), **Tourenplanung** (Wegpunkte →
   `/maps/route` snappen → als `planned`-Track speichern), **GPX/KML-Import** (`TrackImport`,
   namespace-agnostisch, byte-nah zu Web `track-parse.js`; inline, ohne `explore/*`-Roh-Blob).
+  **Tour-Enrichment (2026-07-28, web-Parität):** **Kalorien** (`ExploreCalories`, byte-nah zu
+  `explore-calories.js` — MET-by-speed + Vertikalarbeit; Gewicht/Sex aus `HealthCache`; im
+  Track-Detail-Stat-Grid) + **Richtungspfeile** (`TrackArrows`, byte-nah zu web `_directionArrows`,
+  4..40 Pfeile distanzverteilt; gerenderte rotierte Dreieck-Marker via `MapsforgeController.
+  setDirectionArrows`). Tests `ExploreTourTest`. **Offen (Explore-Tour, mittel):** Foto↔Tour-**Kopplung**
+  (Picker + Auto-Match GPS/Zeit + Foto-Pins auf der Track-Karte — `couplings` überlebt schon per
+  Raw-Overlay, aber keine UI) und **Routen-Vergleich** (gleiche-Route-Touren, Track-Similarity).
   **Offen (klein):** `explore/*`-Roh-Blob für exakten Re-Export importierter Dateien, FIT/KMZ-
   Import, Hintergrund-Location-Rationale-Feinschliff.
 - **Health-Modul — ERLEDIGT (2026-07-27, on-device-Verifikation offen).** Voller ZK-Health-Client

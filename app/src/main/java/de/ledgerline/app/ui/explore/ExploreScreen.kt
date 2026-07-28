@@ -109,6 +109,8 @@ fun ExploreScreen(
             TrackDetailScreen(
                 track = track,
                 unit = unit,
+                elevationFeet = vm.elevationFeet.collectAsStateWithLifecycle().value,
+                calories = vm.caloriesFor(track),
                 onBack = { selectedTrackId = null },
                 onDelete = { vm.deleteTrack(id); selectedTrackId = null },
             )

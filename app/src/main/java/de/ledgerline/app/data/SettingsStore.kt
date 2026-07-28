@@ -21,7 +21,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
  * Non-sensitive UI preferences (plaintext DataStore). Never store secrets here —
  * only things like the idle-lock timeout in minutes.
  */
-class SettingsStore(private val context: Context) {
+class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs.DisplayPrefsSink {
     private val timeoutKey = intPreferencesKey("idle_timeout_minutes")
     private val backgroundRefreshSecondsKey = intPreferencesKey("background_refresh_seconds")
     private val bgOpsKey = booleanPreferencesKey("background_ops_enabled")
@@ -49,6 +49,13 @@ class SettingsStore(private val context: Context) {
     private val worldMapOfferedKey = booleanPreferencesKey("world_map_offered")
     private val terrainKey = booleanPreferencesKey("map_terrain_enabled")
     private val duressThresholdKey = intPreferencesKey("duress_threshold")
+    // Global display preferences (units + clock), server-synced via /me + POST /preferences.
+    private val prefDistanceKey = stringPreferencesKey("pref_distance")
+    private val prefElevationKey = stringPreferencesKey("pref_elevation")
+    private val prefWeightKey = stringPreferencesKey("pref_weight")
+    private val prefTempKey = stringPreferencesKey("pref_temp")
+    private val prefGlucoseKey = stringPreferencesKey("pref_glucose")
+    private val prefTimeFormatKey = stringPreferencesKey("pref_time_format")
 
     // Legacy 5a boolean keys, retained only so a stored value migrates into the new
     // enum policies when the new key is absent (§C1).
@@ -219,6 +226,35 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setUnitSystem(u: de.ledgerline.app.core.units.UnitSystem) {
         context.settingsDataStore.edit { it[unitSystemKey] = u.name }
+    }
+
+    /**
+     * Global display preferences (distance/elevation/weight/temp/glucose units + 12/24h clock).
+     * Server-synced. Distance/elevation seed from the legacy single `unit_system` toggle when the
+     * new keys are absent, so a user who chose imperial for Explore isn't silently reset.
+     */
+    val displayPrefs: Flow<de.ledgerline.app.core.prefs.DisplayPrefs> =
+        context.settingsDataStore.data.map { p ->
+            val legacyImperial = p[unitSystemKey] == de.ledgerline.app.core.units.UnitSystem.IMPERIAL.name
+            de.ledgerline.app.core.prefs.DisplayPrefs(
+                distance = p[prefDistanceKey] ?: if (legacyImperial) "mi" else "km",
+                elevation = p[prefElevationKey] ?: if (legacyImperial) "ft" else "m",
+                weight = p[prefWeightKey] ?: "kg",
+                temp = p[prefTempKey] ?: "c",
+                glucose = p[prefGlucoseKey] ?: "mgdl",
+                timeFormat = p[prefTimeFormatKey] ?: "24h",
+            )
+        }
+
+    override suspend fun setDisplayPrefs(prefs: de.ledgerline.app.core.prefs.DisplayPrefs) {
+        context.settingsDataStore.edit {
+            it[prefDistanceKey] = prefs.distance
+            it[prefElevationKey] = prefs.elevation
+            it[prefWeightKey] = prefs.weight
+            it[prefTempKey] = prefs.temp
+            it[prefGlucoseKey] = prefs.glucose
+            it[prefTimeFormatKey] = prefs.timeFormat
+        }
     }
 
     /** Coordinate display format for the map/track detail. Defaults to decimal degrees. */

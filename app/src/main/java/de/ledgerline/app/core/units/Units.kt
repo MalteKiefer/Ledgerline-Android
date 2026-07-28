@@ -23,11 +23,10 @@ object MeasureFormatter {
         UnitSystem.IMPERIAL -> String.format(Locale.US, "%.2f mi", meters / METERS_PER_MILE)
     }
 
-    /** e.g. "820 m" / "2690 ft". */
-    fun elevation(meters: Double, unit: UnitSystem): String = when (unit) {
-        UnitSystem.METRIC -> String.format(Locale.US, "%.0f m", meters)
-        UnitSystem.IMPERIAL -> String.format(Locale.US, "%.0f ft", meters * FEET_PER_METER)
-    }
+    /** e.g. "820 m" / "2690 ft". Elevation honours its own unit pref (may differ from distance). */
+    fun elevation(meters: Double, feet: Boolean): String =
+        if (feet) String.format(Locale.US, "%.0f ft", meters * FEET_PER_METER)
+        else String.format(Locale.US, "%.0f m", meters)
 
     /** e.g. "18.0 km/h" / "11.2 mph". */
     fun speed(mps: Double, unit: UnitSystem): String {

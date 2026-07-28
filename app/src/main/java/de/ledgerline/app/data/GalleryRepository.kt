@@ -141,7 +141,17 @@ class GalleryRepository(
                     if (offlineFlags.enabled()) {
                         storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
                     }
-                    Outcome.Ok(Gallery(manifest, body.version))
+                    var gallery = Gallery(manifest, body.version)
+                    // Self-heal a degraded index: a record shard was permanently missing (404), so its
+                    // records are gone for good — re-seal the root from only the loaded shards so it no
+                    // longer points at the dead blob (mirrors the web self-heal). Then reclaim orphaned
+                    // blobs (the gallery never ran a reconcile pass before). Both best-effort; a full
+                    // ONLINE load only reaches here after every recoverable record decrypted.
+                    if (degradedState.gallery.value) {
+                        healDegraded(session, vk, manifest, body.version)?.let { gallery = Gallery(manifest, it) }
+                    }
+                    reconcileLiveSet(session, manifest)
+                    Outcome.Ok(gallery)
                 }
             }
         } catch (e: Exception) { cachedOr(Outcome.Err(ErrorKind.NETWORK, e), session, vk) }
@@ -351,5 +361,53 @@ class GalleryRepository(
             }
         }
         Outcome.Err(ErrorKind.HTTP) // gave up after retries
+    }
+
+    /**
+     * Every blob id the manifest still references — per-photo renditions + face crops, person face
+     * crops, and the sealed root's shard + collection blobs. Sent to the server so it can free the
+     * quota held by any blob NOT in this set (grace-gated, 24 h). Album `cover` is a photo id, not a
+     * blob, so it is excluded. NEVER call with a partial/offline manifest — that would free live blobs.
+     */
+    private fun livingSet(m: GalleryManifest): List<String> {
+        val out = ArrayList<String>()
+        for (p in m.photos) {
+            listOfNotNull(p.originalRef, p.thumbRef, p.mediumRef, p.motionRef, p.metaRef).forEach(out::add)
+            out.addAll(p.faceCropRefs)
+        }
+        for (person in m.people) person.faces.forEach { f -> f.cropRef?.let(out::add) }
+        priorRoot.shards.forEach { out.add(it.ref) }
+        priorRoot.albums?.ref?.let(out::add)
+        priorRoot.people?.ref?.let(out::add)
+        return out.distinct()
+    }
+
+    /** Best-effort reconcile of the manifest's living blob set (reclaims orphaned gallery blobs). */
+    private suspend fun reconcileLiveSet(session: Session, manifest: GalleryManifest) {
+        val living = livingSet(manifest)
+        if (living.isEmpty()) return
+        try {
+            apiProvider(session).galleryReconcile(de.ledgerline.app.data.remote.dto.ReconcileRequest(living))
+        } catch (_: Exception) { /* best-effort — reclaimed on a later load */ }
+    }
+
+    /**
+     * Self-heal a degraded index: re-seal the root from the loaded (partial) records so it no longer
+     * references the permanently-missing shard, clearing the degraded freeze. Returns the new version
+     * on success, or null (leaves it degraded to retry next load). Best-effort — never throws.
+     */
+    private suspend fun healDegraded(session: Session, vk: ByteArray, manifest: GalleryManifest, version: Int): Int? {
+        return try {
+            val result = shardWriter.build(manifest.photos, manifest.albums, manifest.people, priorRoot) ?: return null
+            val rootCipher = crypto.sealManifest(CanonicalJson.encode(result.rootJson), vk)
+            val put = apiProvider(session).galleryStorePut(StorePutRequest(rootCipher, version, result.shardRefs))
+            if (!put.isSuccessful) return null
+            val nv = put.body()?.version ?: (version + 1)
+            priorRoot = result.state
+            degradedState.setGallery(false)
+            if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(rootCipher, nv))
+            cache.set(Gallery(manifest, nv))
+            nv
+        } catch (_: Exception) { null }
     }
 }

@@ -37,6 +37,9 @@ object AppModule {
     fun settingsStore(@ApplicationContext ctx: Context) = SettingsStore(ctx)
 
     @Provides
+    fun displayPrefsSink(settings: SettingsStore): de.ledgerline.app.core.prefs.DisplayPrefsSink = settings
+
+    @Provides
     @Singleton
     fun rememberedVaultStore(@ApplicationContext ctx: Context) = RememberedVaultStore(ctx)
 }

@@ -81,6 +81,12 @@
     <string name="pw_tags">Теги</string>
     <string name="pw_tag_add">Добавить тег</string>
     <string name="pw_custom_fields">Свои поля</string>
+    <string name="action_close">Закрыть</string>
+    <string name="pw_details">Данные</string>
+    <string name="pw_security">Безопасность</string>
+    <string name="pw_website">Веб-сайт</string>
+    <string name="pw_totp">Одноразовый код</string>
+    <string name="cd_large_view">Показать крупно</string>
     <string name="pw_custom_label">Название</string>
     <string name="pw_custom_value">Значение</string>
     <string name="pw_custom_add">Добавить поле</string>
@@ -634,6 +640,8 @@
     <string name="stat_pace">Темп</string>
     <string name="stat_speed">Скорость</string>
     <string name="stat_ascent">Подъём</string>
+    <string name="stat_calories">Калории</string>
+    <string name="stat_calories_value">%1$d ккал</string>
     <string name="track_export_gpx">Экспорт GPX</string>
     <string name="track_stat_total_time">Общее время</string>
     <string name="track_stat_moving_time">Время в движении</string>
@@ -643,6 +651,9 @@
     <string name="track_stat_avg">Среднее</string>
     <string name="track_stat_max_speed">Макс. скорость</string>
     <string name="settings_units">Единицы</string>
+    <string name="settings_pref_distance">Расстояние</string>
+    <string name="settings_pref_elevation">Высота</string>
+    <string name="settings_clock">Часы</string>
     <string name="settings_units_metric">Метрические (км, м)</string>
     <string name="settings_units_imperial">Имперские (mi, ft)</string>
     <string name="settings_coord_format">Формат координат</string>

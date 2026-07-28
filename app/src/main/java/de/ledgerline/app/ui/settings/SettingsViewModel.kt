@@ -146,10 +146,12 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     fun setDynamicColor(on: Boolean) { viewModelScope.launch { settingsStore.setDynamicColor(on) } }
 
-    /** Measurement units + coordinate format for the Explore/Karte/Tracker feature. */
-    val unitSystem: StateFlow<de.ledgerline.app.core.units.UnitSystem> = settingsStore.unitSystem
-        .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.core.units.UnitSystem.METRIC)
-    fun setUnitSystem(u: de.ledgerline.app.core.units.UnitSystem) { viewModelScope.launch { settingsStore.setUnitSystem(u) } }
+    /** Global display preferences (units + 12/24h clock). Server-synced via `pushPreferences`. */
+    val displayPrefs: StateFlow<de.ledgerline.app.core.prefs.DisplayPrefs> = settingsStore.displayPrefs
+        .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.core.prefs.DisplayPrefs())
+    fun setDisplayPrefs(prefs: de.ledgerline.app.core.prefs.DisplayPrefs) {
+        viewModelScope.launch { accountRepository.pushPreferences(prefs) }
+    }
 
     val coordinateFormat: StateFlow<de.ledgerline.app.core.geo.CoordinateFormat> = settingsStore.coordinateFormat
         .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.core.geo.CoordinateFormat.DD)

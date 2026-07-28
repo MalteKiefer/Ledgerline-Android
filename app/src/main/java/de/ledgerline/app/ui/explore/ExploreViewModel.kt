@@ -27,8 +27,27 @@ class ExploreViewModel @Inject constructor(
     private val mapStore: de.ledgerline.app.core.map.OfflineMapStore,
     private val demStore: de.ledgerline.app.core.map.DemStore,
     private val settings: de.ledgerline.app.data.SettingsStore,
+    private val healthCache: de.ledgerline.app.core.HealthCache,
     cache: ExploreCache,
 ) : ViewModel() {
+
+    /**
+     * Estimated calories for a track from the tour stats + the user's health data (latest weight +
+     * sex). Null when no weight is on file (mirrors the web, which only shows it when weight/sex/
+     * height are known). Reuses the already-decrypted [HealthCache] — no extra fetch.
+     */
+    fun caloriesFor(track: ExploreTrack): Long? {
+        val m = healthCache.value.value?.manifest ?: return null
+        val weightKg = m.entries.filter { it.metric == "weight" }.maxByOrNull { it.ts }?.v ?: return null
+        val s = track.stats ?: return null
+        return de.ledgerline.app.core.explore.ExploreCalories.estimate(
+            distanceM = s.distanceM,
+            durationS = s.durationMovingS.takeIf { it > 0 } ?: s.durationTotalS,
+            ascentM = s.ascentM,
+            weightKg = weightKg,
+            sex = m.profile.sex.ifBlank { null },
+        )
+    }
 
     /** Terrain relief (hillshading) enabled + a version that bumps as DEM tiles arrive. */
     val terrain: StateFlow<Boolean> = settings.terrainEnabled
@@ -40,9 +59,19 @@ class ExploreViewModel @Inject constructor(
     /** Live recording snapshot. */
     val ui: StateFlow<TrackerUi> = engine.ui
 
-    /** Chosen measurement units (metric/imperial). */
-    val unit: StateFlow<de.ledgerline.app.core.units.UnitSystem> = settings.unitSystem
+    /** Global display preferences (units + clock), server-synced. */
+    val prefs: StateFlow<de.ledgerline.app.core.prefs.DisplayPrefs> = settings.displayPrefs
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), de.ledgerline.app.core.prefs.DisplayPrefs())
+
+    /** Distance/speed/pace unit system, derived from the distance preference. */
+    val unit: StateFlow<de.ledgerline.app.core.units.UnitSystem> = settings.displayPrefs
+        .map { if (it.imperialDistance) de.ledgerline.app.core.units.UnitSystem.IMPERIAL else de.ledgerline.app.core.units.UnitSystem.METRIC }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), de.ledgerline.app.core.units.UnitSystem.METRIC)
+
+    /** Whether elevation renders in feet (its own preference, may differ from distance). */
+    val elevationFeet: StateFlow<Boolean> = settings.displayPrefs
+        .map { it.feetElevation }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     /** Installed offline `.map` files for the renderer. */
     fun offlineMaps(): List<java.io.File> { mapStore.refreshInstalled(); return mapStore.installedFiles() }
