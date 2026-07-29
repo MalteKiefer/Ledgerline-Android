@@ -122,7 +122,8 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                         defaultVatRate = vatRate.replace(',', '.').trim().toDoubleOrNull() ?: 19.0,
                         paymentTermsDays = terms.trim().toIntOrNull() ?: 14,
                         paymentTermsText = termsText.trim(), paymentMethods = methods.trim(),
-                        numberFormat = numberFormat.trim().ifBlank { "YYYY-NNNN" }, nextNumber = nextNumber.trim().toIntOrNull() ?: 1,
+                        // Server bounds (openapi): invoice_next_number ∈ [1, 100_000_000].
+                        numberFormat = numberFormat.trim().ifBlank { "YYYY-NNNN" }, nextNumber = (nextNumber.trim().toIntOrNull() ?: 1).coerceIn(1, 100_000_000),
                         footerText = footer.trim(),
                     ),
                 ) { ok -> if (ok) onBack() }
