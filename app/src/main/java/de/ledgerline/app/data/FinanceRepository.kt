@@ -651,6 +651,12 @@ class FinanceRepository(
         }.getOrNull() ?: cache.company.value
     }
 
+    /** Fetch a bank/site favicon data-URI via the shared SSRF-guarded `/passwords/icon` proxy. */
+    suspend fun fetchIcon(domain: String): String? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        runCatching { apiProvider(session).passwordsIcon(domain).body()?.icon }.getOrNull()
+    }
+
     /** Fetch the stored company-logo image bytes (non-secret, streamed from `GET /company/logo`). */
     suspend fun companyLogo(): ByteArray? = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext null

@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -132,7 +133,7 @@ private fun PaymentRow(pm: PaymentMethod, vm: FinanceViewModel, onClick: () -> U
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconChip(icon = typeIcon(pm.type), tint = typeTint(pm.type))
+        BankAvatar(pm, vm)
         Spacer(Modifier.size(12.dp))
         Column(Modifier.weight(1f)) {
             Text(pm.label.ifBlank { typeLabel(pm.type) }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1)
@@ -151,6 +152,23 @@ private fun PaymentRow(pm: PaymentMethod, vm: FinanceViewModel, onClick: () -> U
 }
 
 private fun PaymentMethod.currencyOrNull(): String? = null   // accounts have no own currency; use company default
+
+/** The bank/site logo (via /passwords/icon) when the account has a website, else the tinted glyph. */
+@Composable
+private fun BankAvatar(pm: PaymentMethod, vm: FinanceViewModel) {
+    val icon by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, pm.id, pm.url) {
+        value = if (pm.url.isBlank()) null else vm.bankIconFor(pm)
+    }
+    val bmp = icon
+    if (bmp != null) {
+        androidx.compose.foundation.Image(
+            bitmap = bmp, contentDescription = null,
+            modifier = Modifier.size(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
+        )
+    } else {
+        IconChip(icon = typeIcon(pm.type), tint = typeTint(pm.type))
+    }
+}
 
 @Composable
 private fun PaymentMethodEditScreen(initial: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit) {
@@ -224,6 +242,7 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
                         Field(pm.bic, { pm = pm.copy(bic = it) }, R.string.finance_company_bic)
                         Field(pm.bankName, { pm = pm.copy(bankName = it) }, R.string.finance_company_bank)
                         Field(pm.accountNumber, { pm = pm.copy(accountNumber = it) }, R.string.finance_pm_account_no)
+                        Field(pm.url, { pm = pm.copy(url = it) }, R.string.finance_pm_url)
                     }
                     "card" -> {
                         Field(pm.cardNumber, { pm = pm.copy(cardNumber = it, cardNetwork = PaymentMethods.cardNetworkOf(it)) }, R.string.finance_pm_card_no, number = true)

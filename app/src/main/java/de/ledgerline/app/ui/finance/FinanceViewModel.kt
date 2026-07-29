@@ -244,6 +244,20 @@ class FinanceViewModel @Inject constructor(
     fun trashPaymentMethod(pm: de.ledgerline.app.domain.model.PaymentMethod, onDone: (Boolean) -> Unit = {}) =
         savePaymentMethod(pm.copy(trashed = true), onDone)
 
+    private val bankIconCache = java.util.concurrent.ConcurrentHashMap<String, androidx.compose.ui.graphics.ImageBitmap>()
+    private val bankIconTried = java.util.Collections.synchronizedSet(HashSet<String>())
+
+    /** The bank/site logo for a payment method's website [pm.url], or null → fall back to the glyph. */
+    suspend fun bankIconFor(pm: de.ledgerline.app.domain.model.PaymentMethod): androidx.compose.ui.graphics.ImageBitmap? =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val host = de.ledgerline.app.core.autofill.DomainMatch.normalizeHost(pm.url) ?: return@withContext null
+            bankIconCache[host]?.let { return@withContext it }
+            if (!bankIconTried.add(host)) return@withContext null
+            val bmp = repo.fetchIcon(host)?.let { de.ledgerline.app.core.passwords.Favicons.decode(it) }
+            if (bmp != null) bankIconCache[host] = bmp
+            bmp
+        }
+
     // ---- transactions (manual edit + statement import) ----
     fun newTransaction(account: String) = de.ledgerline.app.domain.model.Transaction(
         id = de.ledgerline.app.core.Ids.newId(), account = account, date = java.time.LocalDate.now().toString(),
