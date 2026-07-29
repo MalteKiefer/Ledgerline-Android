@@ -179,6 +179,7 @@ data class Receipt(
     val mime: String = "application/octet-stream",
     val total: Double? = null,
     val projectId: String? = null,
+    val partnerId: String? = null,
     val category: String = "",
     val sig: String? = null,
     val blob: String? = null,

@@ -284,12 +284,18 @@ class FinanceViewModel @Inject constructor(
             var r = de.ledgerline.app.domain.model.Receipt(
                 id = de.ledgerline.app.core.Ids.newId(), name = name, mime = mime, sig = sig, blob = up.first, key = up.second,
             )
-            // Best-effort server-side OCR → pre-fill total/category/name/currency (manual if unavailable).
+            // Best-effort server-side OCR → pre-fill fields + auto-name + partner link + learned category.
             repo.ocrDocument(bytes, name, mime)?.let { text ->
                 val a = de.ledgerline.app.core.finance.ReceiptOcr.analyze(text)
-                val niceName = a.merchant.ifBlank { null }?.let { m -> if (a.number.isNotBlank()) "$m ${a.number}" else m } ?: name
+                val merchant = a.merchant.ifBlank { tx.counterparty }
+                val plist = partners.value
+                val learned = de.ledgerline.app.core.finance.ReceiptEnrich.learnedCategoryFor(plist, merchant)
+                val ext = name.substringAfterLast('.', "")
                 r = r.copy(
-                    name = niceName, total = a.total, category = a.category,
+                    name = de.ledgerline.app.core.finance.ReceiptEnrich.buildReceiptName(a.date, merchant, a.number, ext),
+                    total = a.total,
+                    category = learned.ifBlank { a.category },
+                    partnerId = de.ledgerline.app.core.finance.ReceiptEnrich.matchPartner(plist, merchant)?.id,
                 )
             }
             saveTransaction(tx.withReceipts(current + r)) { ok -> onDone(if (ok) true else false) }

@@ -278,6 +278,7 @@ object FinanceRecordCodec {
             mime = o.str("mime") ?: "application/octet-stream",
             total = o["total"]?.jsonPrimitive?.doubleOrNull,
             projectId = o.str("projectId"),
+            partnerId = o.str("partnerId"),
             category = o.str("category") ?: "",
             sig = o.str("sig"),
             blob = o.str("blob") ?: o.str("ref"),
@@ -294,6 +295,7 @@ object FinanceRecordCodec {
         out["mime"] = JsonPrimitive(r.mime)
         setOrNull(out, "total", r.total?.let { numToken(it) })
         setOrNull(out, "projectId", r.projectId?.let { JsonPrimitive(it) })
+        setOrNull(out, "partnerId", r.partnerId?.let { JsonPrimitive(it) })
         if (r.category.isNotEmpty() || r.raw.containsKey("category")) out["category"] = JsonPrimitive(r.category)
         setOrNull(out, "sig", r.sig?.let { JsonPrimitive(it) })
         setOrNull(out, "blob", r.blob?.let { JsonPrimitive(it) })
