@@ -195,7 +195,7 @@
     <string name="file_unfavorite">Kein Favorit</string>
     <string name="file_move">In Ordner verschieben</string>
     <string name="file_move_root">Dateien (Stamm)</string>
-    <string name="file_versions">Versionen (%1)</string>
+    <string name="file_versions">Versionen (%1$d)</string>
     <string name="file_versions_title">Versionsverlauf</string>
     <string name="file_version_restore">Wiederherstellen</string>
     <string name="file_sort">Sortieren</string>
@@ -822,7 +822,7 @@
     <string name="finance_stats_output_vat">Umsatzsteuer (Einnahmen)</string>
     <string name="finance_stats_input_vat">Vorsteuer (Ausgaben)</string>
     <string name="finance_stats_vat_payable">Zahllast</string>
-    <string name="finance_stats_vat_undecided">%1 Buchungen ohne USt-Kategorie</string>
+    <string name="finance_stats_vat_undecided">%1$d Buchungen ohne USt-Kategorie</string>
     <string name="finance_pm_title">Zahlungsmethoden</string>
     <string name="finance_pm_add">Zahlungsmethode hinzufügen</string>
     <string name="finance_pm_edit">Zahlungsmethode bearbeiten</string>
@@ -856,7 +856,7 @@
     <string name="finance_import_map_title">Spalten zuordnen</string>
     <string name="finance_import_map_hint">Wähle, welche CSV-Spalte zu welchem Feld gehört. Datum und Betrag sind Pflicht.</string>
     <string name="finance_import_apply">Importieren</string>
-    <string name="finance_import_added_matched">%1 Buchungen importiert, %2 Rechnungen zugeordnet</string>
+    <string name="finance_import_added_matched">%1$d Buchungen importiert, %2$d Rechnungen zugeordnet</string>
     <string name="finance_import_added">%1$d Buchungen importiert</string>
     <string name="finance_import_none">Keine neuen Buchungen (alles Duplikate)</string>
     <string name="finance_import_unreadable">Auszug konnte nicht gelesen werden</string>

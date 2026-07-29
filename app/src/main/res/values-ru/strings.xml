@@ -211,7 +211,7 @@
     <string name="file_unfavorite">Убрать из избранного</string>
     <string name="file_move">Переместить в папку</string>
     <string name="file_move_root">Файлы (корень)</string>
-    <string name="file_versions">Версии (%1)</string>
+    <string name="file_versions">Версии (%1$d)</string>
     <string name="file_versions_title">История версий</string>
     <string name="file_version_restore">Восстановить</string>
     <string name="file_sort">Сортировка</string>
@@ -825,7 +825,7 @@
     <string name="finance_stats_output_vat">НДС с доходов</string>
     <string name="finance_stats_input_vat">Входящий НДС (расходы)</string>
     <string name="finance_stats_vat_payable">К уплате</string>
-    <string name="finance_stats_vat_undecided">проводок без категории НДС: %1</string>
+    <string name="finance_stats_vat_undecided">проводок без категории НДС: %1$d</string>
     <string name="finance_pm_title">Способы оплаты</string>
     <string name="finance_pm_add">Добавить способ оплаты</string>
     <string name="finance_pm_edit">Изменить способ оплаты</string>
@@ -859,7 +859,7 @@
     <string name="finance_import_map_title">Сопоставить столбцы</string>
     <string name="finance_import_map_hint">Выберите, какой столбец CSV соответствует каждому полю. Дата и сумма обязательны.</string>
     <string name="finance_import_apply">Импортировать</string>
-    <string name="finance_import_added_matched">Импортировано проводок: %1, сопоставлено со счетами: %2</string>
+    <string name="finance_import_added_matched">Импортировано проводок: %1$d, сопоставлено со счетами: %2$d</string>
     <string name="finance_import_added">Импортировано проводок: %1$d</string>
     <string name="finance_import_none">Нет новых проводок (все дубликаты)</string>
     <string name="finance_import_unreadable">Не удалось прочитать выписку</string>
