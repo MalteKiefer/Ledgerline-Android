@@ -397,4 +397,21 @@ interface LedgerlineApi {
         @Path("ref") ref: String,
         @Query("grant") grant: String?,
     ): Response<ResponseBody>
+
+    // --- Cross-user shared vaults (read/accept side; PQ-hybrid VK unwrap is client-side) ---
+
+    @GET("api/v1/vaults")
+    suspend fun vaults(@Query("kind") kind: String? = null):
+        Response<List<de.ledgerline.app.data.remote.dto.VaultMembershipDto>>
+
+    @POST("api/v1/vaults/{vault}/members/{member}/accept")
+    suspend fun acceptVaultMember(@Path("vault") vault: String, @Path("member") member: String): Response<Unit>
+
+    @GET("api/v1/vaults/{vault}/store")
+    suspend fun vaultStore(@Path("vault") vault: String):
+        Response<de.ledgerline.app.data.remote.dto.SharedVaultStoreResponse>
+
+    @GET("api/v1/vaults/{vault}/blobs/raw/{blob}")
+    @Streaming
+    suspend fun vaultBlobRaw(@Path("vault") vault: String, @Path("blob") blob: String): Response<ResponseBody>
 }

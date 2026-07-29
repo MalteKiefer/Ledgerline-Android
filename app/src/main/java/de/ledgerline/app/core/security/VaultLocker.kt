@@ -21,6 +21,7 @@ class VaultLocker @Inject constructor(
     private val thumbCache: ThumbCache,
     private val metaCache: MetaCache,
     private val identityRepository: de.ledgerline.app.data.IdentityRepository,
+    private val sharedVaultRepository: de.ledgerline.app.data.SharedVaultRepository,
     private val passwordsCache: de.ledgerline.app.core.PasswordsCache,
     private val exploreCache: de.ledgerline.app.core.ExploreCache,
     private val healthCache: de.ledgerline.app.core.HealthCache,
@@ -35,6 +36,7 @@ class VaultLocker @Inject constructor(
         vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
         galleryCache.clear(); thumbCache.clear(); metaCache.clear()
         identityRepository.clear()
+        sharedVaultRepository.clear()
         passwordsCache.clear()
         exploreCache.clear()
         healthCache.clear()

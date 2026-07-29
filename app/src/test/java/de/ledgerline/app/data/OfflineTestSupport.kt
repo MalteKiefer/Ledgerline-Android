@@ -174,6 +174,11 @@ open class NotImplementedApi : LedgerlineApi {
         override suspend fun shareUnlock(token: String, body: de.ledgerline.app.data.remote.dto.ShareUnlockRequest): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareUnlockResponse> = throw NotImplementedError()
         override suspend fun shareManifest(token: String, grant: String?): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareManifestResponse> = throw NotImplementedError()
         override suspend fun shareBlob(token: String, ref: String, grant: String?): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
+
+        override suspend fun vaults(kind: String?): retrofit2.Response<List<de.ledgerline.app.data.remote.dto.VaultMembershipDto>> = throw NotImplementedError()
+        override suspend fun acceptVaultMember(vault: String, member: String): retrofit2.Response<Unit> = throw NotImplementedError()
+        override suspend fun vaultStore(vault: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.SharedVaultStoreResponse> = throw NotImplementedError()
+        override suspend fun vaultBlobRaw(vault: String, blob: String): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
     override suspend fun galleryStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun deleteGalleryBlob(blob: String): Response<Unit> = throw NotImplementedError()
     override suspend fun embedText(body: de.ledgerline.app.data.remote.dto.EmbedTextRequest): Response<de.ledgerline.app.data.remote.dto.EmbedTextResponse> = throw NotImplementedError()

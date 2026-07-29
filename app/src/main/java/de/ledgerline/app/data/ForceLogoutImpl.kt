@@ -39,6 +39,7 @@ class ForceLogoutImpl @Inject constructor(
     private val duressGuard: de.ledgerline.app.core.security.DuressGuard,
     private val clockGuard: de.ledgerline.app.core.security.ClockRollbackGuard,
     private val identityRepository: IdentityRepository,
+    private val sharedVaultRepository: SharedVaultRepository,
     private val passwordsCache: de.ledgerline.app.core.PasswordsCache,
     private val exploreCache: de.ledgerline.app.core.ExploreCache,
     private val healthCache: de.ledgerline.app.core.HealthCache,
@@ -50,6 +51,7 @@ class ForceLogoutImpl @Inject constructor(
         vaultKeyHolder.wipe()
         sessionHolder.clear()
         identityRepository.clear()
+        sharedVaultRepository.clear()
         passwordsCache.clear()
         exploreCache.clear()
         healthCache.clear()

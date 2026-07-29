@@ -67,6 +67,11 @@ class GallerySaveTest {
         override suspend fun shareUnlock(token: String, body: de.ledgerline.app.data.remote.dto.ShareUnlockRequest): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareUnlockResponse> = throw NotImplementedError()
         override suspend fun shareManifest(token: String, grant: String?): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareManifestResponse> = throw NotImplementedError()
         override suspend fun shareBlob(token: String, ref: String, grant: String?): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
+
+        override suspend fun vaults(kind: String?): retrofit2.Response<List<de.ledgerline.app.data.remote.dto.VaultMembershipDto>> = throw NotImplementedError()
+        override suspend fun acceptVaultMember(vault: String, member: String): retrofit2.Response<Unit> = throw NotImplementedError()
+        override suspend fun vaultStore(vault: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.SharedVaultStoreResponse> = throw NotImplementedError()
+        override suspend fun vaultBlobRaw(vault: String, blob: String): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
         override suspend fun mapsRoute(points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse> = throw NotImplementedError()
         override suspend fun notesStore(): Response<de.ledgerline.app.data.remote.dto.StoreResponse> = throw NotImplementedError()
         override suspend fun notesStorePut(body: de.ledgerline.app.data.remote.dto.StorePutRequest): Response<de.ledgerline.app.data.remote.dto.StoreResponse> = throw NotImplementedError()

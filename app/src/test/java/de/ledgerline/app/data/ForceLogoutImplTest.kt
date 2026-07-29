@@ -84,6 +84,7 @@ class ForceLogoutImplTest {
             duressGuard = io.mockk.mockk(relaxed = true),
             clockGuard = io.mockk.mockk(relaxed = true),
             identityRepository = io.mockk.mockk(relaxed = true),
+            sharedVaultRepository = io.mockk.mockk(relaxed = true),
             passwordsCache = de.ledgerline.app.core.PasswordsCache(),
             exploreCache = de.ledgerline.app.core.ExploreCache(),
             healthCache = de.ledgerline.app.core.HealthCache(),

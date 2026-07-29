@@ -38,6 +38,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Language
@@ -104,7 +105,7 @@ import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
 /** Internal Settings destinations — a categorized landing (ROOT) plus one sub-screen per category. */
-private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, MAPS, OFFLINE_MAPS, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, NOTIFICATIONS, SHARED_LINK, ABOUT, LICENSES }
+private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, MAPS, OFFLINE_MAPS, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, NOTIFICATIONS, SHARED_LINK, SHARED_VAULTS, ABOUT, LICENSES }
 
 /**
  * Settings screen — a categorized landing list plus per-category sub-screens, in the
@@ -215,6 +216,7 @@ fun SettingsContent(
         SettingsRoute.ACCOUNT -> stringResource(R.string.settings_cat_account)
         SettingsRoute.NOTIFICATIONS -> stringResource(R.string.settings_cat_notifications)
         SettingsRoute.SHARED_LINK -> stringResource(R.string.share_open_title)
+        SettingsRoute.SHARED_VAULTS -> stringResource(R.string.vaults_title)
         SettingsRoute.ABOUT -> stringResource(R.string.settings_cat_about)
         SettingsRoute.LICENSES -> stringResource(R.string.settings_licenses)
     }
@@ -357,6 +359,7 @@ fun SettingsContent(
 
                 SettingsRoute.NOTIFICATIONS -> NotificationsSettings(innerPadding)
                 SettingsRoute.SHARED_LINK -> de.ledgerline.app.ui.share.SharedLinkContent(innerPadding)
+                SettingsRoute.SHARED_VAULTS -> de.ledgerline.app.ui.share.SharedVaultsContent(innerPadding)
                 SettingsRoute.ABOUT -> AboutSettings(innerPadding, onOpenLicenses = { route = SettingsRoute.LICENSES })
                 SettingsRoute.LICENSES -> LicensesScreen(innerPadding)
             }
@@ -483,6 +486,11 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             title = stringResource(R.string.share_open_title),
             subtitle = stringResource(R.string.share_open_hint),
         ) { onNavigate(SettingsRoute.SHARED_LINK) }
+        CategoryRow(
+            icon = Icons.Outlined.Share,
+            title = stringResource(R.string.vaults_title),
+            subtitle = stringResource(R.string.settings_cat_vaults_sub),
+        ) { onNavigate(SettingsRoute.SHARED_VAULTS) }
         CategoryRow(
             icon = Icons.Outlined.Info,
             title = stringResource(R.string.settings_cat_about),
