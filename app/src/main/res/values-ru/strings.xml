@@ -286,6 +286,9 @@
     <string name="settings_lock_note">Ваше хранилище остаётся заблокированным паролем. Биометрия может разблокировать сохранённую сессию, где это включено; ключ шифрования никогда не покидает это устройство.</string>
     <string name="settings_language">Язык</string>
     <string name="settings_language_system">Системный по умолчанию</string>
+    <string name="settings_search">Поиск в настройках</string>
+    <string name="settings_group_sharing">Общий доступ</string>
+    <string name="settings_group_help">Помощь</string>
     <string name="settings_language_de">Deutsch</string>
     <string name="settings_language_en">English</string>
     <string name="settings_contact_sort">Сортировка контактов</string>

@@ -1,5 +1,15 @@
 package de.ledgerline.app.ui.settings
 
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Contrast
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.em
+import de.ledgerline.app.ui.theme.IconChip
 import android.Manifest
 import android.app.LocaleManager
 import android.content.Context
@@ -238,7 +248,7 @@ fun SettingsContent(
     ) { innerPadding ->
         Box(Modifier.fillMaxSize()) {
             when (route) {
-                SettingsRoute.ROOT -> SettingsRoot(innerPadding) { route = it }
+                SettingsRoute.ROOT -> SettingsRoot(innerPadding, vm) { route = it }
 
                 SettingsRoute.APPEARANCE -> AppearanceSettings(
                     padding = innerPadding,
@@ -422,88 +432,225 @@ fun SettingsContent(
 /* ----------------------------- Landing list ----------------------------- */
 
 @Composable
-private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> Unit) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(padding)
-            .verticalScroll(rememberScrollState()),
+private fun SettingsRoot(padding: PaddingValues, vm: SettingsViewModel, onNavigate: (SettingsRoute) -> Unit) {
+    val context = LocalContext.current
+    val account by vm.account.collectAsStateWithLifecycle()
+    val avatar by vm.avatar.collectAsStateWithLifecycle()
+    val storage by vm.storage.collectAsStateWithLifecycle()
+    val themeMode by vm.themeMode.collectAsStateWithLifecycle()
+
+    val themeValue = when (themeMode) {
+        de.ledgerline.app.data.ThemeMode.LIGHT -> stringResource(R.string.settings_theme_light)
+        de.ledgerline.app.data.ThemeMode.DARK -> stringResource(R.string.settings_theme_dark)
+        else -> stringResource(R.string.settings_theme_system)
+    }
+    val langTag = remember { currentLanguageTag(context) }
+    val langValue = SUPPORTED_LANGUAGES.firstOrNull { it.first == langTag }?.second
+        ?: stringResource(R.string.settings_language_system)
+
+    var query by rememberSaveable { mutableStateOf("") }
+    val q = query.trim().lowercase()
+
+    // Every root destination as a flat descriptor so the search field can filter across groups.
+    data class Item(val group: Int, val title: String, val sub: String, val icon: ImageVector, val tint: Color, val onClick: () -> Unit)
+    val g = intArrayOf(0) // group ordinals: 0 Security, 1 Data, 2 Sharing, 3 Appearance, 4 Help
+    val items = listOf(
+        Item(0, stringResource(R.string.settings_cat_security), stringResource(R.string.settings_cat_security_sub), Icons.Outlined.Lock, Brand.tintViolet) { onNavigate(SettingsRoute.SECURITY) },
+        Item(0, stringResource(R.string.settings_cat_autofill), stringResource(R.string.settings_cat_autofill_sub), Icons.Outlined.Password, Brand.tintTeal) { launchAutofillSettings(context) },
+        Item(0, stringResource(R.string.settings_cat_passkeys), stringResource(R.string.settings_cat_passkeys_sub), Icons.Outlined.Fingerprint, Brand.tintBlue) { launchCredentialProviderSettings(context) },
+        Item(1, stringResource(R.string.settings_cat_offline), stringResource(R.string.settings_cat_offline_sub), Icons.Outlined.CloudOff, Brand.tintGreen) { onNavigate(SettingsRoute.OFFLINE) },
+        Item(1, stringResource(R.string.settings_cat_background), stringResource(R.string.settings_cat_background_sub), Icons.Outlined.Sync, Brand.tintTeal) { onNavigate(SettingsRoute.BACKGROUND) },
+        Item(1, stringResource(R.string.settings_cat_backup), stringResource(R.string.settings_cat_backup_sub), Icons.Outlined.PhotoLibrary, Brand.tintOrange) { onNavigate(SettingsRoute.BACKUP) },
+        Item(1, stringResource(R.string.settings_cat_maps), stringResource(R.string.settings_cat_maps_sub), Icons.Outlined.Map, Brand.tintTeal) { onNavigate(SettingsRoute.MAPS) },
+        Item(2, stringResource(R.string.share_open_title), stringResource(R.string.share_open_hint), Icons.Outlined.Link, Brand.tintBlue) { onNavigate(SettingsRoute.SHARED_LINK) },
+        Item(2, stringResource(R.string.vaults_title), stringResource(R.string.settings_cat_vaults_sub), Icons.Outlined.Share, Brand.tintViolet) { onNavigate(SettingsRoute.SHARED_VAULTS) },
+        Item(3, stringResource(R.string.settings_theme), themeValue, Icons.Outlined.Contrast, Brand.tintViolet) { onNavigate(SettingsRoute.APPEARANCE) },
+        Item(3, stringResource(R.string.settings_language), langValue, Icons.Outlined.Language, Brand.tintBlue) { onNavigate(SettingsRoute.APPEARANCE) },
+        Item(4, stringResource(R.string.settings_cat_notifications), stringResource(R.string.settings_cat_notifications_sub), Icons.Outlined.Notifications, Brand.tintOrange) { onNavigate(SettingsRoute.NOTIFICATIONS) },
+        Item(4, stringResource(R.string.settings_cat_about), stringResource(R.string.settings_cat_about_sub), Icons.Outlined.Info, Brand.tintGray) { onNavigate(SettingsRoute.ABOUT) },
+    )
+    val groupLabels = listOf(
+        R.string.settings_group_security, R.string.settings_group_data,
+        R.string.settings_group_sharing, R.string.settings_cat_appearance, R.string.settings_group_help,
+    )
+    val shown = if (q.isEmpty()) items else items.filter { it.title.lowercase().contains(q) || it.sub.lowercase().contains(q) }
+
+    LazyColumn(
+        Modifier.fillMaxSize().padding(padding),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        val autofillContext = LocalContext.current
+        // Search
+        item {
+            OutlinedTextField(
+                value = query, onValueChange = { query = it },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                placeholder = { Text(stringResource(R.string.settings_search)) },
+                singleLine = true,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        // Account header card (hidden while searching to keep results tight)
+        if (q.isEmpty()) item {
+            AccountHeaderCard(account, avatar, storage, vm.serverHost, onClick = { onNavigate(SettingsRoute.ACCOUNT) })
+        }
+        // Grouped rows
+        for (gi in groupLabels.indices) {
+            val rows = shown.filter { it.group == gi }
+            if (rows.isEmpty()) continue
+            item(key = "label$gi") { SettingsSectionLabel(stringResource(groupLabels[gi])) }
+            item(key = "group$gi") {
+                SettingsGroup {
+                    rows.forEachIndexed { i, it ->
+                        if (i > 0) SettingsRowDivider()
+                        SettingsRow(it.icon, it.tint, it.title, it.sub, it.onClick)
+                    }
+                }
+            }
+        }
+        item { Spacer(Modifier.height(16.dp)) }
+    }
+}
 
-        SectionHeader(stringResource(R.string.settings_group_personalization))
-        CategoryRow(
-            icon = Icons.Outlined.Language,
-            title = stringResource(R.string.settings_cat_appearance),
-            subtitle = stringResource(R.string.settings_cat_appearance_sub),
-        ) { onNavigate(SettingsRoute.APPEARANCE) }
+/** Small uppercase group label above a settings card (M3/OneUI settings pattern). */
+@Composable
+private fun SettingsSectionLabel(text: String) {
+    Text(
+        text.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = Brand.accent,
+        letterSpacing = 0.08.em,
+        modifier = Modifier.padding(start = 6.dp, top = 14.dp, bottom = 6.dp),
+    )
+}
 
-        SectionHeader(stringResource(R.string.settings_group_security))
-        CategoryRow(
-            icon = Icons.Outlined.Lock,
-            title = stringResource(R.string.settings_cat_security),
-            subtitle = stringResource(R.string.settings_cat_security_sub),
-        ) { onNavigate(SettingsRoute.SECURITY) }
-        CategoryRow(
-            icon = Icons.Outlined.Password,
-            title = stringResource(R.string.settings_cat_autofill),
-            subtitle = stringResource(R.string.settings_cat_autofill_sub),
-        ) { launchAutofillSettings(autofillContext) }
-        CategoryRow(
-            icon = Icons.Outlined.Fingerprint,
-            title = stringResource(R.string.settings_cat_passkeys),
-            subtitle = stringResource(R.string.settings_cat_passkeys_sub),
-        ) { launchCredentialProviderSettings(autofillContext) }
+/** A rounded elevated container that visually groups a set of [SettingsRow]s. */
+@Composable
+private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().cardSurface(),
+        content = content,
+    )
+}
 
-        SectionHeader(stringResource(R.string.settings_group_data))
-        CategoryRow(
-            icon = Icons.Outlined.CloudOff,
-            title = stringResource(R.string.settings_cat_offline),
-            subtitle = stringResource(R.string.settings_cat_offline_sub),
-        ) { onNavigate(SettingsRoute.OFFLINE) }
-        CategoryRow(
-            icon = Icons.Outlined.Sync,
-            title = stringResource(R.string.settings_cat_background),
-            subtitle = stringResource(R.string.settings_cat_background_sub),
-        ) { onNavigate(SettingsRoute.BACKGROUND) }
-        CategoryRow(
-            icon = Icons.Outlined.PhotoLibrary,
-            title = stringResource(R.string.settings_cat_backup),
-            subtitle = stringResource(R.string.settings_cat_backup_sub),
-        ) { onNavigate(SettingsRoute.BACKUP) }
-        CategoryRow(
-            icon = Icons.Outlined.Map,
-            title = stringResource(R.string.settings_cat_maps),
-            subtitle = stringResource(R.string.settings_cat_maps_sub),
-        ) { onNavigate(SettingsRoute.MAPS) }
+@Composable
+private fun SettingsRowDivider() {
+    androidx.compose.material3.HorizontalDivider(
+        Modifier.padding(start = 60.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+    )
+}
 
-        SectionHeader(stringResource(R.string.settings_group_account))
-        CategoryRow(
-            icon = Icons.Outlined.AccountCircle,
-            title = stringResource(R.string.settings_cat_account),
-            subtitle = stringResource(R.string.settings_cat_account_sub),
-        ) { onNavigate(SettingsRoute.ACCOUNT) }
-        CategoryRow(
-            icon = Icons.Outlined.Notifications,
-            title = stringResource(R.string.settings_cat_notifications),
-            subtitle = stringResource(R.string.settings_cat_notifications_sub),
-        ) { onNavigate(SettingsRoute.NOTIFICATIONS) }
-        CategoryRow(
-            icon = Icons.Outlined.Link,
-            title = stringResource(R.string.share_open_title),
-            subtitle = stringResource(R.string.share_open_hint),
-        ) { onNavigate(SettingsRoute.SHARED_LINK) }
-        CategoryRow(
-            icon = Icons.Outlined.Share,
-            title = stringResource(R.string.vaults_title),
-            subtitle = stringResource(R.string.settings_cat_vaults_sub),
-        ) { onNavigate(SettingsRoute.SHARED_VAULTS) }
-        CategoryRow(
-            icon = Icons.Outlined.Info,
-            title = stringResource(R.string.settings_cat_about),
-            subtitle = stringResource(R.string.settings_cat_about_sub),
-        ) { onNavigate(SettingsRoute.ABOUT) }
-        Spacer(Modifier.height(16.dp))
+/** One settings row: tinted icon chip, title, current value/summary, trailing chevron. */
+@Composable
+private fun SettingsRow(icon: ImageVector, tint: Color, title: String, value: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconChip(icon, tint = tint, size = 32.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (value.isNotBlank()) Text(
+                value,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+        Icon(
+            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Identity-first header: avatar, name, email, connected server, account-wide storage ring. */
+@Composable
+private fun AccountHeaderCard(
+    account: MeUser?,
+    avatar: androidx.compose.ui.graphics.ImageBitmap?,
+    storage: de.ledgerline.app.data.AccountRepository.AccountSnapshot?,
+    serverHost: String?,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().cardSurface().clickable(onClick = onClick).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Avatar: image if present, else gradient initials.
+        if (avatar != null) {
+            androidx.compose.foundation.Image(
+                bitmap = avatar, contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.size(52.dp).clip(androidx.compose.foundation.shape.CircleShape),
+            )
+        } else {
+            Box(
+                Modifier.size(52.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Brand.accentGradient),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    initials(account?.name ?: account?.email),
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(account?.name ?: account?.email ?: stringResource(R.string.account_loading), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            account?.email?.takeIf { it != account.name }?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            serverHost?.let {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
+                    Icon(Icons.Outlined.Lock, contentDescription = null, tint = Brand.accent, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(it, style = MaterialTheme.typography.labelSmall, color = Brand.accent, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+            }
+        }
+        storage?.let { StorageRing(it) }
+    }
+}
+
+/** A compact circular usage gauge (files+gallery vs quota); shows "—" when unlimited. */
+@Composable
+private fun StorageRing(s: de.ledgerline.app.data.AccountRepository.AccountSnapshot) {
+    val quota = s.quotaBytes
+    val frac = if (quota != null && quota > 0) (s.usedBytes.toFloat() / quota).coerceIn(0f, 1f) else 0f
+    val accent = Brand.accent
+    val track = MaterialTheme.colorScheme.outlineVariant
+    Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Canvas(Modifier.size(44.dp)) {
+            val sw = 4.dp.toPx()
+            drawArc(color = track, startAngle = 0f, sweepAngle = 360f, useCenter = false, style = Stroke(width = sw))
+            if (quota != null) drawArc(
+                color = accent, startAngle = -90f, sweepAngle = 360f * frac, useCenter = false,
+                style = Stroke(width = sw, cap = androidx.compose.ui.graphics.StrokeCap.Round),
+            )
+        }
+        Text(
+            if (quota == null) "—" else "${(frac * 100).toInt()}%",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Up to two uppercase initials from a name/email for the avatar fallback. */
+private fun initials(s: String?): String {
+    val base = s?.trim().orEmpty()
+    if (base.isEmpty()) return "?"
+    val parts = base.substringBefore('@').split(' ', '.', '-').filter { it.isNotBlank() }
+    return when {
+        parts.size >= 2 -> "${parts[0].first()}${parts[1].first()}".uppercase()
+        else -> base.take(2).uppercase()
     }
 }
 
@@ -538,16 +685,12 @@ private fun launchCredentialProviderSettings(context: Context) {
         .recoverCatching { context.startActivity(fallback) }
 }
 
-/** A single tappable category row on a tonal surface: leading icon + title + short subtitle. */
+/** Legacy tonal category row (still used inside detail screens like Maps → offline maps). */
 @Composable
 private fun CategoryRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
     ListItem(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = ListItemDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         leadingContent = { Icon(icon, contentDescription = null) },
         headlineContent = { Text(title) },
         supportingContent = { Text(subtitle) },

@@ -270,6 +270,9 @@
     <string name="settings_lock_note">Dein Tresor bleibt mit deiner Passphrase gesperrt. Biometrie kann eine gespeicherte Sitzung entsperren, wo aktiviert; der Schlüssel verlässt dieses Gerät nie.</string>
     <string name="settings_language">Sprache</string>
     <string name="settings_language_system">Systemstandard</string>
+    <string name="settings_search">Einstellungen durchsuchen</string>
+    <string name="settings_group_sharing">Teilen</string>
+    <string name="settings_group_help">Hilfe</string>
     <string name="settings_language_de">Deutsch</string>
     <string name="settings_language_en">English</string>
     <string name="settings_contact_sort">Kontakte-Sortierung</string>

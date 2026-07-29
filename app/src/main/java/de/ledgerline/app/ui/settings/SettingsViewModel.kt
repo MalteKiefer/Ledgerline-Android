@@ -92,6 +92,13 @@ class SettingsViewModel @Inject constructor(
     private val _avatar = MutableStateFlow<androidx.compose.ui.graphics.ImageBitmap?>(null)
     val avatar: StateFlow<androidx.compose.ui.graphics.ImageBitmap?> = _avatar.asStateFlow()
 
+    /** Account-wide storage (files+gallery) for the header ring; null while loading / unlimited. */
+    private val _storage = MutableStateFlow<AccountRepository.AccountSnapshot?>(null)
+    val storage: StateFlow<AccountRepository.AccountSnapshot?> = _storage.asStateFlow()
+
+    /** Host of the connected server (from the pairing base URL), for the account header. */
+    val serverHost: String? = runCatching { java.net.URI(sessionHolder.get()?.baseUrl ?: "").host }.getOrNull()
+
     init {
         viewModelScope.launch {
             val me = accountRepository.me()
@@ -102,6 +109,7 @@ class SettingsViewModel @Inject constructor(
                     runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull()
                 }
             }
+            _storage.value = accountRepository.snapshot()
         }
     }
 
