@@ -32,6 +32,21 @@ object NetworkFactory {
         build(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
 
     /**
+     * A minimal HTTPS client (RESTRICTED_TLS + SPKI pinning, short timeouts, no auth) for the
+     * server-reachability health ping (`GET {baseUrl}/up`). Same fail-closed transport as the API,
+     * so a MITM can't fake "online".
+     */
+    fun pingClient(baseUrl: String, pin: String?): OkHttpClient {
+        val builder = OkHttpClient.Builder()
+            .connectionSpecs(listOf(ConnectionSpec.RESTRICTED_TLS))
+            .callTimeout(5, TimeUnit.SECONDS)
+            .connectTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+        if (pin != null) builder.certificatePinner(PinnedTrust.pinnerFor(baseUrl.toHttpUrl().host, pin))
+        return builder.build()
+    }
+
+    /**
      * Shared wiring seam: builds the interceptor chain + Retrofit client for the given
      * [connectionSpecs]. Production always passes RESTRICTED_TLS only; tests may add
      * CLEARTEXT. Kept `internal` so cleartext can never leak into the public surface.

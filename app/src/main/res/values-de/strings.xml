@@ -900,4 +900,5 @@
     <string name="finance_project_kind_inherited">Vom Elternprojekt übernommen</string>
     <string name="finance_stats_project_costs">Projektkosten</string>
     <string name="finance_expense_category">Kategorie</string>
+    <string name="offline_server_unreachable">Offline — Server nicht erreichbar, erneuter Versuch läuft</string>
 </resources>

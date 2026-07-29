@@ -17,6 +17,7 @@ class LedgerlineApp : Application() {
     @InstallIn(SingletonComponent::class)
     interface AppEntryPoint {
         fun backgroundSync(): BackgroundSync
+        fun serverReachability(): de.ledgerline.app.core.ServerReachability
     }
 
     override fun onCreate() {
@@ -32,7 +33,10 @@ class LedgerlineApp : Application() {
         // zoom jumps and less CPU (default ~1.05 re-renders very finely and feels sluggish).
         org.mapsforge.map.android.input.TouchGestureHandler.DELTA_SCALE = 1.2
 
+        val ep = EntryPointAccessors.fromApplication(this, AppEntryPoint::class.java)
         // Keep the offline cache fresh while the process lives (ZK-safe; see BackgroundSync).
-        EntryPointAccessors.fromApplication(this, AppEntryPoint::class.java).backgroundSync().start()
+        ep.backgroundSync().start()
+        // Check server reachability (GET /up) first + every 60s; drives the app's offline mode.
+        ep.serverReachability().start()
     }
 }

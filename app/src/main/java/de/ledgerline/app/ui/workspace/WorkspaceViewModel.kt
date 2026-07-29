@@ -20,10 +20,25 @@ class WorkspaceViewModel @Inject constructor(
     private val prefetcher: Prefetcher,
     private val backupManager: GalleryBackupManager,
     moduleAccess: de.ledgerline.app.core.ModuleAccess,
+    private val reachability: de.ledgerline.app.core.ServerReachability,
 ) : ViewModel() {
 
     /** The account's allowed module keys (`/me` rights model); null = unknown → allow all. */
     val allowedModules = moduleAccess.allowed
+
+    /** Whether the self-hosted server is reachable (GET /up). false → the app is in offline mode. */
+    val serverOnline = reachability.online
+
+    init {
+        // When the server comes back after being offline, catch up: reload + re-prefetch.
+        viewModelScope.launch {
+            var prev = reachability.online.value
+            reachability.online.collect { now ->
+                if (now && !prev) { load.invoke(); prefetcher.maybePrefetchOnUnlock() }
+                prev = now
+            }
+        }
+    }
     /**
      * Loads the workspace if the cache is empty, then kicks off auto-prefetch on unlock.
      * [Prefetcher] self-gates on policy + constraints + no-stacking and enumerates
@@ -31,6 +46,7 @@ class WorkspaceViewModel @Inject constructor(
      */
     fun ensureLoaded() {
         viewModelScope.launch {
+            reachability.checkNow()   // probe /up immediately on open (post-unlock), not up to 60s later
             if (cache.value.value == null) load.invoke()
             prefetcher.maybePrefetchOnUnlock()
             backupManager.maybeRun()

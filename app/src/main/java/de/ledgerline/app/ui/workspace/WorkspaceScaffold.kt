@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.MonitorHeart
@@ -93,6 +95,8 @@ fun WorkspaceScaffold(
     // The account's module entitlements (rights model): hide nav for modules not allowed.
     val allowedModules by loader.allowedModules.collectAsStateWithLifecycle()
     val visible: (WorkspaceDest) -> Boolean = { d -> d.moduleKey == null || allowedModules?.contains(d.moduleKey) ?: true }
+    // Server reachability (GET /up): false → offline mode (cache-only), retried every 60s.
+    val serverOnline by loader.serverOnline.collectAsStateWithLifecycle()
 
     var dest by rememberSaveable { mutableStateOf(WorkspaceDest.Home) }
     var lastPrimary by rememberSaveable { mutableStateOf(WorkspaceDest.Home) }
@@ -224,6 +228,20 @@ fun WorkspaceScaffold(
                   onBack = { searchOpen = false },
                   modifier = Modifier.fillMaxSize(),
               )
+          }
+          // Offline banner: the server (/up) is unreachable — cache-only, retrying every 60s.
+          if (!serverOnline && !searchOpen) {
+              Surface(
+                  color = MaterialTheme.colorScheme.tertiaryContainer,
+                  contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                  modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding(),
+              ) {
+                  Row(Modifier.padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                      Icon(Icons.Outlined.CloudOff, null, Modifier.size(18.dp))
+                      Spacer(Modifier.width(10.dp))
+                      Text(stringResource(R.string.offline_server_unreachable), style = MaterialTheme.typography.bodyMedium)
+                  }
+              }
           }
         }
     }
