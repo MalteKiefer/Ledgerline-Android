@@ -667,7 +667,16 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   `financeCategories`, `invoiceSeq`) — die `FinanceRepository` re-shardet NUR die Rechnungen und macht
   ein **Root-Level-Raw-Overlay** (nur `shardBits`/`shards` ersetzt, ALLE anderen Root-Keys verbatim
   erhalten; deren Blob-Refs kommen in den `shards[]`-Guard, damit der Server sie nie freigibt) +
-  409-Rebase. Create/Edit/Issue/Mark-Paid/Trash: FAB→`InvoiceEditScreen` (Empfänger, Datumsfelder,
+  409-Rebase.
+  > **Backlog-Batch 2026-07-29 (Commit ca78e67):** 3 Top-Gaps geschlossen — (1) **Öffentliche
+  > Share-Link-Konsumtion** (`/s/{token}/*`): `SharedLinkRepository` (parse `…/s/{token}#s:{sk}` →
+  > meta→unlock-grant→manifest, SK aus URL-Fragment, `ShareCrypto.openManifest`, Blob-Decrypt via neuem
+  > `Crypto.contentDecryptorFromKey`/`BlobDownloader.decryptWithKey` — **kein VK nötig**), UI `ui/share/`
+  > (Paste→Passwort→Datei-Liste mit SAF-Save / Galerie-Grid), Session-Server-scoped (fremder Host → Browser).
+  > (2) **Notifications** (`/notifications`+read+read-all, `NotificationsViewModel`, Settings→Benachrichtigungen).
+  > (3) **`/settings`** (GET/PUT: Geburtstags-/Jahrestags-Kanäle + `file_max_versions`, Settings→Account).
+  > Parser-Test grün, on-device-Verifikation der Krypto-Flows offen (Vault locked).
+  Create/Edit/Issue/Mark-Paid/Trash: FAB→`InvoiceEditScreen` (Empfänger, Datumsfelder,
   Positionen-Editor mit Live-Totals, Notiz), Detail-Aktionen. **Ausstellen** vergibt eine gapless
   GoBD-Nummer (`InvoiceMath.nextSeqForYear`→`formatNumber`, seq pro Rechnung). Test
   `FinanceRepositoryTest` beweist die Collection-Erhaltung (payRef/txRef/partners überleben + im Guard).
