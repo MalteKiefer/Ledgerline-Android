@@ -10,10 +10,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.security.SecureRandom
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -61,6 +64,9 @@ class SharedVaultRepository(
     private val identityRepo: IdentityRepository,
     private val pqkem: PQKEM,
     private val crypto: Crypto,
+    private val vaultKeyHolder: de.ledgerline.app.core.security.VaultKeyHolder,
+    private val workspaceCache: de.ledgerline.app.core.WorkspaceCache,
+    private val mutateWorkspace: de.ledgerline.app.domain.usecase.MutateWorkspace,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
     @Inject constructor(
@@ -68,7 +74,10 @@ class SharedVaultRepository(
         identityRepo: IdentityRepository,
         pqkem: PQKEM,
         crypto: Crypto,
-    ) : this(sessionHolder, identityRepo, pqkem, crypto, { s -> NetworkFactory.create(s.baseUrl, { s.token }, s.spkiPin) })
+        vaultKeyHolder: de.ledgerline.app.core.security.VaultKeyHolder,
+        workspaceCache: de.ledgerline.app.core.WorkspaceCache,
+        mutateWorkspace: de.ledgerline.app.domain.usecase.MutateWorkspace,
+    ) : this(sessionHolder, identityRepo, pqkem, crypto, vaultKeyHolder, workspaceCache, mutateWorkspace, { s -> NetworkFactory.create(s.baseUrl, { s.token }, s.spkiPin) })
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -238,6 +247,86 @@ class SharedVaultRepository(
         }.getOrNull()?.isSuccessful == true
         if (ok) vkCache[vault.vaultId] = newVk
         ok
+    }
+
+    // ---- Private → shared folder conversion (ZK; the server never re-encrypts) ----
+
+    data class ConvertResult(val vaultId: String, val movedFiles: Int)
+
+    /**
+     * Convert a PERSONAL folder subtree into a new shared folder-vault (openapi `/vaults` §note):
+     * create a folder-vault (fresh VK_vault), then for each file re-wrap its per-file key under
+     * VK_vault and re-upload the UNCHANGED ciphertext to the vault blob store, seal a `{name,folders,
+     * files}` manifest under VK_vault, and finally drop the moved files+folders from the personal
+     * files index. The content ciphertext never leaves the client decrypted; only per-file keys are
+     * re-wrapped (VK → VK_vault). Orphaned personal blobs are reclaimed by files reconcile-on-load.
+     * Returns the new vault id + moved-file count, or null on any failure (nothing is removed then).
+     */
+    suspend fun convertFolder(folderId: String, name: String): ConvertResult? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        val personalVk = vaultKeyHolder.get() ?: return@withContext null
+        val manifest = workspaceCache.value.value?.manifest ?: return@withContext null
+        val folders = manifest.fileFolders
+        val subtreeIds = de.ledgerline.app.domain.share.ShareManifests.subtree(folderId, folders)
+        val byId = folders.associateBy { it.id }
+        val filesToMove = manifest.files.filter { !it.trashed && it.folder != null && it.folder in subtreeIds }
+
+        // 1. Create the folder-vault (fresh VK_vault, cached) + empty manifest.
+        val vaultId = create("folder", name) ?: return@withContext null
+        val vk = vkCache[vaultId] ?: return@withContext null
+        val api = apiProvider(session)
+
+        // 2. Move each file: re-wrap key under VK_vault, re-upload unchanged ciphertext.
+        val fileEntries = ArrayList<JsonObject>()
+        for (f in filesToMove) {
+            if (f.blob.isBlank() || f.encFileKey.isBlank()) continue
+            val fk = crypto.openValue(f.encFileKey, personalVk) ?: return@withContext null
+            val cipher = runCatching {
+                val r = api.rawFile(f.blob); if (r.isSuccessful) r.body()?.bytes() else null
+            }.getOrNull() ?: return@withContext null
+            val reqBody = cipher.toRequestBody("application/octet-stream".toMediaTypeOrNull())
+            val body = okhttp3.MultipartBody.Part.createFormData("file", "blob.enc", reqBody)
+            val newRef = runCatching { api.vaultBlobUpload(vaultId, body) }.getOrNull()?.takeIf { it.isSuccessful }?.body()?.id
+                ?: return@withContext null
+            val newKey = crypto.sealValue(fk, vk)
+            val path = de.ledgerline.app.domain.share.ShareManifests.relPath(f.folder, folderId, byId)
+            fileEntries += buildJsonObject {
+                put("ref", JsonPrimitive(newRef)); put("key", JsonPrimitive(newKey))
+                put("name", JsonPrimitive(f.name)); put("mime", JsonPrimitive(f.mime.ifBlank { "application/octet-stream" }))
+                if (path.isNotBlank()) put("path", JsonPrimitive(path))
+            }
+        }
+
+        // 3. Subfolders (excluding the root; the root becomes the vault). Root's direct children reparent to null.
+        val folderEntries = folders.filter { it.id in subtreeIds && it.id != folderId }.map { fo ->
+            buildJsonObject {
+                put("id", JsonPrimitive(fo.id)); put("name", JsonPrimitive(fo.name))
+                put("parent", if (fo.parent == folderId || fo.parent == null) JsonNull else JsonPrimitive(fo.parent!!))
+            }
+        }
+
+        // 4. Seal + PUT the populated manifest at the store's current version.
+        val vaultManifest = buildJsonObject {
+            put("name", JsonPrimitive(name))
+            put("folders", JsonArray(folderEntries))
+            put("files", JsonArray(fileEntries))
+        }
+        val version = runCatching { api.vaultStore(vaultId) }.getOrNull()?.body()?.version ?: 0
+        val put = runCatching {
+            api.vaultStorePut(vaultId, de.ledgerline.app.data.remote.dto.SharedVaultStorePut(crypto.sealManifest(vaultManifest.toString(), vk), version))
+        }.getOrNull()
+        if (put?.isSuccessful != true) return@withContext null
+
+        // 5. Remove the moved files + folders (incl. the root) from the PERSONAL index.
+        val movedFileIds = filesToMove.map { it.id }.toSet()
+        val removeFolderIds = subtreeIds
+        mutateWorkspace.invoke { m ->
+            m.copy(
+                files = m.files.filterNot { it.id in movedFileIds },
+                fileFolders = m.fileFolders.filterNot { it.id in removeFolderIds },
+            )
+        }
+        ConvertResult(vaultId, filesToMove.size)
     }
 
     /** Drop cached vault keys (on lock / logout). */

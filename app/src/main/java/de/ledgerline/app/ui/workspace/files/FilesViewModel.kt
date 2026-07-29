@@ -79,8 +79,25 @@ class FilesViewModel @Inject constructor(
     private val lockGuard: LockGuard,
     private val importFile: ImportFile,
     private val shareRepo: de.ledgerline.app.data.FileSharing,
+    private val sharedVaults: de.ledgerline.app.data.SharedVaultRepository,
     degradedState: de.ledgerline.app.core.offline.DegradedState,
 ) : ViewModel() {
+
+    /** One-shot UI message key (e.g. "vault_converted:N", "vault_convert_failed"). */
+    private val _convertMessage = MutableStateFlow<String?>(null)
+    val convertMessage: StateFlow<String?> = _convertMessage
+    fun clearConvertMessage() { _convertMessage.value = null }
+
+    /**
+     * Convert a personal folder subtree into a new shared folder-vault (ZK re-wrap + re-upload).
+     * On success the moved files/folders disappear from Files (now in the shared vault) and a
+     * reload refreshes the tree.
+     */
+    fun convertFolderToVault(folderId: String, name: String) = viewModelScope.launch {
+        val res = sharedVaults.convertFolder(folderId, name)
+        if (res != null) { _convertMessage.value = "vault_converted:${res.movedFiles}"; load.invoke() }
+        else _convertMessage.value = "vault_convert_failed"
+    }
 
     // ---- Public share links ----------------------------------------------------
     private val _shareSheet = MutableStateFlow<de.ledgerline.app.ui.common.ShareSheetState?>(null)

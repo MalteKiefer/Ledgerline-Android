@@ -206,6 +206,10 @@
     <string name="file_sort_size_desc">Größte zuerst</string>
     <string name="file_sort_size_asc">Kleinste zuerst</string>
     <string name="file_delete">Löschen</string>
+    <string name="files_convert_vault">In geteilten Tresor umwandeln</string>
+    <string name="files_convert_vault_confirm">„%1$s\" samt Inhalt in einen neuen geteilten Tresor verschieben? Die Dateien verlassen deine persönlichen Dateien und können dann mit anderen geteilt werden.</string>
+    <string name="files_convert_vault_ok">Umgewandelt — %1$d Dateien in den geteilten Tresor verschoben.</string>
+    <string name="files_convert_vault_fail">Ordner konnte nicht umgewandelt werden. Nichts wurde geändert.</string>
     <string name="file_delete_confirm">Dieses Element löschen? Das kann nicht rückgängig gemacht werden.</string>
     <string name="file_trash_confirm">Dieses Element in den Papierkorb?</string>
     <string name="file_open">Öffnen</string>

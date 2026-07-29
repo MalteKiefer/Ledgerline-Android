@@ -221,6 +221,10 @@
     <string name="file_sort_size_desc">Largest first</string>
     <string name="file_sort_size_asc">Smallest first</string>
     <string name="file_delete">Delete</string>
+    <string name="files_convert_vault">Convert to shared vault</string>
+    <string name="files_convert_vault_confirm">Move \"%1$s\" and its contents into a new shared vault? Files leave your personal Files and can then be shared with others.</string>
+    <string name="files_convert_vault_ok">Converted — %1$d files moved to the shared vault.</string>
+    <string name="files_convert_vault_fail">Couldn\'t convert this folder. Nothing was changed.</string>
     <string name="file_delete_confirm">Delete this item? This cannot be undone.</string>
     <string name="file_trash_confirm">Move this item to trash?</string>
     <string name="file_open">Open</string>

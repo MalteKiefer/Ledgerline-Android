@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.RestoreFromTrash
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
@@ -185,6 +186,7 @@ fun FilesScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, vm:
     var renameFolder by remember { mutableStateOf<Pair<String, String>?>(null) } // id, current name
     var renameFile by remember { mutableStateOf<Pair<String, String>?>(null) }
     var deleteFolderId by remember { mutableStateOf<String?>(null) }
+    var convertFolder by remember { mutableStateOf<Pair<String, String>?>(null) } // id, name
     var deleteFileEntry by remember { mutableStateOf<FileEntry?>(null) }
     var deleteForeverEntry by remember { mutableStateOf<FileEntry?>(null) }
     var moveTarget by remember { mutableStateOf<FileEntry?>(null) }
@@ -293,6 +295,7 @@ fun FilesScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, vm:
                                                     onRename = { renameFolder = f.id to f.name },
                                                     onDelete = { deleteFolderId = f.id },
                                                     onShare = { vm.openShare(f.id, isFolder = true, f.name, f.share) },
+                                                    onConvert = { convertFolder = f.id to f.name },
                                                 )
                                             },
                                             onClick = { vm.open(f.id) },
@@ -415,6 +418,23 @@ fun FilesScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, vm:
             onDismiss = { deleteFolderId = null },
         )
     }
+    convertFolder?.let { (id, name) ->
+        ConfirmDialog(
+            message = stringResource(R.string.files_convert_vault_confirm, name),
+            confirmLabel = stringResource(R.string.files_convert_vault),
+            onConfirm = { vm.convertFolderToVault(id, name); convertFolder = null },
+            onDismiss = { convertFolder = null },
+        )
+    }
+    val convertMsg by vm.convertMessage.collectAsStateWithLifecycle()
+    LaunchedEffect(convertMsg) {
+        val key = convertMsg ?: return@LaunchedEffect
+        val text = if (key.startsWith("vault_converted:")) {
+            context.resources.getString(R.string.files_convert_vault_ok, key.removePrefix("vault_converted:").toIntOrNull() ?: 0)
+        } else context.resources.getString(R.string.files_convert_vault_fail)
+        snackbar.showSnackbar(text)
+        vm.clearConvertMessage()
+    }
     deleteFileEntry?.let { file ->
         ConfirmDialog(
             message = stringResource(R.string.file_trash_confirm),
@@ -503,13 +523,14 @@ private fun FilesFab(onUpload: () -> Unit, onNewFolder: () -> Unit) {
 
 /** Overflow for a folder row: rename + delete. */
 @Composable
-private fun RowOverflow(onRename: () -> Unit, onDelete: () -> Unit, onShare: () -> Unit) {
+private fun RowOverflow(onRename: () -> Unit, onDelete: () -> Unit, onShare: () -> Unit, onConvert: () -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more)) }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DropdownMenuItem(text = { Text(stringResource(R.string.file_rename)) }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { expanded = false; onRename() })
             DropdownMenuItem(text = { Text(stringResource(R.string.share_action)) }, leadingIcon = { Icon(Icons.Outlined.Link, null) }, onClick = { expanded = false; onShare() })
+            DropdownMenuItem(text = { Text(stringResource(R.string.files_convert_vault)) }, leadingIcon = { Icon(Icons.Outlined.Share, null) }, onClick = { expanded = false; onConvert() })
             DropdownMenuItem(text = { Text(stringResource(R.string.file_delete)) }, leadingIcon = { Icon(Icons.Outlined.Delete, null) }, onClick = { expanded = false; onDelete() })
         }
     }

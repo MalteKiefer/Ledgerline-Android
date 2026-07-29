@@ -72,6 +72,7 @@ class GallerySaveTest {
         override suspend fun acceptVaultMember(vault: String, member: String): retrofit2.Response<Unit> = throw NotImplementedError()
         override suspend fun vaultStore(vault: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.SharedVaultStoreResponse> = throw NotImplementedError()
         override suspend fun vaultBlobRaw(vault: String, blob: String): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
+        override suspend fun vaultBlobUpload(vault: String, file: okhttp3.MultipartBody.Part): retrofit2.Response<de.ledgerline.app.data.remote.dto.UploadResponse> = throw NotImplementedError()
 
         override suspend fun createVault(body: de.ledgerline.app.data.remote.dto.CreateVaultRequest): retrofit2.Response<de.ledgerline.app.data.remote.dto.VaultCreatedResponse> = throw NotImplementedError()
         override suspend fun vaultStorePut(vault: String, body: de.ledgerline.app.data.remote.dto.SharedVaultStorePut): retrofit2.Response<de.ledgerline.app.data.remote.dto.SharedVaultStoreResponse> = throw NotImplementedError()

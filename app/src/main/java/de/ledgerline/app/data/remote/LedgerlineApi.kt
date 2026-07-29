@@ -417,6 +417,10 @@ interface LedgerlineApi {
     @Streaming
     suspend fun vaultBlobRaw(@Path("vault") vault: String, @Path("blob") blob: String): Response<ResponseBody>
 
+    @Multipart
+    @POST("api/v1/vaults/{vault}/blobs/upload")
+    suspend fun vaultBlobUpload(@Path("vault") vault: String, @Part file: MultipartBody.Part): Response<UploadResponse>
+
     // --- Owner-side shared-vault provisioning + member management ---
 
     @POST("api/v1/vaults")

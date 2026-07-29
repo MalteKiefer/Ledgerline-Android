@@ -222,6 +222,10 @@
     <string name="file_sort_size_desc">Сначала большие</string>
     <string name="file_sort_size_asc">Сначала маленькие</string>
     <string name="file_delete">Удалить</string>
+    <string name="files_convert_vault">Преобразовать в общее хранилище</string>
+    <string name="files_convert_vault_confirm">Переместить «%1$s» и его содержимое в новое общее хранилище? Файлы покинут ваши личные Файлы, после чего ими можно будет поделиться.</string>
+    <string name="files_convert_vault_ok">Преобразовано — %1$d файлов перемещено в общее хранилище.</string>
+    <string name="files_convert_vault_fail">Не удалось преобразовать папку. Ничего не изменено.</string>
     <string name="file_delete_confirm">Удалить этот элемент? Это действие нельзя отменить.</string>
     <string name="file_trash_confirm">Переместить этот элемент в корзину?</string>
     <string name="file_open">Открыть</string>
