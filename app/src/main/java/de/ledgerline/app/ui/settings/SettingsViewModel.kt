@@ -13,6 +13,7 @@ import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.core.backup.GalleryBackupManager
+import androidx.compose.ui.graphics.asImageBitmap
 import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.ContactSort
 import de.ledgerline.app.data.DateFormatPref
@@ -87,8 +88,21 @@ class SettingsViewModel @Inject constructor(
     private val _account = MutableStateFlow<MeUser?>(null)
     val account: StateFlow<MeUser?> = _account.asStateFlow()
 
+    /** The user's avatar (`GET /avatar`) when `has_avatar`, decoded for the Account header. */
+    private val _avatar = MutableStateFlow<androidx.compose.ui.graphics.ImageBitmap?>(null)
+    val avatar: StateFlow<androidx.compose.ui.graphics.ImageBitmap?> = _avatar.asStateFlow()
+
     init {
-        viewModelScope.launch { _account.value = accountRepository.me() }
+        viewModelScope.launch {
+            val me = accountRepository.me()
+            _account.value = me
+            if (me?.hasAvatar == true) {
+                val bytes = accountRepository.avatar()
+                _avatar.value = bytes?.let {
+                    runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull()
+                }
+            }
+        }
     }
 
     /** Connected devices (paired Sanctum tokens). Loaded on demand when the Account screen opens. */

@@ -27,14 +27,12 @@ import kotlinx.serialization.Serializable
     val locale: String? = null,
 )
 
-/** `GET /api/v1/me` — account identity + usage. All fields tolerant/defaulted. */
+/** `GET /api/v1/me` — account identity + usage (openapi MeUser schema, web `d0d0b0f6`). */
 @Serializable data class MeResponse(
     val user: MeUser,
     val usage: MeUsage? = null,
     /** Remote kill switch: the owner flagged this device to wipe its local state. */
     val wipe: Boolean = false,
-    /** Global display preferences (units + clock), mirrored from the server (web `fd490ce3`). */
-    val preferences: DisplayPrefsDto? = null,
 )
 
 /** Global non-secret display preferences (units + 12/24h clock). Also the `POST /preferences` body. */
@@ -57,6 +55,10 @@ import kotlinx.serialization.Serializable
     // client hides the nav/tiles for modules NOT listed; the API also enforces it (403 on a
     // disabled module store). `null` = the server didn't send it (older server) → treat as all.
     val modules: List<String>? = null,
+    /** Whether a non-secret avatar is stored → fetch via GET /api/v1/avatar (Bearer). */
+    @SerialName("has_avatar") val hasAvatar: Boolean = false,
+    /** Non-secret display prefs (units + clock) — the server nests these UNDER `user`, not top-level. */
+    val preferences: DisplayPrefsDto? = null,
 )
 
 @Serializable data class MeUsage(

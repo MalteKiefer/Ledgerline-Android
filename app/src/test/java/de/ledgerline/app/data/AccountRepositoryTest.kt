@@ -59,8 +59,7 @@ class AccountRepositoryTest {
         val api = object : NotImplementedApi() {
             override suspend fun me() = Response.success(
                 MeResponse(
-                    user = MeUser(name = "Ada"),
-                    preferences = de.ledgerline.app.data.remote.dto.DisplayPrefsDto(distance = "mi", temp = "f", timeFormat = "12h"),
+                    user = MeUser(name = "Ada", preferences = de.ledgerline.app.data.remote.dto.DisplayPrefsDto(distance = "mi", temp = "f", timeFormat = "12h")),
                 ),
             )
         }

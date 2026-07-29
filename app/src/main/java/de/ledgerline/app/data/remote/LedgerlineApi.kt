@@ -176,6 +176,11 @@ interface LedgerlineApi {
     @POST("api/v1/invoices/ocr")
     suspend fun invoicesOcr(@Part file: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.OcrResponse>
 
+    /** The signed-in user's stored non-secret avatar (streamed image; 404 when none). */
+    @GET("api/v1/avatar")
+    @Streaming
+    suspend fun avatar(): Response<ResponseBody>
+
     @GET("api/v1/company")
     suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse>
 

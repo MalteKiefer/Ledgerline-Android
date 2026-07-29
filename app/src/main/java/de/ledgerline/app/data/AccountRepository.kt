@@ -69,7 +69,7 @@ class AccountRepository(
             if (!res.isSuccessful) return null
             val body = res.body()
             if (body?.wipe == true) authEventBus.emitWipe()
-            adoptPrefs(body?.preferences)
+            adoptPrefs(body?.user?.preferences)
             moduleAccess.set(body?.user?.modules)
             body?.user
         } catch (_: Exception) {
@@ -92,7 +92,7 @@ class AccountRepository(
             if (!res.isSuccessful) return null
             val body = res.body() ?: return null
             if (body.wipe) authEventBus.emitWipe()
-            adoptPrefs(body.preferences)
+            adoptPrefs(body.user.preferences)
             moduleAccess.set(body.user.modules)
             val u = body.usage
             AccountSnapshot(
@@ -103,6 +103,15 @@ class AccountRepository(
         } catch (_: Exception) {
             null
         }
+    }
+
+    /** The signed-in user's avatar image bytes (non-secret, `GET /avatar`), or null if none/failure. */
+    suspend fun avatar(): ByteArray? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val res = apiProvider(session).avatar()
+            if (res.isSuccessful) res.body()?.bytes() else null
+        } catch (_: Exception) { null }
     }
 
     /** The owner's paired devices, current device first. Empty on no session/failure. */
