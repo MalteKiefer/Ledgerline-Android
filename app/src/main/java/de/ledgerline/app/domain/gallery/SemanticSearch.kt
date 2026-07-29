@@ -17,6 +17,20 @@ object SemanticSearch {
     const val MAX_RESULTS = 80
 
     /**
+     * The library's current CLIP model, used to gate which embeddings are comparable: web
+     * reads `config.clipModel` from server bootstrap and only searches embeddings whose
+     * `embModel === config.clipModel`. A native client has no such bootstrap, so it infers
+     * the current model as the **modal** (most frequent) non-null `embModel` across the
+     * photos' metas — the server keeps the bulk of the library re-embedded at the live
+     * model, so the majority IS the current one. Returns null when no meta carries an
+     * `embModel` (older untagged library) → the caller then compares all embeddings,
+     * preserving prior behaviour rather than emptying search.
+     */
+    fun currentModel(models: List<String?>): String? =
+        models.asSequence().filterNotNull().groupingBy { it }.eachCount()
+            .maxByOrNull { it.value }?.key
+
+    /**
      * Cosine similarity via a plain dot product over `min(a.size, b.size)` dims.
      * Callers pass already-normalised vectors (see [norm]); for unit vectors the dot
      * product IS the cosine. Absent/empty vectors score 0.

@@ -300,6 +300,12 @@ interface LedgerlineApi {
     @POST("api/v1/gallery/process")
     suspend fun galleryProcess(@Part file: MultipartBody.Part): Response<ProcessResponse>
 
+    /** Deferred ML pass on a medium rendition (plaintext, discarded): CLIP embedding + faces
+     *  + model tag only, for re-embedding photos whose stored embModel is stale/missing. */
+    @Multipart
+    @POST("api/v1/gallery/analyze")
+    suspend fun galleryAnalyze(@Part file: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.AnalyzeResponse>
+
     @PUT("api/v1/gallery/store")
     suspend fun galleryStorePut(@Body body: StorePutRequest): Response<StoreResponse>
 

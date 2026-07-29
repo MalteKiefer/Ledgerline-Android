@@ -98,4 +98,16 @@ class SemanticSearchTest {
         val ranked = SemanticSearch.rank(q, items, threshold = 0.2, limit = 3)
         assertEquals(3, ranked.size)
     }
+
+    @Test
+    fun currentModel_picks_the_modal_nonnull_model() {
+        val models = listOf("ViT-B-32", "ViT-B-32", "old-model", null, "ViT-B-32")
+        assertEquals("ViT-B-32", SemanticSearch.currentModel(models))
+    }
+
+    @Test
+    fun currentModel_is_null_when_no_model_tagged() {
+        assertEquals(null, SemanticSearch.currentModel(listOf(null, null)))
+        assertEquals(null, SemanticSearch.currentModel(emptyList()))
+    }
 }

@@ -563,6 +563,10 @@
     <string name="person_none_other">Keine anderen Personen</string>
     <string name="export_done">%1$d exportiert</string>
     <string name="gallery_upload_retry">Erneut versuchen</string>
+    <string name="gallery_reindex_action">Suchindex aufbauen</string>
+    <string name="gallery_reindex_progress">Indexierung… %1$d/%2$d</string>
+    <string name="gallery_reindex_done">Suchindex aktualisiert (%1$d Fotos)</string>
+    <string name="gallery_reindex_none">Der Suchindex ist bereits aktuell.</string>
     <string name="person_link_contact">Mit Kontakt verknüpfen</string>
     <string name="person_unlink_contact">Verknüpfung lösen</string>
     <string name="contacts_empty_link">Keine Kontakte zum Verknüpfen</string>

@@ -221,12 +221,19 @@ class GalleryViewModel @Inject constructor(
                 }
             }
 
-            // CLIP content matches: embed text, cosine vs cached normalised embeddings.
+            // CLIP content matches: embed text, cosine vs cached normalised embeddings — but
+            // only embeddings sharing the library's CURRENT model (web `embModel === clipModel`),
+            // so a stale-model embedding can't pollute results. The query is embedded by the
+            // current server model, so only same-model photo embeddings are comparable.
+            val current = SemanticSearch.currentModel(targets.map { metaCache.get(it.id)?.embModel })
             val contentIds = embedText.invoke(q)?.let { qv ->
                 val qn = SemanticSearch.norm(qv)
                 val items = targets.map { p ->
-                    p.id to metaCache.get(p.id)?.embedding?.takeIf { it.isNotEmpty() }
+                    val meta = metaCache.get(p.id)
+                    val emb = meta?.embedding
+                        ?.takeIf { it.isNotEmpty() && (current == null || meta.embModel == current) }
                         ?.let { SemanticSearch.norm(it) }
+                    p.id to emb
                 }
                 SemanticSearch.rank(qn, items, threshold = SEARCH_THRESHOLD)
             }.orEmpty()
@@ -348,6 +355,62 @@ class GalleryViewModel @Inject constructor(
             lastFailedImports = result.failedSources
             _failedImportCount.value = result.failedSources.size
             if (result.failed > 0) _message.value = "upload_failed:${result.failed}"
+        }
+    }
+
+    // --- Deferred CLIP re-index (analyze backfill) ---
+    private val _reindexProgress = MutableStateFlow<Pair<Int, Int>?>(null)
+    /** null = idle; (done,total) while a search re-index runs. Drives the jobs-sheet progress. */
+    val reindexProgress: StateFlow<Pair<Int, Int>?> = _reindexProgress
+
+    /**
+     * Web `reindexAll`/`_reembedOne`: re-embed every non-trashed photo whose sealed CLIP embedding
+     * is missing or on a stale model, so it becomes searchable. Decrypts the medium rendition
+     * transiently, POSTs it to `/gallery/analyze`, and reseals the meta (embedding + embModel only —
+     * faces untouched). The gallery store is updated ONCE at the end; superseded meta blobs are
+     * reclaimed by reconcile-on-load. Best-effort — a failed photo is picked up on a later run.
+     */
+    fun reindexSearch() {
+        if (_reindexProgress.value != null) return
+        viewModelScope.launch {
+            val all = cache.value.value?.manifest?.photos.orEmpty()
+                .filter { !it.trashed && it.metaRef != null && (it.mediumRef != null || it.originalRef != null) }
+            withContext(ioDispatcher) {
+                for (p in all.filter { !metaCache.has(it.id) }) {
+                    val ref = p.metaRef ?: continue
+                    when (val r = blobs.download(ref, p.metaKey ?: "")) {
+                        is Outcome.Ok -> metaCache.put(
+                            p.id,
+                            try { metaJson.decodeFromString<PhotoMetaBlob>(String(r.value)) } catch (_: Exception) { null },
+                        )
+                        is Outcome.Err -> metaCache.put(p.id, null)
+                    }
+                }
+            }
+            val current = SemanticSearch.currentModel(all.map { metaCache.get(it.id)?.embModel })
+            // Missing embedding (never analysed) OR a tagged embedding on a non-current model.
+            val todo = all.filter { p ->
+                val m = metaCache.get(p.id) ?: return@filter false
+                m.embedding.isEmpty() || (current != null && m.embModel != null && m.embModel != current)
+            }
+            if (todo.isEmpty()) { _message.value = "reindex_none"; return@launch }
+            _reindexProgress.value = 0 to todo.size
+            val updates = HashMap<String, Pair<String, String>>()
+            var done = 0
+            for (p in todo) {
+                val ref = p.mediumRef ?: p.originalRef!!
+                val key = (if (p.mediumRef != null) p.mediumKey else p.originalKey) ?: ""
+                blobs.reembed(ref, key, p.metaRef!!, p.metaKey ?: "")?.let { updates[p.id] = it.metaRef to it.metaKey }
+                _reindexProgress.value = ++done to todo.size
+            }
+            if (updates.isNotEmpty()) {
+                mutate.invoke { m ->
+                    m.copy(photos = m.photos.map { ph -> updates[ph.id]?.let { ph.copy(metaRef = it.first, metaKey = it.second) } ?: ph })
+                }
+                metaCache.clear() // resealed metas → drop stale decrypts so search re-reads the new embedding/embModel
+            }
+            _reindexProgress.value = null
+            _message.value = "reindex_done:${updates.size}"
         }
     }
 

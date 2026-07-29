@@ -509,6 +509,13 @@ private fun PhotosTab(
                 if (res == androidx.compose.material3.SnackbarResult.ActionPerformed) vm.retryFailedImports()
             }
             vm.clearMessage()
+        } else if (msg == "reindex_none") {
+            scope.launch { snackbarHostState.showSnackbar(context.resources.getString(R.string.gallery_reindex_none)) }
+            vm.clearMessage()
+        } else if (msg.startsWith("reindex_done:")) {
+            val count = msg.removePrefix("reindex_done:").toIntOrNull() ?: 0
+            scope.launch { snackbarHostState.showSnackbar(context.resources.getString(R.string.gallery_reindex_done, count)) }
+            vm.clearMessage()
         }
     }
 
@@ -971,6 +978,18 @@ private fun GalleryJobsSheet(
             Spacer(Modifier.size(8.dp))
             OutlinedButton(onClick = onOpenDuplicates, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.duplicates_action))
+            }
+            Spacer(Modifier.size(8.dp))
+            val reindex by vm.reindexProgress.collectAsStateWithLifecycle()
+            OutlinedButton(
+                onClick = { vm.reindexSearch() },
+                enabled = reindex == null,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    reindex?.let { (done, total) -> stringResource(R.string.gallery_reindex_progress, done, total) }
+                        ?: stringResource(R.string.gallery_reindex_action),
+                )
             }
             if (failedCount > 0) {
                 Spacer(Modifier.size(8.dp))

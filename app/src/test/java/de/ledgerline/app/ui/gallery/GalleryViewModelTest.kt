@@ -43,6 +43,8 @@ private class FakeBlobs : GalleryBlobs {
     override suspend fun download(ref: String, key: String): Outcome<ByteArray> =
         Outcome.Err(ErrorKind.NETWORK)
     override suspend fun deleteBlobs(refs: List<String>) { deleted += refs }
+    override suspend fun reembed(mediumRef: String, mediumKey: String, metaRef: String, metaKey: String):
+        de.ledgerline.app.domain.usecase.Reembed? = null
 }
 
 private class FakeGalleryUsage : GalleryUsage {

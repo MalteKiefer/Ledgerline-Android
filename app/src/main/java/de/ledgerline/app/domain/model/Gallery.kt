@@ -55,6 +55,9 @@ data class PhotoMetaBlob(
     val faces: List<MetaFace> = emptyList(),
     val phash: Long? = null,
     val exif: kotlinx.serialization.json.JsonObject? = null,
+    /** CLIP model this embedding was produced with (web `embModel`). Semantic search only
+     *  compares embeddings sharing the library's current model; null = older/untagged. */
+    val embModel: String? = null,
 )
 
 @Serializable

@@ -17,6 +17,18 @@ data class ProcessResponse(
     val height: Int? = null,
     val duration: Double? = null,
     val content_id: String? = null,
+    /** CLIP model the embedding was produced with (server `gallery.ml_clip_model`). Tagged
+     *  onto the sealed meta as `embModel` so search only compares same-model embeddings. */
+    val model: String? = null,
+)
+
+/** `POST /gallery/analyze` response: deferred ML pass — CLIP embedding + faces only, plus the
+ *  model tag. Same transient-plaintext ZK window as /gallery/process. */
+@Serializable
+data class AnalyzeResponse(
+    val embedding: JsonElement? = null,
+    val model: String? = null,
+    val faces: List<ProcessFace> = emptyList(),
 )
 
 @Serializable

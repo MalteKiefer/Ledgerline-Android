@@ -182,6 +182,50 @@ class GalleryBlobRepository @VisibleForTesting internal constructor(
         } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
     }
 
+    /**
+     * Web `_reembedOne`: re-embed a photo's CLIP search vector via `POST /gallery/analyze` and
+     * reseal its meta blob with the fresh embedding + `embModel` — **faces untouched** (a CLIP
+     * model swap only affects search; the face model is unchanged). Decrypts the medium (or
+     * original) rendition transiently, POSTs the plaintext, merges into the existing meta JSON
+     * (all other fields preserved verbatim), and uploads a NEW meta blob. Returns the new
+     * ref/key, or null on any failure (the caller keeps the old meta). The superseded meta blob
+     * becomes orphaned and is reclaimed by reconcile-on-load.
+     */
+    override suspend fun reembed(mediumRef: String, mediumKey: String, metaRef: String, metaKey: String): de.ledgerline.app.domain.usecase.Reembed? =
+        withContext(Dispatchers.IO) {
+            val session = sessionHolder.get() ?: return@withContext null
+            val plain = when (val r = download(mediumRef, mediumKey)) {
+                is Outcome.Ok -> r.value; is Outcome.Err -> return@withContext null
+            }
+            val resp = try {
+                val body = plain.toRequestBody("image/jpeg".toMediaTypeOrNull())
+                val part = MultipartBody.Part.createFormData("file", "medium.jpg", body)
+                apiProvider(session).galleryAnalyze(part)
+            } catch (_: Exception) { return@withContext null }
+            if (!resp.isSuccessful) return@withContext null
+            val d = resp.body() ?: return@withContext null
+            val emb = d.embedding as? kotlinx.serialization.json.JsonArray ?: return@withContext null
+            if (emb.isEmpty()) return@withContext null
+
+            val metaBytes = when (val r = download(metaRef, metaKey)) {
+                is Outcome.Ok -> r.value; is Outcome.Err -> return@withContext null
+            }
+            val meta = try {
+                kotlinx.serialization.json.Json.parseToJsonElement(String(metaBytes))
+                    as? kotlinx.serialization.json.JsonObject ?: return@withContext null
+            } catch (_: Exception) { return@withContext null }
+            val overlay = buildMap<String, kotlinx.serialization.json.JsonElement> {
+                put("embedding", emb)
+                d.model?.let { put("embModel", kotlinx.serialization.json.JsonPrimitive(it)) }
+            }
+            val merged = kotlinx.serialization.json.JsonObject(meta + overlay)
+            val out = when (val r = uploadBytes(
+                kotlinx.serialization.json.Json.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), merged).toByteArray(),
+                "meta.enc",
+            )) { is Outcome.Ok -> r.value; is Outcome.Err -> return@withContext null }
+            de.ledgerline.app.domain.usecase.Reembed(out.id, out.encFileKey, d.model)
+        }
+
     override suspend fun invoke(query: String): List<Double>? = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext null
         try {

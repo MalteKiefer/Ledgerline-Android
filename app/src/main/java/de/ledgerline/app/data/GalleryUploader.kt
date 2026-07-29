@@ -78,6 +78,10 @@ class GalleryUploader @VisibleForTesting internal constructor(
             d.exif?.let { put("exif", it) }
             d.place?.let { put("place", it) }
             d.embedding?.let { put("embedding", it) }
+            // Tag which CLIP model produced the embedding (web parity: `embModel`). Without
+            // it, web/iOS treat an Android upload's embedding as stale-model → excluded from
+            // semantic search and flagged for re-analyze. Only meaningful with an embedding.
+            if (d.embedding != null && d.model != null) put("embModel", JsonPrimitive(d.model))
             d.phash?.let { put("phash", it) }   // opaque JsonElement, preserved verbatim
             put("faces", metaFaces)
             d.width?.let { put("width", JsonPrimitive(it)) }

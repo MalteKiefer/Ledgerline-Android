@@ -566,6 +566,10 @@
     <string name="person_none_other">Нет других людей</string>
     <string name="export_done">Экспортировано: %1$d</string>
     <string name="gallery_upload_retry">Повторить</string>
+    <string name="gallery_reindex_action">Построить поисковый индекс</string>
+    <string name="gallery_reindex_progress">Индексация… %1$d/%2$d</string>
+    <string name="gallery_reindex_done">Поисковый индекс обновлён (%1$d фото)</string>
+    <string name="gallery_reindex_none">Поисковый индекс уже актуален.</string>
     <string name="person_link_contact">Связать с контактом</string>
     <string name="person_unlink_contact">Отвязать контакт</string>
     <string name="contacts_empty_link">Нет контактов для связывания</string>
