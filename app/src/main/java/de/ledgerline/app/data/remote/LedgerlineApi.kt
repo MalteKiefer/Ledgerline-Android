@@ -496,4 +496,17 @@ interface LedgerlineApi {
 
     @GET("api/v1/maps/resolve")
     suspend fun mapsResolve(@Query("url") url: String): Response<de.ledgerline.app.data.remote.dto.MapsResolveResponse>
+
+    // --- Explore raw blobs (exact re-export of imported GPX/KML; content encrypted client-side) ---
+
+    @Multipart
+    @POST("api/v1/explore/upload")
+    suspend fun exploreUpload(@Part file: MultipartBody.Part): Response<UploadResponse>
+
+    @GET("api/v1/explore/raw/{blob}")
+    @Streaming
+    suspend fun exploreRaw(@Path("blob") blob: String): Response<ResponseBody>
+
+    @POST("api/v1/explore/blobs/reconcile")
+    suspend fun exploreReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
 }

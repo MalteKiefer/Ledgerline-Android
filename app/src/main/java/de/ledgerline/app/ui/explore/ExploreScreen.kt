@@ -72,11 +72,12 @@ fun ExploreScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            val text = runCatching { context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } }.getOrNull()
+            val rawBytes = runCatching { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+            val text = rawBytes?.toString(Charsets.UTF_8)
             val fileName = uri.lastPathSegment ?: "track.gpx"
             val parsed = text?.let { de.ledgerline.app.core.explore.TrackImport.parse(it, fileName) }
             if (parsed != null) {
-                vm.importParsed(parsed.name, parsed.sourceFormat, parsed.points) { ok ->
+                vm.importParsed(parsed.name, parsed.sourceFormat, parsed.points, rawBytes) { ok ->
                     if (ok) tab = ExploreTab.TRACKS
                 }
             }
@@ -112,6 +113,7 @@ fun ExploreScreen(
                 calories = vm.caloriesFor(track),
                 onBack = { selectedTrackId = null },
                 onDelete = { vm.deleteTrack(id); selectedTrackId = null },
+                onFetchRaw = { vm.rawFileBytes(track) },
             )
             return
         }

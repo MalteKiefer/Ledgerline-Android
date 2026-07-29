@@ -202,6 +202,10 @@ open class NotImplementedApi : LedgerlineApi {
         override suspend fun twoFactorDisable(): retrofit2.Response<de.ledgerline.app.data.remote.dto.TwoFactorEnabledResponse> = throw NotImplementedError()
         override suspend fun changePassword(body: de.ledgerline.app.data.remote.dto.ChangePasswordRequest): retrofit2.Response<Unit> = throw NotImplementedError()
         override suspend fun mapsResolve(url: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.MapsResolveResponse> = throw NotImplementedError()
+
+        override suspend fun exploreUpload(file: okhttp3.MultipartBody.Part): retrofit2.Response<de.ledgerline.app.data.remote.dto.UploadResponse> = throw NotImplementedError()
+        override suspend fun exploreRaw(blob: String): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
+        override suspend fun exploreReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): retrofit2.Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
     override suspend fun galleryStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun deleteGalleryBlob(blob: String): Response<Unit> = throw NotImplementedError()
     override suspend fun embedText(body: de.ledgerline.app.data.remote.dto.EmbedTextRequest): Response<de.ledgerline.app.data.remote.dto.EmbedTextResponse> = throw NotImplementedError()

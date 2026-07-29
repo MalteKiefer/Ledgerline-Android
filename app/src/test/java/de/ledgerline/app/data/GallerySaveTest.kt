@@ -95,6 +95,10 @@ class GallerySaveTest {
         override suspend fun twoFactorDisable(): retrofit2.Response<de.ledgerline.app.data.remote.dto.TwoFactorEnabledResponse> = throw NotImplementedError()
         override suspend fun changePassword(body: de.ledgerline.app.data.remote.dto.ChangePasswordRequest): retrofit2.Response<Unit> = throw NotImplementedError()
         override suspend fun mapsResolve(url: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.MapsResolveResponse> = throw NotImplementedError()
+
+        override suspend fun exploreUpload(file: okhttp3.MultipartBody.Part): retrofit2.Response<de.ledgerline.app.data.remote.dto.UploadResponse> = throw NotImplementedError()
+        override suspend fun exploreRaw(blob: String): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
+        override suspend fun exploreReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): retrofit2.Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
         override suspend fun mapsRoute(points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse> = throw NotImplementedError()
         override suspend fun notesStore(): Response<de.ledgerline.app.data.remote.dto.StoreResponse> = throw NotImplementedError()
         override suspend fun notesStorePut(body: de.ledgerline.app.data.remote.dto.StorePutRequest): Response<de.ledgerline.app.data.remote.dto.StoreResponse> = throw NotImplementedError()

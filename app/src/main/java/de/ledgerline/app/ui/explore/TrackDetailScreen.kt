@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -75,8 +76,11 @@ fun TrackDetailScreen(
     calories: Long?,
     onBack: () -> Unit,
     onDelete: () -> Unit,
+    /** Fetches the original imported file bytes for exact re-export (null = re-serialize GPX). */
+    onFetchRaw: (suspend () -> ByteArray?)? = null,
 ) {
     val context = LocalContext.current
+    val exportScope = androidx.compose.runtime.rememberCoroutineScope()
     val controller = rememberMapsforgeController()
 
     // A small mapsforge marker bitmap reused for the elevation-hover highlight on the map.
@@ -109,7 +113,12 @@ fun TrackDetailScreen(
                 title = track.name,
                 onBack = onBack,
                 actions = {
-                    IconButton(onClick = { shareGpx(context, track) }) {
+                    IconButton(onClick = {
+                        exportScope.launch {
+                            val raw = onFetchRaw?.invoke()
+                            if (raw != null) shareRaw(context, track, raw) else shareGpx(context, track)
+                        }
+                    }) {
                         Icon(
                             Icons.Outlined.IosShare,
                             contentDescription = stringResource(R.string.track_export_gpx),
@@ -350,6 +359,22 @@ private fun shareGpx(context: android.content.Context, track: ExploreTrack) {
         putExtra(Intent.EXTRA_TITLE, "${track.name}.gpx")
         putExtra(Intent.EXTRA_SUBJECT, "${track.name}.gpx")
         putExtra(Intent.EXTRA_TEXT, gpx)
+    }
+    val chooser = Intent.createChooser(send, context.getString(R.string.track_export_gpx))
+    runCatching { context.startActivity(chooser) }
+}
+
+/** Share the ORIGINAL imported file bytes verbatim (exact re-export). GPX/KML are text, so the
+ *  decoded content rides in EXTRA_TEXT with the source extension. */
+private fun shareRaw(context: android.content.Context, track: ExploreTrack, raw: ByteArray) {
+    val fmt = (track.raw["rawFormat"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.lowercase() ?: "gpx"
+    val ext = if (fmt.contains("kml")) "kml" else "gpx"
+    val mime = if (ext == "kml") "application/vnd.google-earth.kml+xml" else "application/gpx+xml"
+    val send = Intent(Intent.ACTION_SEND).apply {
+        type = mime
+        putExtra(Intent.EXTRA_TITLE, "${track.name}.$ext")
+        putExtra(Intent.EXTRA_SUBJECT, "${track.name}.$ext")
+        putExtra(Intent.EXTRA_TEXT, raw.toString(Charsets.UTF_8))
     }
     val chooser = Intent.createChooser(send, context.getString(R.string.track_export_gpx))
     runCatching { context.startActivity(chooser) }

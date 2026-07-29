@@ -11,6 +11,8 @@ import de.ledgerline.app.core.offline.StoreEnvelope
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
+import de.ledgerline.app.data.remote.dto.ReconcileRequest
+import kotlinx.serialization.json.contentOrNull
 import de.ledgerline.app.domain.model.ExploreManifest
 import de.ledgerline.app.domain.model.ExploreStore
 import de.ledgerline.app.domain.model.ExploreTrackCodec
@@ -92,6 +94,12 @@ class ExploreRepository(
                     if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
                     val store = ExploreStore(manifest, body.version)
                     cache.set(store)
+                    // Reconcile explore raw blobs (living-set = every track's rawBlobId) so a deleted
+                    // imported track's original file is freed (24h grace). Full online load only.
+                    val rawIds = manifest.tracks.mapNotNull {
+                        (it.raw["rawBlobId"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+                    }.filter { it.isNotBlank() }
+                    if (rawIds.isNotEmpty()) runCatching { api.exploreReconcile(ReconcileRequest(rawIds)) }
                     Outcome.Ok(store)
                 }
             }
@@ -118,6 +126,38 @@ class ExploreRepository(
             onSaved = { cache.set(it) },
             onEnvelope = { env -> if (offlineFlags.enabled()) storeCache.put(KEY, env) },
         )
+    }
+
+    /** The wrapped key + blob id of an uploaded raw track file (rawBlobKey = encFileKey `{c,n}`). */
+    data class RawBlob(val id: String, val encKey: String)
+
+    /**
+     * Encrypt + upload the ORIGINAL imported file bytes (GPX/KML) to `/explore/upload` so the track
+     * can later be re-exported byte-identically. Content is secretstream-encrypted + Padmé-padded
+     * client-side (VK-wrapped per-file key). Null on failure — the import still succeeds without it.
+     */
+    suspend fun uploadRaw(bytes: ByteArray): RawBlob? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        val vk = vaultKeyHolder.get() ?: return@withContext null
+        val enc = crypto.newContentEncryptor(vk)
+        val body = EncryptedUpload.body(enc, crypto.contentChunkSize, bytes.size.toLong()) { java.io.ByteArrayInputStream(bytes) }
+        runCatching {
+            val part = okhttp3.MultipartBody.Part.createFormData("file", "track.enc", body)
+            val r = apiProvider(session).exploreUpload(part)
+            if (r.isSuccessful) RawBlob(r.body()!!.id, enc.sealKey()) else null
+        }.getOrNull()
+    }
+
+    /** Fetch + decrypt an uploaded raw track file for exact re-export. Null on failure. */
+    suspend fun downloadRaw(blobId: String, encKey: String): ByteArray? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        val vk = vaultKeyHolder.get() ?: return@withContext null
+        runCatching {
+            val r = apiProvider(session).exploreRaw(blobId)
+            if (!r.isSuccessful) return@runCatching null
+            val cipher = r.body()?.bytes() ?: return@runCatching null
+            BlobDownloader.decrypt(cipher, encKey, vk, crypto)
+        }.getOrNull()
     }
 
     /** Reverse-geocode a coordinate to a place name via the server (coarse grid, never cached). */

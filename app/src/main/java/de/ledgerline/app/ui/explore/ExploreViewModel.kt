@@ -181,10 +181,20 @@ class ExploreViewModel @Inject constructor(
     }
 
     // ---- Import (GPX/KML) ----
-    fun importParsed(name: String, sourceFormat: String, points: List<TrackPoint>, onDone: (Boolean) -> Unit) {
+    fun importParsed(name: String, sourceFormat: String, points: List<TrackPoint>, rawBytes: ByteArray?, onDone: (Boolean) -> Unit) {
         if (points.size < 2) { onDone(false); return }
-        val track = buildTrack(name, points, sourceFormat, null)
         viewModelScope.launch {
+            var track = buildTrack(name, points, sourceFormat, null)
+            // Best-effort: upload the ORIGINAL file so it can be re-exported byte-identically. On
+            // failure the track still imports (re-export falls back to re-serialized GPX).
+            if (rawBytes != null) repo.uploadRaw(rawBytes)?.let { rb ->
+                val extra = track.raw + mapOf(
+                    "rawBlobId" to kotlinx.serialization.json.JsonPrimitive(rb.id),
+                    "rawBlobKey" to kotlinx.serialization.json.JsonPrimitive(rb.encKey),
+                    "rawFormat" to kotlinx.serialization.json.JsonPrimitive(sourceFormat),
+                )
+                track = track.copy(raw = kotlinx.serialization.json.JsonObject(extra))
+            }
             val ok = repo.save { m -> m.copy(tracks = m.tracks + track) } is de.ledgerline.app.core.Outcome.Ok
             onDone(ok)
         }
@@ -210,4 +220,11 @@ class ExploreViewModel @Inject constructor(
     }
 
     fun defaultName(): String = engine.ui.value.activity.name.lowercase().replaceFirstChar { it.uppercase() }
+
+    /** The ORIGINAL imported file bytes for [track] (exact re-export), or null if none/failure. */
+    suspend fun rawFileBytes(track: ExploreTrack): ByteArray? {
+        val id = (track.raw["rawBlobId"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull ?: return null
+        val key = (track.raw["rawBlobKey"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull ?: return null
+        return repo.downloadRaw(id, key)
+    }
 }
