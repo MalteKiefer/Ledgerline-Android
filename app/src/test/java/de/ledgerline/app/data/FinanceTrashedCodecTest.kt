@@ -38,6 +38,20 @@ class FinanceTrashedCodecTest {
         assertTrue("must not be the literal boolean true", t.toString() != "true")
     }
 
+    /** GoBD version trail (openapi 09cf5abf): `versionSeq`/`versions[]`/`pdf` are ZK-passthrough —
+     *  Android carries them through a decode→encode round-trip unchanged (raw-overlay). */
+    @Test fun preserves_invoice_version_trail_and_pdf() {
+        val json = Json.parseToJsonElement(
+            """{"id":"i1","status":"paid","versionSeq":2,
+                "versions":[{"seq":1,"label":"2026-0007-001","reason":"issue","at":"2026-07-01T00:00:00Z","snapshot":{"note":"x"}}],
+                "pdf":{"blob":"b-1","key":"k-1","name":"inv.pdf","mime":"application/pdf"}}""",
+        ).jsonObject
+        val out = FinanceRecordCodec.encodeInvoice(FinanceRecordCodec.decodeInvoice(json)!!)
+        assertEquals("versionSeq must survive", JsonPrimitive(2), out["versionSeq"])
+        assertEquals("versions[] must survive verbatim", json["versions"], out["versions"])
+        assertEquals("imported pdf ref must survive", json["pdf"], out["pdf"])
+    }
+
     @Test fun android_restore_writes_null_not_false() {
         val inv = FinanceRecordCodec.decodeInvoice(invoiceJson("\"2026-01-01T00:00:00Z\""))!!.copy(trashed = false)
         val out = FinanceRecordCodec.encodeInvoice(inv)

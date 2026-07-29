@@ -57,8 +57,14 @@ fun InvoiceDetailScreen(inv: Invoice, vm: FinanceViewModel, onBack: () -> Unit, 
                     }) {
                         androidx.compose.material3.Icon(Icons.Outlined.Description, stringResource(R.string.finance_export_xml))
                     }
-                    androidx.compose.material3.IconButton(onClick = onEdit) {
-                        androidx.compose.material3.Icon(Icons.Outlined.Edit, stringResource(R.string.finance_edit))
+                    // GoBD: a finalized (sent/paid) or imported invoice is an immutable record —
+                    // editing it must append a versioned correction to versions[] (with a generated
+                    // PDF for online-created invoices, which this client can't produce). Rather than
+                    // silently overwrite and break the correction trail, only DRAFTs are editable here.
+                    if (inv.status == de.ledgerline.app.domain.model.InvoiceStatus.DRAFT && !inv.raw.containsKey("pdf")) {
+                        androidx.compose.material3.IconButton(onClick = onEdit) {
+                            androidx.compose.material3.Icon(Icons.Outlined.Edit, stringResource(R.string.finance_edit))
+                        }
                     }
                     androidx.compose.material3.IconButton(onClick = { vm.trash(inv) { onBack() } }) {
                         androidx.compose.material3.Icon(Icons.Outlined.Delete, stringResource(R.string.action_delete))
