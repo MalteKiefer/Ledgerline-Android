@@ -186,12 +186,14 @@ private fun PaymentMethodEditScreen(initial: PaymentMethod, vm: FinanceViewModel
 private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit, onEditTx: (de.ledgerline.app.domain.model.Transaction) -> Unit) {
     var pm by remember(initial) { mutableStateOf(initial) }
     var txQuery by remember { mutableStateOf("") }
+    var txYear by remember { mutableStateOf(java.time.LocalDate.now().year.toString()) }
     vm.transactions.collectAsStateWithLifecycle()   // recompose after import/edit
     val allTxns = vm.accountTransactions(initial.id)
-    val txns = remember(allTxns, txQuery) {
+    val txYears = remember(allTxns) { (allTxns.mapNotNull { it.date.take(4).ifBlank { null } } + txYear).distinct().sortedDescending() }
+    val txns = remember(allTxns, txQuery, txYear) {
         val q = txQuery.trim().lowercase()
-        if (q.isEmpty()) allTxns else allTxns.filter {
-            it.counterparty.lowercase().contains(q) || it.purpose.lowercase().contains(q) || it.date.contains(q) ||
+        allTxns.filter { it.date.startsWith(txYear) }.filter {
+            q.isEmpty() || it.counterparty.lowercase().contains(q) || it.purpose.lowercase().contains(q) || it.date.contains(q) ||
                 de.ledgerline.app.core.finance.AmountSearch.amountMatches(it.amount, txQuery)
         }
     }
@@ -276,6 +278,11 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
                     Text(stringResource(R.string.finance_pm_bookings_title), Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
                     androidx.compose.material3.TextButton(onClick = launchImport) { Text(stringResource(R.string.finance_import_action)) }
                     androidx.compose.material3.TextButton(onClick = { onEditTx(vm.newTransaction(initial.id)) }) { Text(stringResource(R.string.finance_tx_add)) }
+                }
+                if (txYears.size > 1) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        txYears.forEach { y -> FilterChip(selected = y == txYear, onClick = { txYear = y }, label = { Text(y) }) }
+                    }
                 }
                 if (allTxns.size > 6) {
                     OutlinedTextField(txQuery, { txQuery = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_tx_search)) }, singleLine = true)

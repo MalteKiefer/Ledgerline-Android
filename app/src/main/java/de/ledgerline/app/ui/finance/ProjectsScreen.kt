@@ -220,6 +220,7 @@ private fun ExpenseEditScreen(project: Project, initial: ProjectExpense, vm: Fin
     var amount by remember(initial) { mutableStateOf(if (initial.amount == 0.0) "" else initial.amount.toString()) }
     var date by remember(initial) { mutableStateOf(initial.date) }
     var note by remember(initial) { mutableStateOf(initial.note) }
+    var category by remember(initial) { mutableStateOf(initial.category) }
     val exists = project.expenses.any { it.id == initial.id }
     AppScaffold(topBar = { AppTopBar(title = stringResource(if (exists) R.string.finance_tx_edit else R.string.finance_tx_add), onBack = onBack, actions = {
         if (exists) IconButton(onClick = { vm.saveProject(project.copy(expenses = project.expenses.filter { it.id != initial.id })) { if (it) onBack() } }) { Icon(Icons.Outlined.Delete, stringResource(R.string.action_delete)) }
@@ -229,9 +230,10 @@ private fun ExpenseEditScreen(project: Project, initial: ProjectExpense, vm: Fin
                 OutlinedTextField(amount, { amount = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_tx_amount)) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 OutlinedTextField(date, { date = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_date)) }, singleLine = true)
                 OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_pm_note)) }, singleLine = true)
+                OutlinedTextField(category, { category = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_expense_category)) }, singleLine = true)
             }
             PrimaryGradientButton(stringResource(R.string.action_save), enabled = amount.replace(',', '.').toDoubleOrNull() != null, onClick = {
-                val e = initial.copy(amount = amount.replace(',', '.').trim().toDoubleOrNull() ?: 0.0, date = date.trim(), note = note.trim())
+                val e = initial.copy(amount = amount.replace(',', '.').trim().toDoubleOrNull() ?: 0.0, date = date.trim(), note = note.trim(), category = category.trim())
                 val next = if (exists) project.expenses.map { if (it.id == e.id) e else it } else project.expenses + e
                 vm.saveProject(project.copy(expenses = next)) { if (it) onBack() }
             })

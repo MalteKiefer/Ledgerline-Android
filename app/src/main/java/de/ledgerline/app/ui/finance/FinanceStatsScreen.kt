@@ -118,6 +118,16 @@ fun FinanceStatsScreen(vm: FinanceViewModel, year: Int, onBack: () -> Unit) {
                 }
             }
 
+            // Project costs split business vs private.
+            val (bizCost, privCost) = vm.projectScopeTotals()
+            if (bizCost != 0.0 || privCost != 0.0) {
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.finance_stats_project_costs), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    TotalRow(stringResource(R.string.finance_project_business), vm.money(bizCost, null))
+                    TotalRow(stringResource(R.string.finance_project_private), vm.money(privCost, null))
+                }
+            }
+
             // Monthly revenue bars
             if (monthly.any { it > 0.0 }) {
                 Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(10.dp)) {

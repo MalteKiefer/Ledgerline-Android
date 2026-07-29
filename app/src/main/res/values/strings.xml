@@ -900,4 +900,6 @@
     <string name="finance_scope_private">Private</string>
     <string name="finance_pm_business">Business account</string>
     <string name="finance_project_kind_inherited">Inherited from parent</string>
+    <string name="finance_stats_project_costs">Project costs</string>
+    <string name="finance_expense_category">Category</string>
 </resources>
