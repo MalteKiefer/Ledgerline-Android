@@ -43,6 +43,11 @@ class ShardedStoreEngine(
     private val storePut: suspend (StorePutRequest) -> Response<StoreResponse>,
     private val rawBlob: suspend (String) -> Response<ResponseBody>,
     private val uploadBlobApi: suspend (MultipartBody.Part) -> Response<UploadResponse>,
+    // Optional: report the living blob set (shard + collection refs) after a full ONLINE load so the
+    // server frees orphaned blobs. Best-effort; never called on a cache/offline or degraded load.
+    private val reconcile: (suspend (List<String>) -> Unit)? = null,
+    // Optional framed batch fetch (`/…/raw-batch`) to pull all shard/collection blobs in one round-trip.
+    private val rawBatch: (suspend (List<String>) -> Response<ResponseBody>)? = null,
 ) {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val jsonEnc = Json { encodeDefaults = true; explicitNulls = false }
@@ -69,7 +74,16 @@ class ShardedStoreEngine(
         if (offlineFlags.enabled()) storeCache.put(rootCacheKey, StoreEnvelope(ct, body.version))
         val plain = crypto.openManifest(ct, vk) ?: error("decrypt failed")
         val root = json.decodeFromString(ShardRoot.serializer(), plain)
-        return assemble(root, vk, allowNetwork = true)
+        val loaded = assemble(root, vk, allowNetwork = true)
+        // Full online load succeeded (assemble throws on a durably-missing shard, so `loaded` is
+        // never partial here): report the living set so the server reclaims orphaned blobs. The
+        // living set = shard blobs + the folders collection blob (records carry no own blobs), which
+        // is exactly the web's `shardRefs()` — anything not listed is grace-gated (24h) freed.
+        reconcile?.let { rc ->
+            val refs = priorRoot.shards.map { it.ref }.filter { it.isNotEmpty() } + listOfNotNull(priorRoot.folders?.ref?.takeIf { it.isNotEmpty() })
+            if (refs.isNotEmpty()) runCatching { rc(refs) }
+        }
+        return loaded
     }
 
     private suspend fun cachedOr(vk: ByteArray): Loaded {
@@ -95,6 +109,16 @@ class ShardedStoreEngine(
             shards = root.shards,
             folders = root.foldersRef?.let { SealedShardWriter.CollDesc(it, root.foldersKey ?: "", root.foldersHash ?: "") },
         )
+        // One batch round-trip for every not-yet-cached shard/collection blob (vs one GET per shard).
+        // Only when online + offline-caching on (write-through), then the per-shard fetch hits cache.
+        if (allowNetwork && offlineFlags.enabled()) rawBatch?.let { batch ->
+            val need = (root.shards.map { it.ref } + listOfNotNull(root.foldersRef))
+                .filter { it.isNotEmpty() && !blobCache.has(it) }
+            for (chunk in need.chunked(512)) runCatching {
+                val res = batch(chunk)
+                if (res.isSuccessful) RawBatchFraming.parse(res.body()!!.bytes()).forEach { (id, cipher) -> blobCache.put(id, cipher) }
+            }
+        }
         val records = coroutineScope {
             root.shards.map { s -> async { fetchShard(s.ref, s.key ?: "", vk, allowNetwork) } }.awaitAll()
         }.flatMap { it ?: emptyList() }

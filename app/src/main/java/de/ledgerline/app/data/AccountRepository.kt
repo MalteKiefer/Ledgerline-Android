@@ -105,6 +105,18 @@ class AccountRepository(
         }
     }
 
+    /**
+     * Report device sync activity (`POST /device/heartbeat`) and honour the remote-wipe kill switch
+     * the response carries (any heartbeat delivers it, like `/me`). Best-effort; safe to call often.
+     */
+    suspend fun heartbeat(state: String) {
+        val session = sessionHolder.get() ?: return
+        try {
+            val res = apiProvider(session).deviceHeartbeat(de.ledgerline.app.data.remote.dto.HeartbeatRequest(state))
+            if (res.isSuccessful && res.body()?.wipe == true) authEventBus.emitWipe()
+        } catch (_: Exception) { /* best-effort */ }
+    }
+
     /** The signed-in user's avatar image bytes (non-secret, `GET /avatar`), or null if none/failure. */
     suspend fun avatar(): ByteArray? {
         val session = sessionHolder.get() ?: return null

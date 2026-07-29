@@ -73,6 +73,9 @@ class BackgroundSync @Inject constructor(
         // Remote kill switch first, ungated by the offline setting — me() fires the wipe
         // event on wipe:true. Works even while locked (token only, no VK needed).
         accountRepository.me()
+        // Report sync activity (also delivers the wipe flag) so the web devices list shows this
+        // client as syncing — a heartbeat this tick means we're actively refreshing.
+        accountRepository.heartbeat("syncing")
         // Periodically (≤ every 12 h) check installed offline maps for newer server versions.
         val now = System.currentTimeMillis()
         if (now - lastMapCheck > 12L * 3600_000L) {

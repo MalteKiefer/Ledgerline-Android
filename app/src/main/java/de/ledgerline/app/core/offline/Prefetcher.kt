@@ -113,10 +113,11 @@ class Prefetcher @Inject constructor(
         val pending = refs.distinctBy { it.id }.filterNot { blobCache.has(it.id) }
         if (pending.isEmpty()) return
 
-        // Gallery blobs are fetched in batches (one raw-batch round-trip per ≤512 ids); files and
-        // contacts stay per-blob (their stores have no batch endpoint wired).
+        // Gallery + files are fetched in batches (one raw-batch round-trip per ≤512 ids); contacts
+        // stay per-blob (their store has no batch endpoint).
         val galleryRefs = pending.filter { it.kind == Kind.GALLERY }.map { it.id }
-        val others = pending.filter { it.kind != Kind.GALLERY }
+        val fileRefs = pending.filter { it.kind == Kind.FILE }.map { it.id }
+        val others = pending.filter { it.kind == Kind.CONTACT }
 
         operationManager.run(OpKind.PREFETCH, total = pending.size) { report ->
             var done = 0
@@ -125,11 +126,15 @@ class Prefetcher @Inject constructor(
                 done += chunk.size
                 report(done, pending.size)
             }
+            for (chunk in fileRefs.chunked(512)) {
+                fileRepo.prefetchBatch(chunk)
+                done += chunk.size
+                report(done, pending.size)
+            }
             for (ref in others) {
                 when (ref.kind) {
-                    Kind.FILE -> fileRepo.prefetch(ref.id)
                     Kind.CONTACT -> contactRepo.prefetch(ref.id)
-                    Kind.GALLERY -> Unit // handled in the batch above
+                    else -> Unit // gallery/files handled in the batches above
                 }
                 report(++done, pending.size)
             }

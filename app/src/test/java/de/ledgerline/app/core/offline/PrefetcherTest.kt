@@ -65,6 +65,16 @@ class PrefetcherTest {
             fileRefs.add(blob)
             return Response.success(byteArrayOf(4, 5, 6).toResponseBody("application/octet-stream".toMediaType()))
         }
+        // Files now batch through raw-batch too (mirrors the gallery fake framing).
+        override suspend fun filesRawBatch(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<ResponseBody> {
+            fileRefs.addAll(body.blobs)
+            val out = java.io.ByteArrayOutputStream()
+            for (id in body.blobs) {
+                val idb = id.toByteArray(Charsets.UTF_8)
+                out.write(u32le(idb.size)); out.write(idb); out.write(u32le(3)); out.write(byteArrayOf(4, 5, 6))
+            }
+            return Response.success(out.toByteArray().toResponseBody("application/octet-stream".toMediaType()))
+        }
     }
 
     private class FakeConstraints(

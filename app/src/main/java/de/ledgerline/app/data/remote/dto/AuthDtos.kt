@@ -61,6 +61,10 @@ import kotlinx.serialization.Serializable
     val preferences: DisplayPrefsDto? = null,
 )
 
+/** `POST /device/heartbeat` — report sync activity; the response carries the remote-wipe kill switch. */
+@Serializable data class HeartbeatRequest(val state: String, val detail: String? = null)
+@Serializable data class HeartbeatResponse(val wipe: Boolean = false)
+
 @Serializable data class MeUsage(
     val files: Long? = null,
     val gallery: Long? = null,

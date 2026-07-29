@@ -95,6 +95,8 @@ class PasswordsRepository(
             storePut = { req -> api().passwordsStorePut(req) },
             rawBlob = { ref -> api().rawPassword(ref) },
             uploadBlobApi = { part -> api().uploadPassword(part) },
+            reconcile = { refs -> api().passwordsReconcile(de.ledgerline.app.data.remote.dto.ReconcileRequest(refs)) },
+            rawBatch = { refs -> api().passwordsRawBatch(de.ledgerline.app.data.remote.dto.ReconcileRequest(refs)) },
         )
     }
 

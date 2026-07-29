@@ -111,6 +111,8 @@ class WorkspaceRepository(
             storePut = { apiProvider(sessionHolder.get()!!).notesStorePut(it) },
             rawBlob = { apiProvider(sessionHolder.get()!!).rawNote(it) },
             uploadBlobApi = { apiProvider(sessionHolder.get()!!).uploadNote(it) },
+            reconcile = { refs -> apiProvider(sessionHolder.get()!!).notesReconcile(de.ledgerline.app.data.remote.dto.ReconcileRequest(refs)) },
+            rawBatch = { refs -> apiProvider(sessionHolder.get()!!).notesRawBatch(de.ledgerline.app.data.remote.dto.ReconcileRequest(refs)) },
         )
     }
 

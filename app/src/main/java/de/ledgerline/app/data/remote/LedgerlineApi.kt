@@ -100,6 +100,10 @@ interface LedgerlineApi {
     @Streaming
     suspend fun rawFile(@Path("blob") blob: String): Response<ResponseBody>
 
+    @POST("api/v1/files/raw-batch")
+    @Streaming
+    suspend fun filesRawBatch(@Body body: ReconcileRequest): Response<ResponseBody>
+
     @Multipart
     @POST("api/v1/files/upload")
     suspend fun uploadFile(@Part file: MultipartBody.Part): Response<UploadResponse>
@@ -149,6 +153,13 @@ interface LedgerlineApi {
     @POST("api/v1/notes/upload")
     suspend fun uploadNote(@Part file: MultipartBody.Part): Response<UploadResponse>
 
+    @POST("api/v1/notes/raw-batch")
+    @Streaming
+    suspend fun notesRawBatch(@Body body: ReconcileRequest): Response<ResponseBody>
+
+    @POST("api/v1/notes/blobs/reconcile")
+    suspend fun notesReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
+
     // --- Finance / invoices sharded store + blobs + non-secret company profile ---
     @GET("api/v1/invoices/store")
     suspend fun invoicesStore(): Response<StoreResponse>
@@ -181,6 +192,10 @@ interface LedgerlineApi {
     @Streaming
     suspend fun avatar(): Response<ResponseBody>
 
+    /** Report sync activity; the response's `wipe` flag delivers the remote kill switch. */
+    @POST("api/v1/device/heartbeat")
+    suspend fun deviceHeartbeat(@Body body: de.ledgerline.app.data.remote.dto.HeartbeatRequest): Response<de.ledgerline.app.data.remote.dto.HeartbeatResponse>
+
     @GET("api/v1/company")
     suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse>
 
@@ -205,6 +220,13 @@ interface LedgerlineApi {
     @Multipart
     @POST("api/v1/passwords/upload")
     suspend fun uploadPassword(@Part file: MultipartBody.Part): Response<UploadResponse>
+
+    @POST("api/v1/passwords/raw-batch")
+    @Streaming
+    suspend fun passwordsRawBatch(@Body body: ReconcileRequest): Response<ResponseBody>
+
+    @POST("api/v1/passwords/blobs/reconcile")
+    suspend fun passwordsReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
 
     @GET("api/v1/files/store")
     suspend fun filesStore(): Response<StoreResponse>

@@ -120,6 +120,22 @@ class FileBlobRepository @VisibleForTesting internal constructor(
         } catch (_: Exception) { false }
     }
 
+    /** Batch-fetch file blobs (`/files/raw-batch`, ≤512/chunk) into the cache — one round-trip. */
+    suspend fun prefetchBatch(refs: List<String>): Int = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext 0
+        val pending = refs.distinct().filterNot { blobCache.has(it) }
+        if (pending.isEmpty()) return@withContext 0
+        var cached = 0
+        for (chunk in pending.chunked(512)) {
+            try {
+                val res = apiProvider(session).filesRawBatch(de.ledgerline.app.data.remote.dto.ReconcileRequest(chunk))
+                if (!res.isSuccessful) continue
+                RawBatchFraming.parse(res.body()!!.bytes()).forEach { (id, cipher) -> blobCache.put(id, cipher); cached++ }
+            } catch (_: Exception) { /* fall back to per-blob prefetch */ }
+        }
+        cached
+    }
+
     /** Download + decrypt a blob fully into memory (for in-app viewing / small files). */
     override suspend fun downloadToBytes(blob: String, encFileKey: String): Outcome<ByteArray> =
         withContext(Dispatchers.IO) {
