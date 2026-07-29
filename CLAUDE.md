@@ -686,7 +686,21 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
   Netto/MwSt-je-Satz/Gesamt, Aktionen) + `InvoiceEditScreen` (FAB/Edit). M3-Karten, €-Format, EN/DE/RU.
   Tests `InvoiceMathTest` + `FinanceRepositoryTest` (Collection-Erhaltung). **On-device (Read) verifiziert:**
   echte Rechnungen entschlüsseln, Totals korrekt (900 net ×19% → 1.071 brutto).
-- Galerie-ML-Parität: semantische Suche (embed-text ist da), Duplikate, Alben-Feinschliff.
+- **Galerie-ML-Parität — CLIP-Suche jetzt modell-korrekt (2026-07-29, web `_reembedOne`/`reindexAll`).**
+  Semantische Suche vergleicht nur Embeddings **desselben** CLIP-Modells (web `embModel === config.clipModel`).
+  Android schrieb/beachtete das Tag nie → Android-Uploads waren für Web/iOS-Suche unsichtbar (Embedding galt als
+  stale-model). Behoben: `GalleryUploader` schreibt `embModel` (aus Process-`model`), `PhotoMetaBlob.embModel`
+  liest es, Suche filtert auf das **aktuelle** Modell (`SemanticSearch.currentModel` = modaler Tag, da kein
+  Bootstrap-`config.clipModel`; null → alle vergleichen, keine Regression). **Backfill** via `POST /gallery/analyze`
+  (vorher ungenutzt): Jobs-Sheet „Suchindex aufbauen" → `GalleryBlobRepository.reembed` (medium entschlüsseln →
+  analyze → Meta neu versiegeln, nur embedding+embModel, Faces unangetastet → metaRef swap; alte Meta-Blobs via
+  P0-Reconcile-on-load freigegeben). On-device-Verifikation offen. **Noch offen:** Duplikate, Alben-Feinschliff.
+- **Beleg-OCR (Server, `/invoices/ocr`) — konform.** Server hat die OCR-Spec umgesetzt (multipart `file`+`lang?` →
+  `{text,source,pages}`, 422 `no_text`/501-Fallback); Android (`attachReceipt`→`ocrDocument`→`ReceiptOcr.analyze`)
+  entspricht dem Contract exakt (non-2xx → null, manuelle Eingabe bleibt).
+- **P0-Endpunkt-Abdeckung erledigt (2026-07-28):** notes/passwords `blobs/reconcile` (Living-Set = Shard+
+  Collection-Refs, nur Full-Online-Load), files/notes/passwords `raw-batch` (ein Fetch statt per-Blob),
+  `device/heartbeat` (`AccountRepository.heartbeat` + Wipe-Flag; `BackgroundSync` sendet `syncing`).
 
 **P2 — Nav-/UX-Angleichung an iOS:** Tab-Struktur (Passwords-Tab), Grouped-List +
 IconChip überall, Wischgesten konfigurierbar, Info-Sheets.
