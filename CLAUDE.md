@@ -701,6 +701,14 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
 - **P0-Endpunkt-Abdeckung erledigt (2026-07-28):** notes/passwords `blobs/reconcile` (Living-Set = Shard+
   Collection-Refs, nur Full-Online-Load), files/notes/passwords `raw-batch` (ein Fetch statt per-Blob),
   `device/heartbeat` (`AccountRepository.heartbeat` + Wipe-Flag; `BackgroundSync` sendet `syncing`).
+- **Deep-Audit-Fixes (2026-07-29, Commit 396facf):** 6 paralleler openapi↔Android-Audit. 5 kritische Fehler
+  behoben: (1) **Explore-Crash** `ExploreTrackCodec` `"t":null` → `longOrNull`/encode-`null`/GpxWriter-omit;
+  (2) **Geocode-ZK-Leak** — `Geocoder`(direkt-Nominatim) entfernt → `GET /gallery/geocode` server-proxied via
+  `PlaceRepository.geocode`; (3) Rechnung-`trashed` ISO-Erhalt (`applyTrashed`, auch pm/tx); (4) Galerie-Person
+  `centroid` persistiert (fresh+merge); (5) Passwörter Legacy-`custom[].secret` Raw-Overlay. Reverse-`address`
+  defensiv (`JsonElement?`, Server `[]`-Sonderfall). Web fixt `address`-Server-Seite separat. Regressions-Tests
+  grün. **Offene Gaps** (mobil): Sharing-Epos (25 Ops, Krypto ready, Link-Konsumtion zuerst), Notifications,
+  Konto-Export/Löschung, `/settings` (Geb.-Kanäle/`file_max_versions`), Login-2FA, `maps/resolve`, Explore-Blobs.
 
 **P2 — Nav-/UX-Angleichung an iOS:** Tab-Struktur (Passwords-Tab), Grouped-List +
 IconChip überall, Wischgesten konfigurierbar, Info-Sheets.
