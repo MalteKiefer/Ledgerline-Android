@@ -11,7 +11,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -95,6 +97,13 @@ object GalleryRecordCodec {
             recordJson.decodeFromJsonElement(de.ledgerline.app.domain.model.PersonFace.serializer(), it)
         } ?: emptyList()
         if (p.faces != decodedRawFaces) out["faces"] = JsonArray(p.faces.map(::faceJson))
+        // Centroid: keep the raw float tokens (e.g. `1e-7`) byte-exact when unchanged; only re-emit
+        // when Android actually recomputed it (a person merge → size-weighted mean). Dropping it would
+        // degrade the server's incremental clustering + break web parity for Android-merged people.
+        val rawCentroid = (raw["centroid"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.doubleOrNull } ?: emptyList()
+        if (p.centroid != rawCentroid) {
+            if (p.centroid.isNotEmpty()) out["centroid"] = JsonArray(p.centroid.map { JsonPrimitive(it) }) else out.remove("centroid")
+        }
         setOrRemove(out, "contactId", p.contactId)
         setOrRemove(out, "contactName", p.contactName)
         return JsonObject(out)
@@ -105,6 +114,9 @@ object GalleryRecordCodec {
         put("name", JsonPrimitive(p.name))
         put("hidden", JsonPrimitive(p.hidden))
         if (p.faces.isNotEmpty()) put("faces", JsonArray(p.faces.map(::faceJson)))
+        // A brand-new Android cluster carries a computed centroid — persist it (web needs it for
+        // incremental re-clustering); web omits it only for zero-face placeholders.
+        if (p.centroid.isNotEmpty()) put("centroid", JsonArray(p.centroid.map { JsonPrimitive(it) }))
         p.contactId?.let { put("contactId", JsonPrimitive(it)) }
         p.contactName?.let { put("contactName", JsonPrimitive(it)) }
     }

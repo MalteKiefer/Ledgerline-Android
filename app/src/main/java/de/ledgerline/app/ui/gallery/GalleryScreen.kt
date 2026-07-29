@@ -442,6 +442,7 @@ private fun PhotosTab(
                 exitSelection()
             },
             onBack = { showLocationPicker = false },
+            onSearch = vm::geocode,
             modifier = modifier,
         )
         return

@@ -15,6 +15,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
+import kotlinx.serialization.json.longOrNull
 
 /**
  * One saved track in the `explore` module store. Known fields are typed; the original decoded
@@ -84,7 +85,11 @@ object ExploreTrackCodec {
                     lat = it.dbl("lat") ?: return@mapNotNull null,
                     lng = it.dbl("lng") ?: return@mapNotNull null,
                     ele = it.dbl("ele"),
-                    t = it["t"]?.jsonPrimitive?.long ?: 0L,
+                    // Web writes `"t": null` for timeless points (planned routes, KML LineStrings,
+                    // GPX without <time>). `JsonNull` IS a JsonPrimitive, so `.long` would run
+                    // "null".toLong() → NumberFormatException and blow up the WHOLE store load.
+                    // `longOrNull` yields null → fall back to the codebase's 0L = "timeless" sentinel.
+                    t = it["t"]?.jsonPrimitive?.longOrNull ?: 0L,
                 )
             }
         },
@@ -115,7 +120,9 @@ object ExploreTrackCodec {
         put("lat", JsonPrimitive(p.lat))
         put("lng", JsonPrimitive(p.lng))
         put("ele", p.ele?.let { JsonPrimitive(it) } ?: JsonNull)
-        put("t", JsonPrimitive(p.t))
+        // Round-trip web's timeless semantics: 0L = "no time" → write `null` (not `0`, which web
+        // would read as epoch 1970 and mis-derive durations). No real GPS point is at epoch 0.
+        put("t", if (p.t == 0L) JsonNull else JsonPrimitive(p.t))
     }
 
     private fun encodeBBox(b: TrackBBox): JsonObject = buildJsonObject {

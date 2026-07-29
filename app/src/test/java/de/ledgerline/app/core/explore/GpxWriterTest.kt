@@ -25,9 +25,16 @@ class GpxWriterTest {
     }
 
     @Test fun omits_ele_when_null() {
-        val gpx = GpxWriter.write("t", listOf(TrackPoint(1.0, 2.0, null, 0L)))
+        val gpx = GpxWriter.write("t", listOf(TrackPoint(1.0, 2.0, null, 1_721_599_999_000L)))
         assertTrue(gpx.contains("<trkpt lat=\"1\" lon=\"2\"><time>"))
         assertTrue(!gpx.contains("<ele>"))
-        assertTrue(gpx.contains("<time>1970-01-01T00:00:00Z</time>"))
+    }
+
+    /** A timeless point (0L sentinel — planned routes / GPX-KML without <time>) must NOT emit a
+     *  bogus epoch-1970 `<time>`; it is simply omitted. */
+    @Test fun omits_time_for_timeless_point() {
+        val gpx = GpxWriter.write("t", listOf(TrackPoint(1.0, 2.0, 5.0, 0L)))
+        assertTrue(gpx.contains("<trkpt lat=\"1\" lon=\"2\"><ele>5</ele></trkpt>"))
+        assertTrue(!gpx.contains("<time>"))
     }
 }

@@ -11,6 +11,7 @@ import de.ledgerline.app.core.tracker.TrackerEngine
 import de.ledgerline.app.core.tracker.TrackerUi
 import de.ledgerline.app.data.ExploreRepository
 import de.ledgerline.app.domain.model.ExploreTrack
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -28,8 +29,12 @@ class ExploreViewModel @Inject constructor(
     private val demStore: de.ledgerline.app.core.map.DemStore,
     private val settings: de.ledgerline.app.data.SettingsStore,
     private val healthCache: de.ledgerline.app.core.HealthCache,
+    private val places: de.ledgerline.app.data.PlaceRepository,
     cache: ExploreCache,
 ) : ViewModel() {
+
+    /** Forward-geocode a place query via the ZK server proxy (never third-party-direct). */
+    suspend fun geocode(query: String): Pair<Double, Double>? = places.geocode(query)
 
     /**
      * Estimated calories for a track from the tour stats + the user's health data (latest weight +
@@ -93,9 +98,12 @@ class ExploreViewModel @Inject constructor(
     suspend fun reverseAddress(lat: Double, lng: Double) = repo.reverseAddress(lat, lng)
 
     /** A catalog region matching the given place [address] parts that isn't installed/downloading. */
-    fun suggestRegion(address: Map<String, String>): de.ledgerline.app.core.map.OfflineMapRegion? {
-        val state = address["state"] ?: address["region"] ?: address["province"]
-        val country = address["country"]
+    fun suggestRegion(address: kotlinx.serialization.json.JsonElement?): de.ledgerline.app.core.map.OfflineMapRegion? {
+        // `address` is `{}` when populated but `[]` when empty (server quirk) → read defensively.
+        val parts = address as? kotlinx.serialization.json.JsonObject
+        fun field(k: String) = (parts?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+        val state = field("state") ?: field("region") ?: field("province")
+        val country = field("country")
         fun norm(s: String) = s.lowercase().replace("ä", "a").replace("ö", "o").replace("ü", "u").replace("ß", "ss").trim()
         val leaves = mapStore.catalog.leaves().filter { it.id != mapStore.worldMapId }
         fun match(needle: String?): de.ledgerline.app.core.map.OfflineMapRegion? {

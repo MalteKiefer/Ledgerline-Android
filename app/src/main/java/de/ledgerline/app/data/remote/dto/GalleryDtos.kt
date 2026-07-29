@@ -39,11 +39,15 @@ data class ProcessFace(
     val crop: String? = null,
 )
 
-/** `GET /gallery/reverse` response: a resolved place display + structured address parts. */
+/** `GET /gallery/reverse` response: a resolved place display + structured address parts.
+ *  `address` is polymorphic on the wire — the server emits `{}` (object) when populated but `[]`
+ *  (empty JSON array, PHP `json_encode([])`) when no structured address resolves, so it is typed as
+ *  a raw [JsonElement] and read defensively (see PlaceRepository.toPhotoPlace) — decoding it as a
+ *  strict Map would throw on `[]` and silently discard an otherwise-usable `place` display name. */
 @Serializable
 data class ReverseResponse(
     val place: String? = null,
-    val address: Map<String, String> = emptyMap(),
+    val address: JsonElement? = null,
 )
 
 /**
@@ -66,3 +70,15 @@ data class EmbedTextRequest(val q: String)
 /** `POST /gallery/embed-text` response: the CLIP text embedding for the query. */
 @Serializable
 data class EmbedTextResponse(val embedding: List<Double> = emptyList())
+
+/** `GET /gallery/geocode?q=` response: up to 6 forward-geocode candidates (server-proxied,
+ *  never third-party-direct → keeps the query + client IP inside the ZK perimeter). */
+@Serializable
+data class GeocodeResponse(val results: List<GeocodeHit> = emptyList())
+
+@Serializable
+data class GeocodeHit(
+    val display: String = "",
+    val lat: Double? = null,
+    val lng: Double? = null,
+)

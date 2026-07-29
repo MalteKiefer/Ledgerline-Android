@@ -91,7 +91,7 @@ object FinanceRecordCodec {
         out["lines"] = JsonArray(inv.lines.map(::encodeLine))
         out["note"] = JsonPrimitive(inv.note)
         if (inv.raw.containsKey("footer") || inv.footer.isNotEmpty()) out["footer"] = JsonPrimitive(inv.footer)
-        out["trashed"] = JsonPrimitive(inv.trashed)
+        applyTrashed(out, inv.trashed, inv.raw["trashed"])
         inv.updated?.let { out["updated"] = JsonPrimitive(it) }
         return JsonObject(out)
     }
@@ -167,7 +167,7 @@ object FinanceRecordCodec {
         out["email"] = JsonPrimitive(pm.email)
         out["note"] = JsonPrimitive(pm.note)
         out["business"] = JsonPrimitive(pm.business)
-        out["trashed"] = JsonPrimitive(pm.trashed)
+        applyTrashed(out, pm.trashed, pm.raw["trashed"])
         return JsonObject(out)
     }
 
@@ -184,7 +184,7 @@ object FinanceRecordCodec {
         out["purpose"] = JsonPrimitive(t.purpose)
         out["vatCat"] = JsonPrimitive(t.vatCat)
         setOrNull(out, "invoiceId", t.invoiceId?.let { JsonPrimitive(it) })
-        out["trashed"] = JsonPrimitive(t.trashed)
+        applyTrashed(out, t.trashed, t.raw["trashed"])
         return JsonObject(out)
     }
 
@@ -344,6 +344,24 @@ object FinanceRecordCodec {
         this[key]?.let { if (it is JsonNull) null else it.jsonPrimitive.contentOrNull }?.takeIf { it.isNotEmpty() }
 
     private fun JsonArray?.orEmpty(): List<kotlinx.serialization.json.JsonElement> = this ?: emptyList()
+
+    /**
+     * Render `trashed` as web does: `false | ISO-string`, NEVER a boolean — mirrors
+     * [FileRecordCodec]/[WorkspaceRecordCodec]. When the flag is unchanged the original raw token
+     * (a web ISO timestamp or `null`) is kept verbatim; only a real trash/restore writes a fresh
+     * ISO / drops the key. A naive `JsonPrimitive(bool)` would destroy a web-set delete timestamp.
+     */
+    private fun applyTrashed(
+        out: MutableMap<String, kotlinx.serialization.json.JsonElement>,
+        trashed: Boolean,
+        rawTrashed: kotlinx.serialization.json.JsonElement?,
+    ) {
+        val wasTrashed = rawTrashed?.truthy() ?: false
+        if (trashed == wasTrashed) return // keep the raw token (ISO / null) — no destructive rewrite
+        out["trashed"] =
+            if (trashed) JsonPrimitive(java.time.Instant.now().toString())
+            else kotlinx.serialization.json.JsonNull
+    }
 
     private fun kotlinx.serialization.json.JsonElement.truthy(): Boolean {
         if (this is JsonNull) return false

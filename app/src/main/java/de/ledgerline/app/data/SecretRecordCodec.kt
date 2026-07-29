@@ -49,7 +49,14 @@ object SecretRecordCodec {
         setOrRemove(out, "folder", s.folder)
         if (had("tags") || s.tags.isNotEmpty()) out["tags"] = JsonArray(s.tags.map { JsonPrimitive(it) })
         if (had("custom") || s.custom.isNotEmpty()) {
-            out["custom"] = JsonArray(s.custom.map { recordJson.encodeToJsonElement(CustomField.serializer(), it) })
+            // Keep the raw custom-field tokens byte-exact when unchanged: a legacy element
+            // `{label,value,secret:true}` (pre-`kind`) would otherwise decode to kind="text" (the
+            // `secret` key dropped by ignoreUnknownKeys) and re-emit as a PLAINTEXT field — silently
+            // unmasking a hidden value. Only re-shape when Android actually edited the list.
+            val rawCustom = raw?.get("custom") as? JsonArray
+            val decodedRaw = rawCustom?.map { recordJson.decodeFromJsonElement(CustomField.serializer(), it) } ?: emptyList()
+            out["custom"] = if (rawCustom != null && s.custom == decodedRaw) rawCustom
+            else JsonArray(s.custom.map { recordJson.encodeToJsonElement(CustomField.serializer(), it) })
         }
         if (had("icon") || s.icon.isNotEmpty()) out["icon"] = JsonPrimitive(s.icon)
         // `fields` is opaque: when untouched, s.fields IS the decoded raw["fields"] (same content

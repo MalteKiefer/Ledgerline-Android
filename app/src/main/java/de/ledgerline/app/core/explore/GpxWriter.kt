@@ -23,7 +23,8 @@ object GpxWriter {
                 .append("\" lon=\"").append(num(p.lng)).append("\">")
             val inner = StringBuilder()
             p.ele?.let { inner.append("<ele>").append(num(it)).append("</ele>") }
-            inner.append("<time>").append(iso(p.t)).append("</time>")
+            // 0L = timeless (planned routes, GPX/KML without <time>) → omit rather than emit epoch 1970.
+            if (p.t != 0L) inner.append("<time>").append(iso(p.t)).append("</time>")
             out.append(inner).append("</trkpt>\n")
         }
         out.append("    </trkseg>\n  </trk>\n</gpx>\n")

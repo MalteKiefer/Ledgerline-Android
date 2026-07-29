@@ -55,6 +55,7 @@ class GallerySaveTest {
         var lastReconcile: List<String>? = null
 
         override suspend fun galleryReverse(lat: Double, lng: Double): Response<de.ledgerline.app.data.remote.dto.ReverseResponse> = throw NotImplementedError()
+        override suspend fun galleryGeocode(q: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.GeocodeResponse> = throw NotImplementedError()
         override suspend fun mapsRoute(points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse> = throw NotImplementedError()
         override suspend fun notesStore(): Response<de.ledgerline.app.data.remote.dto.StoreResponse> = throw NotImplementedError()
         override suspend fun notesStorePut(body: de.ledgerline.app.data.remote.dto.StorePutRequest): Response<de.ledgerline.app.data.remote.dto.StoreResponse> = throw NotImplementedError()

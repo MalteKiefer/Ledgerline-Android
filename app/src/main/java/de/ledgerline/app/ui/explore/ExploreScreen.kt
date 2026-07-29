@@ -85,7 +85,6 @@ fun ExploreScreen(
 
     // Map search (header lupe → expanding modal field): forward-geocode + drop a search pin.
     val mapController = de.ledgerline.app.ui.map.rememberMapsforgeController()
-    val geocoder = remember { de.ledgerline.app.data.remote.Geocoder() }
     val searchPin = de.ledgerline.app.ui.map.rememberMapPin()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var searchOpen by remember { mutableStateOf(false) }
@@ -96,7 +95,7 @@ fun ExploreScreen(
         if (qq.isBlank()) return
         searching = true
         scope.launch {
-            val hit = geocoder.search(qq)
+            val hit = vm.geocode(qq)
             searching = false
             hit?.let { mapController.setSearchPin(it.first, it.second, searchPin); mapController.moveTo(it.first, it.second, 14) }
             searchOpen = false

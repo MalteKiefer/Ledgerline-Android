@@ -37,7 +37,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import de.ledgerline.app.R
-import de.ledgerline.app.data.remote.Geocoder
 import de.ledgerline.app.ui.map.GatedMapsforgeMap
 import de.ledgerline.app.ui.map.rememberMapPin
 import de.ledgerline.app.ui.map.rememberMapsforgeController
@@ -61,7 +60,8 @@ fun LocationPickerScreen(
     onPick: (Double, Double) -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    geocoder: Geocoder = remember { Geocoder() },
+    /** Forward-geocode via the ZK server proxy (GalleryViewModel.geocode) — never third-party-direct. */
+    onSearch: suspend (String) -> Pair<Double, Double>?,
 ) {
     BackHandler(onBack = onBack)
     val fs = LocalFullscreen.current
@@ -98,7 +98,7 @@ fun LocationPickerScreen(
         searching = true
         notFound = false
         scope.launch {
-            val hit = geocoder.search(q)
+            val hit = onSearch(q)
             searching = false
             if (hit == null) notFound = true else { notFound = false; moveMarker(hit.first, hit.second, recenter = true) }
         }

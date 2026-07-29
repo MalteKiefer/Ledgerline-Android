@@ -321,6 +321,12 @@ interface LedgerlineApi {
         @Query("lng") lng: Double,
     ): Response<ReverseResponse>
 
+    /** Forward-geocode a free-text place query — server-proxied (never third-party-direct), so the
+     *  query + client IP stay inside the ZK perimeter (mirrors the web, which routes all place search
+     *  through this endpoint). */
+    @GET("api/v1/gallery/geocode")
+    suspend fun galleryGeocode(@Query("q") q: String): Response<de.ledgerline.app.data.remote.dto.GeocodeResponse>
+
     /** Snap a `lat,lng;lat,lng;…` waypoint string to a routed path (Explore tour planning). */
     @GET("api/v1/maps/route")
     suspend fun mapsRoute(@Query("points") points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse>

@@ -137,6 +137,7 @@ fun PhotoViewerScreen(
                 showLocationPicker = false
             },
             onBack = { showLocationPicker = false },
+            onSearch = vm::geocode,
             modifier = modifier,
         )
         return

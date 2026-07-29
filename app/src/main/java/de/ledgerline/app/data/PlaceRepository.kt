@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -76,6 +77,29 @@ class PlaceRepository @VisibleForTesting internal constructor(
         place
     }
 
+    /**
+     * Forward-geocode a free-text place query to `(lat, lng)` via the server proxy
+     * (`GET /gallery/geocode`) — the query + client IP never touch a third party, matching the
+     * ZK/metadata posture the reverse path already honours. Returns the first candidate, or null on
+     * blank/failure. Not cached (a transient search, not a photo's resolved place).
+     */
+    suspend fun geocode(q: String): Pair<Double, Double>? = withContext(Dispatchers.IO) {
+        val query = q.trim()
+        if (query.isBlank()) return@withContext null
+        val session = sessionHolder.get() ?: return@withContext null
+        try {
+            val r = apiProvider(session).galleryGeocode(query)
+            if (!r.isSuccessful) return@withContext null
+            r.body()?.results?.firstNotNullOfOrNull { hit ->
+                val lat = hit.lat ?: return@firstNotNullOfOrNull null
+                val lng = hit.lng ?: return@firstNotNullOfOrNull null
+                lat to lng
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     /** Drop the encrypted place cache (called on forced logout / disconnect). */
     suspend fun clear() {
         context.placeCacheStore.edit { it.clear() }
@@ -85,9 +109,16 @@ class PlaceRepository @VisibleForTesting internal constructor(
 /** Map the reverse-geocode response to a [PhotoPlace]; null when nothing usable resolved. */
 private fun ReverseResponse.toPhotoPlace(): PhotoPlace? {
     val display = place?.takeIf { it.isNotBlank() }
-    val city = address["city"] ?: address["town"] ?: address["village"] ?: address["municipality"]
-    val state = address["state"]
-    val country = address["country"]
+    // `address` is `{}` when populated but `[]` when empty (server quirk) → only read string parts
+    // when it actually decoded to an object; otherwise fall back to just the display name.
+    val parts = (address as? kotlinx.serialization.json.JsonObject).orEmpty()
+    fun part(k: String) = (parts[k] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNull
+    val city = part("city") ?: part("town") ?: part("village") ?: part("municipality")
+    val state = part("state")
+    val country = part("country")
     if (display == null && city == null && state == null && country == null) return null
     return PhotoPlace(name = null, display = display, city = city, state = state, country = country)
 }
+
+private fun kotlinx.serialization.json.JsonObject?.orEmpty(): Map<String, kotlinx.serialization.json.JsonElement> =
+    this ?: emptyMap()
