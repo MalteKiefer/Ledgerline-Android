@@ -1,5 +1,9 @@
 package de.ledgerline.app.ui.settings
 
+import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.VpnKey
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.ColumnScope
@@ -51,6 +55,7 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Logout
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Map
@@ -534,6 +539,30 @@ private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
     )
 }
 
+/**
+ * One labeled settings section: an uppercase [label] over a rounded [SettingsGroup] card, inset
+ * from the screen edge. The building block every detail sub-screen uses so the whole Settings
+ * area reads as one system (matching the redesigned home). [danger] tints the label red for a
+ * destructive group.
+ */
+@Composable
+private fun SettingsSection(label: String, danger: Boolean = false, hint: String? = null, content: @Composable ColumnScope.() -> Unit) {
+    Text(
+        label.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = if (danger) MaterialTheme.colorScheme.error else Brand.accent,
+        letterSpacing = 0.08.em,
+        modifier = Modifier.padding(start = 22.dp, end = 16.dp, top = 18.dp, bottom = 6.dp),
+    )
+    if (hint != null) Text(
+        hint,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 22.dp, end = 22.dp, bottom = 8.dp),
+    )
+    Column(Modifier.padding(horizontal = 16.dp)) { SettingsGroup(content = content) }
+}
+
 @Composable
 private fun SettingsRowDivider() {
     androidx.compose.material3.HorizontalDivider(
@@ -566,6 +595,23 @@ private fun SettingsRow(icon: ImageVector, tint: Color, title: String, value: St
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/** A settings row with a tinted chip + title + optional value and a trailing action slot. */
+@Composable
+private fun AccountActionRow(icon: ImageVector, tint: Color, title: String, value: String, trailing: @Composable () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconChip(icon, tint = tint, size = 32.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            if (value.isNotBlank()) Text(value, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        }
+        trailing()
     }
 }
 
@@ -720,25 +766,15 @@ private fun MapsSettings(
     onOpenOfflineMaps: () -> Unit,
 ) {
     SubScreen(padding) {
-        SectionHeader(stringResource(R.string.settings_maps_online))
-        SwitchRow(
-            stringResource(R.string.settings_maps_tiles),
-            stringResource(R.string.settings_maps_tiles_sub),
-            mapTiles,
-            onSetMapTiles,
-        )
-        SwitchRow(
-            stringResource(R.string.settings_maps_terrain),
-            stringResource(R.string.settings_maps_terrain_sub),
-            terrain,
-            onSetTerrain,
-        )
-        SectionHeader(stringResource(R.string.settings_maps_offline))
-        CategoryRow(
-            icon = androidx.compose.material.icons.Icons.Outlined.Download,
-            title = stringResource(R.string.offline_maps_title),
-            subtitle = stringResource(R.string.settings_maps_offline_sub),
-        ) { onOpenOfflineMaps() }
+        SettingsSection(stringResource(R.string.settings_maps_online)) {
+            SwitchRow(stringResource(R.string.settings_maps_tiles), stringResource(R.string.settings_maps_tiles_sub), mapTiles, onSetMapTiles)
+            SettingsRowDivider()
+            SwitchRow(stringResource(R.string.settings_maps_terrain), stringResource(R.string.settings_maps_terrain_sub), terrain, onSetTerrain)
+        }
+        SettingsSection(stringResource(R.string.settings_maps_offline)) {
+            SettingsRow(androidx.compose.material.icons.Icons.Outlined.Download, Brand.tintTeal, stringResource(R.string.offline_maps_title), stringResource(R.string.settings_maps_offline_sub), onOpenOfflineMaps)
+        }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -759,75 +795,53 @@ private fun AppearanceSettings(
     onSelectCoord: (de.ledgerline.app.core.geo.CoordinateFormat) -> Unit,
 ) {
     SubScreen(padding) {
-        SectionHeader(stringResource(R.string.settings_theme))
-        Column(Modifier.selectableGroup()) {
-            RadioRow(stringResource(R.string.settings_theme_system), themeMode == de.ledgerline.app.data.ThemeMode.SYSTEM) {
-                onSelectTheme(de.ledgerline.app.data.ThemeMode.SYSTEM)
-            }
-            RadioRow(stringResource(R.string.settings_theme_light), themeMode == de.ledgerline.app.data.ThemeMode.LIGHT) {
-                onSelectTheme(de.ledgerline.app.data.ThemeMode.LIGHT)
-            }
-            RadioRow(stringResource(R.string.settings_theme_dark), themeMode == de.ledgerline.app.data.ThemeMode.DARK) {
-                onSelectTheme(de.ledgerline.app.data.ThemeMode.DARK)
-            }
+        SettingsSection(stringResource(R.string.settings_theme)) {
+            RadioRow(stringResource(R.string.settings_theme_system), themeMode == de.ledgerline.app.data.ThemeMode.SYSTEM) { onSelectTheme(de.ledgerline.app.data.ThemeMode.SYSTEM) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.settings_theme_light), themeMode == de.ledgerline.app.data.ThemeMode.LIGHT) { onSelectTheme(de.ledgerline.app.data.ThemeMode.LIGHT) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.settings_theme_dark), themeMode == de.ledgerline.app.data.ThemeMode.DARK) { onSelectTheme(de.ledgerline.app.data.ThemeMode.DARK) }
         }
-        SectionHeader(stringResource(R.string.settings_units))
-        PrefChoiceRow(stringResource(R.string.settings_pref_distance), listOf("km" to "km", "mi" to "mi"), prefs.distance) { onSetPrefs(prefs.copy(distance = it)) }
-        PrefChoiceRow(stringResource(R.string.settings_pref_elevation), listOf("m" to "m", "ft" to "ft"), prefs.elevation) { onSetPrefs(prefs.copy(elevation = it)) }
-        PrefChoiceRow(stringResource(R.string.health_unit_weight), listOf("kg" to "kg", "lb" to "lb"), prefs.weight) { onSetPrefs(prefs.copy(weight = it)) }
-        PrefChoiceRow(stringResource(R.string.health_unit_temp), listOf("c" to "°C", "f" to "°F"), prefs.temp) { onSetPrefs(prefs.copy(temp = it)) }
-        PrefChoiceRow(stringResource(R.string.health_unit_glucose), listOf("mgdl" to "mg/dL", "mmoll" to "mmol/L"), prefs.glucose) { onSetPrefs(prefs.copy(glucose = it)) }
-
-        SectionHeader(stringResource(R.string.settings_clock))
-        PrefChoiceRow(stringResource(R.string.settings_clock), listOf("24h" to "24 h", "12h" to "12 h"), prefs.timeFormat) { onSetPrefs(prefs.copy(timeFormat = it)) }
-
-        SectionHeader(stringResource(R.string.settings_coord_format))
-        Column(Modifier.selectableGroup()) {
-            de.ledgerline.app.core.geo.CoordinateFormat.entries.forEach { f ->
+        SettingsSection(stringResource(R.string.settings_units)) {
+            PrefChoiceRow(stringResource(R.string.settings_pref_distance), listOf("km" to "km", "mi" to "mi"), prefs.distance) { onSetPrefs(prefs.copy(distance = it)) }
+            PrefChoiceRow(stringResource(R.string.settings_pref_elevation), listOf("m" to "m", "ft" to "ft"), prefs.elevation) { onSetPrefs(prefs.copy(elevation = it)) }
+            PrefChoiceRow(stringResource(R.string.health_unit_weight), listOf("kg" to "kg", "lb" to "lb"), prefs.weight) { onSetPrefs(prefs.copy(weight = it)) }
+            PrefChoiceRow(stringResource(R.string.health_unit_temp), listOf("c" to "°C", "f" to "°F"), prefs.temp) { onSetPrefs(prefs.copy(temp = it)) }
+            PrefChoiceRow(stringResource(R.string.health_unit_glucose), listOf("mgdl" to "mg/dL", "mmoll" to "mmol/L"), prefs.glucose) { onSetPrefs(prefs.copy(glucose = it)) }
+        }
+        SettingsSection(stringResource(R.string.settings_clock)) {
+            PrefChoiceRow(stringResource(R.string.settings_clock), listOf("24h" to "24 h", "12h" to "12 h"), prefs.timeFormat) { onSetPrefs(prefs.copy(timeFormat = it)) }
+        }
+        SettingsSection(stringResource(R.string.settings_coord_format)) {
+            de.ledgerline.app.core.geo.CoordinateFormat.entries.forEachIndexed { i, f ->
+                if (i > 0) SettingsRowDivider()
                 RadioRow(f.name, coordinateFormat == f) { onSelectCoord(f) }
             }
         }
-
-        SectionHeader(stringResource(R.string.settings_language))
-        Column(Modifier.selectableGroup()) {
-            RadioRow(stringResource(R.string.settings_language_system), currentLang == "") {
-                onSelectLang("")
-            }
-            // Supported languages, shown by their native (locale-invariant) names. Keep in
-            // sync with res/xml/locales_config.xml and the values-<tag>/strings.xml files.
+        SettingsSection(stringResource(R.string.settings_language)) {
+            RadioRow(stringResource(R.string.settings_language_system), currentLang == "") { onSelectLang("") }
             SUPPORTED_LANGUAGES.forEach { (tag, nativeName) ->
+                SettingsRowDivider()
                 RadioRow(nativeName, currentLang == tag) { onSelectLang(tag) }
             }
         }
-
-        SectionHeader(stringResource(R.string.settings_contact_sort))
-        Column(Modifier.selectableGroup()) {
-            RadioRow(stringResource(R.string.settings_contact_sort_first), contactSort == ContactSort.FIRST) {
-                onSelectContactSort(ContactSort.FIRST)
-            }
-            RadioRow(stringResource(R.string.settings_contact_sort_last), contactSort == ContactSort.LAST) {
-                onSelectContactSort(ContactSort.LAST)
-            }
-            RadioRow(stringResource(R.string.settings_contact_sort_display), contactSort == ContactSort.DISPLAY) {
-                onSelectContactSort(ContactSort.DISPLAY)
-            }
+        SettingsSection(stringResource(R.string.settings_contact_sort)) {
+            RadioRow(stringResource(R.string.settings_contact_sort_first), contactSort == ContactSort.FIRST) { onSelectContactSort(ContactSort.FIRST) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.settings_contact_sort_last), contactSort == ContactSort.LAST) { onSelectContactSort(ContactSort.LAST) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.settings_contact_sort_display), contactSort == ContactSort.DISPLAY) { onSelectContactSort(ContactSort.DISPLAY) }
         }
-
-        SectionHeader(stringResource(R.string.settings_date_format))
-        Column(Modifier.selectableGroup()) {
-            RadioRow(stringResource(R.string.settings_date_format_system), dateFormat == DateFormatPref.SYSTEM) {
-                onSelectDateFormat(DateFormatPref.SYSTEM)
-            }
-            RadioRow(stringResource(R.string.settings_date_format_dmy), dateFormat == DateFormatPref.DMY) {
-                onSelectDateFormat(DateFormatPref.DMY)
-            }
-            RadioRow(stringResource(R.string.settings_date_format_ymd), dateFormat == DateFormatPref.YMD) {
-                onSelectDateFormat(DateFormatPref.YMD)
-            }
-            RadioRow(stringResource(R.string.settings_date_format_mdy), dateFormat == DateFormatPref.MDY) {
-                onSelectDateFormat(DateFormatPref.MDY)
-            }
+        SettingsSection(stringResource(R.string.settings_date_format)) {
+            RadioRow(stringResource(R.string.settings_date_format_system), dateFormat == DateFormatPref.SYSTEM) { onSelectDateFormat(DateFormatPref.SYSTEM) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.settings_date_format_dmy), dateFormat == DateFormatPref.DMY) { onSelectDateFormat(DateFormatPref.DMY) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.settings_date_format_ymd), dateFormat == DateFormatPref.YMD) { onSelectDateFormat(DateFormatPref.YMD) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.settings_date_format_mdy), dateFormat == DateFormatPref.MDY) { onSelectDateFormat(DateFormatPref.MDY) }
         }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -853,112 +867,77 @@ private fun SecuritySettings(
     integrity: de.ledgerline.app.core.integrity.IntegrityReport?,
 ) {
     SubScreen(padding) {
-        SectionHeader(stringResource(R.string.settings_integrity_title))
-        IntegrityCard(integrity)
-        SectionHeader(stringResource(R.string.settings_security))
+        // Integrity card keeps its own visual; just give it a section label + inset.
         Text(
-            stringResource(R.string.settings_idle_timeout),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            stringResource(R.string.settings_integrity_title).uppercase(),
+            style = MaterialTheme.typography.labelMedium, color = Brand.accent, letterSpacing = 0.08.em,
+            modifier = Modifier.padding(start = 22.dp, end = 16.dp, top = 18.dp, bottom = 6.dp),
         )
-        Column(Modifier.selectableGroup()) {
-            SettingsStore.TIMEOUT_OPTIONS.forEach { minutes ->
+        Column(Modifier.padding(horizontal = 16.dp)) { IntegrityCard(integrity) }
+
+        SettingsSection(stringResource(R.string.settings_idle_timeout)) {
+            SettingsStore.TIMEOUT_OPTIONS.forEachIndexed { i, minutes ->
+                if (i > 0) SettingsRowDivider()
                 RadioRow(timeoutLabel(minutes), timeout == minutes) { onSetTimeout(minutes) }
             }
         }
-        SwitchRow(
-            title = stringResource(R.string.settings_keep_screen_on),
-            subtitle = stringResource(R.string.settings_keep_screen_on_note),
-            checked = keepScreenOn,
-            onCheckedChange = onSetKeepScreenOn,
-        )
-        SelectorGroup(stringResource(R.string.settings_keep_screen_on_duration), enabled = keepScreenOn) {
-            SettingsStore.KEEP_SCREEN_ON_OPTIONS.forEach { minutes ->
-                RadioRow(
-                    keepScreenOnLabel(minutes),
-                    keepScreenOnMinutes == minutes,
-                    enabled = keepScreenOn,
-                ) { onSetKeepScreenOnMinutes(minutes) }
+        SettingsSection(stringResource(R.string.settings_keep_screen_on)) {
+            SwitchRow(stringResource(R.string.settings_keep_screen_on), stringResource(R.string.settings_keep_screen_on_note), keepScreenOn, onSetKeepScreenOn)
+            if (keepScreenOn) SettingsStore.KEEP_SCREEN_ON_OPTIONS.forEach { minutes ->
+                SettingsRowDivider()
+                RadioRow(keepScreenOnLabel(minutes), keepScreenOnMinutes == minutes, enabled = keepScreenOn) { onSetKeepScreenOnMinutes(minutes) }
             }
         }
-        SwitchRow(
-            title = stringResource(R.string.settings_remember_vault),
-            subtitle = stringResource(
-                if (biometricAvailable) R.string.settings_remember_vault_note
-                else R.string.settings_remember_vault_needs_biometric,
-            ),
-            checked = rememberVault && biometricAvailable,
-            onCheckedChange = onSetRememberVault,
-            enabled = biometricAvailable,
-        )
-        SelectorGroup(
-            stringResource(R.string.settings_remember_vault_interval),
-            enabled = rememberVault && biometricAvailable,
-        ) {
-            SettingsStore.REMEMBER_VAULT_DAYS_OPTIONS.forEach { days ->
-                RadioRow(
-                    daysLabel(days),
-                    rememberVaultDays == days,
-                    enabled = rememberVault && biometricAvailable,
-                ) { onSetRememberVaultDays(days) }
+        SettingsSection(stringResource(R.string.settings_remember_vault)) {
+            SwitchRow(
+                stringResource(R.string.settings_remember_vault),
+                stringResource(if (biometricAvailable) R.string.settings_remember_vault_note else R.string.settings_remember_vault_needs_biometric),
+                rememberVault && biometricAvailable, onSetRememberVault, enabled = biometricAvailable,
+            )
+            if (rememberVault && biometricAvailable) SettingsStore.REMEMBER_VAULT_DAYS_OPTIONS.forEach { days ->
+                SettingsRowDivider()
+                RadioRow(daysLabel(days), rememberVaultDays == days) { onSetRememberVaultDays(days) }
             }
         }
         OutlinedButton(
             onClick = onLockNow,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 14.dp),
         ) { Text(stringResource(R.string.settings_lock_now)) }
         Text(
             stringResource(R.string.settings_lock_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 6.dp),
         )
 
-        // Duress auto-wipe — always active; the threshold is one of WipePolicy.options.
-        SectionHeader(stringResource(R.string.security_duress_title))
-        Text(
-            stringResource(R.string.security_duress_body),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        Column(Modifier.selectableGroup()) {
-            de.ledgerline.app.core.security.WipePolicy.options.forEach { n ->
-                RadioRow(stringResource(R.string.security_duress_threshold, n), duressThreshold == n) {
-                    onSetDuressThreshold(n)
-                }
+        SettingsSection(stringResource(R.string.security_duress_title), hint = stringResource(R.string.security_duress_body)) {
+            de.ledgerline.app.core.security.WipePolicy.options.forEachIndexed { i, n ->
+                if (i > 0) SettingsRowDivider()
+                RadioRow(stringResource(R.string.security_duress_threshold, n), duressThreshold == n) { onSetDuressThreshold(n) }
             }
         }
 
-        // Security audit log — newest first.
-        SectionHeader(stringResource(R.string.security_log_title))
-        if (securityEvents.isEmpty()) {
-            Text(
-                stringResource(R.string.security_log_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        } else {
-            securityEvents.asReversed().take(100).forEach { e ->
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                    Text(securityEventLabel(e.type), style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        formatSecTs(e.at),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+        SettingsSection(stringResource(R.string.security_log_title)) {
+            if (securityEvents.isEmpty()) {
+                Text(
+                    stringResource(R.string.security_log_empty),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(14.dp),
+                )
+            } else {
+                securityEvents.asReversed().take(100).forEachIndexed { i, e ->
+                    if (i > 0) SettingsRowDivider()
+                    Column(Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+                        Text(securityEventLabel(e.type), style = MaterialTheme.typography.bodyMedium)
+                        Text(formatSecTs(e.at), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
-            OutlinedButton(
-                onClick = onClearSecurityLog,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            ) { Text(stringResource(R.string.security_log_clear)) }
         }
+        if (securityEvents.isNotEmpty()) OutlinedButton(
+            onClick = onClearSecurityLog,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 12.dp, bottom = 8.dp),
+        ) { Text(stringResource(R.string.security_log_clear)) }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -1003,114 +982,59 @@ private fun OfflineSettings(
     onClearCache: () -> Unit,
 ) {
     SubScreen(padding) {
-        SectionHeader(stringResource(R.string.settings_offline_section))
-        SwitchRow(
-            title = stringResource(R.string.settings_offline_title),
-            subtitle = stringResource(R.string.settings_offline_subtitle),
-            checked = offlineEnabled,
-            onCheckedChange = onSetOffline,
-        )
-        // Files policy: Off / On demand / All.
-        SelectorGroup(
-            title = stringResource(R.string.settings_files_policy),
-            enabled = offlineEnabled,
-        ) {
-            RadioRow(stringResource(R.string.policy_off), filesPolicy == FileBlobPolicy.OFF, offlineEnabled) {
-                onSetFilesPolicy(FileBlobPolicy.OFF)
-            }
-            RadioRow(stringResource(R.string.policy_on_demand), filesPolicy == FileBlobPolicy.ON_DEMAND, offlineEnabled) {
-                onSetFilesPolicy(FileBlobPolicy.ON_DEMAND)
-            }
-            RadioRow(stringResource(R.string.policy_all), filesPolicy == FileBlobPolicy.ALL, offlineEnabled) {
-                onSetFilesPolicy(FileBlobPolicy.ALL)
-            }
+        SettingsSection(stringResource(R.string.settings_offline_section)) {
+            SwitchRow(stringResource(R.string.settings_offline_title), stringResource(R.string.settings_offline_subtitle), offlineEnabled, onSetOffline)
         }
-
-        // Photos policy: Off / Thumbnails / On demand / All.
-        SelectorGroup(
-            title = stringResource(R.string.settings_photos_policy),
-            enabled = offlineEnabled,
-        ) {
-            RadioRow(stringResource(R.string.policy_off), photosPolicy == PhotoBlobPolicy.OFF, offlineEnabled) {
-                onSetPhotosPolicy(PhotoBlobPolicy.OFF)
-            }
-            RadioRow(stringResource(R.string.policy_thumbs), photosPolicy == PhotoBlobPolicy.THUMBS, offlineEnabled) {
-                onSetPhotosPolicy(PhotoBlobPolicy.THUMBS)
-            }
-            RadioRow(stringResource(R.string.policy_on_demand), photosPolicy == PhotoBlobPolicy.ON_DEMAND, offlineEnabled) {
-                onSetPhotosPolicy(PhotoBlobPolicy.ON_DEMAND)
-            }
-            RadioRow(stringResource(R.string.policy_all), photosPolicy == PhotoBlobPolicy.ALL, offlineEnabled) {
-                onSetPhotosPolicy(PhotoBlobPolicy.ALL)
-            }
+        SettingsSection(stringResource(R.string.settings_files_policy)) {
+            RadioRow(stringResource(R.string.policy_off), filesPolicy == FileBlobPolicy.OFF, offlineEnabled) { onSetFilesPolicy(FileBlobPolicy.OFF) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.policy_on_demand), filesPolicy == FileBlobPolicy.ON_DEMAND, offlineEnabled) { onSetFilesPolicy(FileBlobPolicy.ON_DEMAND) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.policy_all), filesPolicy == FileBlobPolicy.ALL, offlineEnabled) { onSetFilesPolicy(FileBlobPolicy.ALL) }
         }
-
-        // Contact avatars policy: Off / On demand / All.
-        SelectorGroup(
-            title = stringResource(R.string.settings_contacts_policy),
-            enabled = offlineEnabled,
-        ) {
-            RadioRow(stringResource(R.string.policy_off), contactsPolicy == ContactBlobPolicy.OFF, offlineEnabled) {
-                onSetContactsPolicy(ContactBlobPolicy.OFF)
-            }
-            RadioRow(stringResource(R.string.policy_on_demand), contactsPolicy == ContactBlobPolicy.ON_DEMAND, offlineEnabled) {
-                onSetContactsPolicy(ContactBlobPolicy.ON_DEMAND)
-            }
-            RadioRow(stringResource(R.string.policy_all), contactsPolicy == ContactBlobPolicy.ALL, offlineEnabled) {
-                onSetContactsPolicy(ContactBlobPolicy.ALL)
-            }
+        SettingsSection(stringResource(R.string.settings_photos_policy)) {
+            RadioRow(stringResource(R.string.policy_off), photosPolicy == PhotoBlobPolicy.OFF, offlineEnabled) { onSetPhotosPolicy(PhotoBlobPolicy.OFF) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.policy_thumbs), photosPolicy == PhotoBlobPolicy.THUMBS, offlineEnabled) { onSetPhotosPolicy(PhotoBlobPolicy.THUMBS) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.policy_on_demand), photosPolicy == PhotoBlobPolicy.ON_DEMAND, offlineEnabled) { onSetPhotosPolicy(PhotoBlobPolicy.ON_DEMAND) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.policy_all), photosPolicy == PhotoBlobPolicy.ALL, offlineEnabled) { onSetPhotosPolicy(PhotoBlobPolicy.ALL) }
         }
-
-        // Notes/todos/bookmarks/contacts records ride the sealed manifest (master switch).
-        Text(
-            stringResource(R.string.settings_offline_manifest_note),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-
-        // Cache size limit: 512 MB / 1 GB / 2 GB / Unlimited.
-        SelectorGroup(
-            title = stringResource(R.string.settings_cache_limit),
-            enabled = offlineEnabled,
-        ) {
-            SettingsStore.CACHE_MAX_MB_OPTIONS.forEach { mb ->
+        SettingsSection(stringResource(R.string.settings_contacts_policy), hint = stringResource(R.string.settings_offline_manifest_note)) {
+            RadioRow(stringResource(R.string.policy_off), contactsPolicy == ContactBlobPolicy.OFF, offlineEnabled) { onSetContactsPolicy(ContactBlobPolicy.OFF) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.policy_on_demand), contactsPolicy == ContactBlobPolicy.ON_DEMAND, offlineEnabled) { onSetContactsPolicy(ContactBlobPolicy.ON_DEMAND) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.policy_all), contactsPolicy == ContactBlobPolicy.ALL, offlineEnabled) { onSetContactsPolicy(ContactBlobPolicy.ALL) }
+        }
+        SettingsSection(stringResource(R.string.settings_cache_limit)) {
+            SettingsStore.CACHE_MAX_MB_OPTIONS.forEachIndexed { i, mb ->
+                if (i > 0) SettingsRowDivider()
                 RadioRow(cacheLimitLabel(mb), cacheMaxMb == mb, offlineEnabled) { onSetCacheMaxMb(mb) }
             }
         }
-
-        SwitchRow(
-            title = stringResource(R.string.settings_prefetch_wifi),
-            subtitle = "",
-            checked = prefetchWifiOnly,
-            enabled = offlineEnabled,
-            onCheckedChange = onSetWifiOnly,
-        )
-        SwitchRow(
-            title = stringResource(R.string.settings_prefetch_charging),
-            subtitle = "",
-            checked = prefetchChargingOnly,
-            enabled = offlineEnabled,
-            onCheckedChange = onSetChargingOnly,
-        )
+        SettingsSection(stringResource(R.string.settings_group_data)) {
+            SwitchRow(stringResource(R.string.settings_prefetch_wifi), "", prefetchWifiOnly, onSetWifiOnly, enabled = offlineEnabled)
+            SettingsRowDivider()
+            SwitchRow(stringResource(R.string.settings_prefetch_charging), "", prefetchChargingOnly, onSetChargingOnly, enabled = offlineEnabled)
+        }
         OutlinedButton(
-            onClick = onPrefetchNow,
-            enabled = offlineEnabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            onClick = onPrefetchNow, enabled = offlineEnabled,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 14.dp),
         ) { Text(stringResource(R.string.settings_prefetch_now)) }
 
-        Text(
-            stringResource(R.string.settings_offline_size, humanSize(cacheSize)),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        TextButton(
-            onClick = onClearCache,
-            modifier = Modifier.padding(horizontal = 8.dp),
-        ) { Text(stringResource(R.string.settings_offline_clear)) }
+        SettingsSection(stringResource(R.string.settings_offline_clear), danger = true, hint = stringResource(R.string.settings_offline_size, humanSize(cacheSize))) {
+            Row(
+                Modifier.fillMaxWidth().clickable(onClick = onClearCache).padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconChip(Icons.Outlined.Delete, tint = MaterialTheme.colorScheme.error, size = 32.dp)
+                Spacer(Modifier.width(14.dp))
+                Text(stringResource(R.string.settings_offline_clear), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -1125,29 +1049,18 @@ private fun BackgroundSettings(
     onSetRefreshSeconds: (Int) -> Unit,
 ) {
     SubScreen(padding) {
-        SectionHeader(stringResource(R.string.settings_refresh_title))
-        Text(
-            stringResource(R.string.settings_refresh_sub),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
-        Column(Modifier.selectableGroup()) {
-            SettingsStore.BACKGROUND_REFRESH_OPTIONS.forEach { seconds ->
+        SettingsSection(stringResource(R.string.settings_refresh_title), hint = stringResource(R.string.settings_refresh_sub)) {
+            SettingsStore.BACKGROUND_REFRESH_OPTIONS.forEachIndexed { i, seconds ->
+                if (i > 0) SettingsRowDivider()
                 RadioRow(refreshLabel(seconds), refreshSeconds == seconds) { onSetRefreshSeconds(seconds) }
             }
         }
-        SwitchRow(
-            title = stringResource(R.string.settings_background_ops_title),
-            subtitle = stringResource(R.string.settings_background_ops_subtitle),
-            checked = backgroundOps,
-            onCheckedChange = onSetBackgroundOps,
-        )
-        SwitchRow(
-            title = stringResource(R.string.settings_link_chooser),
-            subtitle = "",
-            checked = linkChooser,
-            onCheckedChange = onSetLinkChooser,
-        )
+        SettingsSection(stringResource(R.string.settings_group_data)) {
+            SwitchRow(stringResource(R.string.settings_background_ops_title), stringResource(R.string.settings_background_ops_subtitle), backgroundOps, onSetBackgroundOps)
+            SettingsRowDivider()
+            SwitchRow(stringResource(R.string.settings_link_chooser), "", linkChooser, onSetLinkChooser)
+        }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -1165,35 +1078,32 @@ private fun BackupSettings(
 ) {
     LaunchedEffect(enabled) { if (enabled) onLoadAlbums() }
     SubScreen(padding) {
-        SectionHeader(stringResource(R.string.settings_backup_section))
-        SwitchRow(
-            title = stringResource(R.string.settings_backup_title),
-            subtitle = stringResource(R.string.settings_backup_subtitle),
-            checked = enabled,
-            onCheckedChange = onSetEnabled,
-        )
+        SettingsSection(stringResource(R.string.settings_backup_section)) {
+            SwitchRow(stringResource(R.string.settings_backup_title), stringResource(R.string.settings_backup_subtitle), enabled, onSetEnabled)
+        }
         if (enabled) {
-            SectionHeader(stringResource(R.string.settings_backup_albums))
-            albums.forEach { a ->
-                ListItem(
-                    headlineContent = { Text(a.name) },
-                    supportingContent = { Text(stringResource(R.string.settings_backup_album_count, a.count)) },
-                    trailingContent = {
+            SettingsSection(stringResource(R.string.settings_backup_albums), hint = stringResource(R.string.settings_backup_status, backedUpCount)) {
+                albums.forEachIndexed { i, a ->
+                    if (i > 0) SettingsRowDivider()
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onToggleAlbum(a.bucketId) }.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconChip(Icons.Outlined.PhotoLibrary, tint = Brand.tintOrange, size = 32.dp)
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(a.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(stringResource(R.string.settings_backup_album_count, a.count), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         Checkbox(checked = a.bucketId in selected, onCheckedChange = { onToggleAlbum(a.bucketId) })
-                    },
-                    modifier = Modifier.fillMaxWidth().clickable { onToggleAlbum(a.bucketId) },
-                )
+                    }
+                }
             }
-            Text(
-                stringResource(R.string.settings_backup_status, backedUpCount),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-            OutlinedButton(onClick = onBackupNow, modifier = Modifier.padding(16.dp)) {
+            OutlinedButton(onClick = onBackupNow, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 14.dp)) {
                 Text(stringResource(R.string.settings_backup_now))
             }
         }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -1216,107 +1126,68 @@ private fun AccountSettings(
 ) {
     LaunchedEffect(Unit) { onLoadDevices(); onLoadSettings() }
     SubScreen(padding) {
-        SectionHeader(stringResource(R.string.settings_account))
-        avatar?.let { bmp ->
-            androidx.compose.foundation.Image(
-                bitmap = bmp, contentDescription = null,
-                modifier = Modifier.size(64.dp).clip(androidx.compose.foundation.shape.CircleShape),
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-            )
-            Spacer(Modifier.height(8.dp))
+        SettingsSection(stringResource(R.string.settings_account)) {
+            if (account != null) {
+                AccountField(stringResource(R.string.account_name), account.name ?: "—")
+                SettingsRowDivider()
+                AccountField(stringResource(R.string.account_email), account.email ?: "—")
+                if (account.groups.isNotEmpty()) {
+                    SettingsRowDivider()
+                    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text(stringResource(R.string.account_groups), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        FlowRow(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            account.groups.forEach { g -> AssistChip(onClick = {}, label = { Text(g) }) }
+                        }
+                    }
+                }
+            } else {
+                Text(stringResource(R.string.account_loading), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(14.dp))
+            }
         }
-        if (account != null) {
-            AccountField(stringResource(R.string.account_name), account.name ?: "—")
-            AccountField(stringResource(R.string.account_email), account.email ?: "—")
-            if (account.groups.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.account_groups),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                )
-                FlowRow(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    account.groups.forEach { g ->
-                        AssistChip(onClick = {}, label = { Text(g) })
+        if (devices.isNotEmpty()) SettingsSection(stringResource(R.string.settings_devices)) {
+            devices.forEachIndexed { i, d ->
+                if (i > 0) SettingsRowDivider()
+                Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconChip(if (d.current) Icons.Outlined.Smartphone else Icons.Outlined.Devices, tint = if (d.current) Brand.tintGreen else Brand.tintGray, size = 32.dp)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(if (d.current) stringResource(R.string.settings_device_this, d.name) else d.name, style = MaterialTheme.typography.bodyLarge)
+                        val extra = listOfNotNull(d.meta.takeIf { it.isNotBlank() }, d.version).joinToString(" · ")
+                        Text(if (d.wipeRequested) stringResource(R.string.settings_device_wipe_pending) else extra, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    if (!d.current) {
+                        if (!d.wipeRequested) IconButton(onClick = { onWipeDevice(d.id) }) { Icon(Icons.Outlined.DeleteSweep, contentDescription = stringResource(R.string.settings_device_wipe)) }
+                        IconButton(onClick = { onRevokeDevice(d.id) }) { Icon(Icons.Outlined.Logout, contentDescription = stringResource(R.string.settings_device_revoke)) }
                     }
                 }
             }
-        } else {
-            Text(
-                stringResource(R.string.account_loading),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
-        if (devices.isNotEmpty()) {
-            SectionHeader(stringResource(R.string.settings_devices))
-            devices.forEach { d ->
-                ListItem(
-                    headlineContent = {
-                        Text(if (d.current) stringResource(R.string.settings_device_this, d.name) else d.name)
-                    },
-                    supportingContent = {
-                        val extra = listOfNotNull(d.meta.takeIf { it.isNotBlank() }, d.version).joinToString(" · ")
-                        Text(if (d.wipeRequested) stringResource(R.string.settings_device_wipe_pending) else extra)
-                    },
-                    trailingContent = if (d.current) null else {
-                        {
-                            Row {
-                                if (!d.wipeRequested) IconButton(onClick = { onWipeDevice(d.id) }) {
-                                    Icon(Icons.Outlined.DeleteSweep, contentDescription = stringResource(R.string.settings_device_wipe))
-                                }
-                                IconButton(onClick = { onRevokeDevice(d.id) }) {
-                                    Icon(Icons.Outlined.Logout, contentDescription = stringResource(R.string.settings_device_revoke))
-                                }
-                            }
-                        }
-                    },
-                )
-            }
         }
         userSettings?.let { s ->
-            SectionHeader(stringResource(R.string.settings_notify_channels))
-            Text(
-                stringResource(R.string.settings_notify_channels_sub),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-            )
-            ChannelRow(stringResource(R.string.settings_birthday_channels), s.birthdayChannels.orEmpty(), onToggleBirthdayChannel)
-            ChannelRow(stringResource(R.string.settings_anniversary_channels), s.anniversaryChannels.orEmpty(), onToggleAnniversaryChannel)
-            SectionHeader(stringResource(R.string.settings_file_versions))
+            SettingsSection(stringResource(R.string.settings_notify_channels), hint = stringResource(R.string.settings_notify_channels_sub)) {
+                ChannelRow(stringResource(R.string.settings_birthday_channels), s.birthdayChannels.orEmpty(), onToggleBirthdayChannel)
+                SettingsRowDivider()
+                ChannelRow(stringResource(R.string.settings_anniversary_channels), s.anniversaryChannels.orEmpty(), onToggleAnniversaryChannel)
+            }
             val current = s.fileMaxVersions ?: 10
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.settings_file_versions_cap)) },
-                supportingContent = { Text(stringResource(R.string.settings_file_versions_sub)) },
-                trailingContent = {
-                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                        IconButton(onClick = { onSetFileMaxVersions(current - 1) }, enabled = current > 1) {
-                            Text("−", style = MaterialTheme.typography.titleLarge)
-                        }
-                        Text("$current", style = MaterialTheme.typography.titleMedium)
-                        IconButton(onClick = { onSetFileMaxVersions(current + 1) }, enabled = current < 200) {
-                            Text("+", style = MaterialTheme.typography.titleLarge)
-                        }
+            SettingsSection(stringResource(R.string.settings_file_versions)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.settings_file_versions_cap), style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.settings_file_versions_sub), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                },
-            )
+                    IconButton(onClick = { onSetFileMaxVersions(current - 1) }, enabled = current > 1) { Text("−", style = MaterialTheme.typography.titleLarge) }
+                    Text("$current", style = MaterialTheme.typography.titleMedium)
+                    IconButton(onClick = { onSetFileMaxVersions(current + 1) }, enabled = current < 200) { Text("+", style = MaterialTheme.typography.titleLarge) }
+                }
+            }
         }
         AccountControlSection(vm, accountEmail = account?.email)
         Button(
             onClick = onDisconnect,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                contentColor = MaterialTheme.colorScheme.onError,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 18.dp, bottom = 8.dp),
         ) { Text(stringResource(R.string.settings_disconnect)) }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -1355,41 +1226,37 @@ private fun AccountControlSection(vm: SettingsViewModel, accountEmail: String?) 
     var show2faDialog by remember { mutableStateOf(false) }
     var showPwDialog by remember { mutableStateOf(false) }
 
-    SectionHeader(stringResource(R.string.settings_login_security))
-    // Login 2FA
-    if (codes.isNotEmpty()) {
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.tfa_title)) },
-            supportingContent = { Text(stringResource(R.string.tfa_on)) },
-            trailingContent = { TextButton(onClick = vm::disableTwoFactor) { Text(stringResource(R.string.tfa_disable)) } },
-        )
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.tfa_recovery)) },
-            supportingContent = { Text(codes.joinToString("  ")) },
-            trailingContent = { TextButton(onClick = vm::regenerateRecoveryCodes) { Text(stringResource(R.string.tfa_regenerate)) } },
-        )
-    } else {
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.tfa_title)) },
-            supportingContent = { Text(stringResource(R.string.tfa_off)) },
-            trailingContent = { TextButton(onClick = { vm.beginTwoFactor(); show2faDialog = true }) { Text(stringResource(R.string.tfa_enable)) } },
-        )
+    SettingsSection(stringResource(R.string.settings_login_security)) {
+        if (codes.isNotEmpty()) {
+            AccountActionRow(Icons.Outlined.Shield, Brand.tintViolet, stringResource(R.string.tfa_title), stringResource(R.string.tfa_on)) {
+                TextButton(onClick = vm::disableTwoFactor) { Text(stringResource(R.string.tfa_disable)) }
+            }
+            SettingsRowDivider()
+            AccountActionRow(Icons.Outlined.VpnKey, Brand.tintTeal, stringResource(R.string.tfa_recovery), codes.joinToString("  ")) {
+                TextButton(onClick = vm::regenerateRecoveryCodes) { Text(stringResource(R.string.tfa_regenerate)) }
+            }
+        } else {
+            AccountActionRow(Icons.Outlined.Shield, Brand.tintViolet, stringResource(R.string.tfa_title), stringResource(R.string.tfa_off)) {
+                TextButton(onClick = { vm.beginTwoFactor(); show2faDialog = true }) { Text(stringResource(R.string.tfa_enable)) }
+            }
+        }
+        SettingsRowDivider()
+        AccountActionRow(Icons.Outlined.Password, Brand.tintBlue, stringResource(R.string.pw_change_title), "") {
+            TextButton(onClick = { showPwDialog = true }) { Text(stringResource(R.string.pw_change_action)) }
+        }
     }
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.pw_change_title)) },
-        trailingContent = { TextButton(onClick = { showPwDialog = true }) { Text(stringResource(R.string.pw_change_action)) } },
-    )
 
-    SectionHeader(stringResource(R.string.settings_account_data))
-    OutlinedButton(
-        onClick = { vm.exportAccount { bytes -> if (bytes != null) { pendingExport = bytes; exportSaver.launch("ledgerline-export.zip") } } },
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-    ) { Text(stringResource(R.string.account_export)) }
-    OutlinedButton(
-        onClick = { showDelete = true },
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-    ) { Text(stringResource(R.string.account_delete)) }
+    SettingsSection(stringResource(R.string.settings_account_data), danger = true) {
+        AccountActionRow(Icons.Outlined.Download, Brand.tintGreen, stringResource(R.string.account_export), "") {
+            TextButton(onClick = { vm.exportAccount { bytes -> if (bytes != null) { pendingExport = bytes; exportSaver.launch("ledgerline-export.zip") } } }) { Text(stringResource(R.string.settings_export_action)) }
+        }
+        SettingsRowDivider()
+        Row(Modifier.fillMaxWidth().clickable { showDelete = true }.padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconChip(Icons.Outlined.Delete, tint = MaterialTheme.colorScheme.error, size = 32.dp)
+            Spacer(Modifier.width(14.dp))
+            Text(stringResource(R.string.account_delete), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+        }
+    }
 
     androidx.compose.material3.SnackbarHost(snackbar)
 
@@ -1502,39 +1369,42 @@ private fun NotificationsSettings(padding: PaddingValues) {
                 stringResource(R.string.account_loading),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(22.dp),
             )
             state.items.isEmpty() -> Text(
                 stringResource(R.string.notifications_empty),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(22.dp),
             )
-            else -> state.items.forEach { n ->
-                ListItem(
-                    leadingContent = {
-                        val color = when (n.level) {
-                            "error" -> MaterialTheme.colorScheme.error
-                            "warning" -> MaterialTheme.colorScheme.tertiary
-                            "success" -> MaterialTheme.colorScheme.primary
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+            else -> Column(Modifier.padding(horizontal = 16.dp)) {
+                SettingsGroup {
+                    state.items.forEachIndexed { i, n ->
+                        if (i > 0) SettingsRowDivider()
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            val color = when (n.level) {
+                                "error" -> MaterialTheme.colorScheme.error
+                                "warning" -> MaterialTheme.colorScheme.tertiary
+                                "success" -> Brand.accent
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                            Box(Modifier.size(10.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (n.read) MaterialTheme.colorScheme.surfaceVariant else color))
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(n.title, style = MaterialTheme.typography.bodyLarge)
+                                val meta = listOfNotNull(n.body, n.at?.substringBefore('T')).joinToString(" · ")
+                                if (meta.isNotBlank()) Text(meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (!n.read) TextButton(onClick = { vm.markRead(n.id) }) { Text(stringResource(R.string.notifications_mark_read)) }
                         }
-                        Box(
-                            Modifier.size(10.dp).clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(if (n.read) MaterialTheme.colorScheme.surfaceVariant else color),
-                        )
-                    },
-                    headlineContent = { Text(n.title) },
-                    supportingContent = {
-                        val meta = listOfNotNull(n.body, n.at?.substringBefore('T')).joinToString(" · ")
-                        if (meta.isNotBlank()) Text(meta)
-                    },
-                    trailingContent = if (n.read) null else {
-                        { TextButton(onClick = { vm.markRead(n.id) }) { Text(stringResource(R.string.notifications_mark_read)) } }
-                    },
-                )
+                    }
+                }
             }
         }
+        Spacer(Modifier.height(20.dp))
     }
 }
 
@@ -1694,7 +1564,7 @@ private fun SwitchRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -1718,7 +1588,7 @@ private fun RadioRow(label: String, selected: Boolean, enabled: Boolean = true, 
         Modifier
             .fillMaxWidth()
             .selectable(selected = selected, enabled = enabled, onClick = onSelect, role = Role.RadioButton)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

@@ -695,6 +695,7 @@
     <string name="pw_change_ok">Passwort geändert.</string>
     <string name="pw_change_fail">Falsches aktuelles Passwort oder ungültiges neues Passwort.</string>
     <string name="account_export">Meine Daten exportieren (ZIP)</string>
+    <string name="settings_export_action">Exportieren</string>
     <string name="account_delete">Konto löschen</string>
     <string name="account_delete_warn">Dies löscht dein Konto endgültig und krypto-schreddert alle Server-Daten. Nicht rückgängig machbar.</string>
     <string name="account_delete_confirm_hint">Gib deine E-Mail (%1$s) zur Bestätigung ein.</string>

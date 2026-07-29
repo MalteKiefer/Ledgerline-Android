@@ -698,6 +698,7 @@
     <string name="pw_change_ok">Пароль изменён.</string>
     <string name="pw_change_fail">Неверный текущий пароль или недопустимый новый пароль.</string>
     <string name="account_export">Экспортировать мои данные (ZIP)</string>
+    <string name="settings_export_action">Экспорт</string>
     <string name="account_delete">Удалить аккаунт</string>
     <string name="account_delete_warn">Это навсегда удалит ваш аккаунт и крипто-уничтожит все данные на сервере. Отменить нельзя.</string>
     <string name="account_delete_confirm_hint">Введите ваш email (%1$s) для подтверждения.</string>
