@@ -150,6 +150,74 @@ class AccountRepository(
         } catch (_: Exception) { null }
     }
 
+    /** GDPR export: stream the account zip (`GET /account/export`) as raw bytes. Null on failure. */
+    suspend fun exportAccount(): ByteArray? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val r = apiProvider(session).accountExport()
+            if (r.isSuccessful) r.body()?.bytes() else null
+        } catch (_: Exception) { null }
+    }
+
+    /** Crypto-shred the account (`DELETE /account`, `confirmation` = email). Fires ForceLogout on success. */
+    suspend fun deleteAccount(emailConfirmation: String): Boolean {
+        val session = sessionHolder.get() ?: return false
+        return try {
+            val r = apiProvider(session).deleteAccount(de.ledgerline.app.data.remote.dto.DeleteAccountRequest(emailConfirmation))
+            val ok = r.isSuccessful && r.body()?.deleted == true
+            if (ok) authEventBus.emitWipe()   // erase all local state + re-pair (account is gone)
+            ok
+        } catch (_: Exception) { false }
+    }
+
+    /** Persist the chosen locale on the server profile (`POST /locale`). Best-effort. */
+    suspend fun pushLocale(locale: String): Boolean = call { it.putLocale(de.ledgerline.app.data.remote.dto.LocaleRequest(locale)) }
+
+    /** Persist the chosen theme (`POST /theme`; light|dark|system). Best-effort. */
+    suspend fun pushTheme(theme: String): Boolean = call { it.putTheme(de.ledgerline.app.data.remote.dto.ThemeRequest(theme)) }
+
+    // ── Login (account) 2FA — orthogonal to the ZK vault passphrase ──
+
+    /** Begin TOTP setup → the QR SVG + secret + otpauth URI (`enable` then `qr`). */
+    suspend fun twoFactorBegin(): de.ledgerline.app.data.remote.dto.TwoFactorQrResponse? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val api = apiProvider(session)
+            api.twoFactorEnable()
+            val r = api.twoFactorQr()
+            if (r.isSuccessful) r.body() else null
+        } catch (_: Exception) { null }
+    }
+
+    /** Confirm TOTP with a live code. */
+    suspend fun twoFactorConfirm(code: String): Boolean =
+        call { it.twoFactorConfirm(de.ledgerline.app.data.remote.dto.TwoFactorConfirmRequest(code)) }
+
+    suspend fun twoFactorDisable(): Boolean {
+        val session = sessionHolder.get() ?: return false
+        return try { apiProvider(session).twoFactorDisable().isSuccessful } catch (_: Exception) { false }
+    }
+
+    suspend fun recoveryCodes(): List<String> {
+        val session = sessionHolder.get() ?: return emptyList()
+        return try {
+            val r = apiProvider(session).twoFactorRecoveryCodes()
+            if (r.isSuccessful) r.body()?.recovery_codes.orEmpty() else emptyList()
+        } catch (_: Exception) { emptyList() }
+    }
+
+    suspend fun regenerateRecoveryCodes(): List<String> {
+        val session = sessionHolder.get() ?: return emptyList()
+        return try {
+            val r = apiProvider(session).twoFactorRegenerateRecoveryCodes()
+            if (r.isSuccessful) r.body()?.recovery_codes.orEmpty() else emptyList()
+        } catch (_: Exception) { emptyList() }
+    }
+
+    /** Change the app LOGIN password (not the vault passphrase). Returns true on success. */
+    suspend fun changePassword(current: String, new: String): Boolean =
+        call { it.changePassword(de.ledgerline.app.data.remote.dto.ChangePasswordRequest(current, new, new)) }
+
     /** The signed-in user's avatar image bytes (non-secret, `GET /avatar`), or null if none/failure. */
     suspend fun avatar(): ByteArray? {
         val session = sessionHolder.get() ?: return null

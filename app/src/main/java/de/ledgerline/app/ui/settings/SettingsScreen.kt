@@ -64,6 +64,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -74,6 +75,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -237,7 +240,7 @@ fun SettingsContent(
                 SettingsRoute.APPEARANCE -> AppearanceSettings(
                     padding = innerPadding,
                     currentLang = currentLang,
-                    onSelectLang = { tag -> applyLanguage(context, tag); currentLang = tag },
+                    onSelectLang = { tag -> applyLanguage(context, tag); currentLang = tag; vm.pushLocale(tag) },
                     contactSort = contactSort,
                     onSelectContactSort = vm::setContactSort,
                     dateFormat = dateFormat,
@@ -355,6 +358,7 @@ fun SettingsContent(
                     onToggleAnniversaryChannel = vm::toggleAnniversaryChannel,
                     onSetFileMaxVersions = vm::setFileMaxVersions,
                     onDisconnect = { showDisconnectConfirm = true },
+                    vm = vm,
                 )
 
                 SettingsRoute.NOTIFICATIONS -> NotificationsSettings(innerPadding)
@@ -1062,6 +1066,7 @@ private fun AccountSettings(
     onToggleAnniversaryChannel: (String) -> Unit,
     onSetFileMaxVersions: (Int) -> Unit,
     onDisconnect: () -> Unit,
+    vm: SettingsViewModel,
 ) {
     LaunchedEffect(Unit) { onLoadDevices(); onLoadSettings() }
     SubScreen(padding) {
@@ -1155,6 +1160,7 @@ private fun AccountSettings(
                 },
             )
         }
+        AccountControlSection(vm, accountEmail = account?.email)
         Button(
             onClick = onDisconnect,
             colors = ButtonDefaults.buttonColors(
@@ -1166,6 +1172,142 @@ private fun AccountSettings(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) { Text(stringResource(R.string.settings_disconnect)) }
     }
+}
+
+/** Login 2FA + password change + GDPR export/delete. Orthogonal to the ZK vault. */
+@Composable
+private fun AccountControlSection(vm: SettingsViewModel, accountEmail: String?) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
+    val setup by vm.twoFactorSetup.collectAsStateWithLifecycle()
+    val codes by vm.recoveryCodes.collectAsStateWithLifecycle()
+    val tfaMsg by vm.twoFactorMessage.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) { vm.loadRecoveryCodes() }
+    LaunchedEffect(tfaMsg) {
+        val key = tfaMsg ?: return@LaunchedEffect
+        val text = when (key) {
+            "2fa_enabled" -> context.getString(R.string.tfa_enabled)
+            "2fa_disabled" -> context.getString(R.string.tfa_disabled)
+            "2fa_bad_code" -> context.getString(R.string.tfa_bad_code)
+            else -> context.getString(R.string.tfa_failed)
+        }
+        snackbar.showSnackbar(text); vm.clearTwoFactorMessage()
+    }
+
+    // --- GDPR export (stream → SAF) ---
+    var pendingExport by remember { mutableStateOf<ByteArray?>(null) }
+    val exportSaver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        val bytes = pendingExport; pendingExport = null
+        if (uri != null && bytes != null) scope.launch {
+            withContext(Dispatchers.IO) { runCatching { context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } } }
+        }
+    }
+
+    var showDelete by remember { mutableStateOf(false) }
+    var show2faDialog by remember { mutableStateOf(false) }
+    var showPwDialog by remember { mutableStateOf(false) }
+
+    SectionHeader(stringResource(R.string.settings_login_security))
+    // Login 2FA
+    if (codes.isNotEmpty()) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.tfa_title)) },
+            supportingContent = { Text(stringResource(R.string.tfa_on)) },
+            trailingContent = { TextButton(onClick = vm::disableTwoFactor) { Text(stringResource(R.string.tfa_disable)) } },
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.tfa_recovery)) },
+            supportingContent = { Text(codes.joinToString("  ")) },
+            trailingContent = { TextButton(onClick = vm::regenerateRecoveryCodes) { Text(stringResource(R.string.tfa_regenerate)) } },
+        )
+    } else {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.tfa_title)) },
+            supportingContent = { Text(stringResource(R.string.tfa_off)) },
+            trailingContent = { TextButton(onClick = { vm.beginTwoFactor(); show2faDialog = true }) { Text(stringResource(R.string.tfa_enable)) } },
+        )
+    }
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.pw_change_title)) },
+        trailingContent = { TextButton(onClick = { showPwDialog = true }) { Text(stringResource(R.string.pw_change_action)) } },
+    )
+
+    SectionHeader(stringResource(R.string.settings_account_data))
+    OutlinedButton(
+        onClick = { vm.exportAccount { bytes -> if (bytes != null) { pendingExport = bytes; exportSaver.launch("ledgerline-export.zip") } } },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) { Text(stringResource(R.string.account_export)) }
+    OutlinedButton(
+        onClick = { showDelete = true },
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+    ) { Text(stringResource(R.string.account_delete)) }
+
+    androidx.compose.material3.SnackbarHost(snackbar)
+
+    if (show2faDialog && setup != null) TwoFactorDialog(setup!!, onConfirm = { vm.confirmTwoFactor(it) }, onDismiss = { show2faDialog = false; vm.cancelTwoFactorSetup() })
+    if (showPwDialog) ChangePasswordDialog(onSubmit = { cur, new -> showPwDialog = false; vm.changePassword(cur, new) { ok -> scope.launch { snackbar.showSnackbar(context.getString(if (ok) R.string.pw_change_ok else R.string.pw_change_fail)) } } }, onDismiss = { showPwDialog = false })
+    if (showDelete) DeleteAccountDialog(email = accountEmail, onConfirm = { conf -> showDelete = false; vm.deleteAccount(conf) {} }, onDismiss = { showDelete = false })
+}
+
+@Composable
+private fun TwoFactorDialog(setup: SettingsViewModel.TwoFactorSetup, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var code by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.tfa_setup_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.tfa_setup_hint))
+                Text(setup.secret, style = MaterialTheme.typography.titleMedium, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                OutlinedTextField(value = code, onValueChange = { code = it.filter { c -> c.isDigit() }.take(6) }, label = { Text(stringResource(R.string.tfa_code)) }, singleLine = true)
+            }
+        },
+        confirmButton = { Button(onClick = { onConfirm(code) }, enabled = code.length == 6) { Text(stringResource(R.string.tfa_confirm)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun ChangePasswordDialog(onSubmit: (String, String) -> Unit, onDismiss: () -> Unit) {
+    var cur by remember { mutableStateOf("") }
+    var new by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.pw_change_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = cur, onValueChange = { cur = it }, label = { Text(stringResource(R.string.pw_current)) }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), keyboardOptions = de.ledgerline.app.ui.common.secretKeyboardOptions())
+                OutlinedTextField(value = new, onValueChange = { new = it }, label = { Text(stringResource(R.string.pw_new)) }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), keyboardOptions = de.ledgerline.app.ui.common.secretKeyboardOptions(), supportingText = { Text(stringResource(R.string.pw_min)) })
+            }
+        },
+        confirmButton = { Button(onClick = { onSubmit(cur, new) }, enabled = cur.isNotBlank() && new.length >= 12) { Text(stringResource(R.string.pw_change_action)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun DeleteAccountDialog(email: String?, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var conf by remember { mutableStateOf("") }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.account_delete)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.account_delete_warn))
+                Text(stringResource(R.string.account_delete_confirm_hint, email ?: ""))
+                OutlinedTextField(value = conf, onValueChange = { conf = it }, label = { Text(stringResource(R.string.account_email)) }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(conf) }, enabled = conf.isNotBlank() && conf.equals(email, ignoreCase = true), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                Text(stringResource(R.string.account_delete))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 /** Multi-select channel chips (desktop/ntfy/mail/webhook) for a contact-notify event type. */

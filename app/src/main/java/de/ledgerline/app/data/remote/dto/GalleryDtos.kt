@@ -63,6 +63,10 @@ data class MapsRouteResponse(
     val descentM: Double? = null,
 )
 
+/** `GET /maps/resolve` response: coordinates a Google-Maps short link points at (null when not resolvable). */
+@Serializable
+data class MapsResolveResponse(val lat: Double? = null, val lng: Double? = null)
+
 /** `POST /gallery/embed-text` request: the free-text query to embed. */
 @Serializable
 data class EmbedTextRequest(val q: String)

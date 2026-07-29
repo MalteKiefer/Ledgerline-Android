@@ -479,8 +479,8 @@ class GalleryViewModel @Inject constructor(
         return place
     }
 
-    /** Forward-geocode a place query via the ZK server proxy (never third-party-direct). */
-    suspend fun geocode(query: String): Pair<Double, Double>? = places.geocode(query)
+    /** Place query OR maps link → coordinates, all server-proxied (never third-party-direct). */
+    suspend fun geocode(query: String): Pair<Double, Double>? = places.searchOrResolve(query)
 
     /** Library counts for the Jobs/diagnostics sheet (non-trashed). */
     fun diagnostics(): Triple<Int, Int, Int> {

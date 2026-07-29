@@ -109,6 +109,62 @@ class SettingsViewModel @Inject constructor(
     private val _devices = MutableStateFlow<List<de.ledgerline.app.data.remote.dto.DeviceDto>>(emptyList())
     val devices: StateFlow<List<de.ledgerline.app.data.remote.dto.DeviceDto>> = _devices.asStateFlow()
 
+    // ── Account export + GDPR delete ──
+
+    /** Stream the account export zip and hand the bytes to [onBytes] (UI writes it via SAF). */
+    fun exportAccount(onBytes: (ByteArray?) -> Unit) = viewModelScope.launch {
+        onBytes(accountRepository.exportAccount())
+    }
+
+    /** Delete the account (confirmation must equal the email). Fires ForceLogout on success. */
+    fun deleteAccount(emailConfirmation: String, onResult: (Boolean) -> Unit) = viewModelScope.launch {
+        onResult(accountRepository.deleteAccount(emailConfirmation))
+    }
+
+    // ── Login (account) 2FA + password ──
+
+    data class TwoFactorSetup(val svg: String, val secret: String, val uri: String)
+
+    private val _twoFactorSetup = MutableStateFlow<TwoFactorSetup?>(null)
+    val twoFactorSetup: StateFlow<TwoFactorSetup?> = _twoFactorSetup.asStateFlow()
+
+    private val _recoveryCodes = MutableStateFlow<List<String>>(emptyList())
+    val recoveryCodes: StateFlow<List<String>> = _recoveryCodes.asStateFlow()
+
+    private val _twoFactorMessage = MutableStateFlow<String?>(null)
+    val twoFactorMessage: StateFlow<String?> = _twoFactorMessage.asStateFlow()
+    fun clearTwoFactorMessage() { _twoFactorMessage.value = null }
+
+    fun beginTwoFactor() = viewModelScope.launch {
+        val qr = accountRepository.twoFactorBegin()
+        _twoFactorSetup.value = qr?.let { TwoFactorSetup(it.svg, it.secret, it.uri) }
+        if (qr == null) _twoFactorMessage.value = "2fa_failed"
+    }
+
+    fun confirmTwoFactor(code: String) = viewModelScope.launch {
+        if (accountRepository.twoFactorConfirm(code)) {
+            _twoFactorSetup.value = null
+            _recoveryCodes.value = accountRepository.recoveryCodes()
+            _twoFactorMessage.value = "2fa_enabled"
+        } else {
+            _twoFactorMessage.value = "2fa_bad_code"
+        }
+    }
+
+    fun cancelTwoFactorSetup() { _twoFactorSetup.value = null }
+
+    fun disableTwoFactor() = viewModelScope.launch {
+        _twoFactorMessage.value = if (accountRepository.twoFactorDisable()) "2fa_disabled" else "2fa_failed"
+        _recoveryCodes.value = emptyList()
+    }
+
+    fun loadRecoveryCodes() = viewModelScope.launch { _recoveryCodes.value = accountRepository.recoveryCodes() }
+    fun regenerateRecoveryCodes() = viewModelScope.launch { _recoveryCodes.value = accountRepository.regenerateRecoveryCodes() }
+
+    fun changePassword(current: String, new: String, onResult: (Boolean) -> Unit) = viewModelScope.launch {
+        onResult(accountRepository.changePassword(current, new))
+    }
+
     fun loadDevices() = viewModelScope.launch { _devices.value = accountRepository.devices() }
     fun revokeDevice(id: Long) = viewModelScope.launch { if (accountRepository.revokeDevice(id)) loadDevices() }
     fun wipeDevice(id: Long) = viewModelScope.launch { if (accountRepository.wipeDevice(id)) loadDevices() }
@@ -192,7 +248,24 @@ class SettingsViewModel @Inject constructor(
     /** App theme (System/Light/Dark) + Material-You dynamic-color opt-in. */
     val themeMode: StateFlow<de.ledgerline.app.data.ThemeMode> = settingsStore.themeMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.data.ThemeMode.SYSTEM)
-    fun setThemeMode(mode: de.ledgerline.app.data.ThemeMode) { viewModelScope.launch { settingsStore.setThemeMode(mode) } }
+    fun setThemeMode(mode: de.ledgerline.app.data.ThemeMode) {
+        viewModelScope.launch {
+            settingsStore.setThemeMode(mode)
+            // Mirror to the server so web/other clients reflect the choice (best-effort, non-blocking).
+            val wire = when (mode) {
+                de.ledgerline.app.data.ThemeMode.LIGHT -> "light"
+                de.ledgerline.app.data.ThemeMode.DARK -> "dark"
+                else -> "system"
+            }
+            runCatching { accountRepository.pushTheme(wire) }
+        }
+    }
+
+    /** Push the chosen app locale to the server profile (call after applying it locally). */
+    fun pushLocale(tag: String) {
+        val locale = tag.ifBlank { return }
+        viewModelScope.launch { runCatching { accountRepository.pushLocale(locale) } }
+    }
 
     val dynamicColor: StateFlow<Boolean> = settingsStore.dynamicColor
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)

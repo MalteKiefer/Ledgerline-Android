@@ -33,8 +33,8 @@ class ExploreViewModel @Inject constructor(
     cache: ExploreCache,
 ) : ViewModel() {
 
-    /** Forward-geocode a place query via the ZK server proxy (never third-party-direct). */
-    suspend fun geocode(query: String): Pair<Double, Double>? = places.geocode(query)
+    /** Place query OR maps link → coordinates, all server-proxied (never third-party-direct). */
+    suspend fun geocode(query: String): Pair<Double, Double>? = places.searchOrResolve(query)
 
     /**
      * Estimated calories for a track from the tour stats + the user's health data (latest weight +

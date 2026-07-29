@@ -100,6 +100,33 @@ class PlaceRepository @VisibleForTesting internal constructor(
         }
     }
 
+    /**
+     * A place query OR a Google/Apple-Maps link → `(lat,lng)`. A maps URL is resolved server-side
+     * (`GET /maps/resolve`, follows the short link opt-in); anything else is forward-geocoded. Keeps
+     * both egress paths server-proxied (ZK). Null on blank/failure.
+     */
+    suspend fun searchOrResolve(input: String): Pair<Double, Double>? = withContext(Dispatchers.IO) {
+        val q = input.trim()
+        if (q.isBlank()) return@withContext null
+        val session = sessionHolder.get() ?: return@withContext null
+        if (looksLikeMapLink(q)) {
+            val hit = runCatching {
+                val r = apiProvider(session).mapsResolve(q)
+                val b = if (r.isSuccessful) r.body() else null
+                val lat = b?.lat; val lng = b?.lng
+                if (lat != null && lng != null) lat to lng else null
+            }.getOrNull()
+            if (hit != null) return@withContext hit
+            // A URL that didn't resolve → don't fall through to geocode (it isn't a place name).
+            return@withContext null
+        }
+        geocode(q)
+    }
+
+    private fun looksLikeMapLink(s: String): Boolean =
+        s.startsWith("http", ignoreCase = true) &&
+            Regex("google\\.[a-z.]+/maps|maps\\.app\\.goo\\.gl|goo\\.gl/maps|maps\\.apple\\.com", RegexOption.IGNORE_CASE).containsMatchIn(s)
+
     /** Drop the encrypted place cache (called on forced logout / disconnect). */
     suspend fun clear() {
         context.placeCacheStore.edit { it.clear() }

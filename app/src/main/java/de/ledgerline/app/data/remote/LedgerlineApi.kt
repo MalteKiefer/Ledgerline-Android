@@ -21,6 +21,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -445,4 +446,50 @@ interface LedgerlineApi {
 
     @POST("api/v1/vaults/{vault}/rotate")
     suspend fun rotateVault(@Path("vault") vault: String, @Body body: de.ledgerline.app.data.remote.dto.RotateRequest): Response<Unit>
+
+    // --- Account control (export / GDPR delete) ---
+
+    @GET("api/v1/account/export")
+    @Streaming
+    suspend fun accountExport(): Response<ResponseBody>
+
+    @HTTP(method = "DELETE", path = "api/v1/account", hasBody = true)
+    suspend fun deleteAccount(@Body body: de.ledgerline.app.data.remote.dto.DeleteAccountRequest):
+        Response<de.ledgerline.app.data.remote.dto.DeleteAccountResponse>
+
+    // --- Locale / theme server sync ---
+
+    @POST("api/v1/locale")
+    suspend fun putLocale(@Body body: de.ledgerline.app.data.remote.dto.LocaleRequest): Response<Unit>
+
+    @POST("api/v1/theme")
+    suspend fun putTheme(@Body body: de.ledgerline.app.data.remote.dto.ThemeRequest): Response<Unit>
+
+    // --- Login (account) 2FA + password ---
+
+    @POST("api/v1/user/two-factor/enable")
+    suspend fun twoFactorEnable(): Response<de.ledgerline.app.data.remote.dto.TwoFactorEnabledResponse>
+
+    @GET("api/v1/user/two-factor/qr")
+    suspend fun twoFactorQr(): Response<de.ledgerline.app.data.remote.dto.TwoFactorQrResponse>
+
+    @POST("api/v1/user/two-factor/confirm")
+    suspend fun twoFactorConfirm(@Body body: de.ledgerline.app.data.remote.dto.TwoFactorConfirmRequest): Response<Unit>
+
+    @GET("api/v1/user/two-factor/recovery-codes")
+    suspend fun twoFactorRecoveryCodes(): Response<de.ledgerline.app.data.remote.dto.RecoveryCodesResponse>
+
+    @POST("api/v1/user/two-factor/recovery-codes/regenerate")
+    suspend fun twoFactorRegenerateRecoveryCodes(): Response<de.ledgerline.app.data.remote.dto.RecoveryCodesResponse>
+
+    @HTTP(method = "DELETE", path = "api/v1/user/two-factor", hasBody = false)
+    suspend fun twoFactorDisable(): Response<de.ledgerline.app.data.remote.dto.TwoFactorEnabledResponse>
+
+    @PUT("api/v1/user/password")
+    suspend fun changePassword(@Body body: de.ledgerline.app.data.remote.dto.ChangePasswordRequest): Response<Unit>
+
+    // --- Maps: resolve a Google-Maps short link to coordinates (Explore search) ---
+
+    @GET("api/v1/maps/resolve")
+    suspend fun mapsResolve(@Query("url") url: String): Response<de.ledgerline.app.data.remote.dto.MapsResolveResponse>
 }
