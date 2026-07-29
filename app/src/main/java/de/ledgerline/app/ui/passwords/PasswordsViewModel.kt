@@ -210,7 +210,15 @@ class PasswordsViewModel @Inject constructor(
     fun upsert(item: SecretItem, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             val now = Instant.now().toString()
-            val res = repo.save { m ->
+            val res = repo.save { m0 ->
+                // Every item MUST live in a vault (web parity, no orphans): if the draft has no or an
+                // invalid folder, drop it into the first vault — creating a default "Privat" if none exist.
+                var folders = m0.secretFolders
+                if (folders.isEmpty()) folders = folders + de.ledgerline.app.domain.model.SecretFolder(de.ledgerline.app.core.Ids.newId(), "Privat", "manage")
+                val validIds = folders.mapTo(HashSet()) { it.id }
+                val vaulted = if (item.folder != null && item.folder in validIds) item else item.copy(folder = folders.first().id)
+                val m = m0.copy(secretFolders = folders)
+                val item = vaulted
                 val existing = m.secrets.firstOrNull { it.id == item.id }
                 if (existing == null) {
                     m.copy(secrets = m.secrets + item.copy(created = item.created ?: now, updated = now))
