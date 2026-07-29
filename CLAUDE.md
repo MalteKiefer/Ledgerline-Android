@@ -592,8 +592,16 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
 - **Geräte-Verwaltung + Remote-Wipe-UI — ERLEDIGT (2026-07-27):** Settings→Account listet die
   gekoppelten Geräte (`GET /devices`) mit Widerruf (`DELETE /devices/{token}`) + Remote-Wipe
   (`POST /devices/{token}/wipe`); aktuelles Gerät markiert, nicht selbst-widerrufbar
-  (`AccountRepository.devices/revokeDevice/wipeDevice` + `DeviceDto`). **Notifications**,
-  **Konto-Export/Löschen** weiterhin offen.
+  (`AccountRepository.devices/revokeDevice/wipeDevice` + `DeviceDto`).
+- **Konto-Kontrolle komplett — ERLEDIGT (2026-07-29, Commit 02e13fb):** Login-2FA (`/user/two-factor/*`:
+  enable→QR+Secret, confirm mit Live-Code, Recovery-Codes anzeigen/neu, disable — orthogonal zur ZK-
+  Passphrase), Login-Passwort ändern (`PUT /user/password`, min 12), DSGVO-Export (`GET /account/export`
+  → SAF-ZIP), Konto-Löschung (`DELETE /account` mit E-Mail-Bestätigung → Wipe-Kill-Switch), locale/theme-
+  Server-Sync (`POST /locale`,`/theme`), `GET /maps/resolve` (Explore/Foto-Ort-Suche löst eingefügten
+  Google/Apple-Maps-Link server-proxied auf; `PlaceRepository.searchOrResolve`). Alles Settings→Account.
+  **Sharing-Epos ebenfalls komplett** (read/accept `0f6c504` + owner-side create/invite/rotate `046e86f`).
+  **Damit ist das openapi-Audit-Backlog geräumt** — jeder mobil-relevante Endpunkt ist gebunden; nur
+  Admin/Backup/Users/Groups/Server-Security-Log bleiben bewusst out-of-scope (Web-Konsole).
 - **Kombinierter Speicher-Ring — ERLEDIGT (2026-07-27, web `7b2ad183`):** `/me` liefert jetzt
   `usage.quota` (kombiniertes Files+Gallery-Limit, `null`=unbegrenzt). Der Home-Hub-Ring zeigt jetzt
   den **kontoweiten** Verbrauch (`AccountRepository.snapshot()` = ein `/me`-Call für Name + `used`
