@@ -1,4 +1,7 @@
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Properties
+import java.util.TimeZone
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -8,6 +11,27 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+// ── Version derived from git (reproducible, monotonic) ──────────────────────
+// Marketing semver base; bump on real releases. The build metadata (commit count,
+// short SHA, branch, UTC build date) is derived from git so every build is uniquely
+// identifiable and versionCode grows monotonically without manual edits.
+val versionBase = "0.9.0"
+
+fun git(vararg args: String): String? = runCatching {
+    ProcessBuilder(listOf("git", *args))
+        .directory(rootProject.projectDir)
+        .redirectErrorStream(true)
+        .start().inputStream.bufferedReader().readText().trim().ifEmpty { null }
+}.getOrNull()
+
+val gitCommitCount = git("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 1
+val gitSha = git("rev-parse", "--short", "HEAD") ?: "nogit"
+val gitBranch = git("rev-parse", "--abbrev-ref", "HEAD") ?: "detached"
+val gitDirty = git("status", "--porcelain")?.isNotEmpty() == true
+val buildDateUtc: String = SimpleDateFormat("yyyy-MM-dd")
+    .apply { timeZone = TimeZone.getTimeZone("UTC") }
+    .format(Date())
 
 android {
     namespace = "de.ledgerline.app"
@@ -19,8 +43,14 @@ android {
         applicationId = "de.ledgerline.app"
         minSdk = 36
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        // Monotonic from git history (CI-safe, no manual bumps); marketing string stays semver.
+        versionCode = gitCommitCount
+        versionName = versionBase
+        // Build provenance for the About screen (never PII; git SHA + branch + UTC date).
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
+        buildConfigField("String", "GIT_BRANCH", "\"$gitBranch\"")
+        buildConfigField("String", "BUILD_DATE", "\"$buildDateUtc\"")
+        buildConfigField("boolean", "GIT_DIRTY", "$gitDirty")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         resourceConfigurations += listOf("en", "de", "ru")
         // 64-bit only; also drops the stale 4 KB-aligned prebuilt ABIs from lazysodium.

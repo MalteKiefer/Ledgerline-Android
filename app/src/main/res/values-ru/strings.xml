@@ -368,6 +368,14 @@
     <string name="settings_about">О приложении</string>
     <string name="settings_zero_knowledge">Нулевое разглашение: всё шифруется на этом устройстве. Сервер никогда не видит ваши данные.</string>
     <string name="settings_version">Версия %1$s</string>
+    <string name="about_tagline">Ваше приватное zero-knowledge облако</string>
+    <string name="about_zk_title">Zero-knowledge по своей сути</string>
+    <string name="about_contract">Шифрование байт-совместимо с веб- и iOS-клиентами (libsodium + ML-KEM-768). Собрано для Ledgerline API v1.</string>
+    <string name="about_build">Сборка</string>
+    <string name="about_build_id">Идентификатор сборки</string>
+    <string name="about_copy">Копировать</string>
+    <string name="about_copied">Информация о сборке скопирована</string>
+    <string name="about_more">Ещё</string>
     <string name="minutes_1">1 минута</string>
     <string name="minutes_5">5 минут</string>
     <string name="minutes_10">10 минут</string>

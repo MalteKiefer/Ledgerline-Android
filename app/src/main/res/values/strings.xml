@@ -367,6 +367,14 @@
     <string name="settings_about">About</string>
     <string name="settings_zero_knowledge">Zero-knowledge: everything is encrypted on this device. The server never sees your data.</string>
     <string name="settings_version">Version %1$s</string>
+    <string name="about_tagline">Your private, zero-knowledge cloud</string>
+    <string name="about_zk_title">Zero-knowledge by design</string>
+    <string name="about_contract">Encryption is byte-compatible with the web and iOS clients (libsodium + ML-KEM-768). Built against the Ledgerline API v1.</string>
+    <string name="about_build">Build</string>
+    <string name="about_build_id">Build identifier</string>
+    <string name="about_copy">Copy</string>
+    <string name="about_copied">Build info copied</string>
+    <string name="about_more">More</string>
     <string name="minutes_1">1 minute</string>
     <string name="minutes_5">5 minutes</string>
     <string name="minutes_10">10 minutes</string>

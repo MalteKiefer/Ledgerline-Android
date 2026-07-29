@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.foundation.background
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Notifications
@@ -90,6 +91,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.BuildConfig
+import de.ledgerline.app.ui.theme.Brand
+import de.ledgerline.app.ui.theme.cardSurface
 import de.ledgerline.app.R
 import de.ledgerline.app.data.ContactSort
 import de.ledgerline.app.data.DateFormatPref
@@ -1394,22 +1397,82 @@ private fun NotificationsSettings(padding: PaddingValues) {
 
 @Composable
 private fun AboutSettings(padding: PaddingValues, onOpenLicenses: () -> Unit) {
+    val context = LocalContext.current
+    // "0.9.0 (137)" — marketing semver + monotonic git build number.
+    val versionLine = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+    // "a1b2c3d · main · 2026-07-29" (+ "·dirty" for an uncommitted local build).
+    val build = buildString {
+        append(BuildConfig.GIT_SHA)
+        if (BuildConfig.GIT_DIRTY) append("·dirty")
+        append(" · ").append(BuildConfig.GIT_BRANCH)
+        append(" · ").append(BuildConfig.BUILD_DATE)
+    }
+    val diagnostics = "Ledgerline Android $versionLine\n$build"
+
     SubScreen(padding) {
-        SectionHeader(stringResource(R.string.settings_about))
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium)
+        // Brand hero: gradient tile with the shield logo, app name, version.
+        Column(
+            Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+        ) {
+            Box(
+                Modifier.size(96.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(percent = 28))
+                    .background(Brand.accentGradient),
+                contentAlignment = androidx.compose.ui.Alignment.Center,
+            ) {
+                Icon(
+                    painter = androidx.compose.ui.res.painterResource(R.drawable.ic_ledgerline_logo),
+                    contentDescription = null,
+                    tint = androidx.compose.ui.graphics.Color.Unspecified,
+                    modifier = Modifier.size(64.dp),
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
             Text(
-                stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
+                versionLine,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Text(stringResource(R.string.about_tagline), style = MaterialTheme.typography.bodySmall, color = Brand.accent)
+        }
+
+        // Zero-knowledge assurance card.
+        SectionHeader(stringResource(R.string.settings_about))
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).cardSurface().padding(16.dp),
+        ) {
+            Text(stringResource(R.string.about_zk_title), style = MaterialTheme.typography.titleSmall)
             Text(
                 stringResource(R.string.settings_zero_knowledge),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                stringResource(R.string.about_contract),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
+
+        // Build provenance — tap to copy for bug reports.
+        SectionHeader(stringResource(R.string.about_build))
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.about_build_id)) },
+            supportingContent = {
+                Text(build, style = MaterialTheme.typography.bodySmall, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+            },
+            trailingContent = { Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.about_copy)) },
+            modifier = Modifier.clickable {
+                de.ledgerline.app.ui.common.copyToClipboard(context, diagnostics)
+                android.widget.Toast.makeText(context, R.string.about_copied, android.widget.Toast.LENGTH_SHORT).show()
+            },
+        )
+
+        SectionHeader(stringResource(R.string.about_more))
         ListItem(
             headlineContent = { Text(stringResource(R.string.settings_licenses)) },
             supportingContent = { Text(stringResource(R.string.settings_licenses_sub)) },
