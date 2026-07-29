@@ -54,6 +54,7 @@ class PasswordsRepository(
     private val storeCache: StoreDiskCache,
     private val offlineFlags: OfflineFlags,
     private val blobCache: BlobDiskCache,
+    private val sharedVaults: SharedVaultRepository,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
     @Inject constructor(
@@ -64,8 +65,9 @@ class PasswordsRepository(
         storeCache: StoreDiskCache,
         offlineFlags: OfflineFlags,
         blobCache: BlobDiskCache,
+        sharedVaults: SharedVaultRepository,
     ) : this(
-        sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags, blobCache,
+        sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags, blobCache, sharedVaults,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
@@ -250,6 +252,24 @@ class PasswordsRepository(
     /** Optimistic write with 409-rebase (reload → re-apply [mutate] → retry). */
     // On Dispatchers.IO: sealing shard blobs + the root (CanonicalJson + secretstream/secretbox),
     // a 409 rebase decode, and disk-cache writes are heavy — never on the main thread.
+    /**
+     * Move [ids] into a new shared PASSWORD-vault: encode the selected secrets web-shaped (raw-overlay
+     * preserved), create + seal the vault under a fresh VK_vault, then drop them from the personal
+     * store. All-or-nothing — the personal store is only touched after the vault write succeeds.
+     * Returns the new vault id, or null on failure. Trashed secrets are skipped.
+     */
+    suspend fun moveSecretsToSharedVault(name: String, ids: Set<String>): String? = withContext(Dispatchers.IO) {
+        val base = cache.value.value?.manifest ?: when (val l = load()) {
+            is Outcome.Ok -> l.value.manifest; is Outcome.Err -> return@withContext null
+        }
+        val moving = base.secrets.filter { it.id in ids && !it.isTrashed }
+        if (moving.isEmpty()) return@withContext null
+        val items = moving.map { SecretRecordCodec.encodeSecret(it, secretRawById[it.id]) }
+        val vaultId = sharedVaults.createPasswordVault(name, items) ?: return@withContext null
+        save { m -> m.copy(secrets = m.secrets.filterNot { it.id in ids }) }
+        vaultId
+    }
+
     suspend fun save(mutate: (SecretsManifest) -> SecretsManifest): Outcome<SecretsStore> = withContext(Dispatchers.IO) {
         sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)

@@ -678,6 +678,7 @@
     <string name="tfa_bad_code">Invalid or expired code.</string>
     <string name="tfa_failed">Couldn\'t reach the server. Try again.</string>
     <string name="pw_change_title">Login password</string>
+    <string name="pw_move_vault">Move to shared vault</string>
     <string name="pw_change_action">Change</string>
     <string name="pw_current">Current password</string>
     <string name="pw_new">New password</string>

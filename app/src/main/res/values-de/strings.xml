@@ -676,6 +676,7 @@
     <string name="tfa_bad_code">Ungültiger oder abgelaufener Code.</string>
     <string name="tfa_failed">Server nicht erreichbar. Bitte erneut versuchen.</string>
     <string name="pw_change_title">Login-Passwort</string>
+    <string name="pw_move_vault">In geteilten Tresor verschieben</string>
     <string name="pw_change_action">Ändern</string>
     <string name="pw_current">Aktuelles Passwort</string>
     <string name="pw_new">Neues Passwort</string>

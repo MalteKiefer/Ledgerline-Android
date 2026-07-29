@@ -679,6 +679,7 @@
     <string name="tfa_bad_code">Неверный или просроченный код.</string>
     <string name="tfa_failed">Сервер недоступен. Попробуйте ещё раз.</string>
     <string name="pw_change_title">Пароль входа</string>
+    <string name="pw_move_vault">Переместить в общее хранилище</string>
     <string name="pw_change_action">Изменить</string>
     <string name="pw_current">Текущий пароль</string>
     <string name="pw_new">Новый пароль</string>

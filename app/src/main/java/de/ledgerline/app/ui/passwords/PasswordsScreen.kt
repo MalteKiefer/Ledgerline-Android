@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Dns
@@ -337,6 +338,17 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onMenu: (() -> Un
 @Composable
 private fun PwDetail(item: SecretItem, vm: PasswordsViewModel, onBack: () -> Unit, onEdit: () -> Unit) {
     val context = LocalContext.current
+    var showMoveDialog by remember { mutableStateOf(false) }
+    if (showMoveDialog) {
+        de.ledgerline.app.ui.common.TextInputDialog(
+            title = stringResource(de.ledgerline.app.R.string.pw_move_vault),
+            label = stringResource(de.ledgerline.app.R.string.vaults_name),
+            initial = item.title,
+            confirmLabel = stringResource(de.ledgerline.app.R.string.pw_move_vault),
+            onConfirm = { name -> showMoveDialog = false; vm.moveToSharedVault(item.id, name.ifBlank { item.title }); onBack() },
+            onDismiss = { showMoveDialog = false },
+        )
+    }
     AppScaffold(
         topBar = {
             AppTopBar(item.title.ifBlank { typeLabel(item.type) }, onBack = onBack, actions = {
@@ -348,7 +360,20 @@ private fun PwDetail(item: SecretItem, vm: PasswordsViewModel, onBack: () -> Uni
                     IconButton(onClick = { vm.deleteForever(item.id); onBack() }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(de.ledgerline.app.R.string.action_delete)) }
                 } else {
                     IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(de.ledgerline.app.R.string.cd_edit)) }
-                    IconButton(onClick = { vm.trash(item.id); onBack() }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(de.ledgerline.app.R.string.cd_trash)) }
+                    var menu by remember { mutableStateOf(false) }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(de.ledgerline.app.R.string.action_more)) }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(de.ledgerline.app.R.string.pw_move_vault)) },
+                            leadingIcon = { Icon(Icons.Outlined.Share, null) },
+                            onClick = { menu = false; showMoveDialog = true },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(de.ledgerline.app.R.string.cd_trash)) },
+                            leadingIcon = { Icon(Icons.Outlined.Delete, null) },
+                            onClick = { menu = false; vm.trash(item.id); onBack() },
+                        )
+                    }
                 }
             })
         },

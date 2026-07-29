@@ -329,6 +329,28 @@ class SharedVaultRepository(
         ConvertResult(vaultId, filesToMove.size)
     }
 
+    /**
+     * Create a shared PASSWORD-vault pre-populated with [items] (already web-shaped secret JSON).
+     * Secrets carry no content blobs (opaque `fields` inline), so unlike folders there is nothing to
+     * re-upload — the items are just sealed into the vault manifest under VK_vault. Returns the new
+     * vault id, or null on failure (caller then leaves the personal store untouched).
+     */
+    suspend fun createPasswordVault(name: String, items: List<JsonObject>): String? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        val vaultId = create("password", name) ?: return@withContext null
+        val vk = vkCache[vaultId] ?: return@withContext null
+        val manifest = buildJsonObject {
+            put("name", JsonPrimitive(name))
+            put("items", JsonArray(items))
+        }
+        val api = apiProvider(session)
+        val version = runCatching { api.vaultStore(vaultId) }.getOrNull()?.body()?.version ?: 0
+        val put = runCatching {
+            api.vaultStorePut(vaultId, de.ledgerline.app.data.remote.dto.SharedVaultStorePut(crypto.sealManifest(manifest.toString(), vk), version))
+        }.getOrNull()
+        if (put?.isSuccessful == true) vaultId else null
+    }
+
     /** Drop cached vault keys (on lock / logout). */
     fun clear() = vkCache.clear()
 }

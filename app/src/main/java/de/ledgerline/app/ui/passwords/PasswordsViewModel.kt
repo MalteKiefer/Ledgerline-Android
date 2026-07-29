@@ -201,6 +201,15 @@ class PasswordsViewModel @Inject constructor(
 
     fun deleteForever(id: String) = mutate("delete") { secrets -> secrets.filterNot { it.id == id } }
 
+    /**
+     * Move a secret into a new shared PASSWORD-vault (ZK; re-sealed under a fresh VK_vault). On
+     * success it leaves the personal store; `_message` carries a one-shot result key for the UI.
+     */
+    fun moveToSharedVault(id: String, vaultName: String) = viewModelScope.launch {
+        val vaultId = repo.moveSecretsToSharedVault(vaultName, setOf(id))
+        _message.value = if (vaultId != null) "vault_moved" else "vault_move_failed"
+    }
+
     /** Remove a passkey embedded in a login item (in-app passkey management). */
     fun deleteEmbeddedPasskey(loginId: String, credentialIdB64: String) = mutate("passkey-detach") { secrets ->
         de.ledgerline.app.core.passkey.PasskeyStore.detach(loginId, credentialIdB64, secrets, Instant.now().toString())
