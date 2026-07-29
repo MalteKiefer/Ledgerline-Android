@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -202,8 +203,8 @@ private fun InvoiceRow(inv: Invoice, vm: FinanceViewModel, onClick: () -> Unit) 
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(9.dp).clip(CircleShape).background(statusColor(inv.status)))
-        Spacer(Modifier.width(12.dp))
+        de.ledgerline.app.ui.theme.IconChip(Icons.Outlined.ReceiptLong, tint = statusColor(inv.status), size = 34.dp)
+        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(inv.number ?: stringResource(R.string.finance_no_number), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, maxLines = 1)
             Text(

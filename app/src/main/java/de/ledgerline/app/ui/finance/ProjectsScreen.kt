@@ -1,5 +1,6 @@
 package de.ledgerline.app.ui.finance
 
+import de.ledgerline.app.ui.common.SectionLabel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -139,7 +140,7 @@ private fun ProjectDetail(p: Project, vm: FinanceViewModel, onBack: () -> Unit, 
 
             // Manual expenses
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.finance_project_expenses), Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                SectionLabel(stringResource(R.string.finance_project_expenses), Modifier.weight(1f))
                 TextButton(onClick = { expenseEdit = ProjectExpense(id = de.ledgerline.app.core.Ids.newId(), date = java.time.LocalDate.now().toString()) }) { Text(stringResource(R.string.finance_tx_add)) }
             }
             if (p.expenses.isNotEmpty()) Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {
@@ -154,7 +155,7 @@ private fun ProjectDetail(p: Project, vm: FinanceViewModel, onBack: () -> Unit, 
 
             // Bundled receipts (read-only)
             if (receipts.isNotEmpty()) {
-                Text(stringResource(R.string.finance_project_receipts), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                SectionLabel(stringResource(R.string.finance_project_receipts))
                 Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {
                     receipts.forEachIndexed { i, r ->
                         if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
@@ -168,7 +169,7 @@ private fun ProjectDetail(p: Project, vm: FinanceViewModel, onBack: () -> Unit, 
 
             // Sub-projects
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.finance_project_subprojects), Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                SectionLabel(stringResource(R.string.finance_project_subprojects), Modifier.weight(1f))
                 TextButton(onClick = onNewChild) { Text(stringResource(R.string.finance_project_new)) }
             }
             if (children.isNotEmpty()) Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {

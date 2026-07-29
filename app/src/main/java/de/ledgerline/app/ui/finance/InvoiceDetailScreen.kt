@@ -1,5 +1,6 @@
 package de.ledgerline.app.ui.finance
 
+import de.ledgerline.app.ui.common.SectionLabel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -88,7 +89,7 @@ fun InvoiceDetailScreen(inv: Invoice, vm: FinanceViewModel, onBack: () -> Unit, 
             // Recipient
             if (inv.customer.name.isNotBlank() || inv.customer.address.isNotBlank()) {
                 Column(Modifier.fillMaxWidth().cardSurface()) {
-                    Text(stringResource(R.string.finance_recipient), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    SectionLabel(stringResource(R.string.finance_recipient))
                     Spacer(Modifier.width(4.dp))
                     if (inv.customer.name.isNotBlank()) Text(inv.customer.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                     if (inv.customer.attn.isNotBlank()) Text(inv.customer.attn, style = MaterialTheme.typography.bodyMedium)
@@ -100,7 +101,7 @@ fun InvoiceDetailScreen(inv: Invoice, vm: FinanceViewModel, onBack: () -> Unit, 
 
             // Line items
             Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {
-                Text(stringResource(R.string.finance_items), style = MaterialTheme.typography.labelMedium, color = Brand.accent, modifier = Modifier.padding(start = 16.dp, top = 14.dp, bottom = 4.dp))
+                SectionLabel(stringResource(R.string.finance_items), Modifier.padding(start = 10.dp, top = 10.dp))
                 inv.lines.forEachIndexed { i, l ->
                     if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
@@ -139,7 +140,7 @@ fun InvoiceDetailScreen(inv: Invoice, vm: FinanceViewModel, onBack: () -> Unit, 
 
             if (inv.note.isNotBlank()) {
                 Column(Modifier.fillMaxWidth().cardSurface()) {
-                    Text(stringResource(R.string.finance_note), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    SectionLabel(stringResource(R.string.finance_note))
                     Text(inv.note, style = MaterialTheme.typography.bodyMedium)
                 }
             }

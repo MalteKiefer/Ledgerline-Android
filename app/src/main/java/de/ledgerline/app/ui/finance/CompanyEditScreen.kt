@@ -1,5 +1,6 @@
 package de.ledgerline.app.ui.finance
 
+import de.ledgerline.app.ui.common.SectionLabel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -86,7 +87,7 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                 )
             }
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.finance_company_identity), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                SectionLabel(stringResource(R.string.finance_company_identity))
                 Field(name, { name = it }, R.string.finance_customer_name)
                 Field(address, { address = it }, R.string.finance_customer_address)
                 Field(email, { email = it }, R.string.finance_customer_email)
@@ -98,7 +99,7 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                 Field(bankName, { bankName = it }, R.string.finance_company_bank)
             }
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.finance_company_defaults), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                SectionLabel(stringResource(R.string.finance_company_defaults))
                 Field(numberFormat, { numberFormat = it }, R.string.finance_company_numfmt, enabled = !numberingLocked)
                 NumField(nextNumber, { nextNumber = it }, R.string.finance_company_nextnr, enabled = !numberingLocked)
                 if (numberingLocked) {

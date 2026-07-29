@@ -1,5 +1,6 @@
 package de.ledgerline.app.ui.finance
 
+import de.ledgerline.app.ui.common.SectionLabel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,7 +79,7 @@ fun FinanceStatsScreen(vm: FinanceViewModel, year: Int, onBack: () -> Unit) {
 
             // VAT advance return
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.finance_stats_vat_title), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                SectionLabel(stringResource(R.string.finance_stats_vat_title))
                 TotalRow(stringResource(R.string.finance_stats_net), vm.money(vat.net, null))
                 TotalRow(stringResource(R.string.finance_stats_vat), vm.money(vat.vat, null))
                 TotalRow(stringResource(R.string.finance_stats_gross), vm.money(vat.gross, null), bold = true)
@@ -105,7 +106,7 @@ fun FinanceStatsScreen(vm: FinanceViewModel, year: Int, onBack: () -> Unit) {
             // VAT payable from bookings (Umsatzsteuer-Zahllast), if any categorised bookings exist.
             if (accountVat.outputVat != 0.0 || accountVat.inputVat != 0.0 || accountVat.undecided > 0) {
                 Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.finance_stats_vat_payable_title), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    SectionLabel(stringResource(R.string.finance_stats_vat_payable_title))
                     TotalRow(stringResource(R.string.finance_stats_output_vat), vm.money(accountVat.outputVat, null))
                     TotalRow(stringResource(R.string.finance_stats_input_vat), vm.money(accountVat.inputVat, null))
                     TotalRow(stringResource(R.string.finance_stats_vat_payable), vm.money(accountVat.payable, null), bold = true)
@@ -122,7 +123,7 @@ fun FinanceStatsScreen(vm: FinanceViewModel, year: Int, onBack: () -> Unit) {
             val (bizCost, privCost) = vm.projectScopeTotals()
             if (bizCost != 0.0 || privCost != 0.0) {
                 Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.finance_stats_project_costs), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    SectionLabel(stringResource(R.string.finance_stats_project_costs))
                     TotalRow(stringResource(R.string.finance_project_business), vm.money(bizCost, null))
                     TotalRow(stringResource(R.string.finance_project_private), vm.money(privCost, null))
                 }
@@ -131,7 +132,7 @@ fun FinanceStatsScreen(vm: FinanceViewModel, year: Int, onBack: () -> Unit) {
             // Monthly revenue bars
             if (monthly.any { it > 0.0 }) {
                 Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(stringResource(R.string.finance_stats_monthly), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    SectionLabel(stringResource(R.string.finance_stats_monthly))
                     MonthlyBars(monthly)
                 }
             }
@@ -139,11 +140,7 @@ fun FinanceStatsScreen(vm: FinanceViewModel, year: Int, onBack: () -> Unit) {
             // Revenue by customer
             if (customers.isNotEmpty()) {
                 Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {
-                    Text(
-                        stringResource(R.string.finance_stats_by_customer),
-                        style = MaterialTheme.typography.labelMedium, color = Brand.accent,
-                        modifier = Modifier.padding(start = 16.dp, top = 16.dp, end = 16.dp),
-                    )
+                    SectionLabel(stringResource(R.string.finance_stats_by_customer), Modifier.padding(start = 10.dp, top = 10.dp))
                     customers.forEachIndexed { i, c ->
                         if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                         Row(

@@ -1,5 +1,6 @@
 package de.ledgerline.app.ui.finance
 
+import de.ledgerline.app.ui.common.SectionLabel
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.clickable
@@ -109,7 +110,7 @@ fun TransactionEditScreen(initial: Transaction, vm: FinanceViewModel, onBack: ()
                 OutlinedTextField(purpose, { purpose = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_tx_purpose)) }, singleLine = true)
             }
             // VAT category chips
-            Text(stringResource(R.string.finance_tx_vatcat), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+            SectionLabel(stringResource(R.string.finance_tx_vatcat))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 (listOf("") + BankStatement.VAT_CATS).forEach { c ->
                     FilterChip(selected = vatCat == c, onClick = { vatCat = c }, label = { Text(vatCatLabel(c)) })
@@ -131,7 +132,7 @@ fun TransactionEditScreen(initial: Transaction, vm: FinanceViewModel, onBack: ()
             // Receipts (attach documents to this booking) — only for a saved booking.
             if (exists) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text(stringResource(R.string.finance_receipts), Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    SectionLabel(stringResource(R.string.finance_receipts), Modifier.weight(1f))
                     androidx.compose.material3.TextButton(onClick = { attach.launch(arrayOf("image/*", "application/pdf")) }) { Text(stringResource(R.string.finance_receipt_attach)) }
                 }
                 if (receipts.isNotEmpty()) Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {

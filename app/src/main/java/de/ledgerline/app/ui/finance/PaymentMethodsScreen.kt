@@ -1,5 +1,6 @@
 package de.ledgerline.app.ui.finance
 
+import de.ledgerline.app.ui.common.SectionLabel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -275,7 +276,7 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
             // Bookings for this account: import a statement, add manually, edit each.
             if (exists) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.finance_pm_bookings_title), Modifier.weight(1f), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                    SectionLabel(stringResource(R.string.finance_pm_bookings_title), Modifier.weight(1f))
                     androidx.compose.material3.TextButton(onClick = launchImport) { Text(stringResource(R.string.finance_import_action)) }
                     androidx.compose.material3.TextButton(onClick = { onEditTx(vm.newTransaction(initial.id)) }) { Text(stringResource(R.string.finance_tx_add)) }
                 }

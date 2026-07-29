@@ -1,5 +1,6 @@
 package de.ledgerline.app.ui.finance
 
+import de.ledgerline.app.ui.common.SectionLabel
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -94,7 +95,7 @@ fun InvoiceEditScreen(inv: Invoice, vm: FinanceViewModel, onCancel: () -> Unit, 
         ) {
             // Recipient
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(stringResource(R.string.finance_recipient), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                SectionLabel(stringResource(R.string.finance_recipient))
                 Field(name, { name = it }, R.string.finance_customer_name)
                 Field(attn, { attn = it }, R.string.finance_customer_attn)
                 Field(address, { address = it }, R.string.finance_customer_address)
@@ -111,7 +112,7 @@ fun InvoiceEditScreen(inv: Invoice, vm: FinanceViewModel, onCancel: () -> Unit, 
 
             // Line items
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(stringResource(R.string.finance_items), style = MaterialTheme.typography.labelMedium, color = Brand.accent)
+                SectionLabel(stringResource(R.string.finance_items))
                 lines.forEachIndexed { i, l ->
                     if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
