@@ -205,6 +205,12 @@ class SodiumCrypto @Inject constructor() : Crypto {
         val c = (env["c"] ?: error("encFileKey missing 'c'")).jsonPrimitive.content
         val n = (env["n"] ?: error("encFileKey missing 'n'")).jsonPrimitive.content
         val fk = secretBoxOpen(b64decode(c), b64decode(n), vk) ?: error("file key unwrap failed")
+        return decryptorFor(fk)
+    }
+
+    override fun contentDecryptorFromKey(fileKey: ByteArray): Crypto.ContentDecryptor = decryptorFor(fileKey)
+
+    private fun decryptorFor(fk: ByteArray): Crypto.ContentDecryptor {
         val state = SecretStream.State.ByReference()
         return object : Crypto.ContentDecryptor {
             override val headerBytes: Int = SecretStream.HEADERBYTES // 24

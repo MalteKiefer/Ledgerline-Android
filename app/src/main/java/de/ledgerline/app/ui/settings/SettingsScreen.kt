@@ -34,7 +34,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Language
@@ -101,7 +104,7 @@ import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
 /** Internal Settings destinations — a categorized landing (ROOT) plus one sub-screen per category. */
-private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, MAPS, OFFLINE_MAPS, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, ABOUT, LICENSES }
+private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, MAPS, OFFLINE_MAPS, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, NOTIFICATIONS, SHARED_LINK, ABOUT, LICENSES }
 
 /**
  * Settings screen — a categorized landing list plus per-category sub-screens, in the
@@ -156,6 +159,7 @@ fun SettingsContent(
     val displayPrefs by vm.displayPrefs.collectAsStateWithLifecycle()
     val coordinateFormat by vm.coordinateFormat.collectAsStateWithLifecycle()
     val devices by vm.devices.collectAsStateWithLifecycle()
+    val userSettings by vm.userSettings.collectAsStateWithLifecycle()
     val backupEnabled by vm.backupEnabled.collectAsStateWithLifecycle()
     val backupAlbumIds by vm.backupAlbumIds.collectAsStateWithLifecycle()
     val albums by vm.albums.collectAsStateWithLifecycle()
@@ -209,6 +213,8 @@ fun SettingsContent(
         SettingsRoute.BACKGROUND -> stringResource(R.string.settings_cat_background)
         SettingsRoute.BACKUP -> stringResource(R.string.settings_cat_backup)
         SettingsRoute.ACCOUNT -> stringResource(R.string.settings_cat_account)
+        SettingsRoute.NOTIFICATIONS -> stringResource(R.string.settings_cat_notifications)
+        SettingsRoute.SHARED_LINK -> stringResource(R.string.share_open_title)
         SettingsRoute.ABOUT -> stringResource(R.string.settings_cat_about)
         SettingsRoute.LICENSES -> stringResource(R.string.settings_licenses)
     }
@@ -338,12 +344,19 @@ fun SettingsContent(
                     account = account,
                     avatar = avatar,
                     devices = devices,
+                    userSettings = userSettings,
                     onLoadDevices = vm::loadDevices,
+                    onLoadSettings = vm::loadSettings,
                     onRevokeDevice = vm::revokeDevice,
                     onWipeDevice = vm::wipeDevice,
+                    onToggleBirthdayChannel = vm::toggleBirthdayChannel,
+                    onToggleAnniversaryChannel = vm::toggleAnniversaryChannel,
+                    onSetFileMaxVersions = vm::setFileMaxVersions,
                     onDisconnect = { showDisconnectConfirm = true },
                 )
 
+                SettingsRoute.NOTIFICATIONS -> NotificationsSettings(innerPadding)
+                SettingsRoute.SHARED_LINK -> de.ledgerline.app.ui.share.SharedLinkContent(innerPadding)
                 SettingsRoute.ABOUT -> AboutSettings(innerPadding, onOpenLicenses = { route = SettingsRoute.LICENSES })
                 SettingsRoute.LICENSES -> LicensesScreen(innerPadding)
             }
@@ -460,6 +473,16 @@ private fun SettingsRoot(padding: PaddingValues, onNavigate: (SettingsRoute) -> 
             title = stringResource(R.string.settings_cat_account),
             subtitle = stringResource(R.string.settings_cat_account_sub),
         ) { onNavigate(SettingsRoute.ACCOUNT) }
+        CategoryRow(
+            icon = Icons.Outlined.Notifications,
+            title = stringResource(R.string.settings_cat_notifications),
+            subtitle = stringResource(R.string.settings_cat_notifications_sub),
+        ) { onNavigate(SettingsRoute.NOTIFICATIONS) }
+        CategoryRow(
+            icon = Icons.Outlined.Link,
+            title = stringResource(R.string.share_open_title),
+            subtitle = stringResource(R.string.share_open_hint),
+        ) { onNavigate(SettingsRoute.SHARED_LINK) }
         CategoryRow(
             icon = Icons.Outlined.Info,
             title = stringResource(R.string.settings_cat_about),
@@ -1022,12 +1045,17 @@ private fun AccountSettings(
     account: MeUser?,
     avatar: androidx.compose.ui.graphics.ImageBitmap?,
     devices: List<de.ledgerline.app.data.remote.dto.DeviceDto>,
+    userSettings: de.ledgerline.app.data.remote.dto.UserSettingsDto?,
     onLoadDevices: () -> Unit,
+    onLoadSettings: () -> Unit,
     onRevokeDevice: (Long) -> Unit,
     onWipeDevice: (Long) -> Unit,
+    onToggleBirthdayChannel: (String) -> Unit,
+    onToggleAnniversaryChannel: (String) -> Unit,
+    onSetFileMaxVersions: (Int) -> Unit,
     onDisconnect: () -> Unit,
 ) {
-    LaunchedEffect(Unit) { onLoadDevices() }
+    LaunchedEffect(Unit) { onLoadDevices(); onLoadSettings() }
     SubScreen(padding) {
         SectionHeader(stringResource(R.string.settings_account))
         avatar?.let { bmp ->
@@ -1091,6 +1119,34 @@ private fun AccountSettings(
                 )
             }
         }
+        userSettings?.let { s ->
+            SectionHeader(stringResource(R.string.settings_notify_channels))
+            Text(
+                stringResource(R.string.settings_notify_channels_sub),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+            )
+            ChannelRow(stringResource(R.string.settings_birthday_channels), s.birthdayChannels.orEmpty(), onToggleBirthdayChannel)
+            ChannelRow(stringResource(R.string.settings_anniversary_channels), s.anniversaryChannels.orEmpty(), onToggleAnniversaryChannel)
+            SectionHeader(stringResource(R.string.settings_file_versions))
+            val current = s.fileMaxVersions ?: 10
+            ListItem(
+                headlineContent = { Text(stringResource(R.string.settings_file_versions_cap)) },
+                supportingContent = { Text(stringResource(R.string.settings_file_versions_sub)) },
+                trailingContent = {
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        IconButton(onClick = { onSetFileMaxVersions(current - 1) }, enabled = current > 1) {
+                            Text("−", style = MaterialTheme.typography.titleLarge)
+                        }
+                        Text("$current", style = MaterialTheme.typography.titleMedium)
+                        IconButton(onClick = { onSetFileMaxVersions(current + 1) }, enabled = current < 200) {
+                            Text("+", style = MaterialTheme.typography.titleLarge)
+                        }
+                    }
+                },
+            )
+        }
         Button(
             onClick = onDisconnect,
             colors = ButtonDefaults.buttonColors(
@@ -1101,6 +1157,88 @@ private fun AccountSettings(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) { Text(stringResource(R.string.settings_disconnect)) }
+    }
+}
+
+/** Multi-select channel chips (desktop/ntfy/mail/webhook) for a contact-notify event type. */
+@Composable
+private fun ChannelRow(label: String, selected: List<String>, onToggle: (String) -> Unit) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
+    FlowRow(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        for (ch in listOf("desktop", "ntfy", "mail", "webhook")) {
+            androidx.compose.material3.FilterChip(
+                selected = ch in selected,
+                onClick = { onToggle(ch) },
+                label = { Text(ch.replaceFirstChar { it.uppercase() }) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun NotificationsSettings(padding: PaddingValues) {
+    val vm: de.ledgerline.app.ui.notifications.NotificationsViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+    val state by vm.state.collectAsStateWithLifecycle()
+    SubScreen(padding) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            SectionHeader(
+                if (state.unread > 0) stringResource(R.string.notifications_title_unread, state.unread)
+                else stringResource(R.string.notifications_title),
+            )
+            if (state.items.any { !it.read }) {
+                TextButton(onClick = vm::markAllRead) { Text(stringResource(R.string.notifications_mark_all)) }
+            }
+        }
+        when {
+            state.loading -> Text(
+                stringResource(R.string.account_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+            state.items.isEmpty() -> Text(
+                stringResource(R.string.notifications_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+            )
+            else -> state.items.forEach { n ->
+                ListItem(
+                    leadingContent = {
+                        val color = when (n.level) {
+                            "error" -> MaterialTheme.colorScheme.error
+                            "warning" -> MaterialTheme.colorScheme.tertiary
+                            "success" -> MaterialTheme.colorScheme.primary
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        Box(
+                            Modifier.size(10.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(if (n.read) MaterialTheme.colorScheme.surfaceVariant else color),
+                        )
+                    },
+                    headlineContent = { Text(n.title) },
+                    supportingContent = {
+                        val meta = listOfNotNull(n.body, n.at?.substringBefore('T')).joinToString(" · ")
+                        if (meta.isNotBlank()) Text(meta)
+                    },
+                    trailingContent = if (n.read) null else {
+                        { TextButton(onClick = { vm.markRead(n.id) }) { Text(stringResource(R.string.notifications_mark_read)) } }
+                    },
+                )
+            }
+        }
     }
 }
 

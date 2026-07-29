@@ -44,6 +44,7 @@ class GallerySaveTest {
         override fun u32le(n: Int) = ByteArray(4)
         override fun readU32le(b: ByteArray, o: Int) = 0
         override fun newContentEncryptor(vk: ByteArray): Crypto.ContentEncryptor = throw NotImplementedError()
+        override fun contentDecryptorFromKey(fileKey: ByteArray): de.ledgerline.app.core.crypto.Crypto.ContentDecryptor = throw NotImplementedError()
         override fun contentDecryptor(encFileKey: String, vk: ByteArray): Crypto.ContentDecryptor = throw NotImplementedError()
     }
 
@@ -56,6 +57,16 @@ class GallerySaveTest {
 
         override suspend fun galleryReverse(lat: Double, lng: Double): Response<de.ledgerline.app.data.remote.dto.ReverseResponse> = throw NotImplementedError()
         override suspend fun galleryGeocode(q: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.GeocodeResponse> = throw NotImplementedError()
+
+        override suspend fun notifications(etag: String?): retrofit2.Response<de.ledgerline.app.data.remote.dto.NotificationsResponse> = throw NotImplementedError()
+        override suspend fun markNotificationRead(id: Long): retrofit2.Response<Unit> = throw NotImplementedError()
+        override suspend fun markAllNotificationsRead(): retrofit2.Response<Unit> = throw NotImplementedError()
+        override suspend fun getSettings(): retrofit2.Response<de.ledgerline.app.data.remote.dto.UserSettingsDto> = throw NotImplementedError()
+        override suspend fun putSettings(body: de.ledgerline.app.data.remote.dto.UserSettingsDto): retrofit2.Response<de.ledgerline.app.data.remote.dto.UserSettingsDto> = throw NotImplementedError()
+        override suspend fun shareMeta(token: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareMetaResponse> = throw NotImplementedError()
+        override suspend fun shareUnlock(token: String, body: de.ledgerline.app.data.remote.dto.ShareUnlockRequest): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareUnlockResponse> = throw NotImplementedError()
+        override suspend fun shareManifest(token: String, grant: String?): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareManifestResponse> = throw NotImplementedError()
+        override suspend fun shareBlob(token: String, ref: String, grant: String?): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
         override suspend fun mapsRoute(points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse> = throw NotImplementedError()
         override suspend fun notesStore(): Response<de.ledgerline.app.data.remote.dto.StoreResponse> = throw NotImplementedError()
         override suspend fun notesStorePut(body: de.ledgerline.app.data.remote.dto.StorePutRequest): Response<de.ledgerline.app.data.remote.dto.StoreResponse> = throw NotImplementedError()

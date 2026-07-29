@@ -5,8 +5,14 @@ import de.ledgerline.app.core.crypto.Crypto
 /** Frame-decrypts a downloaded blob (secretstream) into plaintext bytes.
  *  Mirrors Phase-3 streamDecrypted; stops at TAG_FINAL, ignoring the Padmé tail. */
 object BlobDownloader {
-    fun decrypt(cipherBytes: ByteArray, encFileKey: String, vk: ByteArray, crypto: Crypto): ByteArray {
-        val dec = crypto.contentDecryptor(encFileKey, vk)
+    fun decrypt(cipherBytes: ByteArray, encFileKey: String, vk: ByteArray, crypto: Crypto): ByteArray =
+        drain(cipherBytes, crypto.contentDecryptor(encFileKey, vk), crypto)
+
+    /** Decrypt a blob with an ALREADY-unwrapped raw per-file key (public share consumption — no VK). */
+    fun decryptWithKey(cipherBytes: ByteArray, fileKey: ByteArray, crypto: Crypto): ByteArray =
+        drain(cipherBytes, crypto.contentDecryptorFromKey(fileKey), crypto)
+
+    private fun drain(cipherBytes: ByteArray, dec: Crypto.ContentDecryptor, crypto: Crypto): ByteArray {
         dec.start(cipherBytes.copyOfRange(0, dec.headerBytes))
         val out = java.io.ByteArrayOutputStream()
         var off = dec.headerBytes

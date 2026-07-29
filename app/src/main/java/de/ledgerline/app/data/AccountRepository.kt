@@ -117,6 +117,39 @@ class AccountRepository(
         } catch (_: Exception) { /* best-effort */ }
     }
 
+    /** Recent in-app notifications + unread count (`GET /notifications`). Null on no session/failure. */
+    suspend fun notifications(): de.ledgerline.app.data.remote.dto.NotificationsResponse? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val r = apiProvider(session).notifications(null)
+            if (r.isSuccessful) r.body() else null
+        } catch (_: Exception) { null }
+    }
+
+    /** Mark one notification read (`POST /notifications/{id}/read`). */
+    suspend fun markNotificationRead(id: Long): Boolean = call { it.markNotificationRead(id) }
+
+    /** Mark all notifications read (`POST /notifications/read-all`). */
+    suspend fun markAllNotificationsRead(): Boolean = call { it.markAllNotificationsRead() }
+
+    /** Per-user non-display settings (`GET /settings`): contact notify channels + file version cap. */
+    suspend fun getSettings(): de.ledgerline.app.data.remote.dto.UserSettingsDto? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val r = apiProvider(session).getSettings()
+            if (r.isSuccessful) r.body() else null
+        } catch (_: Exception) { null }
+    }
+
+    /** Partial-update per-user settings (`PUT /settings`); returns the server echo or null on failure. */
+    suspend fun putSettings(dto: de.ledgerline.app.data.remote.dto.UserSettingsDto): de.ledgerline.app.data.remote.dto.UserSettingsDto? {
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val r = apiProvider(session).putSettings(dto)
+            if (r.isSuccessful) r.body() else null
+        } catch (_: Exception) { null }
+    }
+
     /** The signed-in user's avatar image bytes (non-secret, `GET /avatar`), or null if none/failure. */
     suspend fun avatar(): ByteArray? {
         val session = sessionHolder.get() ?: return null

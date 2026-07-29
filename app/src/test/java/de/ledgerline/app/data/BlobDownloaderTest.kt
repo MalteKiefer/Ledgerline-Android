@@ -23,6 +23,7 @@ class BlobDownloaderTest {
             ((n ushr 24) and 0xff).toByte(),
         )
 
+        override fun contentDecryptorFromKey(fileKey: ByteArray): de.ledgerline.app.core.crypto.Crypto.ContentDecryptor = throw NotImplementedError()
         override fun contentDecryptor(encFileKey: String, vk: ByteArray) = object : Crypto.ContentDecryptor {
             override val headerBytes = 2
             override fun start(header: ByteArray) {}

@@ -350,4 +350,51 @@ interface LedgerlineApi {
 
     @DELETE("api/v1/contacts/blob/{blob}")
     suspend fun deleteContactBlob(@Path("blob") blob: String): Response<Unit>
+
+    // --- Notifications (in-app; ETag/304-aware) ---
+
+    @GET("api/v1/notifications")
+    suspend fun notifications(@retrofit2.http.Header("If-None-Match") etag: String?):
+        Response<de.ledgerline.app.data.remote.dto.NotificationsResponse>
+
+    @POST("api/v1/notifications/{id}/read")
+    suspend fun markNotificationRead(@Path("id") id: Long): Response<Unit>
+
+    @POST("api/v1/notifications/read-all")
+    suspend fun markAllNotificationsRead(): Response<Unit>
+
+    // --- Per-user non-display settings (contact notify channels + file version cap) ---
+
+    @GET("api/v1/settings")
+    suspend fun getSettings(): Response<de.ledgerline.app.data.remote.dto.UserSettingsDto>
+
+    @PUT("api/v1/settings")
+    suspend fun putSettings(@Body body: de.ledgerline.app.data.remote.dto.UserSettingsDto):
+        Response<de.ledgerline.app.data.remote.dto.UserSettingsDto>
+
+    // --- Public share-link CONSUMPTION (unauthenticated; opening someone's link in-app) ---
+
+    @GET("api/v1/s/{token}/meta")
+    suspend fun shareMeta(@Path("token") token: String):
+        Response<de.ledgerline.app.data.remote.dto.ShareMetaResponse>
+
+    @POST("api/v1/s/{token}/unlock")
+    suspend fun shareUnlock(
+        @Path("token") token: String,
+        @Body body: de.ledgerline.app.data.remote.dto.ShareUnlockRequest,
+    ): Response<de.ledgerline.app.data.remote.dto.ShareUnlockResponse>
+
+    @GET("api/v1/s/{token}/manifest")
+    suspend fun shareManifest(
+        @Path("token") token: String,
+        @Query("grant") grant: String?,
+    ): Response<de.ledgerline.app.data.remote.dto.ShareManifestResponse>
+
+    @GET("api/v1/s/{token}/blob/{ref}")
+    @Streaming
+    suspend fun shareBlob(
+        @Path("token") token: String,
+        @Path("ref") ref: String,
+        @Query("grant") grant: String?,
+    ): Response<ResponseBody>
 }

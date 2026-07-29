@@ -51,6 +51,7 @@ class FinanceRepositoryTest {
             override fun encryptChunk(chunk: ByteArray, isLast: Boolean) = chunk
             override fun sealKey() = """{"c":"x","n":"y"}"""
         }
+        override fun contentDecryptorFromKey(fileKey: ByteArray): de.ledgerline.app.core.crypto.Crypto.ContentDecryptor = throw NotImplementedError()
         override fun contentDecryptor(encFileKey: String, vk: ByteArray): Crypto.ContentDecryptor = throw NotImplementedError()
     }
 

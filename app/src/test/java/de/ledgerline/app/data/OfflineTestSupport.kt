@@ -164,6 +164,16 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun galleryProcess(file: MultipartBody.Part): Response<ProcessResponse> = throw NotImplementedError()
     override suspend fun galleryAnalyze(file: okhttp3.MultipartBody.Part): retrofit2.Response<de.ledgerline.app.data.remote.dto.AnalyzeResponse> = throw NotImplementedError()
     override suspend fun galleryGeocode(q: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.GeocodeResponse> = throw NotImplementedError()
+
+        override suspend fun notifications(etag: String?): retrofit2.Response<de.ledgerline.app.data.remote.dto.NotificationsResponse> = throw NotImplementedError()
+        override suspend fun markNotificationRead(id: Long): retrofit2.Response<Unit> = throw NotImplementedError()
+        override suspend fun markAllNotificationsRead(): retrofit2.Response<Unit> = throw NotImplementedError()
+        override suspend fun getSettings(): retrofit2.Response<de.ledgerline.app.data.remote.dto.UserSettingsDto> = throw NotImplementedError()
+        override suspend fun putSettings(body: de.ledgerline.app.data.remote.dto.UserSettingsDto): retrofit2.Response<de.ledgerline.app.data.remote.dto.UserSettingsDto> = throw NotImplementedError()
+        override suspend fun shareMeta(token: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareMetaResponse> = throw NotImplementedError()
+        override suspend fun shareUnlock(token: String, body: de.ledgerline.app.data.remote.dto.ShareUnlockRequest): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareUnlockResponse> = throw NotImplementedError()
+        override suspend fun shareManifest(token: String, grant: String?): retrofit2.Response<de.ledgerline.app.data.remote.dto.ShareManifestResponse> = throw NotImplementedError()
+        override suspend fun shareBlob(token: String, ref: String, grant: String?): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
     override suspend fun galleryStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun deleteGalleryBlob(blob: String): Response<Unit> = throw NotImplementedError()
     override suspend fun embedText(body: de.ledgerline.app.data.remote.dto.EmbedTextRequest): Response<de.ledgerline.app.data.remote.dto.EmbedTextResponse> = throw NotImplementedError()
@@ -236,6 +246,7 @@ open class SealTagCrypto : Crypto {
             ((b[o + 2].toInt() and 0xFF) shl 16) or
             ((b[o + 3].toInt() and 0xFF) shl 24)
     override fun newContentEncryptor(vk: ByteArray): Crypto.ContentEncryptor = throw NotImplementedError()
+    override fun contentDecryptorFromKey(fileKey: ByteArray): de.ledgerline.app.core.crypto.Crypto.ContentDecryptor = throw NotImplementedError()
     override fun contentDecryptor(encFileKey: String, vk: ByteArray): Crypto.ContentDecryptor = EchoDecryptor()
 
     /** Header is empty; each frame decrypts to itself, so one frame == the whole plaintext. */

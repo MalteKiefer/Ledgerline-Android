@@ -113,6 +113,44 @@ class SettingsViewModel @Inject constructor(
     fun revokeDevice(id: Long) = viewModelScope.launch { if (accountRepository.revokeDevice(id)) loadDevices() }
     fun wipeDevice(id: Long) = viewModelScope.launch { if (accountRepository.wipeDevice(id)) loadDevices() }
 
+    /** Per-user non-display settings (contact notify channels + file version cap), server-synced. */
+    private val _userSettings = MutableStateFlow<de.ledgerline.app.data.remote.dto.UserSettingsDto?>(null)
+    val userSettings: StateFlow<de.ledgerline.app.data.remote.dto.UserSettingsDto?> = _userSettings.asStateFlow()
+
+    fun loadSettings() = viewModelScope.launch {
+        accountRepository.getSettings()?.let { _userSettings.value = it }
+    }
+
+    /** Optimistically apply [local] to the UI, then PUT [patch] (a partial body) to the server. */
+    private fun applySettings(local: de.ledgerline.app.data.remote.dto.UserSettingsDto, patch: de.ledgerline.app.data.remote.dto.UserSettingsDto) {
+        _userSettings.value = local
+        viewModelScope.launch { accountRepository.putSettings(patch)?.let { _userSettings.value = it } }
+    }
+
+    private fun toggle(list: List<String>?, ch: String): List<String> {
+        val set = list.orEmpty().toMutableList()
+        if (!set.remove(ch)) set.add(ch)
+        return set
+    }
+
+    fun toggleBirthdayChannel(ch: String) {
+        val cur = _userSettings.value ?: return
+        val next = toggle(cur.birthdayChannels, ch)
+        applySettings(cur.copy(birthdayChannels = next), de.ledgerline.app.data.remote.dto.UserSettingsDto(birthdayChannels = next))
+    }
+
+    fun toggleAnniversaryChannel(ch: String) {
+        val cur = _userSettings.value ?: return
+        val next = toggle(cur.anniversaryChannels, ch)
+        applySettings(cur.copy(anniversaryChannels = next), de.ledgerline.app.data.remote.dto.UserSettingsDto(anniversaryChannels = next))
+    }
+
+    fun setFileMaxVersions(n: Int) {
+        val cur = _userSettings.value ?: return
+        val clamped = n.coerceIn(1, 200)
+        applySettings(cur.copy(fileMaxVersions = clamped), de.ledgerline.app.data.remote.dto.UserSettingsDto(fileMaxVersions = clamped))
+    }
+
     val backupEnabled: StateFlow<Boolean> = settingsStore.backupEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     val backupAlbumIds: StateFlow<Set<String>> = settingsStore.backupAlbumIds

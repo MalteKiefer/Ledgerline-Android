@@ -25,6 +25,7 @@ class UnlockVaultTest {
         override fun u32le(n: Int) = ByteArray(4)
         override fun readU32le(bytes: ByteArray, off: Int) = 0
         override fun newContentEncryptor(vk: ByteArray): Crypto.ContentEncryptor = throw NotImplementedError()
+        override fun contentDecryptorFromKey(fileKey: ByteArray): de.ledgerline.app.core.crypto.Crypto.ContentDecryptor = throw NotImplementedError()
         override fun contentDecryptor(encFileKey: String, vk: ByteArray): Crypto.ContentDecryptor = throw NotImplementedError()
     }
 

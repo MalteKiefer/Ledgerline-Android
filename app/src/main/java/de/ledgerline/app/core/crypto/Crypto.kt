@@ -60,6 +60,10 @@ interface Crypto {
     /** Streaming content decryptor; unwraps the per-file key with vk. */
     fun contentDecryptor(encFileKey: String, vk: ByteArray): ContentDecryptor
 
+    /** Streaming content decryptor from an ALREADY-unwrapped raw per-file key (32 B). Used by public
+     *  share consumption, where the key comes from the share manifest (SK-wrapped), NOT the vault. */
+    fun contentDecryptorFromKey(fileKey: ByteArray): ContentDecryptor
+
     /** Little-endian u32 helpers for the frame length prefix. */
     fun u32le(n: Int): ByteArray
     fun readU32le(bytes: ByteArray, off: Int): Int
