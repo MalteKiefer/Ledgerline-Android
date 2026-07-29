@@ -144,6 +144,7 @@ object FinanceRecordCodec {
             cardExpiry = o.str("cardExpiry") ?: "",
             email = o.str("email") ?: "",
             note = o.str("note") ?: "",
+            business = o["business"]?.truthy() ?: false,
             trashed = o["trashed"]?.truthy() ?: false,
             raw = o,
         )
@@ -165,6 +166,7 @@ object FinanceRecordCodec {
         out["cardExpiry"] = JsonPrimitive(pm.cardExpiry)
         out["email"] = JsonPrimitive(pm.email)
         out["note"] = JsonPrimitive(pm.note)
+        out["business"] = JsonPrimitive(pm.business)
         out["trashed"] = JsonPrimitive(pm.trashed)
         return JsonObject(out)
     }
@@ -224,6 +226,8 @@ object FinanceRecordCodec {
         amount = o["amount"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
         date = o.str("date") ?: "",
         note = o.str("note") ?: "",
+        account = o.str("account"),
+        category = o.str("category") ?: "",
         raw = o,
     )
 
@@ -245,6 +249,8 @@ object FinanceRecordCodec {
         out["amount"] = numToken(e.amount)
         out["date"] = JsonPrimitive(e.date)
         out["note"] = JsonPrimitive(e.note)
+        setOrNull(out, "account", e.account?.let { JsonPrimitive(it) })
+        if (e.category.isNotEmpty() || e.raw.containsKey("category")) out["category"] = JsonPrimitive(e.category)
         return JsonObject(out)
     }
 

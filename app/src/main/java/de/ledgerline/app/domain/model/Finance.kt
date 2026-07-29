@@ -116,6 +116,8 @@ data class PaymentMethod(
     val cardExpiry: String = "",
     val email: String = "",
     val note: String = "",
+    /** The single "business" account (only one at a time); non-business = private-scope. */
+    val business: Boolean = false,
     val trashed: Boolean = false,
     val raw: JsonObject = JsonObject(emptyMap()),
 )
@@ -141,6 +143,8 @@ data class ProjectExpense(
     val amount: Double = 0.0,
     val date: String = "",
     val note: String = "",
+    val account: String? = null,    // optional payment-method id this expense was paid from
+    val category: String = "",
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 

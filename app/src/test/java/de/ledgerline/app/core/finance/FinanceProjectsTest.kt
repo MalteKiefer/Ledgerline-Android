@@ -54,6 +54,24 @@ class FinanceProjectsTest {
         assertEquals(listOf(0, 1, 2, 1), rows.map { it.depth })
     }
 
+    @Test fun effective_kind_derives_from_root() {
+        val ps = listOf(
+            Project(id = "root", name = "R", kind = "private"),
+            Project(id = "a", name = "A", parentId = "root", kind = "business"),  // stale/legacy kind
+            Project(id = "a1", name = "A1", parentId = "a", kind = "business"),
+            Project(id = "biz", name = "B", kind = "business"),
+        )
+        assertEquals("private", FinanceProjects.effectiveKind(ps, "root"))
+        assertEquals("private", FinanceProjects.effectiveKind(ps, "a"))    // inherits root, not its own
+        assertEquals("private", FinanceProjects.effectiveKind(ps, "a1"))
+        assertEquals("business", FinanceProjects.effectiveKind(ps, "biz"))
+        // normalizeKinds rewrites the stale sub-project kinds to the root's.
+        val fixed = FinanceProjects.normalizeKinds(ps).associate { it.id to it.kind }
+        assertEquals("private", fixed["a"])
+        assertEquals("private", fixed["a1"])
+        assertEquals("business", fixed["biz"])
+    }
+
     @Test fun orphan_surfaces_at_root() {
         val orphan = projects + proj("x", "Orphan", parent = "missing")
         val rows = FinanceProjects.projectTree(orphan)

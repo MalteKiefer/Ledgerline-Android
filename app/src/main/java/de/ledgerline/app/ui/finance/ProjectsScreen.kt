@@ -66,11 +66,21 @@ fun ProjectsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
 @Composable
 private fun ProjectTree(vm: FinanceViewModel, onBack: () -> Unit, onOpen: (String) -> Unit, onNew: () -> Unit) {
     vm.projects.collectAsStateWithLifecycle()
-    val rows = vm.projectTree()
+    vm.transactions.collectAsStateWithLifecycle()
+    val scope by vm.financeScope.collectAsStateWithLifecycle()
+    val rows = vm.scopedProjectTree()
+    val (bizTotal, privTotal) = vm.projectScopeTotals()
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.finance_projects), onBack = onBack) }) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = 100.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Spacer(Modifier.size(4.dp))
+                // Cost split business vs private (own totals; no tree double-counting).
+                if (bizTotal != 0.0 || privTotal != 0.0) {
+                    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().cardSurface(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column { Text(vm.money2(bizTotal), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = de.ledgerline.app.ui.theme.Brand.accent); Text(stringResource(R.string.finance_project_business), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        Column(horizontalAlignment = Alignment.End) { Text(vm.money2(privTotal), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Text(stringResource(R.string.finance_project_private), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
                 if (rows.isEmpty()) {
                     Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) {
                         Text(stringResource(R.string.finance_projects_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -185,9 +195,17 @@ private fun ProjectEditScreen(initial: Project, vm: FinanceViewModel, onBack: ()
                 OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_project_name)) }, singleLine = true)
                 OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_pm_note)) })
             }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("business", "private").forEach { k ->
-                    FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(kindLabel(k)) })
+            if (initial.parentId != null) {
+                // A sub-project inherits its root's kind — locked (web parity).
+                Text(
+                    stringResource(R.string.finance_project_kind_inherited) + " (" + kindLabel(vm.effectiveKind(initial.parentId!!)) + ")",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("business", "private").forEach { k ->
+                        FilterChip(selected = kind == k, onClick = { kind = k }, label = { Text(kindLabel(k)) })
+                    }
                 }
             }
             PrimaryGradientButton(stringResource(R.string.action_save), enabled = name.isNotBlank(), onClick = {

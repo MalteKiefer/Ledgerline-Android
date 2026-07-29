@@ -62,6 +62,20 @@ class FinanceViewModel @Inject constructor(
     private val _year = MutableStateFlow(java.time.LocalDate.now().year)
     val year: StateFlow<Int> = _year.asStateFlow()
 
+    // Global business/private scope filtering every finance tab (web `financeScope`). `private` =
+    // a private booking (vatCat 'private'), a non-business payment method, a private project, or a
+    // receipt on any of those; invoices are always business (→ empty in the private scope).
+    private val _scope = MutableStateFlow("all")   // all | business | private
+    val financeScope: StateFlow<String> = _scope.asStateFlow()
+    fun setFinanceScope(s: String) { _scope.value = s }
+
+    private fun scopeMatch(isPrivate: Boolean): Boolean {
+        val s = _scope.value
+        return s == "all" || (s == "private") == isPrivate
+    }
+    private fun pmPrivate(pm: de.ledgerline.app.domain.model.PaymentMethod) = !pm.business
+    private fun txPrivate(tx: de.ledgerline.app.domain.model.Transaction) = tx.vatCat == "private"
+
     init {
         // Load once the vault is unlocked (the VM can init before the key lands).
         viewModelScope.launch {
@@ -83,9 +97,10 @@ class FinanceViewModel @Inject constructor(
     fun years(): List<Int> =
         invoices.value.mapNotNull { InvoiceMath.invoiceYear(it).toIntOrNull() }.distinct().sortedDescending()
 
-    /** Non-trashed invoices of [y], newest issue date first. */
+    /** Non-trashed invoices of [y], newest first. Invoices are business → empty in the private scope. */
     fun invoicesOf(y: Int): List<Invoice> =
-        invoices.value.filter { !it.trashed && InvoiceMath.invoiceYear(it) == y.toString() }
+        if (_scope.value == "private") emptyList()
+        else invoices.value.filter { !it.trashed && InvoiceMath.invoiceYear(it) == y.toString() }
             .sortedByDescending { it.issueDate }
 
     fun kpis(y: Int): InvoiceMath.YearKpis = InvoiceMath.yearKpis(invoices.value, y)
@@ -219,6 +234,19 @@ class FinanceViewModel @Inject constructor(
     fun sortedPaymentMethods(): List<de.ledgerline.app.domain.model.PaymentMethod> =
         de.ledgerline.app.core.finance.PaymentMethods.sorted(paymentMethods.value)
 
+    /** Payment methods filtered by the global scope (non-business = private). */
+    fun scopedPaymentMethods(): List<de.ledgerline.app.domain.model.PaymentMethod> =
+        sortedPaymentMethods().filter { scopeMatch(pmPrivate(it)) }
+
+    /** Mark [pm] the single business account (only one at a time; toggles it off if already set). */
+    fun toggleBusinessAccount(pm: de.ledgerline.app.domain.model.PaymentMethod, onDone: (Boolean) -> Unit = {}) {
+        viewModelScope.launch {
+            val on = !pm.business
+            val res = repo.savePaymentMethods { list -> list.map { it.copy(business = it.id == pm.id && on) } }
+            onDone(res is de.ledgerline.app.core.Outcome.Ok)
+        }
+    }
+
     fun paymentMethodById(id: String): de.ledgerline.app.domain.model.PaymentMethod? =
         paymentMethods.value.firstOrNull { it.id == id }
 
@@ -235,7 +263,9 @@ class FinanceViewModel @Inject constructor(
     fun savePaymentMethod(pm: de.ledgerline.app.domain.model.PaymentMethod, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             val res = repo.savePaymentMethods { list ->
-                if (list.any { it.id == pm.id }) list.map { if (it.id == pm.id) pm else it } else listOf(pm) + list
+                val next = if (list.any { it.id == pm.id }) list.map { if (it.id == pm.id) pm else it } else listOf(pm) + list
+                // Single business account: if this one is business, clear it on every other.
+                if (pm.business) next.map { it.copy(business = it.id == pm.id) } else next
             }
             onDone(res is de.ledgerline.app.core.Outcome.Ok)
         }
@@ -347,18 +377,33 @@ class FinanceViewModel @Inject constructor(
         }
 
     fun projectTree() = FP.projectTree(projects.value)
+    /** The project tree filtered by the global business/private scope (via effective kind). */
+    fun scopedProjectTree() = projectTree().filter { scopeMatch(effectiveKind(it.project.id) == "private") }
     fun projectById(id: String) = projects.value.firstOrNull { it.id == id }
     fun projectRolledTotal(id: String) = FP.rolledTotal(projects.value, id, allReceipts())
     fun projectOwnTotal(p: de.ledgerline.app.domain.model.Project) = FP.ownTotal(p, allReceipts())
+    /** A project's effective kind (derived from the root ancestor; a sub-project can't differ). */
+    fun effectiveKind(id: String) = FP.effectiveKind(projects.value, id)
 
+    /** Own-total cost split business vs private across all projects (for the stats + project cards). */
+    fun projectScopeTotals(): Pair<Double, Double> {
+        var business = 0.0; var priv = 0.0
+        for (p in projects.value) { val t = projectOwnTotal(p); if (effectiveKind(p.id) == "private") priv += t else business += t }
+        return (Math.round(business * 100) / 100.0) to (Math.round(priv * 100) / 100.0)
+    }
+
+    /** New project; a sub-project inherits its parent's effective kind (locked, web parity). */
     fun newProject(parentId: String?, kind: String = "business") = de.ledgerline.app.domain.model.Project(
-        id = de.ledgerline.app.core.Ids.newId(), parentId = parentId, kind = kind, created = java.time.LocalDate.now().toString(),
+        id = de.ledgerline.app.core.Ids.newId(), parentId = parentId,
+        kind = if (parentId != null) effectiveKind(parentId) else kind,
+        created = java.time.LocalDate.now().toString(),
     )
 
     fun saveProject(p: de.ledgerline.app.domain.model.Project, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch {
             val res = repo.saveProjects { list ->
-                if (list.any { it.id == p.id }) list.map { if (it.id == p.id) p else it } else listOf(p) + list
+                val next = if (list.any { it.id == p.id }) list.map { if (it.id == p.id) p else it } else listOf(p) + list
+                FP.normalizeKinds(next)   // force every sub-project to its root's kind
             }
             onDone(res is de.ledgerline.app.core.Outcome.Ok)
         }

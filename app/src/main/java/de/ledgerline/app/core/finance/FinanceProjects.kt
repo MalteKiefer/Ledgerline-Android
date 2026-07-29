@@ -44,6 +44,18 @@ object FinanceProjects {
         return out
     }
 
+    /** A project's effective kind: derived from its ROOT ancestor (a sub-project can't differ). */
+    fun effectiveKind(projects: List<Project>, id: String): String {
+        val byId = projects.associateBy { it.id }
+        var cur = byId[id]; var guard = 0
+        while (cur?.parentId != null && byId[cur.parentId] != null && guard++ < 100) cur = byId[cur.parentId]
+        return if (cur?.kind == "private") "private" else "business"
+    }
+
+    /** Force every sub-project to its root's kind (repairs edits + legacy data). */
+    fun normalizeKinds(projects: List<Project>): List<Project> =
+        projects.map { it.copy(kind = effectiveKind(projects, it.id)) }
+
     /** Sum of a project's own manual expenses. */
     fun expensesSum(project: Project): Double = project.expenses.sumOf { it.amount }
 

@@ -893,4 +893,9 @@
     <string name="finance_receipt_dupe">Bereits angehängt</string>
     <string name="finance_receipt_total">Erkannter Betrag</string>
     <string name="finance_receipt_no_preview">Für diesen Dateityp ist keine Vorschau verfügbar.</string>
+    <string name="finance_scope_all">Alle</string>
+    <string name="finance_scope_business">Geschäftlich</string>
+    <string name="finance_scope_private">Privat</string>
+    <string name="finance_pm_business">Geschäftskonto</string>
+    <string name="finance_project_kind_inherited">Vom Elternprojekt übernommen</string>
 </resources>

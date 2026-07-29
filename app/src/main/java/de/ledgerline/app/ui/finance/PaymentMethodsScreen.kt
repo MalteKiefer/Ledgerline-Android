@@ -97,7 +97,8 @@ fun PaymentMethodsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
 @Composable
 private fun PaymentMethodList(vm: FinanceViewModel, onBack: () -> Unit, onEdit: (PaymentMethod) -> Unit, onNew: () -> Unit) {
     vm.paymentMethods.collectAsStateWithLifecycle()   // recompose on change
-    val list = vm.sortedPaymentMethods()
+    vm.financeScope.collectAsStateWithLifecycle()     // recompose on scope change
+    val list = vm.scopedPaymentMethods()
 
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.finance_pm_title), onBack = onBack) }) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
@@ -255,6 +256,12 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
                     else -> {}
                 }
                 Field(pm.note, { pm = pm.copy(note = it) }, R.string.finance_pm_note)
+            }
+
+            // Business account (single; drives the business/private scope). Non-business = private.
+            Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.finance_pm_business), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                androidx.compose.material3.Switch(checked = pm.business, onCheckedChange = { pm = pm.copy(business = it) })
             }
 
             de.ledgerline.app.ui.theme.PrimaryGradientButton(

@@ -895,4 +895,9 @@
     <string name="finance_receipt_dupe">Already attached</string>
     <string name="finance_receipt_total">Recognised total</string>
     <string name="finance_receipt_no_preview">No preview available for this file type.</string>
+    <string name="finance_scope_all">All</string>
+    <string name="finance_scope_business">Business</string>
+    <string name="finance_scope_private">Private</string>
+    <string name="finance_pm_business">Business account</string>
+    <string name="finance_project_kind_inherited">Inherited from parent</string>
 </resources>

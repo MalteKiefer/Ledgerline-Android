@@ -109,8 +109,9 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
     }
     val invoices by vm.invoices.collectAsStateWithLifecycle()
     val year by vm.year.collectAsStateWithLifecycle()
+    val scope by vm.financeScope.collectAsStateWithLifecycle()
     val years = remember(invoices) { (vm.years() + year).distinct().sortedDescending() }
-    val list = remember(invoices, year) { vm.invoicesOf(year) }
+    val list = remember(invoices, year, scope) { vm.invoicesOf(year) }
     val kpis = remember(invoices, year) { vm.kpis(year) }
 
     AppScaffold(
@@ -147,6 +148,12 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Spacer(Modifier.size(4.dp))
+            // Global business/private scope — filters invoices, payment methods, projects, stats.
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("all" to R.string.finance_scope_all, "business" to R.string.finance_scope_business, "private" to R.string.finance_scope_private).forEach { (k, res) ->
+                    FilterChip(selected = scope == k, onClick = { vm.setFinanceScope(k) }, label = { Text(stringResource(res)) })
+                }
+            }
             // Year selector
             if (years.isNotEmpty()) {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
