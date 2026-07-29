@@ -645,6 +645,17 @@
     <string name="vaults_untitled">Shared vault</string>
     <string name="vaults_back">Back</string>
     <string name="vaults_secret_count">%1$d items</string>
+    <string name="vaults_create">Create vault</string>
+    <string name="vaults_name">Name</string>
+    <string name="vaults_members">Members</string>
+    <string name="vaults_invite_email">Invite by email</string>
+    <string name="vaults_invite">Invite</string>
+    <string name="vaults_remove">Remove</string>
+    <string name="vaults_invite_ok">Invitation sent.</string>
+    <string name="vaults_invite_not_found">No user found with a sharing key for that address.</string>
+    <string name="vaults_member_removed">Member removed and vault re-keyed.</string>
+    <string name="vaults_created">Vault created.</string>
+    <string name="vaults_action_failed">That didn\'t work. Try again.</string>
     <string name="settings_device_this">%1$s (this device)</string>
     <string name="settings_device_revoke">Revoke</string>
     <string name="settings_device_wipe">Remote wipe</string>

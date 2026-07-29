@@ -22,6 +22,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Part
@@ -414,4 +415,34 @@ interface LedgerlineApi {
     @GET("api/v1/vaults/{vault}/blobs/raw/{blob}")
     @Streaming
     suspend fun vaultBlobRaw(@Path("vault") vault: String, @Path("blob") blob: String): Response<ResponseBody>
+
+    // --- Owner-side shared-vault provisioning + member management ---
+
+    @POST("api/v1/vaults")
+    suspend fun createVault(@Body body: de.ledgerline.app.data.remote.dto.CreateVaultRequest):
+        Response<de.ledgerline.app.data.remote.dto.VaultCreatedResponse>
+
+    @PUT("api/v1/vaults/{vault}/store")
+    suspend fun vaultStorePut(@Path("vault") vault: String, @Body body: de.ledgerline.app.data.remote.dto.SharedVaultStorePut):
+        Response<de.ledgerline.app.data.remote.dto.SharedVaultStoreResponse>
+
+    @GET("api/v1/vaults/{vault}/members")
+    suspend fun vaultMembers(@Path("vault") vault: String):
+        Response<List<de.ledgerline.app.data.remote.dto.VaultMemberDto>>
+
+    @POST("api/v1/vaults/{vault}/resolve-recipient")
+    suspend fun resolveRecipient(@Path("vault") vault: String, @Body body: de.ledgerline.app.data.remote.dto.ResolveRecipientRequest):
+        Response<de.ledgerline.app.data.remote.dto.ResolvedRecipientDto>
+
+    @POST("api/v1/vaults/{vault}/members")
+    suspend fun addVaultMember(@Path("vault") vault: String, @Body body: de.ledgerline.app.data.remote.dto.AddMemberRequest): Response<Unit>
+
+    @PATCH("api/v1/vaults/{vault}/members/{member}")
+    suspend fun updateVaultMember(@Path("vault") vault: String, @Path("member") member: String, @Body body: de.ledgerline.app.data.remote.dto.UpdateMemberRequest): Response<Unit>
+
+    @DELETE("api/v1/vaults/{vault}/members/{member}")
+    suspend fun deleteVaultMember(@Path("vault") vault: String, @Path("member") member: String): Response<Unit>
+
+    @POST("api/v1/vaults/{vault}/rotate")
+    suspend fun rotateVault(@Path("vault") vault: String, @Body body: de.ledgerline.app.data.remote.dto.RotateRequest): Response<Unit>
 }

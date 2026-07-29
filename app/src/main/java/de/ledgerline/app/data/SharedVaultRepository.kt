@@ -9,8 +9,12 @@ import de.ledgerline.app.domain.model.Session
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import java.security.SecureRandom
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -143,6 +147,97 @@ class SharedVaultRepository(
         if (r?.isSuccessful != true) return@withContext null
         val cipher = r.body()?.bytes() ?: return@withContext null
         runCatching { BlobDownloader.decryptWithKey(cipher, fk, crypto) }.getOrNull()
+    }
+
+    // ---- Owner side: create, invite, member management, rotate ----
+
+    enum class InviteResult { OK, NOT_FOUND, NO_RECIPIENT_KEY, NO_VAULT_KEY, FAILED }
+
+    /**
+     * Create a shared vault: a fresh random VK_vault wrapped (PQ-hybrid) to MY OWN identity, then an
+     * initial `{name}` manifest sealed under it. Returns the new vault id, or null on failure.
+     */
+    suspend fun create(kind: String, name: String): String? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        val id = identityRepo.ensure() ?: return@withContext null
+        val vk = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val wrapped = runCatching { pqkem.hybridWrap(vk, id.x25519Pub, id.mlkemEk, "").toJson() }.getOrNull() ?: return@withContext null
+        val api = apiProvider(session)
+        val cr = runCatching { api.createVault(de.ledgerline.app.data.remote.dto.CreateVaultRequest(wrapped, kind)) }.getOrNull()
+        if (cr?.isSuccessful != true) return@withContext null
+        val vaultId = cr.body()?.id?.takeIf { it.isNotBlank() } ?: return@withContext null
+        vkCache[vaultId] = vk
+        // Seal an initial manifest (name + kind-appropriate empty collections) at the store's version.
+        val manifest = buildJsonObject {
+            put("name", JsonPrimitive(name))
+            if (kind == "password") put("items", JsonArray(emptyList()))
+            else { put("folders", JsonArray(emptyList())); put("files", JsonArray(emptyList())) }
+        }
+        val version = runCatching { api.vaultStore(vaultId) }.getOrNull()?.body()?.version ?: 0
+        runCatching {
+            api.vaultStorePut(vaultId, de.ledgerline.app.data.remote.dto.SharedVaultStorePut(crypto.sealManifest(manifest.toString(), vk), version))
+        }
+        vaultId
+    }
+
+    suspend fun members(vaultId: String): List<de.ledgerline.app.data.remote.dto.VaultMemberDto> = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext emptyList()
+        val r = runCatching { apiProvider(session).vaultMembers(vaultId) }.getOrNull()
+        if (r?.isSuccessful == true) r.body().orEmpty() else emptyList()
+    }
+
+    /** Resolve a recipient + wrap VK_vault to them + POST the membership. Uniform NOT_FOUND on 422. */
+    suspend fun invite(vault: SharedVault, identifier: String, role: String): InviteResult = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext InviteResult.FAILED
+        val vk = vaultKey(vault) ?: return@withContext InviteResult.NO_VAULT_KEY
+        val api = apiProvider(session)
+        val rr = runCatching { api.resolveRecipient(vault.vaultId, de.ledgerline.app.data.remote.dto.ResolveRecipientRequest(identifier)) }.getOrNull()
+        if (rr?.isSuccessful != true) return@withContext InviteResult.NOT_FOUND
+        val r = rr.body() ?: return@withContext InviteResult.NOT_FOUND
+        val pub = r.publicKey?.let { crypto.b64decode(it) } ?: return@withContext InviteResult.NO_RECIPIENT_KEY
+        val ek = r.mlkemPublicKey?.let { crypto.b64decode(it) } ?: return@withContext InviteResult.NO_RECIPIENT_KEY
+        val wrapped = runCatching { pqkem.hybridWrap(vk, pub, ek, "").toJson() }.getOrNull() ?: return@withContext InviteResult.FAILED
+        val ok = runCatching {
+            api.addVaultMember(vault.vaultId, de.ledgerline.app.data.remote.dto.AddMemberRequest(r.userId, role, wrapped, r.fingerprint))
+        }.getOrNull()?.isSuccessful == true
+        if (ok) InviteResult.OK else InviteResult.FAILED
+    }
+
+    suspend fun updateMemberRole(vaultId: String, memberId: Long, role: String): Boolean = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext false
+        runCatching {
+            apiProvider(session).updateVaultMember(vaultId, memberId.toString(), de.ledgerline.app.data.remote.dto.UpdateMemberRequest(role))
+        }.getOrNull()?.isSuccessful == true
+    }
+
+    /**
+     * Securely remove a member: rotate VK_vault (fresh key, re-seal the manifest, re-wrap to all
+     * REMAINING active members) in one atomic call — the cryptographic revocation step. The removed
+     * member's cached old VK can no longer decrypt future writes.
+     */
+    suspend fun removeMemberAndRotate(vault: SharedVault, removeMemberId: Long): Boolean = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext false
+        val oldVk = vaultKey(vault) ?: return@withContext false
+        val api = apiProvider(session)
+        val storeR = runCatching { api.vaultStore(vault.vaultId) }.getOrNull()
+        if (storeR?.isSuccessful != true) return@withContext false
+        val store = storeR.body() ?: return@withContext false
+        // Re-seal the CURRENT manifest verbatim under a fresh VK (open with old, seal with new — no re-parse).
+        val rawJson = store.sealedManifest?.let { crypto.openManifest(it, oldVk) } ?: "{\"name\":\"\"}"
+        val newVk = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val sealed = crypto.sealManifest(rawJson, newVk)
+        val remaining = members(vault.vaultId).filter {
+            it.status == "active" && it.id != removeMemberId && it.publicKey != null && it.mlkemPublicKey != null
+        }
+        val wraps = remaining.mapNotNull { m ->
+            val pub = crypto.b64decode(m.publicKey!!); val ek = crypto.b64decode(m.mlkemPublicKey!!)
+            runCatching { de.ledgerline.app.data.remote.dto.RotateMember(m.userId, pqkem.hybridWrap(newVk, pub, ek, "").toJson()) }.getOrNull()
+        }
+        val ok = runCatching {
+            api.rotateVault(vault.vaultId, de.ledgerline.app.data.remote.dto.RotateRequest(sealed, store.version, removeMemberId, wraps))
+        }.getOrNull()?.isSuccessful == true
+        if (ok) vkCache[vault.vaultId] = newVk
+        ok
     }
 
     /** Drop cached vault keys (on lock / logout). */

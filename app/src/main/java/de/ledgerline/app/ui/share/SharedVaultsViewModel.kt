@@ -62,4 +62,48 @@ class SharedVaultsViewModel @Inject constructor(
         val v = _state.value.openedVault ?: return null
         return repo.downloadFile(v.vaultId, f)
     }
+
+    // ---- Owner side ----
+
+    private val _members = MutableStateFlow<List<de.ledgerline.app.data.remote.dto.VaultMemberDto>>(emptyList())
+    val members: StateFlow<List<de.ledgerline.app.data.remote.dto.VaultMemberDto>> = _members.asStateFlow()
+
+    /** Transient one-shot message key for the UI snackbar (e.g. "invite_ok", "invite_not_found"). */
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message.asStateFlow()
+    fun clearMessage() { _message.value = null }
+
+    fun createVault(kind: String, name: String) = viewModelScope.launch {
+        _state.value = _state.value.copy(busy = true)
+        val id = repo.create(kind, name)
+        _state.value = _state.value.copy(busy = false)
+        _message.value = if (id != null) "vault_created" else "vault_create_failed"
+        if (id != null) refresh()
+    }
+
+    fun loadMembers(v: SharedVault) = viewModelScope.launch { _members.value = repo.members(v.vaultId) }
+
+    fun invite(v: SharedVault, identifier: String, role: String) = viewModelScope.launch {
+        _state.value = _state.value.copy(busy = true)
+        val res = repo.invite(v, identifier, role)
+        _state.value = _state.value.copy(busy = false)
+        _message.value = when (res) {
+            SharedVaultRepository.InviteResult.OK -> "invite_ok"
+            SharedVaultRepository.InviteResult.NOT_FOUND, SharedVaultRepository.InviteResult.NO_RECIPIENT_KEY -> "invite_not_found"
+            else -> "invite_failed"
+        }
+        if (res == SharedVaultRepository.InviteResult.OK) loadMembers(v)
+    }
+
+    fun updateRole(v: SharedVault, memberId: Long, role: String) = viewModelScope.launch {
+        if (repo.updateMemberRole(v.vaultId, memberId, role)) loadMembers(v)
+    }
+
+    fun removeMember(v: SharedVault, memberId: Long) = viewModelScope.launch {
+        _state.value = _state.value.copy(busy = true)
+        val ok = repo.removeMemberAndRotate(v, memberId)
+        _state.value = _state.value.copy(busy = false)
+        _message.value = if (ok) "member_removed" else "member_remove_failed"
+        if (ok) loadMembers(v)
+    }
 }

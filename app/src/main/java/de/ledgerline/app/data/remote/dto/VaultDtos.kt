@@ -20,6 +20,69 @@ import kotlinx.serialization.Serializable
     val version: Int = 0,
 )
 
+/** `PUT /vaults/{vault}/store` body — re-seal under VK_vault with optimistic concurrency. */
+@Serializable data class SharedVaultStorePut(
+    @SerialName("sealed_manifest") val sealedManifest: String,
+    val version: Int,
+)
+
+// ── Owner-side shared-vault provisioning/management ──
+
+/** `POST /vaults` — VK_vault wrapped to the owner's OWN identity (PQ-hybrid envelope JSON). */
+@Serializable data class CreateVaultRequest(
+    @SerialName("wrapped_vault_key") val wrappedVaultKey: String,
+    val kind: String = "folder",
+)
+
+/** `{ id }` — the new vault's UUID (server IdResponse). */
+@Serializable data class VaultCreatedResponse(val id: String = "")
+
+/** `POST /vaults/{vault}/resolve-recipient` — enum-resistant lookup by email/handle. */
+@Serializable data class ResolveRecipientRequest(val identifier: String)
+
+@Serializable data class ResolvedRecipientDto(
+    @SerialName("user_id") val userId: Long = 0,
+    @SerialName("public_key") val publicKey: String? = null,
+    val fingerprint: String? = null,
+    @SerialName("mlkem_public_key") val mlkemPublicKey: String? = null,
+)
+
+/** `POST /vaults/{vault}/members` — invite: VK_vault hybrid-wrapped to the recipient's identity. */
+@Serializable data class AddMemberRequest(
+    @SerialName("user_id") val userId: Long,
+    val role: String,
+    @SerialName("wrapped_vault_key") val wrappedVaultKey: String,
+    @SerialName("recipient_fingerprint") val recipientFingerprint: String? = null,
+)
+
+@Serializable data class UpdateMemberRequest(val role: String)
+
+/** `GET /vaults/{vault}/members` row. */
+@Serializable data class VaultMemberDto(
+    val id: Long = 0,
+    @SerialName("user_id") val userId: Long = 0,
+    val name: String? = null,
+    val email: String? = null,
+    val role: String = "viewer",
+    val status: String = "pending",
+    @SerialName("public_key") val publicKey: String? = null,
+    @SerialName("mlkem_public_key") val mlkemPublicKey: String? = null,
+    @SerialName("recipient_fingerprint") val recipientFingerprint: String? = null,
+)
+
+/** `POST /vaults/{vault}/rotate` — atomic remove-member + re-key + re-seal. */
+@Serializable data class RotateRequest(
+    @SerialName("sealed_manifest") val sealedManifest: String,
+    @SerialName("expected_version") val expectedVersion: Int,
+    @SerialName("remove_member_id") val removeMemberId: Long,
+    val members: List<RotateMember>,
+)
+
+@Serializable data class RotateMember(
+    @SerialName("user_id") val userId: Long,
+    @SerialName("wrapped_vault_key") val wrappedVaultKey: String,
+)
+
 @Serializable data class VaultResponse(
     val configured: Boolean = false,
     val salt: String? = null,

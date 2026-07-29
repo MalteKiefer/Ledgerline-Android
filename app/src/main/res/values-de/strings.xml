@@ -643,6 +643,17 @@
     <string name="vaults_untitled">Geteilter Tresor</string>
     <string name="vaults_back">Zurück</string>
     <string name="vaults_secret_count">%1$d Einträge</string>
+    <string name="vaults_create">Tresor erstellen</string>
+    <string name="vaults_name">Name</string>
+    <string name="vaults_members">Mitglieder</string>
+    <string name="vaults_invite_email">Per E-Mail einladen</string>
+    <string name="vaults_invite">Einladen</string>
+    <string name="vaults_remove">Entfernen</string>
+    <string name="vaults_invite_ok">Einladung gesendet.</string>
+    <string name="vaults_invite_not_found">Kein Nutzer mit Freigabe-Schlüssel für diese Adresse gefunden.</string>
+    <string name="vaults_member_removed">Mitglied entfernt und Tresor neu verschlüsselt.</string>
+    <string name="vaults_created">Tresor erstellt.</string>
+    <string name="vaults_action_failed">Das hat nicht geklappt. Bitte erneut versuchen.</string>
     <string name="settings_device_this">%1$s (dieses Gerät)</string>
     <string name="settings_device_revoke">Widerrufen</string>
     <string name="settings_device_wipe">Remote-Löschung</string>

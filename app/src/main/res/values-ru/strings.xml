@@ -646,6 +646,17 @@
     <string name="vaults_untitled">Общее хранилище</string>
     <string name="vaults_back">Назад</string>
     <string name="vaults_secret_count">%1$d элементов</string>
+    <string name="vaults_create">Создать хранилище</string>
+    <string name="vaults_name">Название</string>
+    <string name="vaults_members">Участники</string>
+    <string name="vaults_invite_email">Пригласить по эл. почте</string>
+    <string name="vaults_invite">Пригласить</string>
+    <string name="vaults_remove">Удалить</string>
+    <string name="vaults_invite_ok">Приглашение отправлено.</string>
+    <string name="vaults_invite_not_found">Пользователь с ключом общего доступа для этого адреса не найден.</string>
+    <string name="vaults_member_removed">Участник удалён, хранилище перешифровано.</string>
+    <string name="vaults_created">Хранилище создано.</string>
+    <string name="vaults_action_failed">Не получилось. Попробуйте ещё раз.</string>
     <string name="settings_device_this">%1$s (это устройство)</string>
     <string name="settings_device_revoke">Отозвать</string>
     <string name="settings_device_wipe">Удалённая очистка</string>
