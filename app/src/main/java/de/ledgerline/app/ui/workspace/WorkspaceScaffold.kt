@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
@@ -89,6 +90,10 @@ fun WorkspaceScaffold(
     val loader: WorkspaceViewModel = hiltViewModel()
     LaunchedEffect(Unit) { loader.ensureLoaded() }
 
+    // The account's module entitlements (rights model): hide nav for modules not allowed.
+    val allowedModules by loader.allowedModules.collectAsStateWithLifecycle()
+    val visible: (WorkspaceDest) -> Boolean = { d -> d.moduleKey == null || allowedModules?.contains(d.moduleKey) ?: true }
+
     var dest by rememberSaveable { mutableStateOf(WorkspaceDest.Home) }
     var lastPrimary by rememberSaveable { mutableStateOf(WorkspaceDest.Home) }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
@@ -98,9 +103,15 @@ fun WorkspaceScaffold(
     val isPrimary = dest in WorkspaceDest.primary
 
     val navigate: (WorkspaceDest) -> Unit = { d ->
-        if (d in WorkspaceDest.primary) lastPrimary = d
-        dest = d
+        // Never open a module the account isn't entitled to (Home tiles / rail / drawer all route here).
+        if (visible(d)) {
+            if (d in WorkspaceDest.primary) lastPrimary = d
+            dest = d
+        }
     }
+
+    // If the server revokes access to the current screen, fall back to Home.
+    LaunchedEffect(allowedModules) { if (!visible(dest)) { dest = WorkspaceDest.Home; lastPrimary = WorkspaceDest.Home } }
 
     // Back: search first, then non-home → home/lastPrimary.
     BackHandler(enabled = searchOpen) { searchOpen = false }
@@ -114,6 +125,7 @@ fun WorkspaceScaffold(
         drawerContent = {
             DrawerSheet(
                 current = dest,
+                visible = visible,
                 onSearch = { scope.launch { drawerState.close() }; searchOpen = true },
                 onSelect = { d -> scope.launch { drawerState.close() }; navigate(d) },
             )
@@ -126,6 +138,7 @@ fun WorkspaceScaffold(
             if (wide && !fullscreen.value) {
                 NavRail(
                     current = dest,
+                    visible = visible,
                     onSelect = navigate,
                     onMenu = { scope.launch { drawerState.open() } },
                     onSearch = { searchOpen = true },
@@ -220,6 +233,7 @@ fun WorkspaceScaffold(
 @Composable
 private fun NavRail(
     current: WorkspaceDest,
+    visible: (WorkspaceDest) -> Boolean,
     onSelect: (WorkspaceDest) -> Unit,
     onMenu: () -> Unit,
     onSearch: () -> Unit,
@@ -237,7 +251,7 @@ private fun NavRail(
             ) { Icon(Icons.Outlined.Search, stringResource(R.string.search_everything)) }
         },
     ) {
-        PRIMARY_TABS.forEach { t ->
+        PRIMARY_TABS.filter { visible(it.dest) }.forEach { t ->
             androidx.compose.material3.NavigationRailItem(
                 selected = current == t.dest,
                 onClick = { onSelect(t.dest) },
@@ -258,7 +272,7 @@ private val PRIMARY_TABS = listOf(
 )
 
 @Composable
-private fun DrawerSheet(current: WorkspaceDest, onSearch: () -> Unit, onSelect: (WorkspaceDest) -> Unit) {
+private fun DrawerSheet(current: WorkspaceDest, visible: (WorkspaceDest) -> Boolean, onSearch: () -> Unit, onSelect: (WorkspaceDest) -> Unit) {
     ModalDrawerSheet {
         androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
             // Brand header: app name + version.
@@ -291,7 +305,7 @@ private fun DrawerSheet(current: WorkspaceDest, onSearch: () -> Unit, onSelect: 
                     WorkspaceDest.Files to Icons.Outlined.Folder,
                     WorkspaceDest.Photos to Icons.Outlined.PhotoLibrary,
                     WorkspaceDest.Vault to Icons.Outlined.Lock,
-                ).forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
+                ).filter { visible(it.first) }.forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
 
                 androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
                 listOf(
@@ -302,7 +316,7 @@ private fun DrawerSheet(current: WorkspaceDest, onSearch: () -> Unit, onSelect: 
                     WorkspaceDest.Explore to Icons.Outlined.Map,
                     WorkspaceDest.Health to Icons.Outlined.MonitorHeart,
                     WorkspaceDest.Finance to Icons.Outlined.ReceiptLong,
-                ).forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
+                ).filter { visible(it.first) }.forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
             }
             androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
             DrawerRow(WorkspaceDest.Settings, Icons.Outlined.Settings, current, onSelect)

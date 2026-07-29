@@ -19,7 +19,11 @@ class WorkspaceViewModel @Inject constructor(
     private val cache: WorkspaceCache,
     private val prefetcher: Prefetcher,
     private val backupManager: GalleryBackupManager,
+    moduleAccess: de.ledgerline.app.core.ModuleAccess,
 ) : ViewModel() {
+
+    /** The account's allowed module keys (`/me` rights model); null = unknown → allow all. */
+    val allowedModules = moduleAccess.allowed
     /**
      * Loads the workspace if the cache is empty, then kicks off auto-prefetch on unlock.
      * [Prefetcher] self-gates on policy + constraints + no-stacking and enumerates

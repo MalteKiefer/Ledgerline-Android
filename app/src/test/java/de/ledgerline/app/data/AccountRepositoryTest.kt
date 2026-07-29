@@ -24,7 +24,7 @@ class AccountRepositoryTest {
         val api = object : NotImplementedApi() {
             override suspend fun me(): Response<MeResponse> = Response.success(body)
         }
-        return AccountRepository(sh, AuthEventBus(), fakeSink, apiProvider = { api })
+        return AccountRepository(sh, AuthEventBus(), fakeSink, de.ledgerline.app.core.ModuleAccess(), apiProvider = { api })
     }
 
     @Test fun snapshot_sums_files_and_gallery_and_keeps_quota() = runBlocking {
@@ -64,7 +64,7 @@ class AccountRepositoryTest {
                 ),
             )
         }
-        AccountRepository(sh, AuthEventBus(), sink, apiProvider = { api }).me()
+        AccountRepository(sh, AuthEventBus(), sink, de.ledgerline.app.core.ModuleAccess(), apiProvider = { api }).me()
         assertEquals("mi", captured!!.distance)
         assertEquals("f", captured!!.temp)
         assertEquals("12h", captured!!.timeFormat)

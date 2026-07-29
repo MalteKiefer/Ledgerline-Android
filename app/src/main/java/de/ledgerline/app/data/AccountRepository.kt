@@ -15,12 +15,14 @@ class AccountRepository(
     private val sessionHolder: SessionHolder,
     private val authEventBus: AuthEventBus,
     private val prefsSink: de.ledgerline.app.core.prefs.DisplayPrefsSink,
+    private val moduleAccess: de.ledgerline.app.core.ModuleAccess,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
-    @Inject constructor(sessionHolder: SessionHolder, authEventBus: AuthEventBus, prefsSink: de.ledgerline.app.core.prefs.DisplayPrefsSink) : this(
+    @Inject constructor(sessionHolder: SessionHolder, authEventBus: AuthEventBus, prefsSink: de.ledgerline.app.core.prefs.DisplayPrefsSink, moduleAccess: de.ledgerline.app.core.ModuleAccess) : this(
         sessionHolder,
         authEventBus,
         prefsSink,
+        moduleAccess,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
@@ -68,6 +70,7 @@ class AccountRepository(
             val body = res.body()
             if (body?.wipe == true) authEventBus.emitWipe()
             adoptPrefs(body?.preferences)
+            moduleAccess.set(body?.user?.modules)
             body?.user
         } catch (_: Exception) {
             null
@@ -90,6 +93,7 @@ class AccountRepository(
             val body = res.body() ?: return null
             if (body.wipe) authEventBus.emitWipe()
             adoptPrefs(body.preferences)
+            moduleAccess.set(body.user.modules)
             val u = body.usage
             AccountSnapshot(
                 name = body.user.name,

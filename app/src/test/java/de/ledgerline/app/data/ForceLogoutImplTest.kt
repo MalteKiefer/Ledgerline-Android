@@ -88,6 +88,7 @@ class ForceLogoutImplTest {
             exploreCache = de.ledgerline.app.core.ExploreCache(),
             healthCache = de.ledgerline.app.core.HealthCache(),
             financeCache = de.ledgerline.app.core.FinanceCache(),
+            moduleAccess = de.ledgerline.app.core.ModuleAccess(),
         )
 
         forceLogout.invoke()

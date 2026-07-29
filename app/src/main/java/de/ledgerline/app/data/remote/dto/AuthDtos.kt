@@ -53,6 +53,10 @@ import kotlinx.serialization.Serializable
     val email: String? = null,
     val locale: String? = null,
     val groups: List<String> = emptyList(),
+    // The application modules this account may use (per-user/per-group entitlements). A native
+    // client hides the nav/tiles for modules NOT listed; the API also enforces it (403 on a
+    // disabled module store). `null` = the server didn't send it (older server) → treat as all.
+    val modules: List<String>? = null,
 )
 
 @Serializable data class MeUsage(
