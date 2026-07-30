@@ -52,6 +52,7 @@ class SettingsViewModel @Inject constructor(
     private val blobCache: BlobDiskCache,
     private val prefetcher: Prefetcher,
     private val accountRepository: AccountRepository,
+    private val avatarCache: de.ledgerline.app.core.AvatarCache,
     private val backupManager: GalleryBackupManager,
     private val deviceAlbums: DeviceAlbums,
     private val backupStateStore: BackupStateStore,
@@ -99,15 +100,24 @@ class SettingsViewModel @Inject constructor(
     /** Host of the connected server (from the pairing base URL), for the account header. */
     val serverHost: String? = runCatching { java.net.URI(sessionHolder.get()?.baseUrl ?: "").host }.getOrNull()
 
+    private fun decodeAvatar(bytes: ByteArray?) =
+        bytes?.let { runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() }
+
     init {
+        // Cache-first: show the last-cached avatar immediately (offline-safe), refresh below.
+        avatarCache.get()?.let { _avatar.value = decodeAvatar(it) }
         viewModelScope.launch {
             val me = accountRepository.me()
             _account.value = me
             if (me?.hasAvatar == true) {
                 val bytes = accountRepository.avatar()
-                _avatar.value = bytes?.let {
-                    runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull()
+                if (bytes != null && !bytes.contentEquals(avatarCache.get())) {
+                    avatarCache.put(bytes)
+                    _avatar.value = decodeAvatar(bytes)
                 }
+            } else if (me != null) {
+                // Server says no avatar → drop any stale cache.
+                avatarCache.put(null); _avatar.value = null
             }
             _storage.value = accountRepository.snapshot()
         }
