@@ -323,6 +323,7 @@ object FinanceRecordCodec {
             sig = o.str("sig"),
             blob = o.str("blob") ?: o.str("ref"),
             key = o.str("key"),
+            kind = o.str("kind") ?: "",
             raw = o,
         )
     }

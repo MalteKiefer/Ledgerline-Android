@@ -1,6 +1,7 @@
 package de.ledgerline.app.ui.finance
 
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.NoteAdd
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FileOpen
 import de.ledgerline.app.ui.common.SectionLabel
@@ -182,8 +183,11 @@ private fun BankAvatar(pm: PaymentMethod, vm: FinanceViewModel) {
 @Composable
 private fun PaymentMethodDetail(pm: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit, onEdit: () -> Unit) {
     var txEditing by remember { mutableStateOf<de.ledgerline.app.domain.model.Transaction?>(null) }
+    var egTx by remember { mutableStateOf<de.ledgerline.app.domain.model.Transaction?>(null) }
     val editingTx = txEditing
+    val eg = egTx
     if (editingTx != null) { TransactionEditScreen(editingTx, vm, onBack = { txEditing = null }); return }
+    if (eg != null) { EigenbelegScreen(eg, vm, onBack = { egTx = null }); return }
 
     var txQuery by remember { mutableStateOf("") }
     var txYear by remember { mutableStateOf(java.time.LocalDate.now().year.toString()) }
@@ -286,7 +290,15 @@ private fun PaymentMethodDetail(pm: PaymentMethod, vm: FinanceViewModel, onBack:
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(t.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     VatCatBadge(t.vatCat)
+                                    when {
+                                        vm.hasEigenbeleg(t) -> EgBadge(stringResource(R.string.finance_eg_badge), Brand.tintGreen)
+                                        vm.needsEigenbeleg(t) -> EgBadge(stringResource(R.string.finance_eg_missing_badge), Color(0xFFE2915A))
+                                    }
                                 }
+                            }
+                            // Booking with no receipt → quick Eigenbeleg action.
+                            if (vm.receiptsOf(t).isEmpty()) IconButton(onClick = { egTx = t }) {
+                                Icon(Icons.Outlined.NoteAdd, contentDescription = stringResource(R.string.finance_eg_title))
                             }
                             Text(
                                 vm.money(t.amount, t.currency),
@@ -325,6 +337,15 @@ private fun VatCatBadge(cat: String) {
         shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = Brand.accent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+    }
+}
+
+/** A small pill for a booking's voucher status (has / needs an Eigenbeleg). */
+@Composable
+private fun EgBadge(label: String, tint: Color) {
+    Spacer(Modifier.size(6.dp))
+    androidx.compose.material3.Surface(color = tint.copy(alpha = 0.14f), shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = tint, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
     }
 }
 

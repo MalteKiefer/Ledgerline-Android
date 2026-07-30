@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.NumberFormat
 import java.util.Currency
 import java.util.Locale
@@ -321,6 +322,44 @@ class FinanceViewModel @Inject constructor(
 
     private fun sha256Hex(bytes: ByteArray): String =
         java.security.MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+    // ---- Eigenbeleg (self-issued voucher for a booking with no original receipt) ----
+
+    fun hasEigenbeleg(tx: de.ledgerline.app.domain.model.Transaction) = receiptsOf(tx).any { it.isEigenbeleg }
+
+    /** A private-category booking with no receipt still needs a voucher (web `needsEigenbeleg`). */
+    fun needsEigenbeleg(tx: de.ledgerline.app.domain.model.Transaction) =
+        tx.vatCat == "private" && receiptsOf(tx).isEmpty()
+
+    /** Count of this account's private bookings still missing a voucher (web `accountPrivateNoEg`). */
+    fun accountPrivateNoEg(accountId: String) = accountTransactions(accountId).count { needsEigenbeleg(it) }
+
+    /** A prefilled Eigenbeleg draft for [tx] (guessed Beleggrund + company issuer/place). */
+    fun eigenbelegDraft(tx: de.ledgerline.app.domain.model.Transaction): de.ledgerline.app.core.finance.Eigenbeleg.Draft {
+        val c = company.value
+        val lastAddrLine = (c?.address ?: "").split('\n').map { it.trim() }.lastOrNull { it.isNotBlank() } ?: ""
+        return de.ledgerline.app.core.finance.Eigenbeleg.prefill(
+            tx, companyName = c?.name ?: "", companyAddressLastLine = lastAddrLine,
+            defaultVatRate = c?.defaultVatRate ?: 19.0, today = java.time.LocalDate.now().toString(),
+        )
+    }
+
+    /** Render the [draft] to a PDF on-device, upload it, and attach it to [tx] as an eigenbeleg receipt. */
+    fun createEigenbeleg(tx: de.ledgerline.app.domain.model.Transaction, draft: de.ledgerline.app.core.finance.Eigenbeleg.Draft, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val bytes = withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching { de.ledgerline.app.core.finance.EigenbelegPdf.render(draft) }.getOrNull()
+            } ?: run { onDone(false); return@launch }
+            val up = repo.uploadReceiptDocument(bytes) ?: run { onDone(false); return@launch }
+            val label = draft.recipient.ifBlank { draft.grund }
+            val name = "Eigenbeleg ${draft.date} $label".replace(Regex("[\\\\/:*?\"<>|]+"), "-").replace(Regex("\\s+"), " ").trim().take(120) + ".pdf"
+            val r = de.ledgerline.app.core.finance.Eigenbeleg.receipt(
+                id = de.ledgerline.app.core.Ids.newId(), name = name, blob = up.first, key = up.second,
+                sig = sha256Hex(bytes), d = draft,
+            )
+            saveTransaction(tx.withReceipts(receiptsOf(tx) + r)) { ok -> onDone(ok) }
+        }
+    }
 
     /** Attach a document to [tx]: dedupe by content hash, encrypt+upload, store the receipt inline.
      *  [onDone]: true = added, false = failed, null = duplicate (already attached). */

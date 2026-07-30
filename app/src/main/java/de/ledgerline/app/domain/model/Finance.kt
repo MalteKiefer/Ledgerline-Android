@@ -206,8 +206,12 @@ data class Receipt(
     val blob: String? = null,
     /** Sealed per-blob content key (`{c,n}` JSON string), used to decrypt the document. */
     val key: String? = null,
+    /** Receipt kind: "" = an ordinary attached document, "eigenbeleg" = a self-issued voucher. */
+    val kind: String = "",
     val raw: JsonObject = JsonObject(emptyMap()),
-)
+) {
+    val isEigenbeleg: Boolean get() = kind == "eigenbeleg"
+}
 
 /** The decrypted `/invoices/store` slice the app consumes. `seq` = the GoBD per-year counter base. */
 data class FinanceManifest(
