@@ -1011,4 +1011,13 @@
     <string name="finance_stats_project_costs">Projektkosten</string>
     <string name="finance_expense_category">Kategorie</string>
     <string name="offline_server_unreachable">Offline — Server nicht erreichbar, erneuter Versuch läuft</string>
+    <string name="finance_partner_search">Partner suchen</string>
+    <string name="finance_partner_details">Details</string>
+    <string name="finance_partner_url">Webseite</string>
+    <string name="finance_partner_contacts">Ansprechpartner</string>
+    <string name="finance_partner_contact_add">Kontakt hinzufügen</string>
+    <string name="finance_partner_no_contacts">Noch keine Ansprechpartner.</string>
+    <string name="finance_partner_contact_name">Name</string>
+    <string name="finance_partner_contact_role">Funktion / Position</string>
+    <string name="finance_tx_none">Noch keine Buchungen.</string>
 </resources>

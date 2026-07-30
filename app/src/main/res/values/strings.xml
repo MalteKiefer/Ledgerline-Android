@@ -1013,4 +1013,13 @@
     <string name="finance_stats_project_costs">Project costs</string>
     <string name="finance_expense_category">Category</string>
     <string name="offline_server_unreachable">Offline — server unreachable, retrying</string>
+    <string name="finance_partner_search">Search partners</string>
+    <string name="finance_partner_details">Details</string>
+    <string name="finance_partner_url">Website</string>
+    <string name="finance_partner_contacts">Contact persons</string>
+    <string name="finance_partner_contact_add">Add contact</string>
+    <string name="finance_partner_no_contacts">No contact persons yet.</string>
+    <string name="finance_partner_contact_name">Name</string>
+    <string name="finance_partner_contact_role">Role / position</string>
+    <string name="finance_tx_none">No bookings yet.</string>
 </resources>

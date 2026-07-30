@@ -190,7 +190,18 @@ private fun ProjectEditScreen(initial: Project, vm: FinanceViewModel, onBack: ()
     var name by remember(initial) { mutableStateOf(initial.name) }
     var note by remember(initial) { mutableStateOf(initial.note) }
     var kind by remember(initial) { mutableStateOf(initial.kind) }
-    AppScaffold(topBar = { AppTopBar(title = stringResource(if (vm.projectById(initial.id) != null) R.string.finance_project_edit else R.string.finance_project_new), onBack = onBack) }) { pad ->
+    AppScaffold(topBar = {
+        AppTopBar(
+            title = stringResource(if (vm.projectById(initial.id) != null) R.string.finance_project_edit else R.string.finance_project_new),
+            onBack = onBack,
+            actions = {
+                androidx.compose.material3.TextButton(
+                    onClick = { vm.saveProject(initial.copy(name = name.trim(), note = note.trim(), kind = kind)) { if (it) onBack() } },
+                    enabled = name.isNotBlank(),
+                ) { Text(stringResource(R.string.action_save)) }
+            },
+        )
+    }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_project_name)) }, singleLine = true)
@@ -209,9 +220,6 @@ private fun ProjectEditScreen(initial: Project, vm: FinanceViewModel, onBack: ()
                     }
                 }
             }
-            PrimaryGradientButton(stringResource(R.string.action_save), enabled = name.isNotBlank(), onClick = {
-                vm.saveProject(initial.copy(name = name.trim(), note = note.trim(), kind = kind)) { if (it) onBack() }
-            })
         }
     }
 }
@@ -223,8 +231,14 @@ private fun ExpenseEditScreen(project: Project, initial: ProjectExpense, vm: Fin
     var note by remember(initial) { mutableStateOf(initial.note) }
     var category by remember(initial) { mutableStateOf(initial.category) }
     val exists = project.expenses.any { it.id == initial.id }
+    fun persist() {
+        val e = initial.copy(amount = amount.replace(',', '.').trim().toDoubleOrNull() ?: 0.0, date = date.trim(), note = note.trim(), category = category.trim())
+        val next = if (exists) project.expenses.map { if (it.id == e.id) e else it } else project.expenses + e
+        vm.saveProject(project.copy(expenses = next)) { if (it) onBack() }
+    }
     AppScaffold(topBar = { AppTopBar(title = stringResource(if (exists) R.string.finance_tx_edit else R.string.finance_tx_add), onBack = onBack, actions = {
         if (exists) IconButton(onClick = { vm.saveProject(project.copy(expenses = project.expenses.filter { it.id != initial.id })) { if (it) onBack() } }) { Icon(Icons.Outlined.Delete, stringResource(R.string.action_delete)) }
+        androidx.compose.material3.TextButton(onClick = { persist() }, enabled = amount.replace(',', '.').toDoubleOrNull() != null) { Text(stringResource(R.string.action_save)) }
     }) }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -233,11 +247,6 @@ private fun ExpenseEditScreen(project: Project, initial: ProjectExpense, vm: Fin
                 OutlinedTextField(note, { note = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_pm_note)) }, singleLine = true)
                 OutlinedTextField(category, { category = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_expense_category)) }, singleLine = true)
             }
-            PrimaryGradientButton(stringResource(R.string.action_save), enabled = amount.replace(',', '.').toDoubleOrNull() != null, onClick = {
-                val e = initial.copy(amount = amount.replace(',', '.').trim().toDoubleOrNull() ?: 0.0, date = date.trim(), note = note.trim(), category = category.trim())
-                val next = if (exists) project.expenses.map { if (it.id == e.id) e else it } else project.expenses + e
-                vm.saveProject(project.copy(expenses = next)) { if (it) onBack() }
-            })
         }
     }
 }

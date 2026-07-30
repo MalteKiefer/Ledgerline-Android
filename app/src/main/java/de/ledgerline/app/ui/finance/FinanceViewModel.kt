@@ -116,6 +116,11 @@ class FinanceViewModel @Inject constructor(
         transactions.value.filter { it.date.take(4) == y.toString() },
     )
 
+    /** VAT summary for a single payment account in year [y] (per-account Umsatzsteuer). */
+    fun accountVatFor(accountId: String, y: String) = de.ledgerline.app.core.finance.FinanceStats.accountVatSummary(
+        accountTransactions(accountId).filter { it.date.startsWith(y) },
+    )
+
     fun invoiceById(id: String): Invoice? = invoices.value.firstOrNull { it.id == id }
 
     fun totals(inv: Invoice) = InvoiceMath.totals(inv)

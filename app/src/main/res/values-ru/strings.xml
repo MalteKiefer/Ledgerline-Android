@@ -1014,4 +1014,13 @@
     <string name="finance_stats_project_costs">Затраты проектов</string>
     <string name="finance_expense_category">Категория</string>
     <string name="offline_server_unreachable">Офлайн — сервер недоступен, повтор попытки</string>
+    <string name="finance_partner_search">Поиск партнёров</string>
+    <string name="finance_partner_details">Детали</string>
+    <string name="finance_partner_url">Сайт</string>
+    <string name="finance_partner_contacts">Контактные лица</string>
+    <string name="finance_partner_contact_add">Добавить контакт</string>
+    <string name="finance_partner_no_contacts">Пока нет контактных лиц.</string>
+    <string name="finance_partner_contact_name">Имя</string>
+    <string name="finance_partner_contact_role">Роль / должность</string>
+    <string name="finance_tx_none">Пока нет проводок.</string>
 </resources>

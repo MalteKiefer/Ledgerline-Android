@@ -163,12 +163,29 @@ data class Project(
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 
+/** A contact person (Ansprechpartner) for a business partner (`partner.contacts[]`). */
+data class PartnerContact(
+    val id: String = "",
+    val name: String = "",
+    val email: String = "",
+    val phone: String = "",
+    val role: String = "",           // function/position
+)
+
 /** A business partner (merchant/client) in the finance store's `partners` collection (partRef). */
 data class Partner(
     val id: String,
     val name: String = "",
     val category: String = "",       // the learned booking category for this merchant
     val note: String = "",
+    val url: String = "",            // website; the logo is fetched from its host
+    val logo: String = "",           // data: URI favicon/logo (sealed)
+    val address: String = "",
+    val email: String = "",
+    val phone: String = "",
+    val vatId: String = "",          // USt-IdNr.
+    /** Contact persons; the legacy single `contact` string is migrated into `contacts[0]`. */
+    val contacts: List<PartnerContact> = emptyList(),
     val raw: JsonObject = JsonObject(emptyMap()),
 )
 

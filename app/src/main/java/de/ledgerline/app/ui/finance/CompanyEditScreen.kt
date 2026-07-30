@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Edit
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.CompanyProfile
 import de.ledgerline.app.ui.common.AppScaffold
@@ -71,66 +73,123 @@ fun CompanyEditScreen(vm: FinanceViewModel, onBack: () -> Unit) {
         }
     }
 
+    var editing by remember { mutableStateOf(false) }
+    fun save() {
+        vm.saveCompany(
+            c.copy(
+                name = name.trim(), address = address.trim(), email = email.trim(), phone = phone.trim(),
+                vatId = vatId.trim(), taxNumber = taxNumber.trim(), iban = iban.trim(),
+                bic = bic.trim(), bankName = bankName.trim(),
+                defaultVatRate = vatRate.replace(',', '.').trim().toDoubleOrNull() ?: 19.0,
+                paymentTermsDays = terms.trim().toIntOrNull() ?: 14,
+                paymentTermsText = termsText.trim(), paymentMethods = methods.trim(),
+                numberFormat = numberFormat.trim().ifBlank { "YYYY-NNNN" }, nextNumber = (nextNumber.trim().toIntOrNull() ?: 1).coerceIn(1, 100_000_000),
+                footerText = footer.trim(),
+            ),
+        ) { ok -> if (ok) editing = false }
+    }
+
     AppScaffold(
-        topBar = { AppTopBar(title = stringResource(R.string.finance_company), onBack = onBack) },
+        topBar = {
+            AppTopBar(
+                title = stringResource(R.string.finance_company),
+                onBack = { if (editing) editing = false else onBack() },
+                actions = {
+                    if (editing) {
+                        androidx.compose.material3.TextButton(onClick = { save() }) { Text(stringResource(R.string.action_save)) }
+                    } else {
+                        androidx.compose.material3.IconButton(onClick = { editing = true }) {
+                            androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Outlined.Edit, stringResource(R.string.finance_edit))
+                        }
+                    }
+                },
+            )
+        },
     ) { pad ->
         Column(
             Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            // Logo hero (brand-framed) — always shown when present.
             logo?.let { bmp ->
-                androidx.compose.foundation.Image(
-                    bitmap = bmp,
-                    contentDescription = stringResource(R.string.finance_company_logo),
-                    modifier = Modifier.fillMaxWidth().height(88.dp),
-                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                )
-            }
-            Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel(stringResource(R.string.finance_company_identity))
-                Field(name, { name = it }, R.string.finance_customer_name)
-                Field(address, { address = it }, R.string.finance_customer_address)
-                Field(email, { email = it }, R.string.finance_customer_email)
-                Field(phone, { phone = it }, R.string.finance_company_phone)
-                Field(vatId, { vatId = it }, R.string.finance_customer_vatid)
-                Field(taxNumber, { taxNumber = it }, R.string.finance_company_taxnr)
-                Field(iban, { iban = it }, R.string.finance_company_iban)
-                Field(bic, { bic = it }, R.string.finance_company_bic)
-                Field(bankName, { bankName = it }, R.string.finance_company_bank)
-            }
-            Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SectionLabel(stringResource(R.string.finance_company_defaults))
-                Field(numberFormat, { numberFormat = it }, R.string.finance_company_numfmt, enabled = !numberingLocked)
-                NumField(nextNumber, { nextNumber = it }, R.string.finance_company_nextnr, enabled = !numberingLocked)
-                if (numberingLocked) {
-                    Text(
-                        stringResource(R.string.finance_company_numbering_locked),
-                        style = MaterialTheme.typography.bodySmall, color = Brand.accent,
+                Column(Modifier.fillMaxWidth().cardSurface(), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                    androidx.compose.foundation.Image(
+                        bitmap = bmp,
+                        contentDescription = stringResource(R.string.finance_company_logo),
+                        modifier = Modifier.fillMaxWidth().height(96.dp),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                     )
                 }
-                NumField(vatRate, { vatRate = it }, R.string.finance_company_vatrate, decimal = true)
-                NumField(terms, { terms = it }, R.string.finance_company_terms)
-                Field(termsText, { termsText = it }, R.string.finance_company_terms_text)
-                Field(methods, { methods = it }, R.string.finance_company_methods)
-                Field(footer, { footer = it }, R.string.finance_company_footer)
             }
-            PrimaryGradientButton(stringResource(R.string.action_save), onClick = {
-                vm.saveCompany(
-                    c.copy(
-                        name = name.trim(), address = address.trim(), email = email.trim(), phone = phone.trim(),
-                        vatId = vatId.trim(), taxNumber = taxNumber.trim(), iban = iban.trim(),
-                        bic = bic.trim(), bankName = bankName.trim(),
-                        defaultVatRate = vatRate.replace(',', '.').trim().toDoubleOrNull() ?: 19.0,
-                        paymentTermsDays = terms.trim().toIntOrNull() ?: 14,
-                        paymentTermsText = termsText.trim(), paymentMethods = methods.trim(),
-                        // Server bounds (openapi): invoice_next_number ∈ [1, 100_000_000].
-                        numberFormat = numberFormat.trim().ifBlank { "YYYY-NNNN" }, nextNumber = (nextNumber.trim().toIntOrNull() ?: 1).coerceIn(1, 100_000_000),
-                        footerText = footer.trim(),
-                    ),
-                ) { ok -> if (ok) onBack() }
-            })
-            Spacer(Modifier.width(4.dp))
+
+            if (!editing) {
+                // ---- Read-only profile ----
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    SectionLabel(stringResource(R.string.finance_company_identity))
+                    ReadRow(R.string.finance_customer_name, c.name)
+                    ReadRow(R.string.finance_customer_address, c.address)
+                    ReadRow(R.string.finance_customer_email, c.email)
+                    ReadRow(R.string.finance_company_phone, c.phone)
+                    ReadRow(R.string.finance_customer_vatid, c.vatId)
+                    ReadRow(R.string.finance_company_taxnr, c.taxNumber)
+                    ReadRow(R.string.finance_company_iban, c.iban)
+                    ReadRow(R.string.finance_company_bic, c.bic)
+                    ReadRow(R.string.finance_company_bank, c.bankName)
+                }
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    SectionLabel(stringResource(R.string.finance_company_defaults))
+                    ReadRow(R.string.finance_company_numfmt, c.numberFormat)
+                    ReadRow(R.string.finance_company_nextnr, c.nextNumber.toString())
+                    ReadRow(R.string.finance_company_vatrate, trimNum(c.defaultVatRate))
+                    ReadRow(R.string.finance_company_terms, c.paymentTermsDays.toString())
+                    ReadRow(R.string.finance_company_terms_text, c.paymentTermsText)
+                    ReadRow(R.string.finance_company_methods, c.paymentMethods)
+                    ReadRow(R.string.finance_company_footer, c.footerText)
+                }
+            } else {
+                // ---- Edit fields ----
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionLabel(stringResource(R.string.finance_company_identity))
+                    Field(name, { name = it }, R.string.finance_customer_name)
+                    Field(address, { address = it }, R.string.finance_customer_address)
+                    Field(email, { email = it }, R.string.finance_customer_email)
+                    Field(phone, { phone = it }, R.string.finance_company_phone)
+                    Field(vatId, { vatId = it }, R.string.finance_customer_vatid)
+                    Field(taxNumber, { taxNumber = it }, R.string.finance_company_taxnr)
+                    Field(iban, { iban = it }, R.string.finance_company_iban)
+                    Field(bic, { bic = it }, R.string.finance_company_bic)
+                    Field(bankName, { bankName = it }, R.string.finance_company_bank)
+                }
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SectionLabel(stringResource(R.string.finance_company_defaults))
+                    Field(numberFormat, { numberFormat = it }, R.string.finance_company_numfmt, enabled = !numberingLocked)
+                    NumField(nextNumber, { nextNumber = it }, R.string.finance_company_nextnr, enabled = !numberingLocked)
+                    if (numberingLocked) {
+                        Text(stringResource(R.string.finance_company_numbering_locked), style = MaterialTheme.typography.bodySmall, color = Brand.accent)
+                    }
+                    NumField(vatRate, { vatRate = it }, R.string.finance_company_vatrate, decimal = true)
+                    NumField(terms, { terms = it }, R.string.finance_company_terms)
+                    Field(termsText, { termsText = it }, R.string.finance_company_terms_text)
+                    Field(methods, { methods = it }, R.string.finance_company_methods)
+                    Field(footer, { footer = it }, R.string.finance_company_footer)
+                }
+            }
+            Spacer(Modifier.height(4.dp))
         }
+    }
+}
+
+/** Read-only label→value row for the company profile view; hidden when the value is blank. */
+@Composable
+private fun ReadRow(labelRes: Int, value: String) {
+    if (value.isBlank()) return
+    androidx.compose.foundation.layout.Row(
+        Modifier.fillMaxWidth().padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(stringResource(labelRes), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(12.dp))
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, textAlign = androidx.compose.ui.text.style.TextAlign.End)
     }
 }
 

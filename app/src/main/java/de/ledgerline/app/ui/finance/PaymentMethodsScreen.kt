@@ -1,5 +1,8 @@
 package de.ledgerline.app.ui.finance
 
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FileOpen
 import de.ledgerline.app.ui.common.SectionLabel
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -86,12 +89,15 @@ private fun typeLabel(type: String): String = stringResource(
 /** Payment-methods manager: list of accounts (with balance) → add/edit editor. */
 @Composable
 fun PaymentMethodsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
-    var editing by remember { mutableStateOf<PaymentMethod?>(null) }
-    val target = editing
-    if (target != null) {
-        PaymentMethodEditScreen(target, vm, onBack = { editing = null })
-    } else {
-        PaymentMethodList(vm, onBack = onBack, onEdit = { editing = it }, onNew = { editing = vm.newPaymentMethod() })
+    // open = the account whose bookings we're viewing; editForm = the account being edited (subpage).
+    var open by remember { mutableStateOf<PaymentMethod?>(null) }
+    var editForm by remember { mutableStateOf<PaymentMethod?>(null) }
+    val ef = editForm
+    val op = open
+    when {
+        ef != null -> PaymentMethodEditForm(ef, vm, onBack = { editForm = null })
+        op != null -> PaymentMethodDetail(op, vm, onBack = { open = null }, onEdit = { editForm = op })
+        else -> PaymentMethodList(vm, onBack = onBack, onEdit = { open = it }, onNew = { editForm = vm.newPaymentMethod() })
     }
 }
 
@@ -172,24 +178,17 @@ private fun BankAvatar(pm: PaymentMethod, vm: FinanceViewModel) {
     }
 }
 
+/** Bookings view for one payment account: balance + VAT summary + bookings; Edit via topbar menu. */
 @Composable
-private fun PaymentMethodEditScreen(initial: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit) {
+private fun PaymentMethodDetail(pm: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit, onEdit: () -> Unit) {
     var txEditing by remember { mutableStateOf<de.ledgerline.app.domain.model.Transaction?>(null) }
     val editingTx = txEditing
-    if (editingTx != null) {
-        TransactionEditScreen(editingTx, vm, onBack = { txEditing = null })
-        return
-    }
-    PaymentMethodEditBody(initial, vm, onBack = onBack, onEditTx = { txEditing = it })
-}
+    if (editingTx != null) { TransactionEditScreen(editingTx, vm, onBack = { txEditing = null }); return }
 
-@Composable
-private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit, onEditTx: (de.ledgerline.app.domain.model.Transaction) -> Unit) {
-    var pm by remember(initial) { mutableStateOf(initial) }
     var txQuery by remember { mutableStateOf("") }
     var txYear by remember { mutableStateOf(java.time.LocalDate.now().year.toString()) }
-    vm.transactions.collectAsStateWithLifecycle()   // recompose after import/edit
-    val allTxns = vm.accountTransactions(initial.id)
+    vm.transactions.collectAsStateWithLifecycle()
+    val allTxns = vm.accountTransactions(pm.id)
     val txYears = remember(allTxns) { (allTxns.mapNotNull { it.date.take(4).ifBlank { null } } + txYear).distinct().sortedDescending() }
     val txns = remember(allTxns, txQuery, txYear) {
         val q = txQuery.trim().lowercase()
@@ -198,9 +197,9 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
                 de.ledgerline.app.core.finance.AmountSearch.amountMatches(it.amount, txQuery)
         }
     }
-    val exists = vm.paymentMethodById(initial.id) != null
+    val vat = remember(allTxns, txYear) { vm.accountVatFor(pm.id, txYear) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
-    val launchImport = rememberStatementImport(vm, initial.id) { added, matched ->
+    val launchImport = rememberStatementImport(vm, pm.id) { added, matched ->
         val msg = when {
             added > 0 && matched > 0 -> ctx.getString(R.string.finance_import_added_matched, added, matched)
             added > 0 -> ctx.getString(R.string.finance_import_added, added)
@@ -214,13 +213,16 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
     AppScaffold(
         topBar = {
             AppTopBar(
-                title = stringResource(if (exists) R.string.finance_pm_edit else R.string.finance_pm_add),
+                title = pm.label.ifBlank { typeLabel(pm.type) },
                 onBack = onBack,
                 actions = {
-                    if (exists) {
-                        IconButton(onClick = { vm.trashPaymentMethod(pm) { if (it) onBack() } }) {
-                            Icon(Icons.Outlined.Delete, stringResource(R.string.action_delete))
-                        }
+                    var menu by remember { mutableStateOf(false) }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, stringResource(R.string.action_more)) }
+                    androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.finance_edit)) }, leadingIcon = { Icon(Icons.Outlined.Edit, null) }, onClick = { menu = false; onEdit() })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.finance_import_action)) }, leadingIcon = { Icon(Icons.Outlined.FileOpen, null) }, onClick = { menu = false; launchImport() })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.finance_tx_add)) }, leadingIcon = { Icon(Icons.Outlined.Add, null) }, onClick = { menu = false; txEditing = vm.newTransaction(pm.id) })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.action_delete)) }, leadingIcon = { Icon(Icons.Outlined.Delete, null) }, onClick = { menu = false; vm.trashPaymentMethod(pm) { if (it) onBack() } })
                     }
                 },
             )
@@ -230,14 +232,132 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
             Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // Type picker
+            // Account header: avatar, subtitle, balance, business badge.
+            Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
+                BankAvatar(pm, vm)
+                Spacer(Modifier.size(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(pm.label.ifBlank { typeLabel(pm.type) }, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                    val sub = PaymentMethods.subtitle(pm)
+                    if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                    if (pm.business) Text(stringResource(R.string.finance_pm_business), style = MaterialTheme.typography.labelSmall, color = Brand.accent)
+                }
+                if (allTxns.isNotEmpty()) Text(vm.money(vm.accountBalance(pm.id), null), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+
+            // Year filter for both bookings + VAT.
+            if (txYears.size > 1) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    txYears.forEach { y -> FilterChip(selected = y == txYear, onClick = { txYear = y }, label = { Text(y) }) }
+                }
+            }
+
+            // VAT summary (Umsatzsteuer) for this account + year.
+            if (vat.outputVat != 0.0 || vat.inputVat != 0.0 || vat.undecided > 0) {
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SectionLabel(stringResource(R.string.finance_stats_vat_payable_title))
+                    VatRow(stringResource(R.string.finance_stats_output_vat), vm.money(vat.outputVat, null))
+                    VatRow(stringResource(R.string.finance_stats_input_vat), vm.money(vat.inputVat, null))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    VatRow(stringResource(R.string.finance_stats_vat_payable), vm.money(vat.payable, null), bold = true)
+                    if (vat.undecided > 0) Text(
+                        stringResource(R.string.finance_stats_vat_undecided, vat.undecided),
+                        style = MaterialTheme.typography.bodySmall, color = Color(0xFFE2915A),
+                    )
+                }
+            }
+
+            // Bookings.
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel(stringResource(R.string.finance_pm_bookings_title), Modifier.weight(1f))
+            }
+            if (allTxns.size > 6) {
+                OutlinedTextField(txQuery, { txQuery = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_tx_search)) }, singleLine = true)
+            }
+            if (txns.isEmpty()) {
+                Text(stringResource(R.string.finance_tx_none), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(8.dp))
+            } else {
+                Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {
+                    txns.take(200).forEachIndexed { i, t ->
+                        if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        Row(Modifier.fillMaxWidth().clickable { txEditing = t }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(t.counterparty.ifBlank { t.purpose.ifBlank { "—" } }, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(t.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    VatCatBadge(t.vatCat)
+                                }
+                            }
+                            Text(
+                                vm.money(t.amount, t.currency),
+                                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1,
+                                color = if (t.amount < 0) Color(0xFFE2915A) else Color(0xFF59AD6B),
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.size(4.dp))
+        }
+    }
+}
+
+@Composable
+private fun VatRow(label: String, value: String, bold: Boolean = false) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium)
+    }
+}
+
+/** A small VAT-category chip on a booking row (19%/7%/private/…); nothing for undecided. */
+@Composable
+private fun VatCatBadge(cat: String) {
+    val label = when (cat) {
+        "private" -> stringResource(R.string.finance_tx_vat_private)
+        "0" -> "0%"
+        "" -> return
+        else -> "$cat%"
+    }
+    Spacer(Modifier.size(6.dp))
+    androidx.compose.material3.Surface(
+        color = Brand.accent.copy(alpha = 0.12f),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, color = Brand.accent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp))
+    }
+}
+
+/** The payment-method edit form (fields + business toggle); Save via the topbar. */
+@Composable
+private fun PaymentMethodEditForm(initial: PaymentMethod, vm: FinanceViewModel, onBack: () -> Unit) {
+    var pm by remember(initial) { mutableStateOf(initial) }
+    val exists = vm.paymentMethodById(initial.id) != null
+    AppScaffold(
+        topBar = {
+            AppTopBar(
+                title = stringResource(if (exists) R.string.finance_pm_edit else R.string.finance_pm_add),
+                onBack = onBack,
+                actions = {
+                    androidx.compose.material3.TextButton(
+                        onClick = { vm.savePaymentMethod(pm.trimmed()) { if (it) onBack() } },
+                        enabled = PaymentMethods.isValid(pm.copy(label = pm.label.trim())),
+                    ) { Text(stringResource(R.string.action_save)) }
+                },
+            )
+        },
+    ) { pad ->
+        Column(
+            Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PaymentMethods.TYPES.forEach { t ->
                     FilterChip(selected = pm.type == t, onClick = { pm = pm.copy(type = t) }, label = { Text(typeLabel(t)) })
                 }
             }
-
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel(stringResource(R.string.finance_partner_details))
                 Field(pm.label, { pm = pm.copy(label = it) }, R.string.finance_pm_label)
                 Field(pm.holder, { pm = pm.copy(holder = it) }, R.string.finance_pm_holder)
                 when (pm.type) {
@@ -260,52 +380,9 @@ private fun PaymentMethodEditBody(initial: PaymentMethod, vm: FinanceViewModel, 
                 }
                 Field(pm.note, { pm = pm.copy(note = it) }, R.string.finance_pm_note)
             }
-
-            // Business account (single; drives the business/private scope). Non-business = private.
             Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.finance_pm_business), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                 androidx.compose.material3.Switch(checked = pm.business, onCheckedChange = { pm = pm.copy(business = it) })
-            }
-
-            de.ledgerline.app.ui.theme.PrimaryGradientButton(
-                stringResource(R.string.action_save),
-                enabled = PaymentMethods.isValid(pm.copy(label = pm.label.trim())),
-                onClick = { vm.savePaymentMethod(pm.trimmed()) { if (it) onBack() } },
-            )
-
-            // Bookings for this account: import a statement, add manually, edit each.
-            if (exists) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    SectionLabel(stringResource(R.string.finance_pm_bookings_title), Modifier.weight(1f))
-                    androidx.compose.material3.TextButton(onClick = launchImport) { Text(stringResource(R.string.finance_import_action)) }
-                    androidx.compose.material3.TextButton(onClick = { onEditTx(vm.newTransaction(initial.id)) }) { Text(stringResource(R.string.finance_tx_add)) }
-                }
-                if (txYears.size > 1) {
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        txYears.forEach { y -> FilterChip(selected = y == txYear, onClick = { txYear = y }, label = { Text(y) }) }
-                    }
-                }
-                if (allTxns.size > 6) {
-                    OutlinedTextField(txQuery, { txQuery = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.finance_tx_search)) }, singleLine = true)
-                }
-            }
-            if (txns.isNotEmpty()) {
-                Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {
-                    txns.take(200).forEachIndexed { i, t ->
-                        if (i > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                        Row(Modifier.fillMaxWidth().clickable { onEditTx(t) }.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(t.counterparty.ifBlank { t.purpose.ifBlank { "—" } }, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                                Text(t.date, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text(
-                                vm.money(t.amount, t.currency),
-                                style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1,
-                                color = if (t.amount < 0) Color(0xFFE2915A) else Color(0xFF59AD6B),
-                            )
-                        }
-                    }
-                }
             }
             Spacer(Modifier.size(4.dp))
         }

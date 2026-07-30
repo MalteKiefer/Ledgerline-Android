@@ -258,8 +258,21 @@ object FinanceRecordCodec {
 
     fun decodePartner(o: JsonObject): de.ledgerline.app.domain.model.Partner? {
         val id = o.str("id") ?: return null
+        val contacts = (o["contacts"] as? JsonArray).orEmpty().mapNotNull { el ->
+            val c = el as? JsonObject ?: return@mapNotNull null
+            de.ledgerline.app.domain.model.PartnerContact(
+                id = c.str("id") ?: "", name = c.str("name") ?: "", email = c.str("email") ?: "",
+                phone = c.str("phone") ?: "", role = c.str("role") ?: "",
+            )
+        }.ifEmpty {
+            // Legacy single `contact` string → contacts[0] (web migration, back-compat).
+            o.str("contact")?.takeIf { it.isNotBlank() }?.let { listOf(de.ledgerline.app.domain.model.PartnerContact(name = it)) }.orEmpty()
+        }
         return de.ledgerline.app.domain.model.Partner(
-            id = id, name = o.str("name") ?: "", category = o.str("category") ?: "", note = o.str("note") ?: "", raw = o,
+            id = id, name = o.str("name") ?: "", category = o.str("category") ?: "", note = o.str("note") ?: "",
+            url = o.str("url") ?: "", logo = o.str("logo") ?: "", address = o.str("address") ?: "",
+            email = o.str("email") ?: "", phone = o.str("phone") ?: "", vatId = o.str("vatId") ?: "",
+            contacts = contacts, raw = o,
         )
     }
 
@@ -269,6 +282,27 @@ object FinanceRecordCodec {
         out["name"] = JsonPrimitive(p.name)
         out["category"] = JsonPrimitive(p.category)
         out["note"] = JsonPrimitive(p.note)
+        setOrNull(out, "url", p.url.takeIf { it.isNotBlank() }?.let { JsonPrimitive(it) })
+        setOrNull(out, "address", p.address.takeIf { it.isNotBlank() }?.let { JsonPrimitive(it) })
+        setOrNull(out, "email", p.email.takeIf { it.isNotBlank() }?.let { JsonPrimitive(it) })
+        setOrNull(out, "phone", p.phone.takeIf { it.isNotBlank() }?.let { JsonPrimitive(it) })
+        setOrNull(out, "vatId", p.vatId.takeIf { it.isNotBlank() }?.let { JsonPrimitive(it) })
+        // `logo` is fetched/sealed server/web-side; preserve verbatim from raw (never rewrite here).
+        // Contacts: web-shaped array; drop the legacy scalar `contact` once we own contacts[].
+        if (p.contacts.isNotEmpty() || p.raw.containsKey("contacts")) {
+            out["contacts"] = JsonArray(
+                p.contacts.map { ct ->
+                    buildMap<String, kotlinx.serialization.json.JsonElement> {
+                        if (ct.id.isNotBlank()) put("id", JsonPrimitive(ct.id))
+                        put("name", JsonPrimitive(ct.name))
+                        if (ct.email.isNotBlank()) put("email", JsonPrimitive(ct.email))
+                        if (ct.phone.isNotBlank()) put("phone", JsonPrimitive(ct.phone))
+                        if (ct.role.isNotBlank()) put("role", JsonPrimitive(ct.role))
+                    }.let { JsonObject(it) }
+                },
+            )
+            out.remove("contact")
+        }
         return JsonObject(out)
     }
 
