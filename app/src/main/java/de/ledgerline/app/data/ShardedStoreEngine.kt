@@ -86,6 +86,12 @@ class ShardedStoreEngine(
         return loaded
     }
 
+    /**
+     * Offline-only assemble from the disk cache (no network), for a cache-first first paint.
+     * Returns null when nothing is cached so the caller can fall through to the network load.
+     */
+    suspend fun loadCached(vk: ByteArray): Loaded? = cachedOr(vk).takeIf { it.present }
+
     private suspend fun cachedOr(vk: ByteArray): Loaded {
         if (offlineFlags.enabled()) {
             storeCache.get(rootCacheKey)?.let { env ->

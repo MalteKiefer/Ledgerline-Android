@@ -421,6 +421,12 @@ class WorkspaceRepository(
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
+        // Cache-first: assemble the workspace from the disk cache and paint it immediately so the
+        // Files/Notes/Todos/… tabs show content before the network round-trip below refreshes it.
+        // Best-effort — a cold cache just falls through to the network load.
+        if (cache.value.value == null) {
+            runCatching { cachedWorkspace(api, vk) }.getOrNull()?.let { cache.set(it) }
+        }
         try {
             val loaded = coroutineScope {
                 val filesDeferred = async { loadFilesSlice(api, vk) }
@@ -445,6 +451,28 @@ class WorkspaceRepository(
         } catch (e: Exception) {
             Outcome.Err(ErrorKind.NETWORK, e)
         }
+    }
+
+    /**
+     * Assemble the whole workspace from the disk cache only (no network), for a cache-first first
+     * paint. Modules, the files slice, and notes are read from their offline caches; returns null
+     * when nothing is cached (so the caller falls through to the network load without blanking).
+     */
+    private suspend fun cachedWorkspace(api: LedgerlineApi, vk: ByteArray): Workspace? {
+        if (!offlineFlags.enabled()) return null
+        var agg = WorkspaceManifest(v = 3)
+        var any = false
+        for (spec in specs) {
+            val ml = cachedModule(spec, vk) ?: continue
+            versions[spec.key] = ml.version
+            if (ml.plain != null) { agg = spec.merge(agg, ml.plain); any = true }
+        }
+        val files = runCatching { cachedFilesSliceOr(api, vk) }.getOrNull() ?: (emptyList<FileEntry>() to emptyList())
+        val notes = runCatching { notesEngine.loadCached(vk)?.records?.map(WorkspaceRecordCodec::decodeNote) }
+            .getOrNull().orEmpty()
+        if (files.first.isNotEmpty() || files.second.isNotEmpty() || notes.isNotEmpty()) any = true
+        agg = agg.copy(files = files.first, fileFolders = files.second, notes = notes)
+        return if (any) Workspace(agg, 0) else null
     }
 
     /**

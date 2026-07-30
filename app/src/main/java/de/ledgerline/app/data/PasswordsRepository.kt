@@ -126,6 +126,17 @@ class PasswordsRepository(
     suspend fun load(): Outcome<SecretsStore> = withContext(Dispatchers.IO) {
         sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        // Cache-first: paint the last-cached secrets immediately (offline-assembled from the disk
+        // cache) so the list shows before the network round-trip; engine.load below then refreshes.
+        // Best-effort — a cold cache just falls through to the network load.
+        if (cache.value.value == null) {
+            runCatching {
+                engine.loadCached(vk)?.let { l ->
+                    val (s, f) = decodeLoaded(l)
+                    cache.set(SecretsStore(SecretsManifest(secrets = s, secretFolders = f), engine.version))
+                }
+            }
+        }
         try {
             val loaded = engine.load(vk) // network-first; falls back to the offline cache internally
             var (secrets, folders) = decodeLoaded(loaded)

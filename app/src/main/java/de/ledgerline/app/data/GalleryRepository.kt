@@ -126,6 +126,12 @@ class GalleryRepository(
     suspend fun load(): Outcome<Gallery> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        // Cache-first: paint the last-cached gallery immediately (offline-assembled from the disk
+        // cache) so the UI shows content before the network round-trip; the fetch below then
+        // refreshes it. Best-effort — a cold cache just falls through to the network load.
+        if (cache.value.value == null) {
+            (cachedOr(Outcome.Err(ErrorKind.NETWORK), session, vk) as? Outcome.Ok)?.let { cache.set(it.value) }
+        }
         try {
             val res = apiProvider(session).galleryStore()
             when {
