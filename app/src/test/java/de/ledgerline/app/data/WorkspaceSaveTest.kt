@@ -72,6 +72,30 @@ class WorkspaceSaveTest {
         }
     }
 
+    @Test fun offline_note_save_queues_then_replays() = runBlocking {
+        val session = Session("https://h", "tok", "sha256/x", null)
+        val sh = SessionHolder().apply { set(session) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val cache = WorkspaceCache()
+        val fakeApi = FakeApi()
+        val outbox = tmpOutbox()
+        val conn = FakeConnectivity(online = true)
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), outbox, conn, apiProvider = { fakeApi })
+
+        repo.load() // establish base + versions online (all stores empty)
+        conn.online = false
+        val r = repo.save { m -> m.copy(notes = m.notes + Note(id = "n3", title = "Offline")) }
+        assertTrue(r is Outcome.Ok)
+        assertEquals(0, fakeApi.notesPuts) // nothing pushed while offline
+        assertTrue(cache.value.value!!.manifest.notes.any { it.id == "n3" }) // optimistic local state
+        assertTrue(outbox.hasPending())
+
+        conn.online = true
+        assertTrue(repo.replayPending())
+        assertTrue("the queued note must be pushed on replay", fakeApi.notesPuts >= 1)
+        assertTrue(!outbox.hasPending()) // drained
+    }
+
     @Test fun save_writes_notes_to_sharded_store() = runBlocking {
         val session = Session("https://h", "tok", "sha256/x", null)
         val sh = SessionHolder().apply { set(session) }
@@ -79,7 +103,7 @@ class WorkspaceSaveTest {
         val cache = WorkspaceCache()
         val fakeApi = FakeApi()
 
-        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { fakeApi })
 
         // A note mutation seals + PUTs the sharded /notes/store (no longer a monolith module).
         val result = repo.save { m ->
@@ -124,7 +148,7 @@ class WorkspaceSaveTest {
             }
         }
 
-        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { fakeApi })
 
         val result = repo.load()
         assertTrue(result is Outcome.Ok)
@@ -141,7 +165,7 @@ class WorkspaceSaveTest {
         val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
         val cache = WorkspaceCache()
         val fakeApi = FakeApi()
-        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { fakeApi })
 
         // A folder mutation now seals + PUTs the sharded /files/store (no longer rejected).
         val result = repo.save { m ->

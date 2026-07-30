@@ -50,7 +50,7 @@ class OfflineStoreLoadTest {
         val todosJson = """{"v":3,"todos":[{"id":"n1","title":"Docs"}]}"""
         val onlineApi = WorkspaceApi(StoreResponse("SEALED:$todosJson", 7), fail = false)
         val online = WorkspaceRepository(
-            sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { onlineApi },
+            sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { onlineApi },
         )
 
         val first = online.load()
@@ -65,7 +65,7 @@ class OfflineStoreLoadTest {
         // module (incl. the empty ones cached above) is served from disk.
         val offlineApi = WorkspaceApi(null, fail = true)
         val offline = WorkspaceRepository(
-            sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { offlineApi },
+            sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { offlineApi },
         )
         val second = offline.load()
         assertTrue(second is Outcome.Ok)
@@ -78,7 +78,7 @@ class OfflineStoreLoadTest {
         val vh = VaultKeyHolder().apply { set(vk) }
         val api = WorkspaceApi(null, fail = true)
         val repo = WorkspaceRepository(
-            sh, vh, crypto, WorkspaceCache(), tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { api },
+            sh, vh, crypto, WorkspaceCache(), tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { api },
         )
         assertTrue(repo.load() is Outcome.Err)
     }
@@ -91,7 +91,7 @@ class OfflineStoreLoadTest {
         storeCache.put("workspace_notes", de.ledgerline.app.core.offline.StoreEnvelope("SEALED:{}", 3))
         val api = WorkspaceApi(null, fail = true)
         val repo = WorkspaceRepository(
-            sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(enabled = false), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { api },
+            sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(enabled = false), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { api },
         )
         assertTrue(repo.load() is Outcome.Err)
     }
@@ -132,7 +132,7 @@ class OfflineStoreLoadTest {
 
         val online = WorkspaceRepository(
             sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(),
-            de.ledgerline.app.core.offline.DegradedState(), blobCache,
+            de.ledgerline.app.core.offline.DegradedState(), blobCache, tmpOutbox(), FakeConnectivity(),
             apiProvider = { ShardedFilesApi(StoreResponse("SEALED:$rootJson", 5), blobs, fail = false) },
         )
         val first = online.load()
@@ -146,7 +146,7 @@ class OfflineStoreLoadTest {
         // Offline: every workspace GET throws — the files slice must assemble from the cache.
         val offline = WorkspaceRepository(
             sh, vh, crypto, WorkspaceCache(), storeCache, FakeOfflineFlags(),
-            de.ledgerline.app.core.offline.DegradedState(), blobCache,
+            de.ledgerline.app.core.offline.DegradedState(), blobCache, tmpOutbox(), FakeConnectivity(),
             apiProvider = { ShardedFilesApi(null, blobs, fail = true) },
         )
         val res = offline.load()
@@ -175,6 +175,7 @@ class OfflineStoreLoadTest {
             sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
             galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
             blobCache = tmpBlobCache(),
+            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
             apiProvider = { GalleryApi(StoreResponse("SEALED:$manifestJson", 4), code = null) },
         )
         assertTrue(online.load() is Outcome.Ok)
@@ -185,6 +186,7 @@ class OfflineStoreLoadTest {
             sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
             galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
             blobCache = tmpBlobCache(),
+            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
             apiProvider = { GalleryApi(null, code = 503) },
         )
         val res = offline.load()
@@ -234,6 +236,7 @@ class OfflineStoreLoadTest {
             sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
             galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
             blobCache = blobCache,
+            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
             apiProvider = { ShardedGalleryApi(StoreResponse("SEALED:$rootJson", 8), storeCode = null, blobs = blobs, fail = false) },
         )
         val first = online.load()
@@ -249,6 +252,7 @@ class OfflineStoreLoadTest {
             sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
             galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
             blobCache = blobCache,
+            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
             apiProvider = { ShardedGalleryApi(null, storeCode = 503, blobs = blobs, fail = true) },
         )
         val res = offline.load()
@@ -268,6 +272,7 @@ class OfflineStoreLoadTest {
             sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
             galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
             blobCache = tmpBlobCache(),
+            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
             apiProvider = { GalleryApi(null, code = 401) },
         )
         // 401 → HTTP error (forced-logout path), NOT the cached manifest.

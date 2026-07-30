@@ -43,8 +43,10 @@ class GalleryRepository(
     private val galleryUpload: de.ledgerline.app.domain.usecase.GalleryUploadApi,
     private val degradedState: de.ledgerline.app.core.offline.DegradedState,
     private val blobCache: de.ledgerline.app.core.offline.BlobDiskCache,
+    private val syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+    private val connectivity: de.ledgerline.app.core.offline.Connectivity,
     private val apiProvider: (Session) -> LedgerlineApi,
-) {
+) : de.ledgerline.app.core.offline.SyncableStore {
     @Inject constructor(
         sessionHolder: SessionHolder,
         vaultKeyHolder: VaultKeyHolder,
@@ -55,6 +57,8 @@ class GalleryRepository(
         galleryUpload: de.ledgerline.app.domain.usecase.GalleryUploadApi,
         degradedState: de.ledgerline.app.core.offline.DegradedState,
         blobCache: de.ledgerline.app.core.offline.BlobDiskCache,
+        syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+        connectivity: de.ledgerline.app.core.offline.Connectivity,
     ) : this(
         sessionHolder,
         vaultKeyHolder,
@@ -65,11 +69,75 @@ class GalleryRepository(
         galleryUpload,
         degradedState,
         blobCache,
+        syncOutbox,
+        connectivity,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
     private companion object {
         const val KEY = "gallery"
+        const val OUTBOX = "gallery"
+    }
+
+    override val syncLabel: String = "gallery"
+
+    // ---- Offline write outbox (record-level delta; metadata edits only — new-photo imports
+    // create blobs and still require a connection until the blob-upload queue lands) ----
+    private fun collectionsOf(m: GalleryManifest): Map<String, Map<String, kotlinx.serialization.json.JsonObject>> = mapOf(
+        "photos" to m.photos.associate { it.id to GalleryRecordCodec.encodePhoto(it, photoRawById[it.id]) },
+        "albums" to m.albums.associate { it.id to GalleryRecordCodec.encodeAlbum(it, albumRawById[it.id]) },
+        "people" to m.people.associate { it.id to GalleryRecordCodec.encodePerson(it, personRawById[it.id]) },
+    )
+
+    private fun applyDelta(m: GalleryManifest, delta: de.ledgerline.app.core.offline.StoreDelta): GalleryManifest {
+        fun <T> merge(list: List<T>, key: String, id: (T) -> String, decode: (kotlinx.serialization.json.JsonObject) -> T): List<T> {
+            val cd = delta.collections[key] ?: return list
+            if (cd.isEmpty) return list
+            val byId = list.associateByTo(LinkedHashMap()) { id(it) }
+            cd.deletes.forEach { byId.remove(it) }
+            cd.upserts.forEach { (rid, obj) -> byId[rid] = decode(obj) }
+            return byId.values.toList()
+        }
+        return GalleryManifest(
+            photos = merge(m.photos, "photos", { it.id }) { obj -> GalleryRecordCodec.decodePhoto(obj).also { photoRawById[it.id] = obj } },
+            albums = merge(m.albums, "albums", { it.id }) { obj -> GalleryRecordCodec.decodeAlbum(obj).also { albumRawById[it.id] = obj } },
+            people = merge(m.people, "people", { it.id }) { obj -> GalleryRecordCodec.decodePerson(obj).also { personRawById[it.id] = obj } },
+        )
+    }
+
+    private fun withPending(m: GalleryManifest, vk: ByteArray): GalleryManifest =
+        syncOutbox.pending(OUTBOX, vk)?.let { applyDelta(m, it) } ?: m
+
+    private fun enqueueOffline(vk: ByteArray, base: GalleryManifest, next: GalleryManifest): Outcome<Gallery> {
+        val delta = de.ledgerline.app.core.offline.StoreDelta.diff(collectionsOf(base), collectionsOf(next))
+        if (!delta.isEmpty) syncOutbox.append(OUTBOX, delta, vk)
+        val gallery = Gallery(next, cache.value.value?.version ?: 0)
+        cache.set(gallery)
+        return Outcome.Ok(gallery)
+    }
+
+    override suspend fun replayPending(): Boolean = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext false
+        val delta = syncOutbox.pending(OUTBOX, vk) ?: return@withContext true
+        if (delta.isEmpty) { syncOutbox.clear(OUTBOX); return@withContext true }
+        if (!connectivity.isOnline()) return@withContext false
+        if (degradedState.gallery.value) return@withContext false
+        val session = sessionHolder.get() ?: return@withContext false
+        // Diff onto the CLEAN server head (not the delta-layered cache) so the write is non-empty.
+        val clean = try {
+            val res = apiProvider(session).galleryStore()
+            if (!res.isSuccessful) return@withContext false
+            val body = res.body()!!
+            val m = body.ciphertext?.let { ct ->
+                val plain = crypto.openManifest(ct, vk) ?: return@withContext false
+                assembleManifest(json.decodeFromString<GalleryRoot>(plain), session, vk, allowNetwork = true)
+            } ?: GalleryManifest()
+            Gallery(m, body.version)
+        } catch (_: Exception) {
+            return@withContext false
+        }
+        val out = saveOnline(baseOverride = clean) { m -> applyDelta(m, delta) }
+        if (out is Outcome.Ok) { syncOutbox.clear(OUTBOX); true } else false
     }
 
     // coerceInputValues: the sharded gallery root writes `"photos": null` alongside the
@@ -130,7 +198,7 @@ class GalleryRepository(
         // cache) so the UI shows content before the network round-trip; the fetch below then
         // refreshes it. Best-effort — a cold cache just falls through to the network load.
         if (cache.value.value == null) {
-            (cachedOr(Outcome.Err(ErrorKind.NETWORK), session, vk) as? Outcome.Ok)?.let { cache.set(it.value) }
+            (cachedOr(Outcome.Err(ErrorKind.NETWORK), session, vk) as? Outcome.Ok)?.let { cache.set(Gallery(withPending(it.value.manifest, vk), it.value.version)) }
         }
         try {
             val res = apiProvider(session).galleryStore()
@@ -147,14 +215,15 @@ class GalleryRepository(
                     if (offlineFlags.enabled()) {
                         storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
                     }
-                    var gallery = Gallery(manifest, body.version)
+                    // Layer any un-synced offline edits on top of the fresh server manifest.
+                    var gallery = Gallery(withPending(manifest, vk), body.version)
                     // Self-heal a degraded index: a record shard was permanently missing (404), so its
                     // records are gone for good — re-seal the root from only the loaded shards so it no
                     // longer points at the dead blob (mirrors the web self-heal). Then reclaim orphaned
                     // blobs (the gallery never ran a reconcile pass before). Both best-effort; a full
                     // ONLINE load only reaches here after every recoverable record decrypted.
                     if (degradedState.gallery.value) {
-                        healDegraded(session, vk, manifest, body.version)?.let { gallery = Gallery(manifest, it) }
+                        healDegraded(session, vk, manifest, body.version)?.let { gallery = Gallery(withPending(manifest, vk), it) }
                     }
                     reconcileLiveSet(session, manifest)
                     Outcome.Ok(gallery)
@@ -313,13 +382,29 @@ class GalleryRepository(
      * rebase on the winning writer's root, re-apply [mutate], and retry (bounded).
      */
     suspend fun save(mutate: (GalleryManifest) -> GalleryManifest): Outcome<Gallery> = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        if (degradedState.gallery.value) return@withContext Outcome.Err(ErrorKind.HTTP)
+        val base = cache.value.value?.manifest
+            ?: (load() as? Outcome.Ok)?.value?.manifest
+            ?: GalleryManifest()
+        // Offline: queue the metadata edit + optimistic cache. (New-photo imports create blobs and
+        // fail earlier at the uploader, so they never reach here offline.)
+        if (!connectivity.isOnline()) return@withContext enqueueOffline(vk, base, mutate(base))
+        val out = saveOnline(mutate = mutate)
+        if (out is Outcome.Err && out.kind == ErrorKind.NETWORK) enqueueOffline(vk, base, mutate(base)) else out
+    }
+
+    private suspend fun saveOnline(
+        baseOverride: Gallery? = null,
+        mutate: (GalleryManifest) -> GalleryManifest,
+    ): Outcome<Gallery> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         // Frozen while degraded: a shard blob is missing; rewriting the root would drop it for good.
         if (degradedState.gallery.value) return@withContext Outcome.Err(ErrorKind.HTTP)
         val api = apiProvider(session)
 
-        var base = cache.value.value
+        var base = baseOverride ?: cache.value.value
         if (base == null) {
             when (val l = load()) {
                 is Outcome.Ok -> base = l.value

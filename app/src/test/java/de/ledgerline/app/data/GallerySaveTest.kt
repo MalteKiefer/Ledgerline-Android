@@ -217,7 +217,7 @@ class GallerySaveTest {
             override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
         }
 
-        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), fakeUpload, de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
+        val repo = GalleryRepository(sh, vh, fakeCrypto, galleryCache, tmpStoreCache(), FakeOfflineFlags(), fakeUpload, de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { fakeApi })
 
         val result = repo.save { manifest ->
             manifest.copy(photos = manifest.photos + GalleryPhoto(id = "new"))
@@ -241,7 +241,7 @@ class GallerySaveTest {
             override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream) = Outcome.Ok(UploadedBlob("b", "k", size))
             override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
         }
-        val repo = GalleryRepository(sh, vh, fakeCrypto, GalleryCache(), tmpStoreCache(), FakeOfflineFlags(), fakeUpload, de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), apiProvider = { fakeApi })
+        val repo = GalleryRepository(sh, vh, fakeCrypto, GalleryCache(), tmpStoreCache(), FakeOfflineFlags(), fakeUpload, de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { fakeApi })
 
         assertTrue(repo.load() is Outcome.Ok)
         // The living-set POSTed to the server covers every referenced blob (so nothing live is freed).

@@ -63,8 +63,10 @@ class WorkspaceRepository(
     private val offlineFlags: OfflineFlags,
     private val degraded: de.ledgerline.app.core.offline.DegradedState,
     private val blobCache: de.ledgerline.app.core.offline.BlobDiskCache,
+    private val syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+    private val connectivity: de.ledgerline.app.core.offline.Connectivity,
     private val apiProvider: (Session) -> LedgerlineApi,
-) {
+) : de.ledgerline.app.core.offline.SyncableStore {
     /** Production constructor used by Hilt. */
     @Inject constructor(
         sessionHolder: SessionHolder,
@@ -75,6 +77,8 @@ class WorkspaceRepository(
         offlineFlags: OfflineFlags,
         degraded: de.ledgerline.app.core.offline.DegradedState,
         blobCache: de.ledgerline.app.core.offline.BlobDiskCache,
+        syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+        connectivity: de.ledgerline.app.core.offline.Connectivity,
     ) : this(
         sessionHolder,
         vaultKeyHolder,
@@ -84,6 +88,8 @@ class WorkspaceRepository(
         offlineFlags,
         degraded,
         blobCache,
+        syncOutbox,
+        connectivity,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
@@ -92,6 +98,55 @@ class WorkspaceRepository(
         const val FILES_ROOT_KEY = "workspace_files_root"
         /** Offline-cache key for the sharded notes-store **root** envelope. */
         const val NOTES_ROOT_KEY = "workspace_notes_root"
+        /** SyncOutbox key for offline workspace write deltas (one aggregate delta for all modules). */
+        const val OUTBOX = "workspace"
+        val LIST_KEYS = listOf("notes", "todos", "todoLists", "bookmarks", "bookmarkFolders", "contacts", "files", "fileFolders")
+    }
+
+    override val syncLabel: String = "workspace"
+
+    // ---- Offline write outbox (aggregate record-level delta across all modules) ----
+    private fun collectionsOf(m: WorkspaceManifest): Map<String, Map<String, JsonObject>> = mapOf(
+        "notes" to m.notes.associate { it.id to WorkspaceRecordCodec.encodeNote(it) },
+        "todos" to m.todos.associate { it.id to WorkspaceRecordCodec.encodeTodo(it) },
+        "todoLists" to m.todoLists.associate { it.id to WorkspaceRecordCodec.encodeTodoList(it) },
+        "bookmarks" to m.bookmarks.associate { it.id to WorkspaceRecordCodec.encodeBookmark(it) },
+        "bookmarkFolders" to m.bookmarkFolders.associate { it.id to WorkspaceRecordCodec.encodeBookmarkFolder(it) },
+        "contacts" to m.contacts.associate { it.id to WorkspaceRecordCodec.encodeContact(it) },
+        "files" to m.files.associate { it.id to FileRecordCodec.encodeFile(it, fileRawById[it.id]) },
+        "fileFolders" to m.fileFolders.associate { it.id to FileRecordCodec.encodeFolder(it, folderRawById[it.id]) },
+    )
+
+    private fun applyDelta(m: WorkspaceManifest, delta: de.ledgerline.app.core.offline.StoreDelta): WorkspaceManifest {
+        fun <T> merge(list: List<T>, key: String, id: (T) -> String, decode: (JsonObject) -> T): List<T> {
+            val cd = delta.collections[key] ?: return list
+            if (cd.isEmpty) return list
+            val byId = list.associateByTo(LinkedHashMap()) { id(it) }
+            cd.deletes.forEach { byId.remove(it) }
+            cd.upserts.forEach { (rid, obj) -> byId[rid] = decode(obj) }
+            return byId.values.toList()
+        }
+        return m.copy(
+            notes = merge(m.notes, "notes", { it.id }, WorkspaceRecordCodec::decodeNote),
+            todos = merge(m.todos, "todos", { it.id }, WorkspaceRecordCodec::decodeTodo),
+            todoLists = merge(m.todoLists, "todoLists", { it.id }, WorkspaceRecordCodec::decodeTodoList),
+            bookmarks = merge(m.bookmarks, "bookmarks", { it.id }, WorkspaceRecordCodec::decodeBookmark),
+            bookmarkFolders = merge(m.bookmarkFolders, "bookmarkFolders", { it.id }, WorkspaceRecordCodec::decodeBookmarkFolder),
+            contacts = merge(m.contacts, "contacts", { it.id }, WorkspaceRecordCodec::decodeContact),
+            files = merge(m.files, "files", { it.id }) { obj -> FileRecordCodec.decodeFile(obj).also { fileRawById[it.id] = obj } },
+            fileFolders = merge(m.fileFolders, "fileFolders", { it.id }) { obj -> FileRecordCodec.decodeFolder(obj).also { folderRawById[it.id] = obj } },
+        )
+    }
+
+    private fun withPending(m: WorkspaceManifest, vk: ByteArray): WorkspaceManifest =
+        syncOutbox.pending(OUTBOX, vk)?.let { applyDelta(m, it) } ?: m
+
+    private fun enqueueOffline(vk: ByteArray, base: WorkspaceManifest, next: WorkspaceManifest): Outcome<Workspace> {
+        val delta = de.ledgerline.app.core.offline.StoreDelta.diff(collectionsOf(base), collectionsOf(next))
+        if (!delta.isEmpty) syncOutbox.append(OUTBOX, delta, vk)
+        val result = Workspace(next, 0)
+        cache.set(result)
+        return Outcome.Ok(result)
     }
 
     /**
@@ -425,24 +480,11 @@ class WorkspaceRepository(
         // Files/Notes/Todos/… tabs show content before the network round-trip below refreshes it.
         // Best-effort — a cold cache just falls through to the network load.
         if (cache.value.value == null) {
-            runCatching { cachedWorkspace(api, vk) }.getOrNull()?.let { cache.set(it) }
+            runCatching { cachedWorkspace(api, vk) }.getOrNull()?.let { cache.set(Workspace(withPending(it.manifest, vk), it.version)) }
         }
         try {
-            val loaded = coroutineScope {
-                val filesDeferred = async { loadFilesSlice(api, vk) }
-                val notesDeferred = async { loadNotesSlice(vk) }
-                val mods = specs.map { spec -> async { spec to fetchModule(api, spec, vk) } }.awaitAll()
-                Triple(mods, filesDeferred.await(), notesDeferred.await())
-            }
-            val (mods, filesSlice, notesSlice) = loaded
-
-            var agg = WorkspaceManifest(v = 3)
-            for ((spec, ml) in mods) {
-                versions[spec.key] = ml.version
-                if (ml.plain != null) agg = spec.merge(agg, ml.plain)
-            }
-            agg = agg.copy(files = filesSlice.first, fileFolders = filesSlice.second, notes = notesSlice)
-            Outcome.Ok(Workspace(agg, 0))
+            // Layer any un-synced offline edits on top of the fresh server aggregate.
+            Outcome.Ok(Workspace(withPending(fetchAggregate(api, vk), vk), 0))
         } catch (_: AuthException) {
             // 401 → forced-logout path; never fall back to cache.
             Outcome.Err(ErrorKind.HTTP)
@@ -451,6 +493,28 @@ class WorkspaceRepository(
         } catch (e: Exception) {
             Outcome.Err(ErrorKind.NETWORK, e)
         }
+    }
+
+    /**
+     * Fetch + assemble the CLEAN server aggregate (modules + files slice + notes), refreshing the
+     * per-store version state. No offline-delta layering, no caching — used by [load] (which layers
+     * + caches) and by [replayPending] (which needs a clean base to diff the pending delta against).
+     * Throws [AuthException]/[DecryptException]/network exceptions like the module fetch.
+     */
+    private suspend fun fetchAggregate(api: LedgerlineApi, vk: ByteArray): WorkspaceManifest {
+        val loaded = coroutineScope {
+            val filesDeferred = async { loadFilesSlice(api, vk) }
+            val notesDeferred = async { loadNotesSlice(vk) }
+            val mods = specs.map { spec -> async { spec to fetchModule(api, spec, vk) } }.awaitAll()
+            Triple(mods, filesDeferred.await(), notesDeferred.await())
+        }
+        val (mods, filesSlice, notesSlice) = loaded
+        var agg = WorkspaceManifest(v = 3)
+        for ((spec, ml) in mods) {
+            versions[spec.key] = ml.version
+            if (ml.plain != null) agg = spec.merge(agg, ml.plain)
+        }
+        return agg.copy(files = filesSlice.first, fileFolders = filesSlice.second, notes = notesSlice)
     }
 
     /**
@@ -552,15 +616,50 @@ class WorkspaceRepository(
      * a silent drop.
      */
     suspend fun save(mutate: (WorkspaceManifest) -> WorkspaceManifest): Outcome<Workspace> = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        // Resolve the aggregate base (needed to compute an offline delta).
+        val base = cache.value.value?.manifest
+            ?: (load() as? Outcome.Ok)?.value?.manifest
+            ?: WorkspaceManifest()
+        // Offline: queue the edit + optimistic cache instead of the multi-store PUT below.
+        if (!connectivity.isOnline()) return@withContext enqueueOffline(vk, base, mutate(base))
+        val out = saveOnline(mutate = mutate)
+        // Connection dropped mid-flight → fall back to the outbox rather than losing the edit.
+        if (out is Outcome.Err && out.kind == ErrorKind.NETWORK) enqueueOffline(vk, base, mutate(base)) else out
+    }
+
+    /**
+     * Replay pending offline workspace edits onto the current server head. Uses [saveOnline] (which
+     * never re-queues) so a failure keeps the outbox for a later retry. [applyDelta] is idempotent,
+     * so re-applying the delta onto the already-layered cache base is safe; the per-store 409 loops
+     * re-apply it onto the winning server state.
+     */
+    override suspend fun replayPending(): Boolean = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext false
+        val delta = syncOutbox.pending(OUTBOX, vk) ?: return@withContext true
+        if (delta.isEmpty) { syncOutbox.clear(OUTBOX); return@withContext true }
+        if (!connectivity.isOnline()) return@withContext false
+        val session = sessionHolder.get() ?: return@withContext false
+        // Diff the delta against the CLEAN server head (not the delta-layered cache), so saveOnline
+        // actually sees a change to push; its per-store 409 loops re-apply onto the winning state.
+        val clean = try { fetchAggregate(apiProvider(session), vk) } catch (_: Exception) { return@withContext false }
+        val out = saveOnline(baseOverride = clean) { m -> applyDelta(m, delta) }
+        if (out is Outcome.Ok) { syncOutbox.clear(OUTBOX); true } else false
+    }
+
+    private suspend fun saveOnline(
+        baseOverride: WorkspaceManifest? = null,
+        mutate: (WorkspaceManifest) -> WorkspaceManifest,
+    ): Outcome<Workspace> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
 
         // Establish the aggregate base + per-module versions.
-        var curBase = cache.value.value?.manifest
+        var curBase = baseOverride ?: cache.value.value?.manifest
         if (curBase == null || versions.size < specs.size) {
             when (val l = load()) {
-                is Outcome.Ok -> curBase = l.value.manifest
+                is Outcome.Ok -> curBase = baseOverride ?: l.value.manifest
                 is Outcome.Err -> return@withContext l
             }
         }
