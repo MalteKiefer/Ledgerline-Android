@@ -54,6 +54,16 @@ class FakeOfflineFlags(
 fun tmpStoreCache(): StoreDiskCache =
     StoreDiskCache(File(System.getProperty("java.io.tmpdir"), "t-store-" + System.nanoTime()))
 
+/** A [de.ledgerline.app.core.offline.SyncOutbox] at a fresh temp dir, sealing with [SealTagCrypto]. */
+fun tmpOutbox(): de.ledgerline.app.core.offline.SyncOutbox =
+    de.ledgerline.app.core.offline.SyncOutbox(File(System.getProperty("java.io.tmpdir"), "t-outbox-" + System.nanoTime()), SealTagCrypto())
+
+/** Fake [de.ledgerline.app.core.offline.Connectivity] with a flippable online state (default online). */
+class FakeConnectivity(@Volatile var online: Boolean = true) : de.ledgerline.app.core.offline.Connectivity {
+    override fun isOnline() = online
+    override fun isUnmetered() = online
+}
+
 // ---- Blob-repo test factories (were `Repo.forTest` in main) ----------------------
 
 /**

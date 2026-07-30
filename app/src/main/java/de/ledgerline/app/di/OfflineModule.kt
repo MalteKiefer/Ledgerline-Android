@@ -12,6 +12,8 @@ import de.ledgerline.app.core.offline.Constraints
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.offline.OfflinePrefs
 import de.ledgerline.app.core.offline.SyncableStore
+import de.ledgerline.app.data.ExploreRepository
+import de.ledgerline.app.data.HealthRepository
 import de.ledgerline.app.data.PasswordsRepository
 import javax.inject.Singleton
 
@@ -39,4 +41,12 @@ abstract class OfflineModule {
     @Binds
     @IntoSet
     abstract fun passwordsSyncable(impl: PasswordsRepository): SyncableStore
+
+    @Binds
+    @IntoSet
+    abstract fun healthSyncable(impl: HealthRepository): SyncableStore
+
+    @Binds
+    @IntoSet
+    abstract fun exploreSyncable(impl: ExploreRepository): SyncableStore
 }

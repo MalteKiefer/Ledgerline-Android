@@ -38,8 +38,10 @@ class HealthRepository(
     private val cache: HealthCache,
     private val storeCache: StoreDiskCache,
     private val offlineFlags: OfflineFlags,
+    private val syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+    private val connectivity: de.ledgerline.app.core.offline.Connectivity,
     private val apiProvider: (Session) -> LedgerlineApi,
-) {
+) : de.ledgerline.app.core.offline.SyncableStore {
     @Inject constructor(
         sessionHolder: SessionHolder,
         vaultKeyHolder: VaultKeyHolder,
@@ -47,14 +49,40 @@ class HealthRepository(
         cache: HealthCache,
         storeCache: StoreDiskCache,
         offlineFlags: OfflineFlags,
+        syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+        connectivity: de.ledgerline.app.core.offline.Connectivity,
     ) : this(
-        sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags,
+        sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags, syncOutbox, connectivity,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
     private companion object {
         const val KEY = "health"
         const val MODULE = "health"
+        val LIST_KEYS = listOf("healthEntries", "healthFasts")
+        val SINGLETON_KEYS = listOf("healthProfile")
+    }
+
+    override val syncLabel: String = "health"
+
+    // ---- Offline write outbox (record-level delta over the manifest root) ----
+    private fun collectionsOf(m: HealthManifest) =
+        de.ledgerline.app.core.offline.ManifestDelta.collections(HealthRecordCodec.encodeManifest(m), LIST_KEYS, SINGLETON_KEYS)
+
+    private fun applyDelta(m: HealthManifest, delta: de.ledgerline.app.core.offline.StoreDelta): HealthManifest =
+        HealthRecordCodec.decodeManifest(
+            de.ledgerline.app.core.offline.ManifestDelta.apply(HealthRecordCodec.encodeManifest(m), delta, LIST_KEYS, SINGLETON_KEYS),
+        )
+
+    private fun withPending(m: HealthManifest, vk: ByteArray): HealthManifest =
+        syncOutbox.pending(KEY, vk)?.let { applyDelta(m, it) } ?: m
+
+    private fun enqueueOffline(vk: ByteArray, base: HealthManifest, next: HealthManifest): Outcome<HealthStore> {
+        val delta = de.ledgerline.app.core.offline.StoreDelta.diff(collectionsOf(base), collectionsOf(next))
+        if (!delta.isEmpty) syncOutbox.append(KEY, delta, vk)
+        val store = HealthStore(next, cache.value.value?.version ?: 0)
+        cache.set(store)
+        return Outcome.Ok(store)
     }
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -77,7 +105,7 @@ class HealthRepository(
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
         if (cache.value.value == null && offlineFlags.enabled()) {
-            (cachedOr(Outcome.Err(ErrorKind.NETWORK), vk) as? Outcome.Ok)?.let { cache.set(it.value) }
+            (cachedOr(Outcome.Err(ErrorKind.NETWORK), vk) as? Outcome.Ok)?.let { cache.set(HealthStore(withPending(it.value.manifest, vk), it.value.version)) }
         }
         try {
             val res = api.moduleStore(MODULE)
@@ -91,7 +119,8 @@ class HealthRepository(
                         decodeManifest(plain)
                     } ?: HealthManifest()
                     if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
-                    val store = HealthStore(manifest, body.version)
+                    // Layer any un-synced offline edits on top of the fresh server state.
+                    val store = HealthStore(withPending(manifest, vk), body.version)
                     cache.set(store)
                     Outcome.Ok(store)
                 }
@@ -104,10 +133,27 @@ class HealthRepository(
     suspend fun save(mutate: (HealthManifest) -> HealthManifest): Outcome<HealthStore> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        // Resolve the base manifest (needed to compute an offline delta).
+        val base = cache.value.value?.manifest
+            ?: (load() as? Outcome.Ok)?.value?.manifest
+            ?: HealthManifest()
+        // Offline: queue the edit + optimistic cache instead of a doomed PUT.
+        if (!connectivity.isOnline()) return@withContext enqueueOffline(vk, base, mutate(base))
+        val out = pushOptimistic(session, vk, cache.value.value?.let { it.manifest to it.version }, mutate)
+        // Connection dropped mid-flight → fall back to the outbox rather than losing the edit.
+        if (out is Outcome.Err && out.kind == ErrorKind.NETWORK) enqueueOffline(vk, base, mutate(base)) else out
+    }
+
+    /** The raw optimistic seal+PUT (no offline handling) — shared by [save] and [replayPending]. */
+    private suspend fun pushOptimistic(
+        session: Session,
+        vk: ByteArray,
+        cached: Pair<HealthManifest, Int>?,
+        mutate: (HealthManifest) -> HealthManifest,
+    ): Outcome<HealthStore> {
         val api = apiProvider(session)
-        val current = cache.value.value
-        optimisticSave(
-            cached = current?.let { it.manifest to it.version },
+        return optimisticSave(
+            cached = cached,
             mutate = mutate,
             fetch = { api.moduleStore(MODULE) },
             put = { api.putModuleStore(MODULE, it) },
@@ -119,6 +165,18 @@ class HealthRepository(
             onSaved = { cache.set(it) },
             onEnvelope = { env -> if (offlineFlags.enabled()) storeCache.put(KEY, env) },
         )
+    }
+
+    /** Replay pending offline health edits onto the current server head; clears the outbox on success. */
+    override suspend fun replayPending(): Boolean = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext false
+        val vk = vaultKeyHolder.get() ?: return@withContext false
+        val delta = syncOutbox.pending(KEY, vk) ?: return@withContext true
+        if (delta.isEmpty) { syncOutbox.clear(KEY); return@withContext true }
+        if (!connectivity.isOnline()) return@withContext false
+        // cached=null forces a fresh server fetch; the 409 loop re-applies the delta onto the winner.
+        val out = pushOptimistic(session, vk, cached = null) { m -> applyDelta(m, delta) }
+        if (out is Outcome.Ok) { syncOutbox.clear(KEY); true } else false
     }
 
     private fun cachedOr(err: Outcome<HealthStore>, vk: ByteArray): Outcome<HealthStore> =

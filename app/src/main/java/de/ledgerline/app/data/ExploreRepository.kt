@@ -39,8 +39,10 @@ class ExploreRepository(
     private val cache: ExploreCache,
     private val storeCache: StoreDiskCache,
     private val offlineFlags: OfflineFlags,
+    private val syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+    private val connectivity: de.ledgerline.app.core.offline.Connectivity,
     private val apiProvider: (Session) -> LedgerlineApi,
-) {
+) : de.ledgerline.app.core.offline.SyncableStore {
     @Inject constructor(
         sessionHolder: SessionHolder,
         vaultKeyHolder: VaultKeyHolder,
@@ -48,14 +50,39 @@ class ExploreRepository(
         cache: ExploreCache,
         storeCache: StoreDiskCache,
         offlineFlags: OfflineFlags,
+        syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+        connectivity: de.ledgerline.app.core.offline.Connectivity,
     ) : this(
-        sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags,
+        sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags, syncOutbox, connectivity,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
     private companion object {
         const val KEY = "explore"
         const val MODULE = "explore"
+        val LIST_KEYS = listOf("tracks")
+    }
+
+    override val syncLabel: String = "explore"
+
+    // ---- Offline write outbox (record-level delta over the manifest root) ----
+    private fun collectionsOf(m: ExploreManifest) =
+        de.ledgerline.app.core.offline.ManifestDelta.collections(ExploreTrackCodec.encodeManifest(m), LIST_KEYS)
+
+    private fun applyDelta(m: ExploreManifest, delta: de.ledgerline.app.core.offline.StoreDelta): ExploreManifest =
+        ExploreTrackCodec.decodeManifest(
+            de.ledgerline.app.core.offline.ManifestDelta.apply(ExploreTrackCodec.encodeManifest(m), delta, LIST_KEYS),
+        )
+
+    private fun withPending(m: ExploreManifest, vk: ByteArray): ExploreManifest =
+        syncOutbox.pending(KEY, vk)?.let { applyDelta(m, it) } ?: m
+
+    private fun enqueueOffline(vk: ByteArray, base: ExploreManifest, next: ExploreManifest): Outcome<ExploreStore> {
+        val delta = de.ledgerline.app.core.offline.StoreDelta.diff(collectionsOf(base), collectionsOf(next))
+        if (!delta.isEmpty) syncOutbox.append(KEY, delta, vk)
+        val store = ExploreStore(next, cache.value.value?.version ?: 0)
+        cache.set(store)
+        return Outcome.Ok(store)
     }
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -78,7 +105,7 @@ class ExploreRepository(
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         val api = apiProvider(session)
         if (cache.value.value == null && offlineFlags.enabled()) {
-            (cachedOr(Outcome.Err(ErrorKind.NETWORK), vk) as? Outcome.Ok)?.let { cache.set(it.value) }
+            (cachedOr(Outcome.Err(ErrorKind.NETWORK), vk) as? Outcome.Ok)?.let { cache.set(ExploreStore(withPending(it.value.manifest, vk), it.value.version)) }
         }
         try {
             val res = api.moduleStore(MODULE)
@@ -92,7 +119,7 @@ class ExploreRepository(
                         decodeManifest(plain)
                     } ?: ExploreManifest()
                     if (offlineFlags.enabled()) storeCache.put(KEY, StoreEnvelope(body.ciphertext, body.version))
-                    val store = ExploreStore(manifest, body.version)
+                    val store = ExploreStore(withPending(manifest, vk), body.version)
                     cache.set(store)
                     // Reconcile explore raw blobs (living-set = every track's rawBlobId) so a deleted
                     // imported track's original file is freed (24h grace). Full online load only.
@@ -111,10 +138,24 @@ class ExploreRepository(
     suspend fun save(mutate: (ExploreManifest) -> ExploreManifest): Outcome<ExploreStore> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        val base = cache.value.value?.manifest
+            ?: (load() as? Outcome.Ok)?.value?.manifest
+            ?: ExploreManifest()
+        if (!connectivity.isOnline()) return@withContext enqueueOffline(vk, base, mutate(base))
+        val out = pushOptimistic(session, vk, cache.value.value?.let { it.manifest to it.version }, mutate)
+        if (out is Outcome.Err && out.kind == ErrorKind.NETWORK) enqueueOffline(vk, base, mutate(base)) else out
+    }
+
+    /** The raw optimistic seal+PUT (no offline handling) — shared by [save] and [replayPending]. */
+    private suspend fun pushOptimistic(
+        session: Session,
+        vk: ByteArray,
+        cached: Pair<ExploreManifest, Int>?,
+        mutate: (ExploreManifest) -> ExploreManifest,
+    ): Outcome<ExploreStore> {
         val api = apiProvider(session)
-        val current = cache.value.value
-        optimisticSave(
-            cached = current?.let { it.manifest to it.version },
+        return optimisticSave(
+            cached = cached,
             mutate = mutate,
             fetch = { api.moduleStore(MODULE) },
             put = { api.putModuleStore(MODULE, it) },
@@ -126,6 +167,17 @@ class ExploreRepository(
             onSaved = { cache.set(it) },
             onEnvelope = { env -> if (offlineFlags.enabled()) storeCache.put(KEY, env) },
         )
+    }
+
+    /** Replay pending offline track edits onto the current server head; clears the outbox on success. */
+    override suspend fun replayPending(): Boolean = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext false
+        val vk = vaultKeyHolder.get() ?: return@withContext false
+        val delta = syncOutbox.pending(KEY, vk) ?: return@withContext true
+        if (delta.isEmpty) { syncOutbox.clear(KEY); return@withContext true }
+        if (!connectivity.isOnline()) return@withContext false
+        val out = pushOptimistic(session, vk, cached = null) { m -> applyDelta(m, delta) }
+        if (out is Outcome.Ok) { syncOutbox.clear(KEY); true } else false
     }
 
     /** The wrapped key + blob id of an uploaded raw track file (rawBlobKey = encFileKey `{c,n}`). */
