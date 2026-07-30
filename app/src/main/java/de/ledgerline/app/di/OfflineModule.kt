@@ -2,6 +2,7 @@ package de.ledgerline.app.di
 
 import dagger.Binds
 import dagger.Module
+import dagger.multibindings.IntoSet
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import de.ledgerline.app.core.offline.AndroidConnectivity
@@ -10,6 +11,8 @@ import de.ledgerline.app.core.offline.ConstraintChecker
 import de.ledgerline.app.core.offline.Constraints
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.offline.OfflinePrefs
+import de.ledgerline.app.core.offline.SyncableStore
+import de.ledgerline.app.data.PasswordsRepository
 import javax.inject.Singleton
 
 /**
@@ -31,4 +34,9 @@ abstract class OfflineModule {
     @Binds
     @Singleton
     abstract fun constraints(impl: ConstraintChecker): Constraints
+
+    // ---- Offline write outbox: register each SyncableStore into the replay set. ----
+    @Binds
+    @IntoSet
+    abstract fun passwordsSyncable(impl: PasswordsRepository): SyncableStore
 }

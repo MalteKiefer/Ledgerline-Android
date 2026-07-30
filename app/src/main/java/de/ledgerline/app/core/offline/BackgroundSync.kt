@@ -42,6 +42,7 @@ class BackgroundSync @Inject constructor(
     private val passwordsRepo: PasswordsRepository,
     private val settingsStore: SettingsStore,
     private val offlineMapStore: de.ledgerline.app.core.map.OfflineMapStore,
+    private val syncEngine: OfflineSyncEngine,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     @Volatile
@@ -84,6 +85,9 @@ class BackgroundSync @Inject constructor(
         }
         if (!offlineFlags.enabled()) return
         if (vaultKeyHolder.get() != null) {
+            // Push any offline write deltas up first (so the pulls below see the authoritative
+            // server state), then refresh the caches.
+            runCatching { syncEngine.syncNow() }
             load.invoke()
             passwordsRepo.load()
             prefetcher.maybePrefetchOnUnlock()

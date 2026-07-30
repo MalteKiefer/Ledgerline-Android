@@ -55,8 +55,10 @@ class PasswordsRepository(
     private val offlineFlags: OfflineFlags,
     private val blobCache: BlobDiskCache,
     private val sharedVaults: SharedVaultRepository,
+    private val syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+    private val connectivity: de.ledgerline.app.core.offline.Connectivity,
     private val apiProvider: (Session) -> LedgerlineApi,
-) {
+) : de.ledgerline.app.core.offline.SyncableStore {
     @Inject constructor(
         sessionHolder: SessionHolder,
         vaultKeyHolder: VaultKeyHolder,
@@ -66,8 +68,11 @@ class PasswordsRepository(
         offlineFlags: OfflineFlags,
         blobCache: BlobDiskCache,
         sharedVaults: SharedVaultRepository,
+        syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+        connectivity: de.ledgerline.app.core.offline.Connectivity,
     ) : this(
         sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags, blobCache, sharedVaults,
+        syncOutbox, connectivity,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
@@ -76,7 +81,35 @@ class PasswordsRepository(
         const val MODULE = "passwords"
         /** Offline-cache key for the sharded root envelope (distinct from the old monolith key). */
         const val ROOT_KEY = "passwords_root"
+        /** SyncOutbox key for offline write deltas. */
+        const val OUTBOX = "passwords"
     }
+
+    override val syncLabel: String = "passwords"
+
+    // ---- Offline write outbox (record-level delta) ---------------------------
+    /** The two collections this store owns, as id → record JSON (raw-overlay encoded). */
+    private fun collectionsOf(m: SecretsManifest): Map<String, Map<String, JsonObject>> = mapOf(
+        "secrets" to m.secrets.associate { it.id to SecretRecordCodec.encodeSecret(it, secretRawById[it.id]) },
+        "secretFolders" to m.secretFolders.associate { it.id to SecretRecordCodec.encodeFolder(it, folderRawById[it.id]) },
+    )
+
+    /** Apply a record delta onto [m] (upsert overwrites/inserts by id, delete removes), capturing raws. */
+    private fun applyDelta(m: SecretsManifest, delta: de.ledgerline.app.core.offline.StoreDelta): SecretsManifest {
+        val sd = delta.collections["secrets"] ?: de.ledgerline.app.core.offline.CollectionDelta()
+        val fd = delta.collections["secretFolders"] ?: de.ledgerline.app.core.offline.CollectionDelta()
+        val byId = m.secrets.associateByTo(LinkedHashMap()) { it.id }
+        sd.deletes.forEach { byId.remove(it) }
+        sd.upserts.forEach { (id, obj) -> secretRawById[id] = obj; byId[id] = SecretRecordCodec.decodeSecret(obj) }
+        val foldersById = m.secretFolders.associateByTo(LinkedHashMap()) { it.id }
+        fd.deletes.forEach { foldersById.remove(it) }
+        fd.upserts.forEach { (id, obj) -> folderRawById[id] = obj; foldersById[id] = SecretRecordCodec.decodeFolder(obj) }
+        return m.copy(secrets = byId.values.toList(), secretFolders = foldersById.values.toList())
+    }
+
+    /** Layer any pending offline delta on top of [m] so the UI reflects un-synced local edits. */
+    private fun withPending(m: SecretsManifest, vk: ByteArray): SecretsManifest =
+        syncOutbox.pending(OUTBOX, vk)?.let { applyDelta(m, it) } ?: m
 
     /** Resolve the current session's API (session presence is guarded by load/save before use). */
     private fun api(): LedgerlineApi = apiProvider(sessionHolder.get()!!)
@@ -133,7 +166,7 @@ class PasswordsRepository(
             runCatching {
                 engine.loadCached(vk)?.let { l ->
                     val (s, f) = decodeLoaded(l)
-                    cache.set(SecretsStore(SecretsManifest(secrets = s, secretFolders = f), engine.version))
+                    cache.set(SecretsStore(withPending(SecretsManifest(secrets = s, secretFolders = f), vk), engine.version))
                 }
             }
         }
@@ -144,7 +177,7 @@ class PasswordsRepository(
             if (secrets.isEmpty() && folders.isEmpty()) {
                 migrateFromMonolith(vk)?.let { (s, f) -> secrets = s; folders = f }
             }
-            val store = SecretsStore(SecretsManifest(secrets = secrets, secretFolders = folders), engine.version)
+            val store = SecretsStore(withPending(SecretsManifest(secrets = secrets, secretFolders = folders), vk), engine.version)
             cache.set(store)
             Outcome.Ok(store)
         } catch (_: ShardedStoreEngine.AuthException) {
@@ -290,7 +323,7 @@ class PasswordsRepository(
             is Outcome.Ok -> l.value.manifest
             is Outcome.Err -> return@withContext l
         }
-        commit(vk, base, mutate)
+        commit(vk, base, mutate = mutate)
     }
 
     /**
@@ -301,9 +334,13 @@ class PasswordsRepository(
     private suspend fun commit(
         vk: ByteArray,
         base: SecretsManifest,
+        allowOfflineQueue: Boolean = true,
         mutate: (SecretsManifest) -> SecretsManifest,
     ): Outcome<SecretsStore> {
         var curNext = mutate(base)
+        // Offline: don't wait for a doomed PUT — persist the edit to the outbox + cache optimistically
+        // (unless this is a replay, which must report failure so the outbox is retained).
+        if (allowOfflineQueue && !connectivity.isOnline()) return enqueueOffline(vk, base, curNext)
         var attempts = 0
         while (true) {
             if (attempts++ >= 5) return Outcome.Err(ErrorKind.HTTP)
@@ -323,13 +360,45 @@ class PasswordsRepository(
                     } catch (_: ShardedStoreEngine.AuthException) {
                         return Outcome.Err(ErrorKind.HTTP)
                     } catch (e: Exception) {
-                        return Outcome.Err(ErrorKind.NETWORK, e)
+                        return if (allowOfflineQueue) enqueueOffline(vk, base, curNext) else Outcome.Err(ErrorKind.NETWORK, e)
                     }
                     val (s, f) = decodeLoaded(loaded)
                     curNext = mutate(SecretsManifest(secrets = s, secretFolders = f))
                 }
-                ShardedStoreEngine.PutOutcome.Error -> return Outcome.Err(ErrorKind.NETWORK)
+                ShardedStoreEngine.PutOutcome.Error ->
+                    return if (allowOfflineQueue) enqueueOffline(vk, base, curNext) else Outcome.Err(ErrorKind.NETWORK)
             }
         }
+    }
+
+    /** Persist an offline edit: record the [base]→[next] delta in the outbox and update the cache. */
+    private fun enqueueOffline(vk: ByteArray, base: SecretsManifest, next: SecretsManifest): Outcome<SecretsStore> {
+        val delta = de.ledgerline.app.core.offline.StoreDelta.diff(collectionsOf(base), collectionsOf(next))
+        if (!delta.isEmpty) syncOutbox.append(OUTBOX, delta, vk)
+        val store = SecretsStore(next, engine.version)
+        cache.set(store)
+        return Outcome.Ok(store) // optimistic — the edit is durable in the (VK-sealed) outbox
+    }
+
+    /** Replay pending offline password edits onto the current server head; clears the outbox on success. */
+    override suspend fun replayPending(): Boolean = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext false
+        val delta = syncOutbox.pending(OUTBOX, vk) ?: return@withContext true
+        if (delta.isEmpty) { syncOutbox.clear(OUTBOX); return@withContext true }
+        if (!connectivity.isOnline()) return@withContext false
+        // Push onto the CLEAN server head (not the delta-layered cache): load fresh, bake the delta
+        // in via commit (whose 409 loop re-applies it onto the winning state), then clear the outbox.
+        val clean = try {
+            val loaded = engine.load(vk)
+            var (s, f) = decodeLoaded(loaded)
+            if (s.isEmpty() && f.isEmpty()) migrateFromMonolith(vk)?.let { (ss, ff) -> s = ss; f = ff }
+            SecretsManifest(secrets = s, secretFolders = f)
+        } catch (_: ShardedStoreEngine.AuthException) {
+            return@withContext false
+        } catch (_: Exception) {
+            return@withContext false // still offline / transient — retry later
+        }
+        val out = commit(vk, clean, allowOfflineQueue = false) { m -> applyDelta(m, delta) }
+        if (out is Outcome.Ok) { syncOutbox.clear(OUTBOX); true } else false
     }
 }
