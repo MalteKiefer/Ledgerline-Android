@@ -1045,4 +1045,5 @@
     <string name="finance_eg_grund_betriebsausgabe">Betriebsausgabe (Beleg verloren)</string>
     <string name="finance_eg_grund_sachgeschenk">Sachgeschenk</string>
     <string name="finance_eg_grund_sonstiges">Sonstiges</string>
+    <string name="finance_eg_sig_big">Vergrößern</string>
 </resources>

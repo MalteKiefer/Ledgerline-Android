@@ -1048,4 +1048,5 @@
     <string name="finance_eg_grund_betriebsausgabe">Расход (чек утерян)</string>
     <string name="finance_eg_grund_sachgeschenk">Подарок</string>
     <string name="finance_eg_grund_sonstiges">Прочее</string>
+    <string name="finance_eg_sig_big">Увеличить</string>
 </resources>

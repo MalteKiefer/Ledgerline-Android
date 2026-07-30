@@ -1047,4 +1047,5 @@
     <string name="finance_eg_grund_betriebsausgabe">Business expense (lost receipt)</string>
     <string name="finance_eg_grund_sachgeschenk">Gift in kind</string>
     <string name="finance_eg_grund_sonstiges">Other</string>
+    <string name="finance_eg_sig_big">Enlarge</string>
 </resources>

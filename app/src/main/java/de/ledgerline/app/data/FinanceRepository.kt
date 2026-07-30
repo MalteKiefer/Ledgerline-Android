@@ -100,6 +100,9 @@ class FinanceRepository(
     suspend fun load(): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+        // Cache-first: show the last-cached store immediately, then refresh from the network below.
+        // Without this the screen blocks on a full round-trip before anything appears.
+        if (cache.value.value == null) runCatching { cachedOr(vk) }
         try {
             val res = api().invoicesStore()
             if (res.code() == HttpURLConnection.HTTP_UNAUTHORIZED) return@withContext Outcome.Err(ErrorKind.HTTP)
