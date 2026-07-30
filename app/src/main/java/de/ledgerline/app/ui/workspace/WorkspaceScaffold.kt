@@ -1,5 +1,8 @@
 package de.ledgerline.app.ui.workspace
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -291,66 +294,103 @@ private val PRIMARY_TABS = listOf(
 
 @Composable
 private fun DrawerSheet(current: WorkspaceDest, visible: (WorkspaceDest) -> Boolean, onSearch: () -> Unit, onSelect: (WorkspaceDest) -> Unit) {
-    ModalDrawerSheet {
+    ModalDrawerSheet(
+        drawerContainerColor = MaterialTheme.colorScheme.surface,
+        drawerShape = androidx.compose.foundation.shape.RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
+    ) {
         androidx.compose.foundation.layout.Column(Modifier.fillMaxSize()) {
-            // Brand header: app name + version.
+            // Brand hero: gradient tile with the shield logo, app name + version.
             Row(
-                Modifier.padding(start = 24.dp, end = 24.dp, top = 22.dp, bottom = 14.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    "v" + de.ledgerline.app.BuildConfig.VERSION_NAME,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Box(
+                    Modifier.size(44.dp)
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(13.dp))
+                        .background(de.ledgerline.app.ui.theme.Brand.accentGradient),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = androidx.compose.ui.res.painterResource(R.drawable.ic_ledgerline_logo),
+                        contentDescription = null,
+                        tint = androidx.compose.ui.graphics.Color.Unspecified,
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "v" + de.ledgerline.app.BuildConfig.VERSION_NAME,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
-            NavigationDrawerItem(
-                icon = { Icon(Icons.Outlined.Search, null) },
-                label = { Text(stringResource(R.string.search_everything)) },
-                selected = false,
-                onClick = onSearch,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
+
+            // Prominent search pill.
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .clickable(onClick = onSearch)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(stringResource(R.string.search_everything), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+
             // Middle list scrolls if it can't fit; Settings stays pinned at the bottom.
             androidx.compose.foundation.layout.Column(
-                Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                Modifier.weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(top = 8.dp),
             ) {
-                androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
+                de.ledgerline.app.ui.common.SectionLabel(stringResource(R.string.drawer_group_cloud), Modifier.padding(start = 22.dp, top = 8.dp))
                 listOf(
-                    WorkspaceDest.Home to Icons.Outlined.Home,
-                    WorkspaceDest.Files to Icons.Outlined.Folder,
-                    WorkspaceDest.Photos to Icons.Outlined.PhotoLibrary,
-                    WorkspaceDest.Vault to Icons.Outlined.Lock,
-                ).filter { visible(it.first) }.forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
+                    Triple(WorkspaceDest.Home, Icons.Outlined.Home, de.ledgerline.app.ui.theme.Brand.accent),
+                    Triple(WorkspaceDest.Files, Icons.Outlined.Folder, de.ledgerline.app.ui.theme.Brand.tintBlue),
+                    Triple(WorkspaceDest.Photos, Icons.Outlined.PhotoLibrary, de.ledgerline.app.ui.theme.Brand.tintOrange),
+                    Triple(WorkspaceDest.Vault, Icons.Outlined.Lock, de.ledgerline.app.ui.theme.Brand.tintViolet),
+                ).filter { visible(it.first) }.forEach { (d, ic, t) -> DrawerRow(d, ic, t, current, onSelect) }
 
-                androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
+                de.ledgerline.app.ui.common.SectionLabel(stringResource(R.string.drawer_group_workspace), Modifier.padding(start = 22.dp, top = 14.dp))
                 listOf(
-                    WorkspaceDest.Notes to Icons.Outlined.Description,
-                    WorkspaceDest.Todos to Icons.Outlined.CheckCircle,
-                    WorkspaceDest.Bookmarks to Icons.Outlined.Bookmarks,
-                    WorkspaceDest.Contacts to Icons.Outlined.Contacts,
-                    WorkspaceDest.Explore to Icons.Outlined.Map,
-                    WorkspaceDest.Health to Icons.Outlined.MonitorHeart,
-                    WorkspaceDest.Finance to Icons.Outlined.ReceiptLong,
-                ).filter { visible(it.first) }.forEach { (d, ic) -> DrawerRow(d, ic, current, onSelect) }
+                    Triple(WorkspaceDest.Notes, Icons.Outlined.Description, de.ledgerline.app.ui.theme.Brand.tintViolet),
+                    Triple(WorkspaceDest.Todos, Icons.Outlined.CheckCircle, de.ledgerline.app.ui.theme.Brand.tintGreen),
+                    Triple(WorkspaceDest.Bookmarks, Icons.Outlined.Bookmarks, de.ledgerline.app.ui.theme.Brand.tintBlue),
+                    Triple(WorkspaceDest.Contacts, Icons.Outlined.Contacts, de.ledgerline.app.ui.theme.Brand.tintTeal),
+                    Triple(WorkspaceDest.Explore, Icons.Outlined.Map, de.ledgerline.app.ui.theme.Brand.tintTeal),
+                    Triple(WorkspaceDest.Health, Icons.Outlined.MonitorHeart, de.ledgerline.app.ui.theme.Brand.tintGreen),
+                    Triple(WorkspaceDest.Finance, Icons.Outlined.ReceiptLong, de.ledgerline.app.ui.theme.Brand.tintGreen),
+                ).filter { visible(it.first) }.forEach { (d, ic, t) -> DrawerRow(d, ic, t, current, onSelect) }
             }
-            androidx.compose.material3.HorizontalDivider(Modifier.padding(16.dp))
-            DrawerRow(WorkspaceDest.Settings, Icons.Outlined.Settings, current, onSelect)
+            androidx.compose.material3.HorizontalDivider(Modifier.padding(horizontal = 22.dp, vertical = 8.dp))
+            DrawerRow(WorkspaceDest.Settings, Icons.Outlined.Settings, de.ledgerline.app.ui.theme.Brand.tintGray, current, onSelect)
             Spacer(Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
-private fun DrawerRow(dest: WorkspaceDest, icon: ImageVector, current: WorkspaceDest, onSelect: (WorkspaceDest) -> Unit) {
+private fun DrawerRow(
+    dest: WorkspaceDest,
+    icon: ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    current: WorkspaceDest,
+    onSelect: (WorkspaceDest) -> Unit,
+) {
+    val selected = dest == current
     NavigationDrawerItem(
-        icon = { Icon(icon, null) },
+        icon = { de.ledgerline.app.ui.theme.IconChip(icon, tint = tint, size = 30.dp) },
         label = { Text(stringResource(dest.labelRes)) },
-        selected = dest == current,
+        selected = selected,
         onClick = { onSelect(dest) },
-        modifier = Modifier.padding(horizontal = 12.dp),
+        colors = androidx.compose.material3.NavigationDrawerItemDefaults.colors(
+            selectedContainerColor = de.ledgerline.app.ui.theme.Brand.accent.copy(alpha = 0.14f),
+            selectedTextColor = de.ledgerline.app.ui.theme.Brand.accent,
+        ),
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
     )
 }
 

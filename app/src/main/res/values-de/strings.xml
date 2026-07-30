@@ -719,6 +719,8 @@
     <string name="home_qa_password">Passwort</string>
     <string name="home_spaces">Bereiche</string>
     <string name="search_everything">Alles durchsuchen…</string>
+    <string name="drawer_group_cloud">Cloud</string>
+    <string name="drawer_group_workspace">Arbeitsbereich</string>
     <string name="settings_group_personalization">Personalisierung</string>
     <string name="settings_group_security">Sicherheit &amp; Datenschutz</string>
     <string name="settings_group_data">Daten &amp; Sync</string>
