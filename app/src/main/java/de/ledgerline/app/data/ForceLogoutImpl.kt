@@ -41,6 +41,7 @@ class ForceLogoutImpl @Inject constructor(
     private val identityRepository: IdentityRepository,
     private val sharedVaultRepository: SharedVaultRepository,
     private val avatarCache: de.ledgerline.app.core.AvatarCache,
+    private val snapshotCache: de.ledgerline.app.core.AccountSnapshotCache,
     private val passwordsCache: de.ledgerline.app.core.PasswordsCache,
     private val exploreCache: de.ledgerline.app.core.ExploreCache,
     private val healthCache: de.ledgerline.app.core.HealthCache,
@@ -54,6 +55,7 @@ class ForceLogoutImpl @Inject constructor(
         identityRepository.clear()
         sharedVaultRepository.clear()
         avatarCache.put(null)
+        snapshotCache.put(null)
         passwordsCache.clear()
         exploreCache.clear()
         healthCache.clear()

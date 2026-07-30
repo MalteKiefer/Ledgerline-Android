@@ -16,13 +16,15 @@ class AccountRepository(
     private val authEventBus: AuthEventBus,
     private val prefsSink: de.ledgerline.app.core.prefs.DisplayPrefsSink,
     private val moduleAccess: de.ledgerline.app.core.ModuleAccess,
+    private val snapshotCache: de.ledgerline.app.core.AccountSnapshotCache,
     private val apiProvider: (Session) -> LedgerlineApi,
 ) {
-    @Inject constructor(sessionHolder: SessionHolder, authEventBus: AuthEventBus, prefsSink: de.ledgerline.app.core.prefs.DisplayPrefsSink, moduleAccess: de.ledgerline.app.core.ModuleAccess) : this(
+    @Inject constructor(sessionHolder: SessionHolder, authEventBus: AuthEventBus, prefsSink: de.ledgerline.app.core.prefs.DisplayPrefsSink, moduleAccess: de.ledgerline.app.core.ModuleAccess, snapshotCache: de.ledgerline.app.core.AccountSnapshotCache) : this(
         sessionHolder,
         authEventBus,
         prefsSink,
         moduleAccess,
+        snapshotCache,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
@@ -80,6 +82,10 @@ class AccountRepository(
     /** Account name + account-wide storage: [usedBytes] = files+gallery, [quotaBytes] = combined limit (null = unlimited). */
     data class AccountSnapshot(val name: String?, val usedBytes: Long, val quotaBytes: Long?)
 
+    /** Last cached snapshot for a cache-first first paint (offline-safe), or null if none cached. */
+    fun cachedSnapshot(): AccountSnapshot? =
+        snapshotCache.get()?.let { AccountSnapshot(it.name, it.usedBytes, it.quotaBytes) }
+
     /**
      * One `/me` fetch yielding both the display name and the **combined** (files + gallery) storage
      * figures the server started exposing as `usage.quota` (web `7b2ad183`). `quotaBytes` is null
@@ -99,7 +105,7 @@ class AccountRepository(
                 name = body.user.name,
                 usedBytes = (u?.files ?: 0L) + (u?.gallery ?: 0L),
                 quotaBytes = u?.quota,
-            )
+            ).also { snapshotCache.put(de.ledgerline.app.core.AccountSnapshotCache.Snap(it.name, it.usedBytes, it.quotaBytes)) }
         } catch (_: Exception) {
             null
         }

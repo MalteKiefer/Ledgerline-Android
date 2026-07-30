@@ -70,8 +70,13 @@ class HomeViewModel @Inject constructor(
     val userName: StateFlow<String?> = _userName.asStateFlow()
 
     fun refresh() {
-        // One /me fetch yields both the name and the combined storage figures.
+        // Cache-first: paint the last cached name + storage ring immediately (offline-safe), then
+        // refresh from /me in the background. One /me fetch yields both the name and the figures.
         viewModelScope.launch {
+            account.cachedSnapshot()?.let { c ->
+                _userName.value = c.name
+                _usage.value = c.usedBytes to (c.quotaBytes ?: 0L)
+            }
             val snap = withContext(Dispatchers.IO) { account.snapshot() } ?: return@launch
             _userName.value = snap.name
             _usage.value = snap.usedBytes to (snap.quotaBytes ?: 0L)

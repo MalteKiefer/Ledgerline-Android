@@ -104,8 +104,9 @@ class SettingsViewModel @Inject constructor(
         bytes?.let { runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() }
 
     init {
-        // Cache-first: show the last-cached avatar immediately (offline-safe), refresh below.
+        // Cache-first: show the last-cached avatar + storage ring immediately (offline-safe), refresh below.
         avatarCache.get()?.let { _avatar.value = decodeAvatar(it) }
+        _storage.value = accountRepository.cachedSnapshot()
         viewModelScope.launch {
             val me = accountRepository.me()
             _account.value = me
