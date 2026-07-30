@@ -100,6 +100,16 @@ class SignatureView(context: Context) : View(context) {
     }
 }
 
+/** Unwrap a [Context] to its hosting [android.app.Activity] (through ContextWrapper), or null. */
+fun findActivity(context: Context): android.app.Activity? {
+    var c: Context? = context
+    while (c is android.content.ContextWrapper) {
+        if (c is android.app.Activity) return c
+        c = c.baseContext
+    }
+    return null
+}
+
 /** Holds the current [SignatureView] so callers can read/clear it without recomposition. */
 class SignatureController {
     internal var view: SignatureView? = null

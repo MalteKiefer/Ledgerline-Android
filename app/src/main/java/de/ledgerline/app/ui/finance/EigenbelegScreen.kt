@@ -140,25 +140,37 @@ fun EigenbelegScreen(tx: Transaction, vm: FinanceViewModel, onBack: () -> Unit) 
         }
     }
 
-    // Fullscreen signing surface — much larger area for a proper signature.
+    // Fullscreen LANDSCAPE signing surface (iOS parity) — the pad fills the whole screen sideways.
     if (bigOpen) {
         val bigController = remember { de.ledgerline.app.ui.common.SignatureController() }
+        val ctx = androidx.compose.ui.platform.LocalContext.current
+        // Lock the activity to landscape while the sheet is open; restore on close.
+        androidx.compose.runtime.DisposableEffect(Unit) {
+            val act = de.ledgerline.app.ui.common.findActivity(ctx)
+            val prev = act?.requestedOrientation
+            act?.requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            onDispose { act?.requestedOrientation = prev ?: android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+        }
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { bigOpen = false },
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
         ) {
-            Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                    Text(stringResource(R.string.finance_eg_signature), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = { bigController.clear() }) { Text(stringResource(R.string.finance_eg_sig_clear)) }
-                    TextButton(onClick = { bigOpen = false }) { Text(stringResource(R.string.action_cancel)) }
-                    TextButton(onClick = { signatureUri = bigController.dataUri(); reseedKey++; bigOpen = false }) { Text(stringResource(R.string.action_save)) }
+            androidx.compose.material3.Surface(Modifier.fillMaxSize()) {
+                Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Text(stringResource(R.string.finance_eg_signature), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                        TextButton(onClick = { bigController.clear() }) { Text(stringResource(R.string.finance_eg_sig_clear)) }
+                        TextButton(onClick = { bigOpen = false }) { Text(stringResource(R.string.action_cancel)) }
+                        TextButton(onClick = { signatureUri = bigController.dataUri(); reseedKey++; bigOpen = false }) { Text(stringResource(R.string.action_save)) }
+                    }
+                    // Full-bleed pad with a dotted signing baseline underneath.
+                    de.ledgerline.app.ui.common.SignaturePad(
+                        controller = bigController,
+                        modifier = Modifier.fillMaxWidth().weight(1f).cardSurface(padded = false),
+                        initialUri = signatureUri,
+                    )
+                    Text(stringResource(R.string.finance_eg_sig_hint), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                de.ledgerline.app.ui.common.SignaturePad(
-                    controller = bigController,
-                    modifier = Modifier.fillMaxWidth().weight(1f).cardSurface(padded = false),
-                    initialUri = signatureUri,
-                )
             }
         }
     }

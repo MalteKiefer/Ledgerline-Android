@@ -1049,4 +1049,5 @@
     <string name="finance_eg_grund_sachgeschenk">Подарок</string>
     <string name="finance_eg_grund_sonstiges">Прочее</string>
     <string name="finance_eg_sig_big">Увеличить</string>
+    <string name="finance_eg_sig_hint">Распишитесь пальцем — затем Сохранить.</string>
 </resources>
