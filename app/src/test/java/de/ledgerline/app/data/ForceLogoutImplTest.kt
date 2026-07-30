@@ -77,6 +77,7 @@ class ForceLogoutImplTest {
             metaCache = metaCache,
             storeCache = storeCache,
             blobCache = blobCache,
+            vaultParamsCache = de.ledgerline.app.core.offline.VaultParamsCache(tmp.newFile("vault_params.json")),
             backupStateStore = backupStateStore,
             rememberedVault = rememberedVault,
             placeRepository = placeRepository,

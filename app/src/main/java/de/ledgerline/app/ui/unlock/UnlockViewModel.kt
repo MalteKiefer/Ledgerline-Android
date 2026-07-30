@@ -49,6 +49,7 @@ class UnlockViewModel @Inject constructor(
     private val authEventBus: de.ledgerline.app.core.AuthEventBus,
     private val clockGuard: de.ledgerline.app.core.security.ClockRollbackGuard,
     private val identityRepository: de.ledgerline.app.data.IdentityRepository,
+    private val vaultParamsCache: de.ledgerline.app.core.offline.VaultParamsCache,
 ) : ViewModel() {
     private val _state = MutableStateFlow<UnlockUiState>(UnlockUiState.Idle)
     val state: StateFlow<UnlockUiState> = _state
@@ -164,7 +165,7 @@ class UnlockViewModel @Inject constructor(
             sessionHolder.set(session)
             val bytes = charsToUtf8(passphrase)
             val result = withContext(Dispatchers.Default) { // Argon2id is CPU-heavy
-                UnlockVault(crypto, holder).withPassphrase(VaultRepository(session), bytes)
+                UnlockVault(crypto, holder).withPassphrase(VaultRepository(session, vaultParamsCache), bytes)
             }
             passphrase.fill(' ')
             when (result) {
@@ -237,7 +238,7 @@ class UnlockViewModel @Inject constructor(
             sessionHolder.set(session)
             val hex = code.filterNot { it.isWhitespace() }
             val result = withContext(Dispatchers.Default) {
-                UnlockVault(crypto, holder).withRecoveryCode(VaultRepository(session), hex)
+                UnlockVault(crypto, holder).withRecoveryCode(VaultRepository(session, vaultParamsCache), hex)
             }
             _state.value = when (result) {
                 is Outcome.Ok -> {

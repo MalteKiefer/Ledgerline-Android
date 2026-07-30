@@ -32,6 +32,7 @@ class ForceLogoutImpl @Inject constructor(
     private val metaCache: MetaCache,
     private val storeCache: StoreDiskCache,
     private val blobCache: BlobDiskCache,
+    private val vaultParamsCache: de.ledgerline.app.core.offline.VaultParamsCache,
     private val backupStateStore: BackupStateStore,
     private val rememberedVault: RememberedVaultStore,
     private val placeRepository: PlaceRepository,
@@ -70,6 +71,7 @@ class ForceLogoutImpl @Inject constructor(
         // normal lock keeps the disk cache — only this forced-logout path wipes it, §11.)
         storeCache.clear()
         blobCache.clear()
+        vaultParamsCache.clear()
         backupStateStore.clear()
         rememberedVault.clear()
         placeRepository.clear()
