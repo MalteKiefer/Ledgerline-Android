@@ -31,6 +31,11 @@ object NetworkFactory {
     fun create(baseUrl: String, tokenProvider: () -> String?, pin: String?): LedgerlineApi =
         build(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
 
+    /** The plaintext-relational finance API over the same pinned, authenticated transport. */
+    fun createFinance(baseUrl: String, tokenProvider: () -> String?, pin: String?): FinanceApi =
+        retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
+            .create(FinanceApi::class.java)
+
     /**
      * A minimal HTTPS client (RESTRICTED_TLS + SPKI pinning, short timeouts, no auth) for the
      * server-reachability health ping (`GET {baseUrl}/up`). Same fail-closed transport as the API,
@@ -56,7 +61,15 @@ object NetworkFactory {
         tokenProvider: () -> String?,
         pin: String?,
         connectionSpecs: List<ConnectionSpec>,
-    ): LedgerlineApi {
+    ): LedgerlineApi = retrofitFor(baseUrl, tokenProvider, pin, connectionSpecs).create(LedgerlineApi::class.java)
+
+    /** Builds the shared interceptor chain + Retrofit client (used for every API interface). */
+    private fun retrofitFor(
+        baseUrl: String,
+        tokenProvider: () -> String?,
+        pin: String?,
+        connectionSpecs: List<ConnectionSpec>,
+    ): Retrofit {
         val host = baseUrl.toHttpUrl().host
         val builder = OkHttpClient.Builder()
             .connectionSpecs(connectionSpecs)
@@ -75,11 +88,10 @@ object NetworkFactory {
             }
             .addInterceptor(BackoffInterceptor())
         if (pin != null) builder.certificatePinner(PinnedTrust.pinnerFor(host, pin))
-        val retrofit = Retrofit.Builder()
+        return Retrofit.Builder()
             .baseUrl(if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/")
             .client(builder.build())
             .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
             .build()
-        return retrofit.create(LedgerlineApi::class.java)
     }
 }

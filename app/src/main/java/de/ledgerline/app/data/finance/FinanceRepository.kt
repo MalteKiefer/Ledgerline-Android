@@ -1,0 +1,193 @@
+package de.ledgerline.app.data.finance
+
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import de.ledgerline.app.core.ErrorKind
+import de.ledgerline.app.core.Outcome
+import de.ledgerline.app.core.SessionHolder
+import de.ledgerline.app.core.offline.Connectivity
+import de.ledgerline.app.data.remote.FinanceApi
+import de.ledgerline.app.data.remote.NetworkFactory
+import de.ledgerline.app.domain.model.finance.BankTransaction
+import de.ledgerline.app.domain.model.finance.CompanyProfile
+import de.ledgerline.app.domain.model.finance.FinanceCategory
+import de.ledgerline.app.domain.model.finance.FinanceData
+import de.ledgerline.app.domain.model.finance.FinanceDuplicates
+import de.ledgerline.app.domain.model.finance.FinancePartner
+import de.ledgerline.app.domain.model.finance.FinanceProject
+import de.ledgerline.app.domain.model.finance.FinanceReports
+import de.ledgerline.app.domain.model.finance.Invoice
+import de.ledgerline.app.domain.model.finance.PaymentMethod
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import retrofit2.Response
+import java.io.File
+import java.net.HttpURLConnection
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * The finance data layer for the plaintext-relational pivot (no client crypto). [data] is the
+ * in-memory snapshot the UI observes; [load] is **cache-first** — paints the last snapshot from a
+ * plaintext disk cache immediately, then refreshes from `GET /finance/data`. Mutations are per-record
+ * REST with an optimistic `version` in the body (PUT → 409 on conflict); on success the returned
+ * record is patched into the snapshot (+ disk cache) for a snappy UI, and a later [load] reconciles
+ * server-computed fields (numbers, seq, receipts).
+ *
+ * Reads work offline from the disk cache. The offline write-queue is phase 2b — a mutation offline
+ * currently returns a NETWORK error (no data loss; the edit just isn't applied).
+ */
+@Singleton
+class FinanceRepository @Inject constructor(
+    @ApplicationContext context: Context,
+    private val sessionHolder: SessionHolder,
+    private val connectivity: Connectivity,
+) {
+    private val cacheFile = File(context.filesDir, "finance_data.json")
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
+
+    private val _data = MutableStateFlow<FinanceData?>(null)
+    val data: StateFlow<FinanceData?> = _data.asStateFlow()
+
+    private fun api(): FinanceApi {
+        val s = sessionHolder.get() ?: error("no session")
+        return NetworkFactory.createFinance(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin)
+    }
+
+    private fun readDisk(): FinanceData? =
+        runCatching { if (cacheFile.exists()) json.decodeFromString(FinanceData.serializer(), cacheFile.readText()) else null }.getOrNull()
+
+    private fun writeDisk(d: FinanceData) {
+        runCatching {
+            val tmp = File(cacheFile.parentFile, cacheFile.name + ".tmp")
+            tmp.writeText(json.encodeToString(FinanceData.serializer(), d))
+            tmp.renameTo(cacheFile)
+        }
+    }
+
+    fun clear() {
+        _data.value = null
+        runCatching { cacheFile.delete() }
+    }
+
+    /** Cache-first load: emit the disk snapshot immediately, then refresh from the server. */
+    suspend fun load(): Outcome<FinanceData> = withContext(Dispatchers.IO) {
+        sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        if (_data.value == null) readDisk()?.let { _data.value = it }
+        try {
+            val res = api().financeData()
+            when {
+                res.code() == HttpURLConnection.HTTP_UNAUTHORIZED -> Outcome.Err(ErrorKind.HTTP)
+                !res.isSuccessful -> _data.value?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK)
+                else -> {
+                    val body = res.body()!!
+                    publish(body)
+                    Outcome.Ok(body)
+                }
+            }
+        } catch (e: Exception) {
+            _data.value?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK, e)
+        }
+    }
+
+    private fun publish(d: FinanceData) { _data.value = d; writeDisk(d) }
+    private fun cur() = _data.value ?: FinanceData()
+
+    private fun upsertInvoice(v: Invoice) = publish(cur().let { it.copy(invoices = it.invoices.upsert(v) { x -> x.id == v.id }) })
+    private fun upsertTransaction(v: BankTransaction) = publish(cur().let { it.copy(transactions = it.transactions.upsert(v) { x -> x.id == v.id }) })
+    private fun upsertPartner(v: FinancePartner) = publish(cur().let { it.copy(partners = it.partners.upsert(v) { x -> x.id == v.id }) })
+    private fun upsertPayment(v: PaymentMethod) = publish(cur().let { it.copy(paymentMethods = it.paymentMethods.upsert(v) { x -> x.id == v.id }) })
+    private fun upsertProject(v: FinanceProject) = publish(cur().let { it.copy(projects = it.projects.upsert(v) { x -> x.id == v.id }) })
+    private fun upsertCategory(v: FinanceCategory) = publish(cur().let { it.copy(financeCategories = it.financeCategories.upsert(v) { x -> x.id == v.id }) })
+
+    // ---- Invoices ----
+    suspend fun createInvoice(body: JsonObject) = record({ api().createInvoice(body) }, { it.invoice }, ::upsertInvoice)
+    suspend fun updateInvoice(id: Int, body: JsonObject) = record({ api().updateInvoice(id, body) }, { it.invoice }, ::upsertInvoice)
+    suspend fun finalizeInvoice(id: Int) = record({ api().finalizeInvoice(id) }, { it.invoice }, ::upsertInvoice)
+    suspend fun restoreInvoice(id: Int) = record({ api().restoreInvoice(id) }, { it.invoice }, ::upsertInvoice)
+    suspend fun deleteInvoice(id: Int) = delete({ api().deleteInvoice(id) }) { publish(cur().let { d -> d.copy(invoices = d.invoices.filterNot { it.id == id }) }) }
+
+    // ---- Transactions ----
+    suspend fun createTransaction(body: JsonObject) = record({ api().createTransaction(body) }, { it.transaction }, ::upsertTransaction)
+    suspend fun updateTransaction(id: Int, body: JsonObject) = record({ api().updateTransaction(id, body) }, { it.transaction }, ::upsertTransaction)
+    suspend fun deleteTransaction(id: Int) = delete({ api().deleteTransaction(id) }) { publish(cur().let { d -> d.copy(transactions = d.transactions.filterNot { it.id == id }) }) }
+
+    // ---- Partners ----
+    suspend fun createPartner(body: JsonObject) = record({ api().createPartner(body) }, { it.partner }, ::upsertPartner)
+    suspend fun updatePartner(id: Int, body: JsonObject) = record({ api().updatePartner(id, body) }, { it.partner }, ::upsertPartner)
+    suspend fun deletePartner(id: Int) = delete({ api().deletePartner(id) }) { publish(cur().let { d -> d.copy(partners = d.partners.filterNot { it.id == id }) }) }
+
+    // ---- Payment methods ----
+    suspend fun createPaymentMethod(body: JsonObject) = record({ api().createPaymentMethod(body) }, { it.paymentMethod }, ::upsertPayment)
+    suspend fun updatePaymentMethod(id: Int, body: JsonObject) = record({ api().updatePaymentMethod(id, body) }, { it.paymentMethod }, ::upsertPayment)
+    suspend fun deletePaymentMethod(id: Int) = delete({ api().deletePaymentMethod(id) }) { publish(cur().let { d -> d.copy(paymentMethods = d.paymentMethods.filterNot { it.id == id }) }) }
+
+    // ---- Projects ----
+    suspend fun createProject(body: JsonObject) = record({ api().createProject(body) }, { it.project }, ::upsertProject)
+    suspend fun updateProject(id: Int, body: JsonObject) = record({ api().updateProject(id, body) }, { it.project }, ::upsertProject)
+    suspend fun moveProject(id: Int, body: JsonObject) = record({ api().moveProject(id, body) }, { it.project }, ::upsertProject)
+    suspend fun deleteProject(id: Int) = delete({ api().deleteProject(id) }) { publish(cur().let { d -> d.copy(projects = d.projects.filterNot { it.id == id }) }) }
+
+    // ---- Categories ----
+    suspend fun createCategory(body: JsonObject) = record({ api().createCategory(body) }, { it.category }, ::upsertCategory)
+    suspend fun updateCategory(id: Int, body: JsonObject) = record({ api().updateCategory(id, body) }, { it.category }, ::upsertCategory)
+    suspend fun deleteCategory(id: Int) = delete({ api().deleteCategory(id) }) { publish(cur().let { d -> d.copy(financeCategories = d.financeCategories.filterNot { it.id == id }) }) }
+
+    // ---- Read-only server analytics (always live) ----
+    suspend fun reports(year: Int?): FinanceReports? = get { api().financeReports(year) }
+    suspend fun duplicates(): FinanceDuplicates? = get { api().financeDuplicates() }
+    suspend fun accountVat(accountId: Int, year: Int?) = get { api().accountVat(accountId, year) }
+
+    // ---- Company profile ----
+    suspend fun company(): CompanyProfile? = get { api().company() }?.company
+    suspend fun updateCompany(profile: CompanyProfile): CompanyProfile? = get { api().updateCompany(profile) }?.company
+
+    // ---- generic helpers ----
+    /** A record create/update: extract the record from the `{record}` wrapper + patch the cache. */
+    private suspend fun <W, R> record(
+        call: suspend () -> Response<W>,
+        extract: (W) -> R?,
+        upsert: (R) -> Unit,
+    ): Outcome<R> {
+        if (!connectivity.isOnline()) return Outcome.Err(ErrorKind.NETWORK)
+        return withContext(Dispatchers.IO) {
+            try {
+                val res = call()
+                if (!res.isSuccessful) {
+                    return@withContext Outcome.Err(if (res.code() == 409) ErrorKind.HTTP else ErrorKind.NETWORK)
+                }
+                val r = res.body()?.let(extract) ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                upsert(r)
+                Outcome.Ok(r)
+            } catch (e: Exception) {
+                Outcome.Err(ErrorKind.NETWORK, e)
+            }
+        }
+    }
+
+    private suspend fun delete(call: suspend () -> Response<*>, onOk: () -> Unit): Outcome<Unit> {
+        if (!connectivity.isOnline()) return Outcome.Err(ErrorKind.NETWORK)
+        return withContext(Dispatchers.IO) {
+            try {
+                if (call().isSuccessful) { onOk(); Outcome.Ok(Unit) } else Outcome.Err(ErrorKind.NETWORK)
+            } catch (e: Exception) {
+                Outcome.Err(ErrorKind.NETWORK, e)
+            }
+        }
+    }
+
+    private suspend fun <T> get(call: suspend () -> Response<T>): T? = withContext(Dispatchers.IO) {
+        runCatching { call().takeIf { it.isSuccessful }?.body() }.getOrNull()
+    }
+}
+
+/** Replace the element matching [where] with [v], or append it when none matches. */
+private inline fun <T> List<T>.upsert(v: T, where: (T) -> Boolean): List<T> {
+    val i = indexOfFirst(where)
+    return if (i >= 0) toMutableList().also { it[i] = v } else this + v
+}
