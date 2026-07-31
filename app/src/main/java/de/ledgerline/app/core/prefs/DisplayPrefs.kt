@@ -1,6 +1,5 @@
 package de.ledgerline.app.core.prefs
 
-import de.ledgerline.app.domain.model.HealthUnits
 import kotlin.math.roundToLong
 
 /**
@@ -20,13 +19,6 @@ data class DisplayPrefs(
     val imperialDistance: Boolean get() = distance == "mi"
     val feetElevation: Boolean get() = elevation == "ft"
     val is12h: Boolean get() = timeFormat == "12h"
-
-    /** Health unit config sourced from the global prefs (byte-compatible with `healthUnits()`). */
-    fun healthUnits(): HealthUnits = HealthUnits(
-        weight = if (weight == "lb") "lb" else "kg",
-        glucose = if (glucose == "mmoll") "mmoll" else "mgdl",
-        temp = if (temp == "f") "f" else "c",
-    )
 
     companion object {
         const val METERS_PER_MILE = 1609.344
