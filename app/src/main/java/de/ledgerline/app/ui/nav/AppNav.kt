@@ -13,45 +13,48 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.lifecycle.HiltViewModel
+import de.ledgerline.app.core.AppLockState
 import de.ledgerline.app.core.AuthEventBus
-import de.ledgerline.app.core.security.VaultKeyHolder
+import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.SessionStore
+import de.ledgerline.app.data.finance.FinanceRepository
 import de.ledgerline.app.domain.usecase.ForceLogout
+import de.ledgerline.app.ui.lock.AppLockScreen
+import de.ledgerline.app.ui.money.FinanceShell
 import de.ledgerline.app.ui.onboarding.WelcomeScreen
 import de.ledgerline.app.ui.pairing.PairingScreen
-import de.ledgerline.app.ui.unlock.UnlockScreen
-import de.ledgerline.app.ui.workspace.WorkspaceScaffold
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class Destination { LOADING, WELCOME, PAIRING, UNLOCK, HOME }
+enum class Destination { LOADING, WELCOME, PAIRING, LOCK, HOME }
 
+/**
+ * Root flow for the finance pivot: WELCOME → PAIRING → LOCK (biometric session read) → HOME. There
+ * is no zero-knowledge vault/passphrase step anymore — the Sanctum token (unsealed by one biometric)
+ * grants data access directly. [AppLockState] is the in-memory gate; backgrounding/idle/logout locks.
+ */
 @HiltViewModel
 class RootViewModel @Inject constructor(
     private val sessionStore: SessionStore,
-    private val vaultKeyHolder: VaultKeyHolder,
+    private val appLockState: AppLockState,
+    private val sessionHolder: SessionHolder,
     private val authEventBus: AuthEventBus,
     private val forceLogout: ForceLogout,
+    private val financeRepository: FinanceRepository,
     private val accountRepository: AccountRepository,
 ) : ViewModel() {
     private val _dest = MutableStateFlow(Destination.LOADING)
     val dest: StateFlow<Destination> = _dest
 
-    val unlocked: StateFlow<Boolean> = vaultKeyHolder.unlocked
+    val unlocked: StateFlow<Boolean> = appLockState.unlocked
 
-    /**
-     * Decide the start destination. If a session already exists, go straight to
-     * unlock. Otherwise show onboarding — unless a pairing deep link launched the
-     * app, in which case jump directly to pairing (scanning).
-     */
     fun start(hasPairLink: Boolean) {
         viewModelScope.launch {
-            // exists() only checks for the sealed blob's presence — no auth/decrypt.
             _dest.value = when {
-                sessionStore.exists() -> Destination.UNLOCK
+                sessionStore.exists() -> Destination.LOCK
                 hasPairLink -> Destination.PAIRING
                 else -> Destination.WELCOME
             }
@@ -59,44 +62,37 @@ class RootViewModel @Inject constructor(
     }
 
     init {
-        // If the vault key is wiped while we're past unlock, drop back to UNLOCK.
+        // Locked while past the gate (backgrounded/idle) → back to the lock screen.
         viewModelScope.launch {
-            vaultKeyHolder.unlocked.collect { unlocked ->
-                if (!unlocked && _dest.value == Destination.HOME) _dest.value = Destination.UNLOCK
+            appLockState.unlocked.collect { unlocked ->
+                if (!unlocked && _dest.value == Destination.HOME) _dest.value = Destination.LOCK
             }
         }
-        // Any authenticated 401 (revoked token) → wipe everything and re-pair.
-        viewModelScope.launch {
-            authEventBus.unauthorized.collect {
-                forceLogout.invoke()
-                _dest.value = Destination.WELCOME
-            }
-        }
-        // Remote kill switch: the owner flagged this device to wipe from the web
-        // (`GET /me` → `wipe:true`). Same outcome as a 401 — erase all local state + re-pair.
-        viewModelScope.launch {
-            authEventBus.wipe.collect {
-                forceLogout.invoke()
-                _dest.value = Destination.WELCOME
-            }
-        }
+        // Revoked token (authenticated 401) or remote wipe → erase local state + re-pair.
+        viewModelScope.launch { authEventBus.unauthorized.collect { wipeToWelcome() } }
+        viewModelScope.launch { authEventBus.wipe.collect { wipeToWelcome() } }
+    }
+
+    private suspend fun wipeToWelcome() {
+        forceLogout.invoke()
+        appLockState.lock()
+        financeRepository.clear()
+        sessionHolder.clear()
+        _dest.value = Destination.WELCOME
     }
 
     fun toPairing() { _dest.value = Destination.PAIRING }
-    fun toUnlock() { _dest.value = Destination.UNLOCK }
+    fun toLock() { appLockState.lock(); _dest.value = Destination.LOCK }
     fun toHome() {
         _dest.value = Destination.HOME
-        // Check the kill switch right after unlock (me() fires the wipe event on wipe:true).
-        viewModelScope.launch { accountRepository.me() }
+        viewModelScope.launch { accountRepository.me() } // fires the remote-wipe kill switch
     }
     fun toWelcome() { _dest.value = Destination.WELCOME }
 }
 
 /**
- * Root flow gate: pairing vs unlock vs home. [authorize] runs the app-lock
- * CryptoObject-bound biometric/device-credential prompt on a keystore cipher (needs
- * the Activity) and returns the authorised cipher, threaded into the screens that
- * touch the auth-gated keystore key. Exactly one prompt per session read/write.
+ * Root gate. [authorize] runs the app-lock CryptoObject-bound biometric on a keystore cipher and
+ * returns the authorised cipher (used by pairing to seal the token and by the lock screen to read it).
  */
 @Composable
 fun AppNav(
@@ -107,11 +103,7 @@ fun AppNav(
 ) {
     val dest by vm.dest.collectAsStateWithLifecycle()
 
-    // Resolve the start destination once the initial link is known.
     LaunchedEffect(Unit) { vm.start(hasPairLink = initialPairLink != null) }
-
-    // A pairing link delivered while running (onNewIntent) routes to pairing,
-    // unless a session already exists (then unlock takes precedence).
     LaunchedEffect(initialPairLink) {
         if (initialPairLink != null && dest == Destination.WELCOME) vm.toPairing()
     }
@@ -119,17 +111,14 @@ fun AppNav(
     when (dest) {
         Destination.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         Destination.WELCOME -> WelcomeScreen(onGetStarted = { vm.toPairing() })
-        Destination.PAIRING -> PairingScreen(authorize = authorize, initialPairLink = initialPairLink, onPaired = { vm.toUnlock() })
-        Destination.UNLOCK -> UnlockScreen(authorize = authorize, strongAuthorize = strongAuthorize, onUnlocked = { vm.toHome() })
+        Destination.PAIRING -> PairingScreen(authorize = authorize, initialPairLink = initialPairLink, onPaired = { vm.toLock() })
+        Destination.LOCK -> AppLockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
         Destination.HOME -> {
             val unlocked by vm.unlocked.collectAsStateWithLifecycle()
             if (unlocked) {
-                WorkspaceScaffold(
-                    onLockNow = { vm.toUnlock() },
-                    onDisconnected = { vm.toWelcome() },
-                )
+                FinanceShell(onLockNow = { vm.toLock() }, onDisconnected = { vm.toWelcome() })
             } else {
-                UnlockScreen(authorize = authorize, strongAuthorize = strongAuthorize, onUnlocked = { vm.toHome() })
+                AppLockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
             }
         }
     }
