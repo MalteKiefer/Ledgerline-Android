@@ -199,6 +199,9 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
             }
 
             Field(note, { note = it }, R.string.invoice_note)
+
+            if (id != null) InvoicePdfSection(vm, id, hasPdf = existing?.pdfPath != null)
+
             if (id != null && existing?.number == null) {
                 TextButton(onClick = { vm.finalizeInvoice(id) { } }) { Text(stringResource(R.string.invoice_finalize)) }
             }
@@ -249,6 +252,29 @@ private fun ImportedInvoiceScreen(vm: FinanceViewModel, inv: de.ledgerline.app.d
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun InvoicePdfSection(vm: FinanceViewModel, id: Int, hasPdf: Boolean) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            busy = true
+            val bytes = runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+            if (bytes != null) vm.uploadInvoicePdf(id, bytes, queryName(ctx, uri) ?: "invoice.pdf") { busy = false } else busy = false
+        }
+    }
+    SectionLabel(stringResource(R.string.invoice_pdf))
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (hasPdf) TextButton(onClick = {
+            scope.launch { vm.invoicePdf(id)?.let { DocOpener.open(ctx, it, "invoice-$id.pdf", "application/pdf") } }
+        }) { Text(stringResource(R.string.invoice_open_pdf)) }
+        TextButton(enabled = !busy, onClick = { picker.launch("application/pdf") }) { Text(stringResource(R.string.invoice_upload_pdf)) }
     }
 }
 
@@ -407,7 +433,7 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
             Field(purpose, { purpose = it }, R.string.transaction_purpose)
             Field(vatCat, { vatCat = it }, R.string.transaction_vat_cat)
 
-            if (id != null) ReceiptsSection(vm, id)
+            if (id != null) ReceiptsSection(vm, id, onOcrText = { if (purpose.isBlank()) purpose = it })
 
             if (id != null) TextButton(onClick = { vm.deleteTransaction(id) { ok -> if (ok) onBack() } }) {
                 Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
@@ -417,7 +443,7 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
 }
 
 @Composable
-private fun ReceiptsSection(vm: FinanceViewModel, txId: Int) {
+private fun ReceiptsSection(vm: FinanceViewModel, txId: Int, onOcrText: (String) -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val tx = vm.data.collectAsStateWithLifecycle().value?.transactions?.firstOrNull { it.id == txId }
@@ -436,6 +462,20 @@ private fun ReceiptsSection(vm: FinanceViewModel, txId: Int) {
         }
     }
 
+    // OCR: scan a receipt image/PDF → extract text → offer it as the purpose (transient; nothing stored server-side).
+    val ocrPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            busy = true
+            val bytes = runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+            val mime = ctx.contentResolver.getType(uri) ?: "application/octet-stream"
+            val text = if (bytes != null) vm.ocr(bytes, queryName(ctx, uri) ?: "scan", mime) else null
+            busy = false
+            text?.takeIf { it.isNotBlank() }?.let { onOcrText(it.lines().firstOrNull { l -> l.isNotBlank() }?.take(140) ?: it.take(140)) }
+        }
+    }
+
     SectionLabel(stringResource(R.string.receipts))
     receipts.forEach { r ->
         val rid = jstr(r, "id"); val rname = jstr(r, "name").ifBlank { rid }
@@ -451,7 +491,10 @@ private fun ReceiptsSection(vm: FinanceViewModel, txId: Int) {
             }
         }
     }
-    TextButton(enabled = !busy, onClick = { picker.launch("*/*") }) { Text(stringResource(R.string.receipt_attach)) }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(enabled = !busy, onClick = { picker.launch("*/*") }) { Text(stringResource(R.string.receipt_attach)) }
+        TextButton(enabled = !busy, onClick = { ocrPicker.launch("image/*") }) { Text(stringResource(R.string.receipt_ocr)) }
+    }
 }
 
 private fun guessMime(name: String): String = when {

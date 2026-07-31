@@ -1172,4 +1172,7 @@
     <string name="import_hint">Import a CSV bank statement. Common German bank exports are auto-detected.</string>
     <string name="import_count">Import %1$d transactions</string>
     <string name="import_result">Imported %1$d, skipped %2$d (duplicates).</string>
+    <string name="invoice_pdf">PDF</string>
+    <string name="invoice_upload_pdf">Upload PDF</string>
+    <string name="receipt_ocr">Scan (OCR)</string>
 </resources>

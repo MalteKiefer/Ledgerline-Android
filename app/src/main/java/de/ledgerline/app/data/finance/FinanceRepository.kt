@@ -156,6 +156,27 @@ class FinanceRepository @Inject constructor(
         runCatching { api().invoicePdf(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
     }
 
+    /** Upload a PDF for an invoice (multipart). Patches the returned invoice into the cache. */
+    suspend fun uploadInvoicePdf(id: Int, bytes: ByteArray, fileName: String): Outcome<Invoice> {
+        if (!connectivity.isOnline()) return Outcome.Err(ErrorKind.NETWORK)
+        return withContext(Dispatchers.IO) {
+            try {
+                val part = okhttp3.MultipartBody.Part.createFormData("file", fileName, bytes.toRequestBody("application/pdf".toMediaTypeOrNull()))
+                val inv = api().uploadInvoicePdf(id, part).takeIf { it.isSuccessful }?.body()?.invoice ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                upsertInvoice(inv); Outcome.Ok(inv)
+            } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
+        }
+    }
+
+    /** OCR a receipt image/PDF to text (transient; server stores nothing). Null on failure/offline. */
+    suspend fun ocr(bytes: ByteArray, fileName: String, mime: String): String? = withContext(Dispatchers.IO) {
+        if (!connectivity.isOnline()) return@withContext null
+        runCatching {
+            val part = okhttp3.MultipartBody.Part.createFormData("file", fileName, bytes.toRequestBody(mime.toMediaTypeOrNull()))
+            api().ocr(part).takeIf { it.isSuccessful }?.body()?.text
+        }.getOrNull()
+    }
+
     // ---- Receipts (online-only; multipart file bytes) ----
     suspend fun attachReceipt(txId: Int, bytes: ByteArray, fileName: String, mime: String): Outcome<BankTransaction> {
         if (!connectivity.isOnline()) return Outcome.Err(ErrorKind.NETWORK)

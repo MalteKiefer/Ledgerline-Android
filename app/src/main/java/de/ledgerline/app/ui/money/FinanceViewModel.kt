@@ -82,6 +82,9 @@ class FinanceViewModel @Inject constructor(
         run({ if (id == null) repo.createInvoice(body) else repo.updateInvoice(id, body) }, done)
     fun finalizeInvoice(id: Int, done: (Boolean) -> Unit) = run({ repo.finalizeInvoice(id) }, done)
     suspend fun invoicePdf(id: Int): ByteArray? = repo.invoicePdf(id)
+    fun uploadInvoicePdf(id: Int, bytes: ByteArray, name: String, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.uploadInvoicePdf(id, bytes, name) is Outcome.Ok) }
+    suspend fun ocr(bytes: ByteArray, name: String, mime: String): String? = repo.ocr(bytes, name, mime)
     fun deleteInvoice(id: Int, done: (Boolean) -> Unit) = run({ repo.deleteInvoice(id) }, done)
 
     fun saveTransaction(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
