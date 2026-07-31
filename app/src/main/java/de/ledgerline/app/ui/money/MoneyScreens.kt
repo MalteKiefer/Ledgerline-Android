@@ -1,6 +1,7 @@
 package de.ledgerline.app.ui.money
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -118,6 +119,10 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
     }
     val defaultVat = "19"
     var customer by remember { mutableStateOf(existing?.let { customerName(it) } ?: "") }
+    var custAttn by remember { mutableStateOf(existing?.let { jstr(it.customer, "attn") } ?: "") }
+    var custAddress by remember { mutableStateOf(existing?.let { jstr(it.customer, "address") } ?: "") }
+    var custEmail by remember { mutableStateOf(existing?.let { jstr(it.customer, "email") } ?: "") }
+    var custVatId by remember { mutableStateOf(existing?.let { jstr(it.customer, "vatId") } ?: "") }
     var issueDate by remember { mutableStateOf(existing?.issueDate ?: "") }
     var dueDate by remember { mutableStateOf(existing?.dueDate ?: "") }
     var note by remember { mutableStateOf(existing?.note ?: "") }
@@ -150,6 +155,10 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
         existing?.let { put("version", it.version) }
         put("customer", buildJsonObject {
             put("name", customer.trim())
+            if (custAttn.isNotBlank()) put("attn", custAttn.trim())
+            if (custAddress.isNotBlank()) put("address", custAddress.trim())
+            if (custEmail.isNotBlank()) put("email", custEmail.trim())
+            if (custVatId.isNotBlank()) put("vatId", custVatId.trim())
             if (invoiceEmail.isNotBlank()) put("invoiceEmail", invoiceEmail.trim())
         })
         put("issue_date", issueDate.trim())
@@ -195,6 +204,10 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Field(customer, { customer = it }, R.string.invoice_customer)
+            Field(custAttn, { custAttn = it }, R.string.invoice_customer_attn)
+            Field(custAddress, { custAddress = it }, R.string.invoice_customer_address)
+            Field(custEmail, { custEmail = it }, R.string.invoice_customer_email)
+            Field(custVatId, { custVatId = it }, R.string.invoice_customer_vat_id)
             Field(issueDate, { issueDate = it }, R.string.invoice_issue_date)
             Field(dueDate, { dueDate = it }, R.string.invoice_due_date)
 
@@ -447,13 +460,18 @@ fun BulkImportScreen(vm: FinanceViewModel, onBack: () -> Unit) {
 fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
     val existing = remember(id) { id?.let { vm.transaction(it) } }
     val accounts = vm.data.collectAsStateWithLifecycle().value?.paymentMethods.orEmpty()
+    val projects = vm.data.collectAsStateWithLifecycle().value?.projects?.filter { it.deletedAt == null }.orEmpty()
     var date by remember { mutableStateOf(existing?.date ?: "") }
     var amount by remember { mutableStateOf(existing?.amount ?: "") }
     var counterparty by remember { mutableStateOf(existing?.counterparty ?: "") }
+    var counterpartyIban by remember { mutableStateOf(existing?.counterpartyIban ?: "") }
+    var bic by remember { mutableStateOf(existing?.bic ?: "") }
     var purpose by remember { mutableStateOf(existing?.purpose ?: "") }
+    var bookingText by remember { mutableStateOf(existing?.bookingText ?: "") }
     var vatCat by remember { mutableStateOf(existing?.vatCat ?: "") }
+    var projectId by remember { mutableStateOf(existing?.financeProjectId) }
     var busy by remember { mutableStateOf(false) }
-    val accountId = existing?.paymentMethodId ?: accounts.firstOrNull()?.id
+    var accountId by remember { mutableStateOf(existing?.paymentMethodId ?: accounts.firstOrNull()?.id) }
 
     fun body(): JsonObject = buildJsonObject {
         existing?.let { put("version", it.version) }
@@ -461,8 +479,12 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
         put("date", date.trim())
         put("amount", amount.replace(',', '.').trim())
         put("counterparty", counterparty.trim())
+        put("counterparty_iban", counterpartyIban.trim())
+        put("bic", bic.trim())
         put("purpose", purpose.trim())
+        put("booking_text", bookingText.trim())
         put("vat_cat", vatCat.trim())
+        projectId?.let { put("finance_project_id", it) }
     }
 
     AppScaffold(
@@ -480,12 +502,32 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
         },
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (accountId == null) Text(stringResource(R.string.transaction_need_account), color = MaterialTheme.colorScheme.error)
+            if (accounts.isEmpty()) Text(stringResource(R.string.transaction_need_account), color = MaterialTheme.colorScheme.error)
+            else {
+                SectionLabel(stringResource(R.string.transaction_account))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    accounts.filter { it.deletedAt == null }.forEach { a ->
+                        androidx.compose.material3.FilterChip(selected = accountId == a.id, onClick = { accountId = a.id }, label = { Text(a.name) })
+                    }
+                }
+            }
             Field(date, { date = it }, R.string.transaction_date)
             Field(amount, { amount = it }, R.string.transaction_amount)
             Field(counterparty, { counterparty = it }, R.string.transaction_counterparty)
+            Field(counterpartyIban, { counterpartyIban = it }, R.string.transaction_counterparty_iban)
+            Field(bic, { bic = it }, R.string.transaction_bic)
             Field(purpose, { purpose = it }, R.string.transaction_purpose)
+            Field(bookingText, { bookingText = it }, R.string.transaction_booking_text)
             Field(vatCat, { vatCat = it }, R.string.transaction_vat_cat)
+            if (projects.isNotEmpty()) {
+                SectionLabel(stringResource(R.string.transaction_project))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.FilterChip(selected = projectId == null, onClick = { projectId = null }, label = { Text(stringResource(R.string.transaction_project_none)) })
+                    projects.forEach { pr ->
+                        androidx.compose.material3.FilterChip(selected = projectId == pr.id, onClick = { projectId = pr.id }, label = { Text(pr.name) })
+                    }
+                }
+            }
 
             if (id != null) ReceiptsSection(vm, id, onOcrText = { if (purpose.isBlank()) purpose = it })
 
@@ -553,6 +595,17 @@ private fun ReceiptsSection(vm: FinanceViewModel, txId: Int, onOcrText: (String)
     }
 }
 
+@Composable
+private fun pmTypeLabel(t: String): String = stringResource(
+    when (t) {
+        "bank" -> R.string.pm_type_bank
+        "card" -> R.string.pm_type_card
+        "paypal" -> R.string.pm_type_paypal
+        "cash" -> R.string.pm_type_cash
+        else -> R.string.pm_type_other
+    },
+)
+
 private fun guessMime(name: String): String = when {
     name.endsWith(".pdf", true) -> "application/pdf"
     name.endsWith(".png", true) -> "image/png"
@@ -581,12 +634,20 @@ fun PartnersScreen(vm: FinanceViewModel, onBack: () -> Unit) {
         val p = editing?.let { vm.partner(it) }
         var name by remember { mutableStateOf(p?.name ?: "") }
         var email by remember { mutableStateOf(p?.email ?: "") }
+        var invoiceEmail by remember { mutableStateOf(p?.invoiceEmail ?: "") }
         var phone by remember { mutableStateOf(p?.phone ?: "") }
         var category by remember { mutableStateOf(p?.category ?: "") }
+        var kind by remember { mutableStateOf(p?.kind ?: "") }
+        var address by remember { mutableStateOf(p?.address ?: "") }
+        var vatId by remember { mutableStateOf(p?.vatId ?: "") }
+        var url by remember { mutableStateOf(p?.url ?: "") }
+        var note by remember { mutableStateOf(p?.note ?: "") }
         var busy by remember { mutableStateOf(false) }
         fun body() = buildJsonObject {
             p?.let { put("version", it.version) }
             put("name", name.trim()); put("email", email.trim()); put("phone", phone.trim()); put("category", category.trim())
+            put("kind", kind.trim()); put("address", address.trim()); put("vat_id", vatId.trim())
+            put("url", url.trim()); put("note", note.trim()); put("invoice_email", invoiceEmail.trim())
         }
         AppScaffold(topBar = {
             AppTopBar(title = stringResource(R.string.more_partners), onBack = { editing = null; creating = false }, actions = {
@@ -597,9 +658,14 @@ fun PartnersScreen(vm: FinanceViewModel, onBack: () -> Unit) {
         }) { pad ->
             Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Field(name, { name = it }, R.string.partner_name)
-                Field(email, { email = it }, R.string.partner_email)
-                Field(phone, { phone = it }, R.string.partner_phone)
                 Field(category, { category = it }, R.string.partner_category)
+                Field(address, { address = it }, R.string.partner_address)
+                Field(email, { email = it }, R.string.partner_email)
+                Field(invoiceEmail, { invoiceEmail = it }, R.string.partner_invoice_email)
+                Field(phone, { phone = it }, R.string.partner_phone)
+                Field(vatId, { vatId = it }, R.string.partner_vat_id)
+                Field(url, { url = it }, R.string.partner_url)
+                Field(note, { note = it }, R.string.partner_note)
             }
         }
         return
@@ -621,13 +687,29 @@ fun PaymentMethodsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
 
     if (creating || editing != null) {
         val p = editing?.let { vm.paymentMethod(it) }
+        var type by remember { mutableStateOf(p?.type ?: "bank") }
         var name by remember { mutableStateOf(p?.name ?: "") }
-        var iban by remember { mutableStateOf(p?.iban ?: "") }
         var holder by remember { mutableStateOf(p?.holder ?: "") }
+        var iban by remember { mutableStateOf(p?.iban ?: "") }
+        var bic by remember { mutableStateOf(p?.bic ?: "") }
+        var bank by remember { mutableStateOf(p?.bank ?: "") }
+        var accountNo by remember { mutableStateOf(p?.accountNo ?: "") }
+        var cardNumber by remember { mutableStateOf(p?.cardNumber ?: "") }
+        var cardNetwork by remember { mutableStateOf(p?.cardNetwork ?: "") }
+        var cardExpiry by remember { mutableStateOf(p?.cardExpiry ?: "") }
+        var paypalEmail by remember { mutableStateOf(p?.paypalEmail ?: "") }
+        var note by remember { mutableStateOf(p?.note ?: "") }
+        var business by remember { mutableStateOf(p?.business ?: false) }
         var busy by remember { mutableStateOf(false) }
         fun body() = buildJsonObject {
             p?.let { put("version", it.version) }
-            put("type", p?.type ?: "bank"); put("name", name.trim()); put("iban", iban.trim()); put("holder", holder.trim())
+            put("type", type); put("name", name.trim()); put("holder", holder.trim())
+            put("note", note.trim()); put("business", business)
+            when (type) {
+                "bank" -> { put("iban", iban.trim()); put("bic", bic.trim()); put("bank", bank.trim()); put("account_no", accountNo.trim()) }
+                "card" -> { put("card_number", cardNumber.trim()); put("card_network", cardNetwork.trim()); put("card_expiry", cardExpiry.trim()) }
+                "paypal" -> put("paypal_email", paypalEmail.trim())
+            }
         }
         AppScaffold(topBar = {
             AppTopBar(title = stringResource(R.string.more_payment_methods), onBack = { editing = null; creating = false }, actions = {
@@ -637,9 +719,33 @@ fun PaymentMethodsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
             })
         }) { pad ->
             Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionLabel(stringResource(R.string.pm_type))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("bank", "card", "paypal", "cash", "other").forEach { t ->
+                        androidx.compose.material3.FilterChip(selected = type == t, onClick = { type = t }, label = { Text(pmTypeLabel(t)) })
+                    }
+                }
                 Field(name, { name = it }, R.string.pm_name)
                 Field(holder, { holder = it }, R.string.pm_holder)
-                Field(iban, { iban = it }, R.string.pm_iban)
+                when (type) {
+                    "bank" -> {
+                        Field(iban, { iban = it }, R.string.pm_iban)
+                        Field(bic, { bic = it }, R.string.pm_bic)
+                        Field(bank, { bank = it }, R.string.pm_bank)
+                        Field(accountNo, { accountNo = it }, R.string.pm_account_no)
+                    }
+                    "card" -> {
+                        Field(cardNumber, { cardNumber = it }, R.string.pm_card_number)
+                        Field(cardNetwork, { cardNetwork = it }, R.string.pm_card_network)
+                        Field(cardExpiry, { cardExpiry = it }, R.string.pm_card_expiry)
+                    }
+                    "paypal" -> Field(paypalEmail, { paypalEmail = it }, R.string.pm_paypal_email)
+                }
+                Field(note, { note = it }, R.string.pm_note)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.pm_business), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    androidx.compose.material3.Switch(checked = business, onCheckedChange = { business = it })
+                }
             }
         }
         return
@@ -662,8 +768,13 @@ fun ProjectsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
     if (creating || editing != null) {
         val p = editing?.let { vm.project(it) }
         var name by remember { mutableStateOf(p?.name ?: "") }
+        var kind by remember { mutableStateOf(p?.kind ?: "business") }
+        var note by remember { mutableStateOf(p?.note ?: "") }
         var busy by remember { mutableStateOf(false) }
-        fun body() = buildJsonObject { p?.let { put("version", it.version) }; put("name", name.trim()); put("kind", p?.kind ?: "business") }
+        fun body() = buildJsonObject {
+            p?.let { put("version", it.version) }
+            put("name", name.trim()); put("kind", kind); put("note", note.trim())
+        }
         AppScaffold(topBar = {
             AppTopBar(title = stringResource(R.string.more_projects), onBack = { editing = null; creating = false }, actions = {
                 TextButton(enabled = !busy && name.isNotBlank(), onClick = {
@@ -671,8 +782,14 @@ fun ProjectsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                 }) { Text(stringResource(R.string.action_save)) }
             })
         }) { pad ->
-            Column(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Field(name, { name = it }, R.string.project_name)
+                SectionLabel(stringResource(R.string.project_kind))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.FilterChip(selected = kind == "business", onClick = { kind = "business" }, label = { Text(stringResource(R.string.project_kind_business)) })
+                    androidx.compose.material3.FilterChip(selected = kind == "private", onClick = { kind = "private" }, label = { Text(stringResource(R.string.project_kind_private)) })
+                }
+                Field(note, { note = it }, R.string.project_note)
             }
         }
         return
@@ -700,31 +817,60 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: () -> Unit) {
     var name by remember(p) { mutableStateOf(p.companyName ?: "") }
     var address by remember(p) { mutableStateOf(p.companyAddress ?: "") }
     var email by remember(p) { mutableStateOf(p.companyEmail ?: "") }
+    var phone by remember(p) { mutableStateOf(p.companyPhone ?: "") }
+    var taxId by remember(p) { mutableStateOf(p.companyTaxId ?: "") }
     var vatId by remember(p) { mutableStateOf(p.companyVatId ?: "") }
     var iban by remember(p) { mutableStateOf(p.companyIban ?: "") }
+    var bic by remember(p) { mutableStateOf(p.companyBic ?: "") }
+    var bankName by remember(p) { mutableStateOf(p.companyBankName ?: "") }
+    var numberFormat by remember(p) { mutableStateOf(p.invoiceNumberFormat ?: "") }
+    var defaultVat by remember(p) { mutableStateOf(p.invoiceDefaultVatRate?.let { egStr(it) } ?: "") }
+    var termsDays by remember(p) { mutableStateOf(p.invoicePaymentTermsDays?.toString() ?: "") }
+    var footer by remember(p) { mutableStateOf(p.invoiceFooterText ?: "") }
     var smallBusiness by remember(p) { mutableStateOf(p.smallBusiness ?: false) }
     var busy by remember { mutableStateOf(false) }
     AppScaffold(topBar = {
         AppTopBar(title = stringResource(R.string.more_company), onBack = onBack, actions = {
             TextButton(enabled = !busy, onClick = {
                 busy = true
-                vm.saveCompany(p.copy(companyName = name, companyAddress = address, companyEmail = email, companyVatId = vatId, companyIban = iban, smallBusiness = smallBusiness)) { ok -> busy = false; if (ok) onBack() }
+                vm.saveCompany(p.copy(
+                    companyName = name, companyAddress = address, companyEmail = email, companyPhone = phone,
+                    companyTaxId = taxId, companyVatId = vatId, companyIban = iban, companyBic = bic, companyBankName = bankName,
+                    invoiceNumberFormat = numberFormat.ifBlank { null },
+                    invoiceDefaultVatRate = defaultVat.replace(',', '.').toDoubleOrNull(),
+                    invoicePaymentTermsDays = termsDays.toIntOrNull(),
+                    invoiceFooterText = footer.ifBlank { null }, smallBusiness = smallBusiness,
+                )) { ok -> busy = false; if (ok) onBack() }
             }) { Text(stringResource(R.string.action_save)) }
         })
     }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionLabel(stringResource(R.string.company_identity))
             Field(name, { name = it }, R.string.company_name)
             Field(address, { address = it }, R.string.company_address)
             Field(email, { email = it }, R.string.company_email)
+            Field(phone, { phone = it }, R.string.company_phone)
+            SectionLabel(stringResource(R.string.company_tax))
+            Field(taxId, { taxId = it }, R.string.company_tax_id)
             Field(vatId, { vatId = it }, R.string.company_vat_id)
-            Field(iban, { iban = it }, R.string.company_iban)
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.company_small_business), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
                 androidx.compose.material3.Switch(checked = smallBusiness, onCheckedChange = { smallBusiness = it })
             }
+            SectionLabel(stringResource(R.string.company_bank))
+            Field(iban, { iban = it }, R.string.company_iban)
+            Field(bic, { bic = it }, R.string.company_bic)
+            Field(bankName, { bankName = it }, R.string.company_bank_name)
+            SectionLabel(stringResource(R.string.company_invoice_defaults))
+            Field(numberFormat, { numberFormat = it }, R.string.company_number_format)
+            Field(defaultVat, { defaultVat = it }, R.string.company_default_vat)
+            Field(termsDays, { termsDays = it }, R.string.company_terms_days)
+            Field(footer, { footer = it }, R.string.company_footer)
         }
     }
 }
+
+private fun egStr(v: Double) = if (v == kotlin.math.floor(v)) v.toLong().toString() else v.toString()
 
 // ===========================================================================
 //  Shared bits
