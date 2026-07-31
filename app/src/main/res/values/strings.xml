@@ -1166,4 +1166,10 @@
     <string name="invoice_pdf_error">Could not open the PDF.</string>
     <string name="receipts">Receipts</string>
     <string name="receipt_attach">Attach receipt</string>
+    <string name="transactions_import">Import statement</string>
+    <string name="import_pick_csv">Choose a CSV file</string>
+    <string name="import_target_account">Target account</string>
+    <string name="import_hint">Import a CSV bank statement. Common German bank exports are auto-detected.</string>
+    <string name="import_count">Import %1$d transactions</string>
+    <string name="import_result">Imported %1$d, skipped %2$d (duplicates).</string>
 </resources>

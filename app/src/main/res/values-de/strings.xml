@@ -1164,4 +1164,10 @@
     <string name="invoice_pdf_error">PDF konnte nicht geöffnet werden.</string>
     <string name="receipts">Belege</string>
     <string name="receipt_attach">Beleg anhängen</string>
+    <string name="transactions_import">Auszug importieren</string>
+    <string name="import_pick_csv">CSV-Datei wählen</string>
+    <string name="import_target_account">Zielkonto</string>
+    <string name="import_hint">CSV-Bankauszug importieren. Gängige deutsche Bank-Exporte werden automatisch erkannt.</string>
+    <string name="import_count">%1$d Umsätze importieren</string>
+    <string name="import_result">%1$d importiert, %2$d übersprungen (Duplikate).</string>
 </resources>

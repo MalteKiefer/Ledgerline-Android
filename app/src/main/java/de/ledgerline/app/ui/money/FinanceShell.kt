@@ -57,6 +57,7 @@ private enum class Tab(val labelRes: Int, val icon: ImageVector) {
 sealed interface MoneyRoute {
     data class InvoiceEdit(val id: Int?) : MoneyRoute
     data class TransactionEdit(val id: Int?) : MoneyRoute
+    data object BulkImport : MoneyRoute
     data object Partners : MoneyRoute
     data object PaymentMethods : MoneyRoute
     data object Projects : MoneyRoute
@@ -104,7 +105,7 @@ fun FinanceShell(
             when (tab) {
                 Tab.DASHBOARD -> DashboardTab(vm, onOpenInvoices = { tab = Tab.INVOICES })
                 Tab.INVOICES -> InvoicesTab(vm, onEdit = { route = MoneyRoute.InvoiceEdit(it) })
-                Tab.TRANSACTIONS -> TransactionsTab(vm, onEdit = { route = MoneyRoute.TransactionEdit(it) })
+                Tab.TRANSACTIONS -> TransactionsTab(vm, onEdit = { route = MoneyRoute.TransactionEdit(it) }, onImport = { route = MoneyRoute.BulkImport })
                 Tab.MORE -> MoreTab(
                     onPartners = { route = MoneyRoute.Partners },
                     onPaymentMethods = { route = MoneyRoute.PaymentMethods },
@@ -129,6 +130,7 @@ private fun MoneyRouteHost(
     when (route) {
         is MoneyRoute.InvoiceEdit -> InvoiceEditScreen(vm, route.id, onBack)
         is MoneyRoute.TransactionEdit -> TransactionEditScreen(vm, route.id, onBack)
+        MoneyRoute.BulkImport -> BulkImportScreen(vm, onBack)
         MoneyRoute.Partners -> PartnersScreen(vm, onBack)
         MoneyRoute.PaymentMethods -> PaymentMethodsScreen(vm, onBack)
         MoneyRoute.Projects -> ProjectsScreen(vm, onBack)

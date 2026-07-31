@@ -26,6 +26,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Response
@@ -182,6 +183,22 @@ class FinanceRepository @Inject constructor(
 
     suspend fun receiptBytes(txId: Int, receiptId: String): ByteArray? = withContext(Dispatchers.IO) {
         runCatching { api().receiptRaw(txId, receiptId).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
+
+    /** Bulk-import parsed statement lines for one account (server dedups by signature). Returns
+     *  (created, skipped), then reloads so the new rows appear. Null on failure/offline. */
+    suspend fun bulkImport(paymentMethodId: Int, lines: List<JsonObject>): Pair<Int, Int>? = withContext(Dispatchers.IO) {
+        if (!connectivity.isOnline()) return@withContext null
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("payment_method_id", kotlinx.serialization.json.JsonPrimitive(paymentMethodId))
+            put("transactions", kotlinx.serialization.json.JsonArray(lines))
+        }
+        try {
+            val res = api().bulkTransactions(body)
+            val r = res.takeIf { it.isSuccessful }?.body() ?: return@withContext null
+            load()
+            r.created to r.skipped
+        } catch (_: Exception) { null }
     }
 
     // ---- Company profile ----

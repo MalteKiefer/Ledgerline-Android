@@ -92,6 +92,7 @@ class FinanceViewModel @Inject constructor(
     fun deleteReceipt(txId: Int, receiptId: String, done: (Boolean) -> Unit) =
         viewModelScope.launch { done(repo.deleteReceipt(txId, receiptId) is Outcome.Ok) }
     suspend fun receiptBytes(txId: Int, receiptId: String) = repo.receiptBytes(txId, receiptId)
+    suspend fun bulkImport(paymentMethodId: Int, lines: List<kotlinx.serialization.json.JsonObject>) = repo.bulkImport(paymentMethodId, lines)
 
     fun savePartner(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
         run({ if (id == null) repo.createPartner(body) else repo.updatePartner(id, body) }, done)

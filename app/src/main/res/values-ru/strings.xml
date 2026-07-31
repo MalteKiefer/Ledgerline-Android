@@ -1167,4 +1167,10 @@
     <string name="invoice_pdf_error">Не удалось открыть PDF.</string>
     <string name="receipts">Чеки</string>
     <string name="receipt_attach">Прикрепить чек</string>
+    <string name="transactions_import">Импорт выписки</string>
+    <string name="import_pick_csv">Выбрать CSV-файл</string>
+    <string name="import_target_account">Целевой счёт</string>
+    <string name="import_hint">Импорт банковской выписки CSV. Распространённые немецкие форматы определяются автоматически.</string>
+    <string name="import_count">Импортировать %1$d операций</string>
+    <string name="import_result">Импортировано %1$d, пропущено %2$d (дубликаты).</string>
 </resources>

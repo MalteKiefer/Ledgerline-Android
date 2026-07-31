@@ -280,10 +280,14 @@ private fun TotalRow(label: String, value: String, bold: Boolean = false) {
 //  Transactions
 // ===========================================================================
 @Composable
-fun TransactionsTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit) {
+fun TransactionsTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit, onImport: () -> Unit) {
     val data by vm.data.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {
         val tx = data?.transactions?.sortedByDescending { it.date }.orEmpty()
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onImport) { Text(stringResource(R.string.transactions_import)) }
+            }
         if (tx.isEmpty()) EmptyState(stringResource(R.string.transactions_empty))
         else LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(tx, key = { it.id }) { t ->
@@ -296,12 +300,66 @@ fun TransactionsTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit) {
                 }
             }
         }
+        }
         ExtendedFloatingActionButton(
             onClick = { onEdit(null) },
             icon = { Icon(Icons.Outlined.Add, null) },
             text = { Text(stringResource(R.string.transaction_new)) },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         )
+    }
+}
+
+@Composable
+fun BulkImportScreen(vm: FinanceViewModel, onBack: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val accounts = vm.data.collectAsStateWithLifecycle().value?.paymentMethods?.filter { it.deletedAt == null }.orEmpty()
+    var lines by remember { mutableStateOf<List<de.ledgerline.app.core.finance.BankLine>>(emptyList()) }
+    var accountId by remember { mutableStateOf<Int?>(null) }
+    var result by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) {
+            val text = runCatching { ctx.contentResolver.openInputStream(uri)?.use { String(it.readBytes()) } }.getOrNull()
+            lines = if (text != null) de.ledgerline.app.core.finance.BankCsv.parse(text) else emptyList()
+            result = null
+        }
+    }
+
+    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.transactions_import), onBack = onBack) }) { pad ->
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            result?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            TextButton(onClick = { picker.launch("*/*") }) { Text(stringResource(R.string.import_pick_csv)) }
+
+            if (lines.isNotEmpty()) {
+                Text(stringResource(R.string.import_target_account))
+                accounts.forEach { a ->
+                    Row(Modifier.fillMaxWidth().clickable { accountId = a.id }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material3.RadioButton(selected = accountId == a.id, onClick = { accountId = a.id })
+                        Text(a.name, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+                de.ledgerline.app.ui.theme.PrimaryGradientButton(
+                    text = stringResource(R.string.import_count, lines.size),
+                    enabled = !busy && accountId != null,
+                    onClick = {
+                        busy = true
+                        scope.launch {
+                            val r = vm.bulkImport(accountId!!, lines.map { de.ledgerline.app.core.finance.BankCsv.toJson(it) })
+                            busy = false
+                            result = if (r != null) ctx.getString(R.string.import_result, r.first, r.second) else ctx.getString(R.string.security_failed)
+                            if (r != null) lines = emptyList()
+                        }
+                    },
+                )
+            } else {
+                Text(stringResource(R.string.import_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 
