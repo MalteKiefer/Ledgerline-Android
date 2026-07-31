@@ -62,4 +62,21 @@ class AccountViewModel @Inject constructor(
     }
 
     fun lockNow() = appLockState.lock()
+
+    // ---- 2FA ----
+    suspend fun twoFactorBegin() = account.twoFactorBegin()
+    fun twoFactorConfirm(code: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(account.twoFactorConfirm(code)) }
+    fun twoFactorDisable(done: (Boolean) -> Unit) = viewModelScope.launch { done(account.twoFactorDisable()) }
+    suspend fun recoveryCodes() = account.recoveryCodes()
+
+    // ---- password / account ----
+    fun changePassword(current: String, new: String, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(account.changePassword(current, new)) }
+
+    suspend fun exportAccount(): ByteArray? = account.exportAccount()
+
+    fun deleteAccount(email: String, done: (Boolean) -> Unit) = viewModelScope.launch {
+        val ok = account.deleteAccount(email)
+        if (ok) { forceLogout.invoke(); done(true) } else done(false)
+    }
 }

@@ -1139,4 +1139,25 @@
     <string name="insights_duplicate_transactions">Возможные дубликаты операций</string>
     <string name="insights_no_duplicates">Ничего не найдено.</string>
     <string name="insights_ids">ID:</string>
+    <string name="security_title">Безопасность</string>
+    <string name="security_password">Пароль входа</string>
+    <string name="security_current_password">Текущий пароль</string>
+    <string name="security_new_password">Новый пароль (мин. 12)</string>
+    <string name="security_change_password">Сменить пароль</string>
+    <string name="security_password_changed">Пароль изменён.</string>
+    <string name="security_2fa">Двухфакторная аутентификация</string>
+    <string name="security_2fa_enable">Включить 2FA</string>
+    <string name="security_2fa_disable">Отключить 2FA</string>
+    <string name="security_2fa_disabled">2FA отключена.</string>
+    <string name="security_2fa_secret">Ключ:</string>
+    <string name="security_2fa_code">6-значный код</string>
+    <string name="security_2fa_confirm">Подтвердить</string>
+    <string name="security_2fa_enabled">2FA включена.</string>
+    <string name="security_data">Данные</string>
+    <string name="security_export">Экспорт данных аккаунта</string>
+    <string name="security_export_done">Экспорт сохранён.</string>
+    <string name="security_danger">Опасная зона</string>
+    <string name="security_delete_confirm_email">Введите email для подтверждения</string>
+    <string name="security_delete_account">Удалить аккаунт</string>
+    <string name="security_failed">Что-то пошло не так.</string>
 </resources>

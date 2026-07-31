@@ -1136,4 +1136,25 @@
     <string name="insights_duplicate_transactions">Mögliche doppelte Umsätze</string>
     <string name="insights_no_duplicates">Nichts gefunden.</string>
     <string name="insights_ids">IDs:</string>
+    <string name="security_title">Sicherheit</string>
+    <string name="security_password">Login-Passwort</string>
+    <string name="security_current_password">Aktuelles Passwort</string>
+    <string name="security_new_password">Neues Passwort (min. 12)</string>
+    <string name="security_change_password">Passwort ändern</string>
+    <string name="security_password_changed">Passwort geändert.</string>
+    <string name="security_2fa">Zwei-Faktor-Authentifizierung</string>
+    <string name="security_2fa_enable">2FA aktivieren</string>
+    <string name="security_2fa_disable">2FA deaktivieren</string>
+    <string name="security_2fa_disabled">2FA deaktiviert.</string>
+    <string name="security_2fa_secret">Schlüssel:</string>
+    <string name="security_2fa_code">6-stelliger Code</string>
+    <string name="security_2fa_confirm">Bestätigen</string>
+    <string name="security_2fa_enabled">2FA aktiviert.</string>
+    <string name="security_data">Daten</string>
+    <string name="security_export">Kontodaten exportieren</string>
+    <string name="security_export_done">Export gespeichert.</string>
+    <string name="security_danger">Gefahrenzone</string>
+    <string name="security_delete_confirm_email">E-Mail zur Bestätigung eingeben</string>
+    <string name="security_delete_account">Konto löschen</string>
+    <string name="security_failed">Etwas ist schiefgelaufen.</string>
 </resources>

@@ -42,11 +42,13 @@ import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.common.SectionLabel
 import de.ledgerline.app.ui.theme.cardSurface
+import kotlinx.coroutines.launch
 
 private sealed interface SettingsSub {
     data object Hub : SettingsSub
     data object Devices : SettingsSub
     data object Notifications : SettingsSub
+    data object Security : SettingsSub
     data object About : SettingsSub
 }
 
@@ -57,6 +59,7 @@ fun MoneySettingsScreen(onBack: () -> Unit, onLoggedOut: () -> Unit, vm: Account
     when (sub) {
         SettingsSub.Devices -> DevicesScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Notifications -> NotificationsScreen(vm) { sub = SettingsSub.Hub }
+        SettingsSub.Security -> SecurityScreen(vm, onLoggedOut) { sub = SettingsSub.Hub }
         SettingsSub.About -> AboutScreen { sub = SettingsSub.Hub }
         SettingsSub.Hub -> SettingsHub(vm, onBack, onLoggedOut, open = { sub = it })
     }
@@ -89,6 +92,7 @@ private fun SettingsHub(vm: AccountViewModel, onBack: () -> Unit, onLoggedOut: (
 
             SectionLabel(stringResource(R.string.settings_security))
             HubRow(stringResource(R.string.settings_lock_now)) { vm.lockNow() }
+            HubRow(stringResource(R.string.security_title)) { open(SettingsSub.Security) }
 
             SectionLabel(stringResource(R.string.settings_account), danger = true)
             TextButton(onClick = { vm.logout(onLoggedOut) }) {
@@ -165,6 +169,67 @@ private fun NotificationsScreen(vm: AccountViewModel, onBack: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SecurityScreen(vm: AccountViewModel, onLoggedOut: () -> Unit, onBack: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var curPw by remember { mutableStateOf("") }
+    var newPw by remember { mutableStateOf("") }
+    var msg by remember { mutableStateOf<String?>(null) }
+    var twoFa by remember { mutableStateOf<de.ledgerline.app.data.remote.dto.TwoFactorQrResponse?>(null) }
+    var twoFaCode by remember { mutableStateOf("") }
+    var delEmail by remember { mutableStateOf("") }
+
+    // SAF: write the export bytes to a user-chosen location (no FileProvider needed).
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/zip"),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            val bytes = vm.exportAccount()
+            if (bytes != null) {
+                runCatching { ctx.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } }
+                msg = ctx.getString(R.string.security_export_done)
+            } else msg = ctx.getString(R.string.security_failed)
+        }
+    }
+
+    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.security_title), onBack = onBack) }) { pad ->
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            msg?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+
+            SectionLabel(stringResource(R.string.security_password))
+            Field(curPw, { curPw = it }, R.string.security_current_password)
+            Field(newPw, { newPw = it }, R.string.security_new_password)
+            TextButton(enabled = curPw.isNotBlank() && newPw.length >= 12, onClick = {
+                vm.changePassword(curPw, newPw) { ok -> msg = ctx.getString(if (ok) R.string.security_password_changed else R.string.security_failed); if (ok) { curPw = ""; newPw = "" } }
+            }) { Text(stringResource(R.string.security_change_password)) }
+
+            SectionLabel(stringResource(R.string.security_2fa))
+            if (twoFa == null) {
+                TextButton(onClick = { scope.launch { twoFa = vm.twoFactorBegin() } }) { Text(stringResource(R.string.security_2fa_enable)) }
+                TextButton(onClick = { vm.twoFactorDisable { msg = ctx.getString(if (it) R.string.security_2fa_disabled else R.string.security_failed) } }) {
+                    Text(stringResource(R.string.security_2fa_disable))
+                }
+            } else {
+                twoFa?.secret?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.security_2fa_secret) + " " + it, style = MaterialTheme.typography.bodyMedium) }
+                Field(twoFaCode, { twoFaCode = it }, R.string.security_2fa_code)
+                TextButton(enabled = twoFaCode.length >= 6, onClick = {
+                    vm.twoFactorConfirm(twoFaCode) { ok -> msg = ctx.getString(if (ok) R.string.security_2fa_enabled else R.string.security_failed); if (ok) { twoFa = null; twoFaCode = "" } }
+                }) { Text(stringResource(R.string.security_2fa_confirm)) }
+            }
+
+            SectionLabel(stringResource(R.string.security_data))
+            TextButton(onClick = { exportLauncher.launch("ledgerline-export.zip") }) { Text(stringResource(R.string.security_export)) }
+
+            SectionLabel(stringResource(R.string.security_danger), danger = true)
+            Field(delEmail, { delEmail = it }, R.string.security_delete_confirm_email)
+            TextButton(enabled = delEmail.isNotBlank(), onClick = {
+                vm.deleteAccount(delEmail) { ok -> if (ok) onLoggedOut() else msg = ctx.getString(R.string.security_failed) }
+            }) { Text(stringResource(R.string.security_delete_account), color = MaterialTheme.colorScheme.error) }
         }
     }
 }
