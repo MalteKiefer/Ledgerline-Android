@@ -1122,4 +1122,12 @@
     <string name="device_this">this device</string>
     <string name="device_wipe">Remote wipe</string>
     <string name="device_revoke">Revoke</string>
+    <string name="invoice_lines">Line items</string>
+    <string name="line_desc">Description</string>
+    <string name="line_qty">Qty</string>
+    <string name="line_price">Unit price</string>
+    <string name="line_vat">VAT %</string>
+    <string name="line_add">Add line</string>
+    <string name="invoice_vat_amount">VAT</string>
+    <string name="invoice_gross">Total</string>
 </resources>

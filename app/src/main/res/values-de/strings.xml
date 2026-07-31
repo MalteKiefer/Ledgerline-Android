@@ -1120,4 +1120,12 @@
     <string name="device_this">dieses Gerät</string>
     <string name="device_wipe">Fernlöschung</string>
     <string name="device_revoke">Widerrufen</string>
+    <string name="invoice_lines">Positionen</string>
+    <string name="line_desc">Beschreibung</string>
+    <string name="line_qty">Menge</string>
+    <string name="line_price">Einzelpreis</string>
+    <string name="line_vat">USt %</string>
+    <string name="line_add">Position hinzufügen</string>
+    <string name="invoice_vat_amount">USt</string>
+    <string name="invoice_gross">Gesamt</string>
 </resources>

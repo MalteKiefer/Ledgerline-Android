@@ -1123,4 +1123,12 @@
     <string name="device_this">это устройство</string>
     <string name="device_wipe">Удалить удалённо</string>
     <string name="device_revoke">Отозвать</string>
+    <string name="invoice_lines">Позиции</string>
+    <string name="line_desc">Описание</string>
+    <string name="line_qty">Кол-во</string>
+    <string name="line_price">Цена за ед.</string>
+    <string name="line_vat">НДС %</string>
+    <string name="line_add">Добавить позицию</string>
+    <string name="invoice_vat_amount">НДС</string>
+    <string name="invoice_gross">Итого</string>
 </resources>

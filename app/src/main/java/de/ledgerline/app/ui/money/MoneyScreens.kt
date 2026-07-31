@@ -91,24 +91,58 @@ private fun statusLabel(status: String): String = stringResource(
     },
 )
 
+private class LineRow(desc: String, qty: String, price: String, vat: String) {
+    var desc by androidx.compose.runtime.mutableStateOf(desc)
+    var qty by androidx.compose.runtime.mutableStateOf(qty)
+    var price by androidx.compose.runtime.mutableStateOf(price)
+    var vat by androidx.compose.runtime.mutableStateOf(vat)
+    val net: Double get() = (qty.replace(',', '.').toDoubleOrNull() ?: 0.0) * (price.replace(',', '.').toDoubleOrNull() ?: 0.0)
+    val vatAmount: Double get() = net * (vat.replace(',', '.').toDoubleOrNull() ?: 0.0) / 100.0
+}
+
+private fun jstr(o: JsonObject?, k: String): String =
+    (o?.get(k) as? kotlinx.serialization.json.JsonPrimitive)?.content ?: ""
+
 @Composable
 fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
     val existing = remember(id) { id?.let { vm.invoice(it) } }
+    val defaultVat = "19"
     var customer by remember { mutableStateOf(existing?.let { customerName(it) } ?: "") }
     var issueDate by remember { mutableStateOf(existing?.issueDate ?: "") }
     var dueDate by remember { mutableStateOf(existing?.dueDate ?: "") }
-    var net by remember { mutableStateOf(existing?.net ?: "") }
-    var vatRate by remember { mutableStateOf(existing?.vatRate ?: "19") }
     var note by remember { mutableStateOf(existing?.note ?: "") }
+    val lines = remember {
+        androidx.compose.runtime.mutableStateListOf<LineRow>().apply {
+            val src = existing?.lines.orEmpty()
+            if (src.isEmpty()) add(LineRow("", "1", "", defaultVat))
+            else src.forEach { l -> add(LineRow(jstr(l, "desc"), jstr(l, "qty").ifBlank { "1" }, jstr(l, "unitPrice"), jstr(l, "vatRate").ifBlank { defaultVat })) }
+        }
+    }
     var busy by remember { mutableStateOf(false) }
+
+    val net = lines.sumOf { it.net }
+    val vat = lines.sumOf { it.vatAmount }
+    val gross = net + vat
 
     fun body(): JsonObject = buildJsonObject {
         existing?.let { put("version", it.version) }
         put("customer", buildJsonObject { put("name", customer.trim()) })
         put("issue_date", issueDate.trim())
         put("due_date", dueDate.trim())
-        put("net", net.replace(',', '.').trim())
-        put("vat_rate", vatRate.replace(',', '.').trim())
+        put("lines", kotlinx.serialization.json.buildJsonArray {
+            lines.filter { it.desc.isNotBlank() || it.price.isNotBlank() }.forEach { l ->
+                add(buildJsonObject {
+                    put("desc", l.desc.trim())
+                    put("qty", l.qty.replace(',', '.').trim())
+                    put("unitPrice", l.price.replace(',', '.').trim())
+                    put("vatRate", l.vat.replace(',', '.').trim())
+                })
+            }
+        })
+        put("net", roundStr(net))
+        put("vat", roundStr(vat))
+        put("gross", roundStr(gross))
+        put("vat_rate", lines.firstOrNull()?.vat?.replace(',', '.')?.trim() ?: defaultVat)
         put("note", note.trim())
         put("currency", existing?.currency ?: "EUR")
     }
@@ -131,8 +165,30 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
             Field(customer, { customer = it }, R.string.invoice_customer)
             Field(issueDate, { issueDate = it }, R.string.invoice_issue_date)
             Field(dueDate, { dueDate = it }, R.string.invoice_due_date)
-            Field(net, { net = it }, R.string.invoice_net)
-            Field(vatRate, { vatRate = it }, R.string.invoice_vat_rate)
+
+            SectionLabel(stringResource(R.string.invoice_lines))
+            lines.forEachIndexed { i, l ->
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.OutlinedTextField(l.desc, { l.desc = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.line_desc)) })
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NumField(l.qty, { l.qty = it }, R.string.line_qty, Modifier.weight(1f))
+                        NumField(l.price, { l.price = it }, R.string.line_price, Modifier.weight(1f))
+                        NumField(l.vat, { l.vat = it }, R.string.line_vat, Modifier.weight(1f))
+                    }
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(FinanceViewModel.money(l.net), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (lines.size > 1) TextButton(onClick = { lines.removeAt(i) }) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) }
+                    }
+                }
+            }
+            TextButton(onClick = { lines.add(LineRow("", "1", "", defaultVat)) }) { Text(stringResource(R.string.line_add)) }
+
+            Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                TotalRow(stringResource(R.string.invoice_net), FinanceViewModel.money(net))
+                TotalRow(stringResource(R.string.invoice_vat_amount), FinanceViewModel.money(vat))
+                TotalRow(stringResource(R.string.invoice_gross), FinanceViewModel.money(gross), bold = true)
+            }
+
             Field(note, { note = it }, R.string.invoice_note)
             if (id != null && existing?.number == null) {
                 TextButton(onClick = { vm.finalizeInvoice(id) { } }) { Text(stringResource(R.string.invoice_finalize)) }
@@ -143,6 +199,24 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+private fun roundStr(v: Double): String = (Math.round(v * 100.0) / 100.0).toString()
+
+@Composable
+private fun NumField(value: String, onChange: (String) -> Unit, label: Int, modifier: Modifier) {
+    androidx.compose.material3.OutlinedTextField(
+        value, onChange, modifier, label = { Text(stringResource(label)) }, singleLine = true,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+    )
+}
+
+@Composable
+private fun TotalRow(label: String, value: String, bold: Boolean = false) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = if (bold) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
+        Text(value, style = if (bold) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
     }
 }
 
