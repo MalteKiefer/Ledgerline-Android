@@ -58,6 +58,12 @@ interface FinanceApi {
     @GET("api/v1/finance/reports/account-vat")
     suspend fun accountVat(@Query("account_id") accountId: Int, @Query("year") year: Int?): Response<AccountVatSummary>
 
+    @GET("api/v1/finance/reports/vat-advance")
+    suspend fun vatAdvance(@Query("year") year: Int?, @Query("quarter") quarter: Int?): Response<de.ledgerline.app.domain.model.finance.VatAdvanceReturn>
+
+    @GET("api/v1/finance/reports/euer")
+    suspend fun euer(@Query("year") year: Int?): Response<de.ledgerline.app.domain.model.finance.EuerReport>
+
     @GET("api/v1/finance/duplicates")
     suspend fun financeDuplicates(): Response<FinanceDuplicates>
 
@@ -93,6 +99,15 @@ interface FinanceApi {
     @Multipart
     @POST("api/v1/finance/invoices/{id}/pdf")
     suspend fun uploadInvoicePdf(@Path("id") id: Int, @Part file: MultipartBody.Part): Response<InvoiceResponse>
+
+    @POST("api/v1/finance/invoices/{id}/email")
+    suspend fun emailInvoice(@Path("id") id: Int, @Body body: JsonObject): Response<OkBody>
+
+    @POST("api/v1/finance/invoices/{id}/storno")
+    suspend fun stornoInvoice(@Path("id") id: Int): Response<InvoiceResponse>
+
+    @POST("api/v1/finance/invoices/{id}/dun")
+    suspend fun dunInvoice(@Path("id") id: Int, @Body body: JsonObject): Response<OkBody>
 
     // ---- Bank transactions ----
     @POST("api/v1/finance/transactions")

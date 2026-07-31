@@ -24,6 +24,8 @@ data class Invoice(
     val seq: Int? = null,
     val year: Int? = null,
     val status: String = "draft", // draft | sent | paid
+    val type: String = "invoice", // invoice | credit_note (Storno/Gutschrift)
+    @SerialName("cancels_invoice_id") val cancelsInvoiceId: Int? = null,
     @SerialName("issue_date") val issueDate: String? = null,
     @SerialName("due_date") val dueDate: String? = null,
     val currency: String = "EUR",
@@ -31,10 +33,18 @@ data class Invoice(
     val gross: String? = null,
     val net: String? = null,
     val vat: String? = null,
+    @SerialName("discount_type") val discountType: String? = null, // percent | amount
+    @SerialName("discount_value") val discountValue: String? = null,
+    @SerialName("skonto_percent") val skontoPercent: String? = null,
+    @SerialName("skonto_days") val skontoDays: Int? = null,
     val imported: Boolean = false,
     @SerialName("paid_at") val paidAt: String? = null,
+    @SerialName("sent_at") val sentAt: String? = null,
+    @SerialName("reminded_at") val remindedAt: String? = null,
+    @SerialName("reminder_count") val reminderCount: Int = 0,
     @SerialName("payment_account") val paymentAccount: String? = null,
     @SerialName("partner_id") val partnerId: Int? = null,
+    @SerialName("invoice_email") val invoiceEmail: String? = null,
     @SerialName("pdf_path") val pdfPath: String? = null,
     val customer: JsonObject? = null,
     val lines: List<JsonObject> = emptyList(),
@@ -45,7 +55,9 @@ data class Invoice(
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
     @SerialName("deleted_at") val deletedAt: String? = null,
-)
+) {
+    val isCreditNote: Boolean get() = type == "credit_note"
+}
 
 @Serializable
 data class FinancePartner(
@@ -109,6 +121,8 @@ data class FinanceProject(
 data class FinanceCategory(
     val id: Int = 0,
     val name: String = "",
+    val color: String? = null, // #RRGGBB
+    val icon: String? = null,  // heroicons-outline name
 )
 
 @Serializable
@@ -229,4 +243,44 @@ data class CategorySuggestion(
     @SerialName("tx_id") val txId: Int = 0,
     val merchant: String = "",
     @SerialName("suggested_category") val suggestedCategory: String = "",
+)
+
+// ---- Tax reports (server-computed, v1.528) ----
+
+@Serializable
+data class VatAdvanceRate(
+    val rate: Double = 0.0,
+    val outputNet: Double = 0.0,
+    val outputVat: Double = 0.0,
+    val inputNet: Double = 0.0,
+    val inputVat: Double = 0.0,
+)
+
+/** Unified USt-Voranmeldung (Zahllast); §19 Kleinunternehmer → outputVat 0. */
+@Serializable
+data class VatAdvanceReturn(
+    val year: Int = 0,
+    val quarter: Int? = null,
+    val net: Double = 0.0,
+    val outputVat: Double = 0.0,
+    val inputVat: Double = 0.0,
+    val payable: Double = 0.0,
+    val byRate: List<VatAdvanceRate> = emptyList(),
+    @SerialName("small_business") val smallBusiness: Boolean = false,
+)
+
+@Serializable
+data class EuerBucket(val name: String = "", val amount: Double = 0.0)
+
+@Serializable
+data class EuerSide(val total: Double = 0.0, val byCategory: List<EuerBucket> = emptyList())
+
+/** Simplified EÜR: income − expenses = profit. */
+@Serializable
+data class EuerReport(
+    val year: Int = 0,
+    val income: EuerSide = EuerSide(),
+    val expenses: EuerSide = EuerSide(),
+    val profit: Double = 0.0,
+    @SerialName("small_business") val smallBusiness: Boolean = false,
 )

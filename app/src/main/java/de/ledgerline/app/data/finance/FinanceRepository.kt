@@ -156,6 +156,31 @@ class FinanceRepository @Inject constructor(
         runCatching { api().invoicePdf(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
     }
 
+    // ---- Tax reports + invoice lifecycle (v1.528) ----
+    suspend fun vatAdvance(year: Int?, quarter: Int?) = get { api().vatAdvance(year, quarter) }
+    suspend fun euer(year: Int?) = get { api().euer(year) }
+
+    /** Storno: create a credit note cancelling a finalized invoice; patches it into the cache. */
+    suspend fun stornoInvoice(id: Int): Outcome<Invoice> = record({ api().stornoInvoice(id) }, { it.invoice }, ::upsertInvoice)
+
+    /** Email the invoice's stored PDF to [to] (or the customer's email when blank). */
+    suspend fun emailInvoice(id: Int, to: String?): Boolean = withContext(Dispatchers.IO) {
+        if (!connectivity.isOnline()) return@withContext false
+        runCatching { api().emailInvoice(id, toBody(to)).isSuccessful }.getOrDefault(false)
+    }
+
+    /** Send a payment reminder (Mahnung); reloads to pick up reminder_count/reminded_at. */
+    suspend fun dunInvoice(id: Int, to: String?): Boolean = withContext(Dispatchers.IO) {
+        if (!connectivity.isOnline()) return@withContext false
+        val ok = runCatching { api().dunInvoice(id, toBody(to)).isSuccessful }.getOrDefault(false)
+        if (ok) load()
+        ok
+    }
+
+    private fun toBody(to: String?): JsonObject = kotlinx.serialization.json.buildJsonObject {
+        if (!to.isNullOrBlank()) put("to", kotlinx.serialization.json.JsonPrimitive(to))
+    }
+
     /** Upload a PDF for an invoice (multipart). Patches the returned invoice into the cache. */
     suspend fun uploadInvoicePdf(id: Int, bytes: ByteArray, fileName: String): Outcome<Invoice> {
         if (!connectivity.isOnline()) return Outcome.Err(ErrorKind.NETWORK)
