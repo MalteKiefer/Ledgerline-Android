@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.MoreHoriz
@@ -140,12 +142,16 @@ private fun MoneyRouteHost(
 private fun DashboardTab(vm: FinanceViewModel, onOpenInvoices: () -> Unit) {
     val reports by vm.reports.collectAsStateWithLifecycle()
     val data by vm.data.collectAsStateWithLifecycle()
+    val year by vm.year.collectAsStateWithLifecycle()
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         val r = reports
-        SectionLabel(stringResource(R.string.dashboard_year_kpis) + " " + (r?.year ?: vm.year.value).toString())
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            SectionLabel(stringResource(R.string.dashboard_year_kpis), Modifier.weight(1f))
+            YearPicker(current = r?.year ?: year, years = r?.years.orEmpty(), onPick = { vm.setYear(it) })
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             KpiCard(stringResource(R.string.dashboard_revenue_net), FinanceViewModel.money(r?.kpis?.net ?: 0.0), Modifier.weight(1f))
             KpiCard(stringResource(R.string.dashboard_invoices), (r?.kpis?.count ?: 0).toString(), Modifier.weight(1f))
@@ -168,6 +174,23 @@ private fun DashboardTab(vm: FinanceViewModel, onOpenInvoices: () -> Unit) {
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun YearPicker(current: Int, years: List<Int>, onPick: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val options = (years + current).distinct().sortedDescending()
+    Box {
+        androidx.compose.material3.TextButton(onClick = { open = true }) {
+            Text(current.toString())
+            Icon(Icons.Outlined.ArrowDropDown, contentDescription = null)
+        }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            options.forEach { y ->
+                androidx.compose.material3.DropdownMenuItem(text = { Text(y.toString()) }, onClick = { open = false; onPick(y) })
+            }
+        }
     }
 }
 
