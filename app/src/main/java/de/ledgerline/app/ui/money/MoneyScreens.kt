@@ -201,14 +201,18 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
             )
         },
     ) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Field(customer, { customer = it }, R.string.invoice_customer)
-            Field(custAttn, { custAttn = it }, R.string.invoice_customer_attn)
-            Field(custAddress, { custAddress = it }, R.string.invoice_customer_address)
-            Field(custEmail, { custEmail = it }, R.string.invoice_customer_email)
-            Field(custVatId, { custVatId = it }, R.string.invoice_customer_vat_id)
-            Field(issueDate, { issueDate = it }, R.string.invoice_issue_date)
-            Field(dueDate, { dueDate = it }, R.string.invoice_due_date)
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            FormSection(stringResource(R.string.invoice_customer_section)) {
+                Field(customer, { customer = it }, R.string.invoice_customer)
+                Field(custAttn, { custAttn = it }, R.string.invoice_customer_attn)
+                Field(custAddress, { custAddress = it }, R.string.invoice_customer_address)
+                Field(custEmail, { custEmail = it }, R.string.invoice_customer_email)
+                Field(custVatId, { custVatId = it }, R.string.invoice_customer_vat_id)
+            }
+            FormSection(stringResource(R.string.invoice_dates)) {
+                Field(issueDate, { issueDate = it }, R.string.invoice_issue_date)
+                Field(dueDate, { dueDate = it }, R.string.invoice_due_date)
+            }
 
             SectionLabel(stringResource(R.string.invoice_lines))
             lines.forEachIndexed { i, l ->
@@ -246,8 +250,10 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
                 TotalRow(stringResource(R.string.invoice_gross), FinanceViewModel.money(gross), bold = true)
             }
 
-            Field(invoiceEmail, { invoiceEmail = it }, R.string.invoice_email_field)
-            Field(note, { note = it }, R.string.invoice_note)
+            FormSection(stringResource(R.string.section_more)) {
+                Field(invoiceEmail, { invoiceEmail = it }, R.string.invoice_email_field)
+                Field(note, { note = it }, R.string.invoice_note)
+            }
 
             if (id != null) InvoicePdfSection(vm, id, hasPdf = existing?.pdfPath != null)
 
@@ -500,35 +506,40 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
             )
         },
     ) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (accounts.isEmpty()) Text(stringResource(R.string.transaction_need_account), color = MaterialTheme.colorScheme.error)
-            else {
-                SectionLabel(stringResource(R.string.transaction_account))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    accounts.filter { it.deletedAt == null }.forEach { a ->
-                        androidx.compose.material3.FilterChip(selected = accountId == a.id, onClick = { accountId = a.id }, label = { Text(a.name) })
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            FormSection(stringResource(R.string.section_general)) {
+                if (accounts.isEmpty()) Text(stringResource(R.string.transaction_need_account), color = MaterialTheme.colorScheme.error)
+                else {
+                    SectionLabel(stringResource(R.string.transaction_account))
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        accounts.filter { it.deletedAt == null }.forEach { a ->
+                            androidx.compose.material3.FilterChip(selected = accountId == a.id, onClick = { accountId = a.id }, label = { Text(a.name) })
+                        }
                     }
                 }
+                Field(date, { date = it }, R.string.transaction_date)
+                Field(amount, { amount = it }, R.string.transaction_amount)
+                Field(vatCat, { vatCat = it }, R.string.transaction_vat_cat)
             }
-            Field(date, { date = it }, R.string.transaction_date)
-            Field(amount, { amount = it }, R.string.transaction_amount)
-            Field(counterparty, { counterparty = it }, R.string.transaction_counterparty)
-            Field(counterpartyIban, { counterpartyIban = it }, R.string.transaction_counterparty_iban)
-            Field(bic, { bic = it }, R.string.transaction_bic)
-            Field(purpose, { purpose = it }, R.string.transaction_purpose)
-            Field(bookingText, { bookingText = it }, R.string.transaction_booking_text)
-            Field(vatCat, { vatCat = it }, R.string.transaction_vat_cat)
+            FormSection(stringResource(R.string.section_counterparty)) {
+                Field(counterparty, { counterparty = it }, R.string.transaction_counterparty)
+                Field(counterpartyIban, { counterpartyIban = it }, R.string.transaction_counterparty_iban)
+                Field(bic, { bic = it }, R.string.transaction_bic)
+                Field(purpose, { purpose = it }, R.string.transaction_purpose)
+                Field(bookingText, { bookingText = it }, R.string.transaction_booking_text)
+            }
             if (projects.isNotEmpty()) {
-                SectionLabel(stringResource(R.string.transaction_project))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    androidx.compose.material3.FilterChip(selected = projectId == null, onClick = { projectId = null }, label = { Text(stringResource(R.string.transaction_project_none)) })
-                    projects.forEach { pr ->
-                        androidx.compose.material3.FilterChip(selected = projectId == pr.id, onClick = { projectId = pr.id }, label = { Text(pr.name) })
+                FormSection(stringResource(R.string.transaction_project)) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.FilterChip(selected = projectId == null, onClick = { projectId = null }, label = { Text(stringResource(R.string.transaction_project_none)) })
+                        projects.forEach { pr ->
+                            androidx.compose.material3.FilterChip(selected = projectId == pr.id, onClick = { projectId = pr.id }, label = { Text(pr.name) })
+                        }
                     }
                 }
             }
 
-            if (id != null) ReceiptsSection(vm, id, onOcrText = { if (purpose.isBlank()) purpose = it })
+            if (id != null) FormSection(stringResource(R.string.receipts)) { ReceiptsSectionBody(vm, id) { if (purpose.isBlank()) purpose = it } }
 
             if (id != null) TextButton(onClick = { vm.deleteTransaction(id) { ok -> if (ok) onBack() } }) {
                 Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
@@ -538,7 +549,7 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
 }
 
 @Composable
-private fun ReceiptsSection(vm: FinanceViewModel, txId: Int, onOcrText: (String) -> Unit) {
+private fun ReceiptsSectionBody(vm: FinanceViewModel, txId: Int, onOcrText: (String) -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val tx = vm.data.collectAsStateWithLifecycle().value?.transactions?.firstOrNull { it.id == txId }
@@ -571,11 +582,10 @@ private fun ReceiptsSection(vm: FinanceViewModel, txId: Int, onOcrText: (String)
         }
     }
 
-    SectionLabel(stringResource(R.string.receipts))
     receipts.forEach { r ->
         val rid = jstr(r, "id"); val rname = jstr(r, "name").ifBlank { rid }
         val locked = (r["locked"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true"
-        Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(rname, Modifier.weight(1f).clickable {
                 scope.launch {
                     val bytes = vm.receiptBytes(txId, rid)
@@ -655,16 +665,22 @@ fun PartnersScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                 }) { Text(stringResource(R.string.action_save)) }
             })
         }) { pad ->
-            Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Field(name, { name = it }, R.string.partner_name)
-                Field(category, { category = it }, R.string.partner_category)
-                Field(address, { address = it }, R.string.partner_address)
-                Field(email, { email = it }, R.string.partner_email)
-                Field(invoiceEmail, { invoiceEmail = it }, R.string.partner_invoice_email)
-                Field(phone, { phone = it }, R.string.partner_phone)
-                Field(vatId, { vatId = it }, R.string.partner_vat_id)
-                Field(url, { url = it }, R.string.partner_url)
-                Field(note, { note = it }, R.string.partner_note)
+            Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                FormSection(stringResource(R.string.section_general)) {
+                    Field(name, { name = it }, R.string.partner_name)
+                    Field(category, { category = it }, R.string.partner_category)
+                    Field(vatId, { vatId = it }, R.string.partner_vat_id)
+                    Field(url, { url = it }, R.string.partner_url)
+                }
+                FormSection(stringResource(R.string.section_contact)) {
+                    Field(address, { address = it }, R.string.partner_address)
+                    Field(email, { email = it }, R.string.partner_email)
+                    Field(invoiceEmail, { invoiceEmail = it }, R.string.partner_invoice_email)
+                    Field(phone, { phone = it }, R.string.partner_phone)
+                }
+                FormSection(stringResource(R.string.section_note)) {
+                    Field(note, { note = it }, R.string.partner_note)
+                }
             }
         }
         return
@@ -717,33 +733,30 @@ fun PaymentMethodsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                 }) { Text(stringResource(R.string.action_save)) }
             })
         }) { pad ->
-            Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SectionLabel(stringResource(R.string.pm_type))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("bank", "card", "paypal", "cash", "other").forEach { t ->
-                        androidx.compose.material3.FilterChip(selected = type == t, onClick = { type = t }, label = { Text(pmTypeLabel(t)) })
-                    }
+            Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                FormSection(stringResource(R.string.pm_type)) {
+                    ChipRow(listOf("bank", "card", "paypal", "cash", "other"), type, { pmTypeLabel(it) }) { type = it }
+                    Field(name, { name = it }, R.string.pm_name)
+                    Field(holder, { holder = it }, R.string.pm_holder)
                 }
-                Field(name, { name = it }, R.string.pm_name)
-                Field(holder, { holder = it }, R.string.pm_holder)
-                when (type) {
-                    "bank" -> {
-                        Field(iban, { iban = it }, R.string.pm_iban)
-                        Field(bic, { bic = it }, R.string.pm_bic)
-                        Field(bank, { bank = it }, R.string.pm_bank)
-                        Field(accountNo, { accountNo = it }, R.string.pm_account_no)
+                FormSection(stringResource(R.string.section_details)) {
+                    when (type) {
+                        "bank" -> {
+                            Field(iban, { iban = it }, R.string.pm_iban)
+                            Field(bic, { bic = it }, R.string.pm_bic)
+                            Field(bank, { bank = it }, R.string.pm_bank)
+                            Field(accountNo, { accountNo = it }, R.string.pm_account_no)
+                        }
+                        "card" -> {
+                            Field(cardNumber, { cardNumber = it }, R.string.pm_card_number)
+                            Field(cardNetwork, { cardNetwork = it }, R.string.pm_card_network)
+                            Field(cardExpiry, { cardExpiry = it }, R.string.pm_card_expiry)
+                        }
+                        "paypal" -> Field(paypalEmail, { paypalEmail = it }, R.string.pm_paypal_email)
+                        else -> Text(stringResource(R.string.pm_no_details), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    "card" -> {
-                        Field(cardNumber, { cardNumber = it }, R.string.pm_card_number)
-                        Field(cardNetwork, { cardNetwork = it }, R.string.pm_card_network)
-                        Field(cardExpiry, { cardExpiry = it }, R.string.pm_card_expiry)
-                    }
-                    "paypal" -> Field(paypalEmail, { paypalEmail = it }, R.string.pm_paypal_email)
-                }
-                Field(note, { note = it }, R.string.pm_note)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.pm_business), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                    androidx.compose.material3.Switch(checked = business, onCheckedChange = { business = it })
+                    Field(note, { note = it }, R.string.pm_note)
+                    ToggleRow(stringResource(R.string.pm_business), business) { business = it }
                 }
             }
         }
@@ -781,14 +794,13 @@ fun ProjectsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                 }) { Text(stringResource(R.string.action_save)) }
             })
         }) { pad ->
-            Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Field(name, { name = it }, R.string.project_name)
-                SectionLabel(stringResource(R.string.project_kind))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    androidx.compose.material3.FilterChip(selected = kind == "business", onClick = { kind = "business" }, label = { Text(stringResource(R.string.project_kind_business)) })
-                    androidx.compose.material3.FilterChip(selected = kind == "private", onClick = { kind = "private" }, label = { Text(stringResource(R.string.project_kind_private)) })
+            Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                FormSection(stringResource(R.string.section_general)) {
+                    Field(name, { name = it }, R.string.project_name)
+                    SectionLabel(stringResource(R.string.project_kind))
+                    ChipRow(listOf("business", "private"), kind, { if (it == "business") stringResource(R.string.project_kind_business) else stringResource(R.string.project_kind_private) }) { kind = it }
+                    Field(note, { note = it }, R.string.project_note)
                 }
-                Field(note, { note = it }, R.string.project_note)
             }
         }
         return
@@ -843,28 +855,29 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: () -> Unit) {
             }) { Text(stringResource(R.string.action_save)) }
         })
     }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionLabel(stringResource(R.string.company_identity))
-            Field(name, { name = it }, R.string.company_name)
-            Field(address, { address = it }, R.string.company_address)
-            Field(email, { email = it }, R.string.company_email)
-            Field(phone, { phone = it }, R.string.company_phone)
-            SectionLabel(stringResource(R.string.company_tax))
-            Field(taxId, { taxId = it }, R.string.company_tax_id)
-            Field(vatId, { vatId = it }, R.string.company_vat_id)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.company_small_business), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-                androidx.compose.material3.Switch(checked = smallBusiness, onCheckedChange = { smallBusiness = it })
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            FormSection(stringResource(R.string.company_identity)) {
+                Field(name, { name = it }, R.string.company_name)
+                Field(address, { address = it }, R.string.company_address)
+                Field(email, { email = it }, R.string.company_email)
+                Field(phone, { phone = it }, R.string.company_phone)
             }
-            SectionLabel(stringResource(R.string.company_bank))
-            Field(iban, { iban = it }, R.string.company_iban)
-            Field(bic, { bic = it }, R.string.company_bic)
-            Field(bankName, { bankName = it }, R.string.company_bank_name)
-            SectionLabel(stringResource(R.string.company_invoice_defaults))
-            Field(numberFormat, { numberFormat = it }, R.string.company_number_format)
-            Field(defaultVat, { defaultVat = it }, R.string.company_default_vat)
-            Field(termsDays, { termsDays = it }, R.string.company_terms_days)
-            Field(footer, { footer = it }, R.string.company_footer)
+            FormSection(stringResource(R.string.company_tax)) {
+                Field(taxId, { taxId = it }, R.string.company_tax_id)
+                Field(vatId, { vatId = it }, R.string.company_vat_id)
+                ToggleRow(stringResource(R.string.company_small_business), smallBusiness) { smallBusiness = it }
+            }
+            FormSection(stringResource(R.string.company_bank)) {
+                Field(iban, { iban = it }, R.string.company_iban)
+                Field(bic, { bic = it }, R.string.company_bic)
+                Field(bankName, { bankName = it }, R.string.company_bank_name)
+            }
+            FormSection(stringResource(R.string.company_invoice_defaults)) {
+                Field(numberFormat, { numberFormat = it }, R.string.company_number_format)
+                Field(defaultVat, { defaultVat = it }, R.string.company_default_vat)
+                Field(termsDays, { termsDays = it }, R.string.company_terms_days)
+                Field(footer, { footer = it }, R.string.company_footer)
+            }
         }
     }
 }
@@ -874,6 +887,42 @@ private fun egStr(v: Double) = if (v == kotlin.math.floor(v)) v.toLong().toStrin
 // ===========================================================================
 //  Shared bits
 // ===========================================================================
+
+/** A titled form group: an accent [SectionLabel] over a rounded card holding the fields. Matches
+ *  the dashboard/insights/settings card style so editors feel part of the same design. */
+@Composable
+internal fun FormSection(
+    label: String,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    SectionLabel(label)
+    Column(
+        Modifier.fillMaxWidth().cardSurface(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        content = content,
+    )
+}
+
+/** A labelled switch row for inside a [FormSection]. */
+@Composable
+internal fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+/** A horizontally-scrolling row of choice chips for inside a [FormSection]. [label] is @Composable
+ *  so callers can resolve string resources per option. */
+@Composable
+internal fun <T> ChipRow(options: List<T>, selected: T, label: @Composable (T) -> String, onSelect: (T) -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        options.forEach { o ->
+            androidx.compose.material3.FilterChip(selected = selected == o, onClick = { onSelect(o) }, label = { Text(label(o)) })
+        }
+    }
+}
+
 @Composable
 internal fun Field(value: String, onChange: (String) -> Unit, label: Int) {
     OutlinedTextField(value, onChange, Modifier.fillMaxWidth(), label = { Text(stringResource(label)) }, singleLine = true)

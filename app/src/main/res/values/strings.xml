@@ -1245,4 +1245,13 @@
     <string name="company_terms_days">Payment terms (days)</string>
     <string name="company_footer">Invoice footer</string>
     <string name="company_tax_id">Tax number</string>
+    <string name="section_general">General</string>
+    <string name="section_contact">Contact</string>
+    <string name="section_note">Note</string>
+    <string name="section_details">Details</string>
+    <string name="section_counterparty">Counterparty</string>
+    <string name="section_more">More</string>
+    <string name="invoice_customer_section">Customer</string>
+    <string name="invoice_dates">Dates</string>
+    <string name="pm_no_details">No extra details for this type.</string>
 </resources>

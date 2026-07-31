@@ -1246,4 +1246,13 @@
     <string name="company_terms_days">Срок оплаты (дней)</string>
     <string name="company_footer">Нижний колонтитул счёта</string>
     <string name="company_tax_id">Налоговый номер</string>
+    <string name="section_general">Общее</string>
+    <string name="section_contact">Контакт</string>
+    <string name="section_note">Примечание</string>
+    <string name="section_details">Детали</string>
+    <string name="section_counterparty">Контрагент</string>
+    <string name="section_more">Ещё</string>
+    <string name="invoice_customer_section">Клиент</string>
+    <string name="invoice_dates">Даты</string>
+    <string name="pm_no_details">Нет доп. полей для этого типа.</string>
 </resources>
