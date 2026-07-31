@@ -1159,4 +1159,9 @@
     <string name="security_delete_confirm_email">Type your email to confirm</string>
     <string name="security_delete_account">Delete account</string>
     <string name="security_failed">Something went wrong.</string>
+    <string name="invoice_imported">imported</string>
+    <string name="invoice_number_label">Number</string>
+    <string name="invoice_status_label">Status</string>
+    <string name="invoice_open_pdf">Open original PDF</string>
+    <string name="invoice_pdf_error">Could not open the PDF.</string>
 </resources>

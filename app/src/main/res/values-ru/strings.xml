@@ -1160,4 +1160,9 @@
     <string name="security_delete_confirm_email">Введите email для подтверждения</string>
     <string name="security_delete_account">Удалить аккаунт</string>
     <string name="security_failed">Что-то пошло не так.</string>
+    <string name="invoice_imported">импортирован</string>
+    <string name="invoice_number_label">Номер</string>
+    <string name="invoice_status_label">Статус</string>
+    <string name="invoice_open_pdf">Открыть оригинал PDF</string>
+    <string name="invoice_pdf_error">Не удалось открыть PDF.</string>
 </resources>

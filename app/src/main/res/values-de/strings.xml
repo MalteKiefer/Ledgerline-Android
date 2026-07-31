@@ -1157,4 +1157,9 @@
     <string name="security_delete_confirm_email">E-Mail zur Bestätigung eingeben</string>
     <string name="security_delete_account">Konto löschen</string>
     <string name="security_failed">Etwas ist schiefgelaufen.</string>
+    <string name="invoice_imported">importiert</string>
+    <string name="invoice_number_label">Nummer</string>
+    <string name="invoice_status_label">Status</string>
+    <string name="invoice_open_pdf">Original-PDF öffnen</string>
+    <string name="invoice_pdf_error">PDF konnte nicht geöffnet werden.</string>
 </resources>

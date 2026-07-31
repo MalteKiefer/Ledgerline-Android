@@ -148,6 +148,11 @@ class FinanceRepository @Inject constructor(
     suspend fun categorySuggestions() = get { api().categorySuggestions() }?.suggestions.orEmpty()
     suspend fun accountVat(accountId: Int, year: Int?) = get { api().accountVat(accountId, year) }
 
+    /** Download an invoice's server-rendered / imported-original PDF bytes, or null. */
+    suspend fun invoicePdf(id: Int): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { api().invoicePdf(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
+
     // ---- Company profile ----
     suspend fun company(): CompanyProfile? = get { api().company() }?.company
     suspend fun updateCompany(profile: CompanyProfile): CompanyProfile? = get { api().updateCompany(profile) }?.company

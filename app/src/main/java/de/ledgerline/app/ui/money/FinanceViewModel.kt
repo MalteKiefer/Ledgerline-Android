@@ -81,6 +81,7 @@ class FinanceViewModel @Inject constructor(
     fun saveInvoice(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
         run({ if (id == null) repo.createInvoice(body) else repo.updateInvoice(id, body) }, done)
     fun finalizeInvoice(id: Int, done: (Boolean) -> Unit) = run({ repo.finalizeInvoice(id) }, done)
+    suspend fun invoicePdf(id: Int): ByteArray? = repo.invoicePdf(id)
     fun deleteInvoice(id: Int, done: (Boolean) -> Unit) = run({ repo.deleteInvoice(id) }, done)
 
     fun saveTransaction(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =

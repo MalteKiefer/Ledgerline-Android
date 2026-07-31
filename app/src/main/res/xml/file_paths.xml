@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Temp dir where downloaded invoice PDFs / receipts are written before opening. -->
+    <cache-path name="docs" path="docs/" />
+</paths>

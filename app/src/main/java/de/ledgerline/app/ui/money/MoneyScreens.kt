@@ -34,7 +34,9 @@ import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.finance.CompanyProfile
 import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
+import de.ledgerline.app.ui.common.DocOpener
 import de.ledgerline.app.ui.common.SectionLabel
+import kotlinx.coroutines.launch
 import de.ledgerline.app.ui.theme.cardSurface
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -61,8 +63,9 @@ fun InvoicesTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit) {
                             Text(inv.number ?: stringResource(R.string.invoice_draft), style = MaterialTheme.typography.titleMedium)
                             Text(FinanceViewModel.money(inv.gross, inv.currency), style = MaterialTheme.typography.titleMedium)
                         }
+                        val importedTag = if (inv.imported) stringResource(R.string.invoice_imported) else null
                         Text(
-                            listOfNotNull(customerName(inv), inv.issueDate, statusLabel(inv.status)).joinToString(" · "),
+                            listOfNotNull(customerName(inv), inv.issueDate, statusLabel(inv.status), importedTag).joinToString(" · "),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -106,6 +109,12 @@ private fun jstr(o: JsonObject?, k: String): String =
 @Composable
 fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
     val existing = remember(id) { id?.let { vm.invoice(it) } }
+    // Imported invoices are an immutable record of the original PDF (web parity) — show the key
+    // fields read-only + open the original PDF, no editor.
+    if (existing != null && existing.imported) {
+        ImportedInvoiceScreen(vm, existing, onBack)
+        return
+    }
     val defaultVat = "19"
     var customer by remember { mutableStateOf(existing?.let { customerName(it) } ?: "") }
     var issueDate by remember { mutableStateOf(existing?.issueDate ?: "") }
@@ -203,6 +212,53 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
 }
 
 private fun roundStr(v: Double): String = (Math.round(v * 100.0) / 100.0).toString()
+
+@Composable
+private fun ImportedInvoiceScreen(vm: FinanceViewModel, inv: de.ledgerline.app.domain.model.finance.Invoice, onBack: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf(false) }
+    AppScaffold(topBar = {
+        AppTopBar(title = inv.number ?: stringResource(R.string.invoice_imported), onBack = onBack, actions = {
+            if (inv.id != 0) TextButton(onClick = { vm.deleteInvoice(inv.id) { ok -> if (ok) onBack() } }) {
+                Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+            }
+        })
+    }) { pad ->
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                InfoRow(stringResource(R.string.invoice_number_label), inv.number ?: "—")
+                InfoRow(stringResource(R.string.invoice_customer), customerName(inv) ?: "—")
+                InfoRow(stringResource(R.string.invoice_issue_date), inv.issueDate ?: "—")
+                InfoRow(stringResource(R.string.invoice_gross), FinanceViewModel.money(inv.gross, inv.currency))
+                inv.vatRate?.let { InfoRow(stringResource(R.string.invoice_vat_rate), it) }
+                InfoRow(stringResource(R.string.invoice_status_label), statusLabel(inv.status))
+            }
+            if (error) Text(stringResource(R.string.invoice_pdf_error), color = MaterialTheme.colorScheme.error)
+            de.ledgerline.app.ui.theme.PrimaryGradientButton(
+                text = stringResource(R.string.invoice_open_pdf),
+                enabled = !busy,
+                onClick = {
+                    busy = true; error = false
+                    scope.launch {
+                        val bytes = vm.invoicePdf(inv.id)
+                        busy = false
+                        if (bytes == null || !DocOpener.open(ctx, bytes, "invoice-${inv.id}.pdf", "application/pdf")) error = true
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyMedium)
+    }
+}
 
 @Composable
 private fun NumField(value: String, onChange: (String) -> Unit, label: Int, modifier: Modifier) {
