@@ -87,6 +87,11 @@ class FinanceViewModel @Inject constructor(
     fun saveTransaction(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
         run({ if (id == null) repo.createTransaction(body) else repo.updateTransaction(id, body) }, done)
     fun deleteTransaction(id: Int, done: (Boolean) -> Unit) = run({ repo.deleteTransaction(id) }, done)
+    fun attachReceipt(txId: Int, bytes: ByteArray, name: String, mime: String, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.attachReceipt(txId, bytes, name, mime) is Outcome.Ok) }
+    fun deleteReceipt(txId: Int, receiptId: String, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.deleteReceipt(txId, receiptId) is Outcome.Ok) }
+    suspend fun receiptBytes(txId: Int, receiptId: String) = repo.receiptBytes(txId, receiptId)
 
     fun savePartner(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
         run({ if (id == null) repo.createPartner(body) else repo.updatePartner(id, body) }, done)

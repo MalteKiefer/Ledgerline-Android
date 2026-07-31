@@ -1162,4 +1162,6 @@
     <string name="invoice_status_label">Status</string>
     <string name="invoice_open_pdf">Original-PDF öffnen</string>
     <string name="invoice_pdf_error">PDF konnte nicht geöffnet werden.</string>
+    <string name="receipts">Belege</string>
+    <string name="receipt_attach">Beleg anhängen</string>
 </resources>

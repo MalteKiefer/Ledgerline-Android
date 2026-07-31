@@ -26,6 +26,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import retrofit2.Response
 import java.io.File
 import java.net.HttpURLConnection
@@ -151,6 +153,35 @@ class FinanceRepository @Inject constructor(
     /** Download an invoice's server-rendered / imported-original PDF bytes, or null. */
     suspend fun invoicePdf(id: Int): ByteArray? = withContext(Dispatchers.IO) {
         runCatching { api().invoicePdf(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
+
+    // ---- Receipts (online-only; multipart file bytes) ----
+    suspend fun attachReceipt(txId: Int, bytes: ByteArray, fileName: String, mime: String): Outcome<BankTransaction> {
+        if (!connectivity.isOnline()) return Outcome.Err(ErrorKind.NETWORK)
+        return withContext(Dispatchers.IO) {
+            try {
+                val part = okhttp3.MultipartBody.Part.createFormData(
+                    "file", fileName,
+                    bytes.toRequestBody(mime.toMediaTypeOrNull()),
+                )
+                val res = api().attachReceipt(txId, part)
+                val t = res.takeIf { it.isSuccessful }?.body()?.transaction ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                upsertTransaction(t); Outcome.Ok(t)
+            } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
+        }
+    }
+
+    suspend fun deleteReceipt(txId: Int, receiptId: String): Outcome<BankTransaction> = withContext(Dispatchers.IO) {
+        if (!connectivity.isOnline()) return@withContext Outcome.Err(ErrorKind.NETWORK)
+        try {
+            val res = api().deleteReceipt(txId, receiptId)
+            val t = res.takeIf { it.isSuccessful }?.body()?.transaction ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+            upsertTransaction(t); Outcome.Ok(t)
+        } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
+    }
+
+    suspend fun receiptBytes(txId: Int, receiptId: String): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { api().receiptRaw(txId, receiptId).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
     }
 
     // ---- Company profile ----

@@ -348,12 +348,67 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
             Field(counterparty, { counterparty = it }, R.string.transaction_counterparty)
             Field(purpose, { purpose = it }, R.string.transaction_purpose)
             Field(vatCat, { vatCat = it }, R.string.transaction_vat_cat)
+
+            if (id != null) ReceiptsSection(vm, id)
+
             if (id != null) TextButton(onClick = { vm.deleteTransaction(id) { ok -> if (ok) onBack() } }) {
                 Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
             }
         }
     }
 }
+
+@Composable
+private fun ReceiptsSection(vm: FinanceViewModel, txId: Int) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val tx = vm.data.collectAsStateWithLifecycle().value?.transactions?.firstOrNull { it.id == txId }
+    val receipts = tx?.receipts.orEmpty()
+    var busy by remember { mutableStateOf(false) }
+
+    val picker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            busy = true
+            val bytes = runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull()
+            val mime = ctx.contentResolver.getType(uri) ?: "application/octet-stream"
+            val name = queryName(ctx, uri) ?: "receipt"
+            if (bytes != null) vm.attachReceipt(txId, bytes, name, mime) { busy = false } else busy = false
+        }
+    }
+
+    SectionLabel(stringResource(R.string.receipts))
+    receipts.forEach { r ->
+        val rid = jstr(r, "id"); val rname = jstr(r, "name").ifBlank { rid }
+        Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
+            Text(rname, Modifier.weight(1f).clickable {
+                scope.launch {
+                    val bytes = vm.receiptBytes(txId, rid)
+                    if (bytes != null) DocOpener.open(ctx, bytes, rname, guessMime(rname))
+                }
+            }, style = MaterialTheme.typography.bodyMedium)
+            TextButton(onClick = { vm.deleteReceipt(txId, rid) { } }) {
+                Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+    TextButton(enabled = !busy, onClick = { picker.launch("*/*") }) { Text(stringResource(R.string.receipt_attach)) }
+}
+
+private fun guessMime(name: String): String = when {
+    name.endsWith(".pdf", true) -> "application/pdf"
+    name.endsWith(".png", true) -> "image/png"
+    name.endsWith(".jpg", true) || name.endsWith(".jpeg", true) -> "image/jpeg"
+    else -> "application/octet-stream"
+}
+
+private fun queryName(ctx: android.content.Context, uri: android.net.Uri): String? = runCatching {
+    ctx.contentResolver.query(uri, null, null, null, null)?.use { c ->
+        val i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+        if (i >= 0 && c.moveToFirst()) c.getString(i) else null
+    }
+}.getOrNull()
 
 // ===========================================================================
 //  Partners / Payment methods / Projects — simple name-first lists

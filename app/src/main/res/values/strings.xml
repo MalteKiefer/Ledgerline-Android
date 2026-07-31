@@ -1164,4 +1164,6 @@
     <string name="invoice_status_label">Status</string>
     <string name="invoice_open_pdf">Open original PDF</string>
     <string name="invoice_pdf_error">Could not open the PDF.</string>
+    <string name="receipts">Receipts</string>
+    <string name="receipt_attach">Attach receipt</string>
 </resources>

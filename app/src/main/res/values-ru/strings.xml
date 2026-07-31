@@ -1165,4 +1165,6 @@
     <string name="invoice_status_label">Статус</string>
     <string name="invoice_open_pdf">Открыть оригинал PDF</string>
     <string name="invoice_pdf_error">Не удалось открыть PDF.</string>
+    <string name="receipts">Чеки</string>
+    <string name="receipt_attach">Прикрепить чек</string>
 </resources>
