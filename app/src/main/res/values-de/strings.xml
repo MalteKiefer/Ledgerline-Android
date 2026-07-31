@@ -1195,4 +1195,6 @@
     <string name="insights_expenses">Ausgaben</string>
     <string name="insights_profit">Gewinn</string>
     <string name="company_small_business">§19 Kleinunternehmer</string>
+    <string name="dashboard_open_invoices">Offene Rechnungen</string>
+    <string name="dashboard_open_count">Offen (Anzahl)</string>
 </resources>

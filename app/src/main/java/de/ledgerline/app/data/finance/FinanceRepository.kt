@@ -54,7 +54,7 @@ class FinanceRepository @Inject constructor(
     private val outbox: FinanceOutbox,
 ) {
     private val cacheFile = File(context.filesDir, "finance_data.json")
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false; coerceInputValues = true }
 
     private val _data = MutableStateFlow<FinanceData?>(null)
     val data: StateFlow<FinanceData?> = _data.asStateFlow()

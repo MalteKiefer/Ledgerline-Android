@@ -1197,4 +1197,6 @@
     <string name="insights_expenses">Expenses</string>
     <string name="insights_profit">Profit</string>
     <string name="company_small_business">§19 Kleinunternehmer</string>
+    <string name="dashboard_open_invoices">Open invoices</string>
+    <string name="dashboard_open_count">Open count</string>
 </resources>

@@ -533,6 +533,7 @@ private fun ReceiptsSection(vm: FinanceViewModel, txId: Int, onOcrText: (String)
     SectionLabel(stringResource(R.string.receipts))
     receipts.forEach { r ->
         val rid = jstr(r, "id"); val rname = jstr(r, "name").ifBlank { rid }
+        val locked = (r["locked"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true"
         Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
             Text(rname, Modifier.weight(1f).clickable {
                 scope.launch {
@@ -540,7 +541,8 @@ private fun ReceiptsSection(vm: FinanceViewModel, txId: Int, onOcrText: (String)
                     if (bytes != null) DocOpener.open(ctx, bytes, rname, guessMime(rname))
                 }
             }, style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = { vm.deleteReceipt(txId, rid) { } }) {
+            // A locked receipt (e.g. an auto-linked invoice) cannot be deleted (server rejects it).
+            if (!locked) TextButton(onClick = { vm.deleteReceipt(txId, rid) { } }) {
                 Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
             }
         }

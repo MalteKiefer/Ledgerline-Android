@@ -1198,4 +1198,6 @@
     <string name="insights_expenses">Расходы</string>
     <string name="insights_profit">Прибыль</string>
     <string name="company_small_business">§19 малый бизнес</string>
+    <string name="dashboard_open_invoices">Открытые счета</string>
+    <string name="dashboard_open_count">Открыто (кол-во)</string>
 </resources>

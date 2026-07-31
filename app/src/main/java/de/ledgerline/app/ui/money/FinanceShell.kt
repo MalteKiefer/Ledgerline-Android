@@ -165,6 +165,10 @@ private fun DashboardTab(vm: FinanceViewModel, onOpenInvoices: () -> Unit) {
             KpiCard(stringResource(R.string.dashboard_vat_payable), FinanceViewModel.money(r?.vat?.vat ?: 0.0), Modifier.weight(1f))
             KpiCard(stringResource(R.string.dashboard_customers), (r?.kpis?.customers ?: 0).toString(), Modifier.weight(1f))
         }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            KpiCard(stringResource(R.string.dashboard_open_invoices), FinanceViewModel.money(r?.aging?.openGross ?: 0.0), Modifier.weight(1f))
+            KpiCard(stringResource(R.string.dashboard_open_count), (r?.aging?.openCount ?: 0).toString(), Modifier.weight(1f))
+        }
 
         SectionLabel(stringResource(R.string.dashboard_top_customers))
         Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(10.dp)) {

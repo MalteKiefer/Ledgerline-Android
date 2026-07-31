@@ -25,7 +25,10 @@ import java.util.concurrent.TimeUnit
  * plain-HTTP MockWebServer.
  */
 object NetworkFactory {
-    private val json = Json { ignoreUnknownKeys = true }
+    // coerceInputValues: several finance columns (customer/lines/versions/receipts/expenses/
+    // contacts) are nullable arrays/objects server-side; coerce a JSON null on a non-null
+    // defaulted field to its default instead of throwing.
+    private val json = Json { ignoreUnknownKeys = true; coerceInputValues = true }
 
     /** Production entry point: HTTPS-only (RESTRICTED_TLS), optionally pinned. */
     fun create(baseUrl: String, tokenProvider: () -> String?, pin: String?): LedgerlineApi =

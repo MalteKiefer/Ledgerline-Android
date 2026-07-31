@@ -70,6 +70,7 @@ data class FinancePartner(
     val note: String? = null,
     val address: String? = null,
     val email: String? = null,
+    @SerialName("invoice_email") val invoiceEmail: String? = null,
     val phone: String? = null,
     @SerialName("vat_id") val vatId: String? = null,
     val contacts: List<JsonObject> = emptyList(),
@@ -200,6 +201,13 @@ data class RevenueByCustomer(
 @Serializable
 data class MonthRevenue(val month: Int = 0, val net: Double = 0.0)
 
+/** Aging of OPEN invoices (status=sent, untrashed) by days past due. Detail buckets ignored here. */
+@Serializable
+data class InvoiceAging(
+    val openCount: Int = 0,
+    val openGross: Double = 0.0,
+)
+
 @Serializable
 data class FinanceReports(
     val year: Int = 0,
@@ -209,6 +217,7 @@ data class FinanceReports(
     val kpis: FinanceKpis = FinanceKpis(),
     val customers: List<RevenueByCustomer> = emptyList(),
     val months: List<MonthRevenue> = emptyList(),
+    val aging: InvoiceAging = InvoiceAging(),
 )
 
 @Serializable
