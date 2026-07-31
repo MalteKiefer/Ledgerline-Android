@@ -179,7 +179,6 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
         }
         if (skontoPercent.isNotBlank()) put("skonto_percent", skontoPercent.replace(',', '.').trim())
         skontoDays.toIntOrNull()?.let { put("skonto_days", it) }
-        if (invoiceEmail.isNotBlank()) put("invoice_email", invoiceEmail.trim())
         put("net", roundStr(net))
         put("vat", roundStr(vat))
         put("gross", roundStr(gross))
