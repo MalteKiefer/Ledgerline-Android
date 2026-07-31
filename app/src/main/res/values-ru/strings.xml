@@ -1113,4 +1113,14 @@
     <string name="company_email">Эл. почта</string>
     <string name="company_vat_id">НДС-номер</string>
     <string name="company_iban">IBAN</string>
+    <string name="settings_appearance">Оформление</string>
+    <string name="theme_system">Системная</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_dark">Тёмная</string>
+    <string name="settings_notifications">Уведомления</string>
+    <string name="settings_logout">Выйти</string>
+    <string name="devices_empty">Нет подключённых устройств.</string>
+    <string name="device_this">это устройство</string>
+    <string name="device_wipe">Удалить удалённо</string>
+    <string name="device_revoke">Отозвать</string>
 </resources>

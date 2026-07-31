@@ -250,6 +250,9 @@ class AccountRepository(
     /** Flag a device to erase its local state on next contact (remote kill switch). */
     suspend fun wipeDevice(id: Long): Boolean = call { it.wipeDevice(id.toString()) }
 
+    /** Revoke THIS device's token server-side (logout). Local wipe is the caller's job. */
+    suspend fun revokeCurrentSession(): Boolean = call { it.deleteSession() }
+
     private suspend fun call(block: suspend (LedgerlineApi) -> retrofit2.Response<Unit>): Boolean {
         val session = sessionHolder.get() ?: return false
         return try {

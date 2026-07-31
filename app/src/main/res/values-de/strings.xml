@@ -1110,4 +1110,14 @@
     <string name="company_email">E-Mail</string>
     <string name="company_vat_id">USt-IdNr.</string>
     <string name="company_iban">IBAN</string>
+    <string name="settings_appearance">Darstellung</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Hell</string>
+    <string name="theme_dark">Dunkel</string>
+    <string name="settings_notifications">Benachrichtigungen</string>
+    <string name="settings_logout">Abmelden</string>
+    <string name="devices_empty">Keine verbundenen Geräte.</string>
+    <string name="device_this">dieses Gerät</string>
+    <string name="device_wipe">Fernlöschung</string>
+    <string name="device_revoke">Widerrufen</string>
 </resources>

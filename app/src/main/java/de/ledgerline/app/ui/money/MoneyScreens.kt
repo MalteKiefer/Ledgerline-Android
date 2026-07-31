@@ -380,32 +380,15 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: () -> Unit) {
 }
 
 // ===========================================================================
-//  Settings — minimal (lock + disconnect)
-// ===========================================================================
-@Composable
-fun MoneySettingsScreen(onBack: () -> Unit, onLockNow: () -> Unit, onDisconnected: () -> Unit) {
-    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.more_settings), onBack = onBack) }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionLabel(stringResource(R.string.settings_security))
-            TextButton(onClick = onLockNow) { Text(stringResource(R.string.settings_lock_now)) }
-            SectionLabel(stringResource(R.string.settings_account), danger = true)
-            TextButton(onClick = onDisconnected) {
-                Text(stringResource(R.string.settings_disconnect), color = MaterialTheme.colorScheme.error)
-            }
-        }
-    }
-}
-
-// ===========================================================================
 //  Shared bits
 // ===========================================================================
 @Composable
-private fun Field(value: String, onChange: (String) -> Unit, label: Int) {
+internal fun Field(value: String, onChange: (String) -> Unit, label: Int) {
     OutlinedTextField(value, onChange, Modifier.fillMaxWidth(), label = { Text(stringResource(label)) }, singleLine = true)
 }
 
 @Composable
-private fun EmptyState(text: String) {
+internal fun EmptyState(text: String) {
     Box(Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

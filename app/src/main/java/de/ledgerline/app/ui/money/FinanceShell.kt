@@ -129,7 +129,7 @@ private fun MoneyRouteHost(
         MoneyRoute.PaymentMethods -> PaymentMethodsScreen(vm, onBack)
         MoneyRoute.Projects -> ProjectsScreen(vm, onBack)
         MoneyRoute.Company -> CompanyScreen(vm, onBack)
-        MoneyRoute.Settings -> MoneySettingsScreen(onBack = onBack, onLockNow = onLockNow, onDisconnected = onDisconnected)
+        MoneyRoute.Settings -> MoneySettingsScreen(onBack = onBack, onLoggedOut = onDisconnected)
     }
 }
 

@@ -1112,4 +1112,14 @@
     <string name="company_email">Email</string>
     <string name="company_vat_id">VAT ID</string>
     <string name="company_iban">IBAN</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_logout">Log out</string>
+    <string name="devices_empty">No connected devices.</string>
+    <string name="device_this">this device</string>
+    <string name="device_wipe">Remote wipe</string>
+    <string name="device_revoke">Revoke</string>
 </resources>
