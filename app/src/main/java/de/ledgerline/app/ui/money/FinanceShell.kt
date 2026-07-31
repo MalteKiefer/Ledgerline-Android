@@ -61,6 +61,7 @@ sealed interface MoneyRoute {
     data object PaymentMethods : MoneyRoute
     data object Projects : MoneyRoute
     data object Company : MoneyRoute
+    data object Insights : MoneyRoute
     data object Settings : MoneyRoute
 }
 
@@ -109,6 +110,7 @@ fun FinanceShell(
                     onPaymentMethods = { route = MoneyRoute.PaymentMethods },
                     onProjects = { route = MoneyRoute.Projects },
                     onCompany = { route = MoneyRoute.Company },
+                    onInsights = { route = MoneyRoute.Insights },
                     onSettings = { route = MoneyRoute.Settings },
                 )
             }
@@ -131,6 +133,7 @@ private fun MoneyRouteHost(
         MoneyRoute.PaymentMethods -> PaymentMethodsScreen(vm, onBack)
         MoneyRoute.Projects -> ProjectsScreen(vm, onBack)
         MoneyRoute.Company -> CompanyScreen(vm, onBack)
+        MoneyRoute.Insights -> InsightsScreen(vm, onBack)
         MoneyRoute.Settings -> MoneySettingsScreen(onBack = onBack, onLoggedOut = onDisconnected)
     }
 }
@@ -211,6 +214,7 @@ private fun MoreTab(
     onPaymentMethods: () -> Unit,
     onProjects: () -> Unit,
     onCompany: () -> Unit,
+    onInsights: () -> Unit,
     onSettings: () -> Unit,
 ) {
     Column(
@@ -220,6 +224,7 @@ private fun MoreTab(
         MoreRow(stringResource(R.string.more_partners), Icons.Outlined.AccountBalance, Brand.tintBlue, onPartners)
         MoreRow(stringResource(R.string.more_payment_methods), Icons.Outlined.AccountBalance, Brand.tintGreen, onPaymentMethods)
         MoreRow(stringResource(R.string.more_projects), Icons.Outlined.Dashboard, Brand.tintOrange, onProjects)
+        MoreRow(stringResource(R.string.more_insights), Icons.Outlined.Dashboard, Brand.tintViolet, onInsights)
         MoreRow(stringResource(R.string.more_company), Icons.Outlined.AccountBalance, Brand.tintTeal, onCompany)
         MoreRow(stringResource(R.string.more_settings), Icons.Outlined.MoreHoriz, Brand.tintGray, onSettings)
     }

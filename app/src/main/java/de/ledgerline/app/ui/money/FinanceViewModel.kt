@@ -102,6 +102,19 @@ class FinanceViewModel @Inject constructor(
     fun saveCategory(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
         run({ if (id == null) repo.createCategory(body) else repo.updateCategory(id, body) }, done)
 
+    suspend fun loadDuplicates() = repo.duplicates()
+    suspend fun loadSuggestions() = repo.categorySuggestions()
+
+    /** Apply a suggested category to a transaction (sets its vat_cat/category via update). */
+    fun applySuggestion(txId: Int, category: String, done: (Boolean) -> Unit) {
+        val tx = transaction(txId) ?: return done(false)
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("version", kotlinx.serialization.json.JsonPrimitive(tx.version))
+            put("vat_cat", kotlinx.serialization.json.JsonPrimitive(category))
+        }
+        run({ repo.updateTransaction(txId, body) }, done)
+    }
+
     suspend fun loadCompany(): CompanyProfile? = repo.company()
     fun saveCompany(profile: CompanyProfile, done: (Boolean) -> Unit) {
         viewModelScope.launch { done(repo.updateCompany(profile) != null) }

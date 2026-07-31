@@ -1130,4 +1130,12 @@
     <string name="line_add">Add line</string>
     <string name="invoice_vat_amount">VAT</string>
     <string name="invoice_gross">Total</string>
+    <string name="more_insights">Insights</string>
+    <string name="insights_suggestions">Category suggestions</string>
+    <string name="insights_no_suggestions">No suggestions.</string>
+    <string name="insights_apply">Apply</string>
+    <string name="insights_duplicate_invoices">Possible duplicate invoices</string>
+    <string name="insights_duplicate_transactions">Possible duplicate transactions</string>
+    <string name="insights_no_duplicates">None found.</string>
+    <string name="insights_ids">IDs:</string>
 </resources>

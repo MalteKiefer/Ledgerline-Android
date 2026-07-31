@@ -1128,4 +1128,12 @@
     <string name="line_add">Position hinzufügen</string>
     <string name="invoice_vat_amount">USt</string>
     <string name="invoice_gross">Gesamt</string>
+    <string name="more_insights">Analysen</string>
+    <string name="insights_suggestions">Kategorie-Vorschläge</string>
+    <string name="insights_no_suggestions">Keine Vorschläge.</string>
+    <string name="insights_apply">Übernehmen</string>
+    <string name="insights_duplicate_invoices">Mögliche doppelte Rechnungen</string>
+    <string name="insights_duplicate_transactions">Mögliche doppelte Umsätze</string>
+    <string name="insights_no_duplicates">Nichts gefunden.</string>
+    <string name="insights_ids">IDs:</string>
 </resources>

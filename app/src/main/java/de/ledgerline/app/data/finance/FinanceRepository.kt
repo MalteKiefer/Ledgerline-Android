@@ -145,6 +145,7 @@ class FinanceRepository @Inject constructor(
     // ---- Read-only server analytics (always live) ----
     suspend fun reports(year: Int?): FinanceReports? = get { api().financeReports(year) }
     suspend fun duplicates(): FinanceDuplicates? = get { api().financeDuplicates() }
+    suspend fun categorySuggestions() = get { api().categorySuggestions() }?.suggestions.orEmpty()
     suspend fun accountVat(accountId: Int, year: Int?) = get { api().accountVat(accountId, year) }
 
     // ---- Company profile ----

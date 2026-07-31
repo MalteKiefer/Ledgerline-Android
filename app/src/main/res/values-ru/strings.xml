@@ -1131,4 +1131,12 @@
     <string name="line_add">Добавить позицию</string>
     <string name="invoice_vat_amount">НДС</string>
     <string name="invoice_gross">Итого</string>
+    <string name="more_insights">Аналитика</string>
+    <string name="insights_suggestions">Предложения категорий</string>
+    <string name="insights_no_suggestions">Нет предложений.</string>
+    <string name="insights_apply">Применить</string>
+    <string name="insights_duplicate_invoices">Возможные дубликаты счетов</string>
+    <string name="insights_duplicate_transactions">Возможные дубликаты операций</string>
+    <string name="insights_no_duplicates">Ничего не найдено.</string>
+    <string name="insights_ids">ID:</string>
 </resources>
