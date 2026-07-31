@@ -2,7 +2,7 @@
 
 Native Android-Client für die selbst-gehostete **Ledgerline**. **Server-Pivot v1.5xx (Juli 2026):
 das Zero-Knowledge-/Vault-/Sealed-Store-Modell wurde vollständig entfernt.** Der Server ist jetzt
-eine **plaintext-relationale Finance-API** (Laravel-13, `/api/v1`, aktuell **v1.526.x**). Es gibt nur
+eine **plaintext-relationale Finance-API** (Laravel-13, `/api/v1`, aktuell **v1.528.x**). Es gibt nur
 noch ein Modul: **Finance** (Rechnungen, Bank-Umsätze, Zahlungsmittel, Geschäftspartner, Projekte,
 Kategorien) + Firmenprofil. Web-App = Referenz/Superset; iOS = Look-&-Feel-Referenz.
 
@@ -137,13 +137,18 @@ credentials/autofill/documentfile). `LedgerlineApi` + tote dto getrimmt. Tests: 
 `BankCsvTest`. `assembleDebug` + Unit-Tests grün. **On-device-Verifikation weiter offen** (Gerät fiel
 wiederholt beim Install ab).
 
+**v1.528 (Invoice-Lifecycle + Tax-Core) umgesetzt:** Invoice-Felder (credit_note/discount/skonto/
+dunning/invoice_email), Company `small_business` (§19), Category color/icon (Modell); Endpunkte
+`/reports/vat-advance`, `/reports/euer`, invoices `/email` `/storno` `/dun`. UI: Rabatt/Skonto +
+Lifecycle-Aktionen im Editor, Tax-Reports in Insights, §19-Switch im Firmenprofil.
+
 **TODO (Rest):**
 - **On-device:** Pairing (QR) → biometrisch entsperren → `/finance/data` lädt → Rechnung/Umsatz
-  anlegen/PDF/Beleg/CSV-Import durchklicken. FLAG_SECURE → visuell prüfen.
+  anlegen/PDF/Beleg/CSV-Import/Storno/Mahnung durchklicken. FLAG_SECURE → visuell prüfen.
 - **Bulk-Import:** MT940/CAMT.053-Formate (nur CSV fertig).
 - **Offline-Create** (provisional int-id-Remap über Fremdschlüssel) — bewusst verschoben (riskant).
-- **Firmenlogo** Upload/Anzeige (multipart `logo`/`remove_logo`); ungenutzte xml/drawables der
-  gelöschten Features entfernen; mehr Finance-Unit-Tests.
+- **Firmenlogo** Upload/Anzeige (multipart `logo`/`remove_logo`); Kategorie-Farbe/-Icon-Picker;
+  ungenutzte xml/drawables der gelöschten Features entfernen; mehr Finance-Unit-Tests.
 
 ## 8. Referenzen
 - API: `../ledgerline/openapi.yaml` · `../ledgerline/routes/api.php`
