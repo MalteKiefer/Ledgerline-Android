@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import retrofit2.Response
 import java.io.File
 import java.net.HttpURLConnection
@@ -47,6 +48,7 @@ class FinanceRepository @Inject constructor(
     @ApplicationContext context: Context,
     private val sessionHolder: SessionHolder,
     private val connectivity: Connectivity,
+    private val outbox: FinanceOutbox,
 ) {
     private val cacheFile = File(context.filesDir, "finance_data.json")
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false }
@@ -79,6 +81,8 @@ class FinanceRepository @Inject constructor(
     suspend fun load(): Outcome<FinanceData> = withContext(Dispatchers.IO) {
         sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         if (_data.value == null) readDisk()?.let { _data.value = it }
+        // Push any queued offline edits before pulling fresh, so the snapshot reflects them.
+        runCatching { replayPending() }
         try {
             val res = api().financeData()
             when {
@@ -105,35 +109,35 @@ class FinanceRepository @Inject constructor(
     private fun upsertProject(v: FinanceProject) = publish(cur().let { it.copy(projects = it.projects.upsert(v) { x -> x.id == v.id }) })
     private fun upsertCategory(v: FinanceCategory) = publish(cur().let { it.copy(financeCategories = it.financeCategories.upsert(v) { x -> x.id == v.id }) })
 
-    // ---- Invoices ----
+    // ---- Invoices ---- (create/finalize/restore online-only; update/delete offline-queued)
     suspend fun createInvoice(body: JsonObject) = record({ api().createInvoice(body) }, { it.invoice }, ::upsertInvoice)
-    suspend fun updateInvoice(id: Int, body: JsonObject) = record({ api().updateInvoice(id, body) }, { it.invoice }, ::upsertInvoice)
+    suspend fun updateInvoice(id: Int, body: JsonObject) = update("invoice", id, body, Invoice.serializer(), cur().invoices.firstOrNull { it.id == id }, ::upsertInvoice, { api().updateInvoice(id, body) }, { it.invoice })
     suspend fun finalizeInvoice(id: Int) = record({ api().finalizeInvoice(id) }, { it.invoice }, ::upsertInvoice)
     suspend fun restoreInvoice(id: Int) = record({ api().restoreInvoice(id) }, { it.invoice }, ::upsertInvoice)
-    suspend fun deleteInvoice(id: Int) = delete({ api().deleteInvoice(id) }) { publish(cur().let { d -> d.copy(invoices = d.invoices.filterNot { it.id == id }) }) }
+    suspend fun deleteInvoice(id: Int) = deleteQueued("invoice", id, { api().deleteInvoice(id) }) { publish(cur().let { d -> d.copy(invoices = d.invoices.filterNot { it.id == id }) }) }
 
     // ---- Transactions ----
     suspend fun createTransaction(body: JsonObject) = record({ api().createTransaction(body) }, { it.transaction }, ::upsertTransaction)
-    suspend fun updateTransaction(id: Int, body: JsonObject) = record({ api().updateTransaction(id, body) }, { it.transaction }, ::upsertTransaction)
-    suspend fun deleteTransaction(id: Int) = delete({ api().deleteTransaction(id) }) { publish(cur().let { d -> d.copy(transactions = d.transactions.filterNot { it.id == id }) }) }
+    suspend fun updateTransaction(id: Int, body: JsonObject) = update("transaction", id, body, BankTransaction.serializer(), cur().transactions.firstOrNull { it.id == id }, ::upsertTransaction, { api().updateTransaction(id, body) }, { it.transaction })
+    suspend fun deleteTransaction(id: Int) = deleteQueued("transaction", id, { api().deleteTransaction(id) }) { publish(cur().let { d -> d.copy(transactions = d.transactions.filterNot { it.id == id }) }) }
 
     // ---- Partners ----
     suspend fun createPartner(body: JsonObject) = record({ api().createPartner(body) }, { it.partner }, ::upsertPartner)
-    suspend fun updatePartner(id: Int, body: JsonObject) = record({ api().updatePartner(id, body) }, { it.partner }, ::upsertPartner)
-    suspend fun deletePartner(id: Int) = delete({ api().deletePartner(id) }) { publish(cur().let { d -> d.copy(partners = d.partners.filterNot { it.id == id }) }) }
+    suspend fun updatePartner(id: Int, body: JsonObject) = update("partner", id, body, FinancePartner.serializer(), cur().partners.firstOrNull { it.id == id }, ::upsertPartner, { api().updatePartner(id, body) }, { it.partner })
+    suspend fun deletePartner(id: Int) = deleteQueued("partner", id, { api().deletePartner(id) }) { publish(cur().let { d -> d.copy(partners = d.partners.filterNot { it.id == id }) }) }
 
     // ---- Payment methods ----
     suspend fun createPaymentMethod(body: JsonObject) = record({ api().createPaymentMethod(body) }, { it.paymentMethod }, ::upsertPayment)
-    suspend fun updatePaymentMethod(id: Int, body: JsonObject) = record({ api().updatePaymentMethod(id, body) }, { it.paymentMethod }, ::upsertPayment)
-    suspend fun deletePaymentMethod(id: Int) = delete({ api().deletePaymentMethod(id) }) { publish(cur().let { d -> d.copy(paymentMethods = d.paymentMethods.filterNot { it.id == id }) }) }
+    suspend fun updatePaymentMethod(id: Int, body: JsonObject) = update("paymentMethod", id, body, PaymentMethod.serializer(), cur().paymentMethods.firstOrNull { it.id == id }, ::upsertPayment, { api().updatePaymentMethod(id, body) }, { it.paymentMethod })
+    suspend fun deletePaymentMethod(id: Int) = deleteQueued("paymentMethod", id, { api().deletePaymentMethod(id) }) { publish(cur().let { d -> d.copy(paymentMethods = d.paymentMethods.filterNot { it.id == id }) }) }
 
     // ---- Projects ----
     suspend fun createProject(body: JsonObject) = record({ api().createProject(body) }, { it.project }, ::upsertProject)
-    suspend fun updateProject(id: Int, body: JsonObject) = record({ api().updateProject(id, body) }, { it.project }, ::upsertProject)
+    suspend fun updateProject(id: Int, body: JsonObject) = update("project", id, body, FinanceProject.serializer(), cur().projects.firstOrNull { it.id == id }, ::upsertProject, { api().updateProject(id, body) }, { it.project })
     suspend fun moveProject(id: Int, body: JsonObject) = record({ api().moveProject(id, body) }, { it.project }, ::upsertProject)
-    suspend fun deleteProject(id: Int) = delete({ api().deleteProject(id) }) { publish(cur().let { d -> d.copy(projects = d.projects.filterNot { it.id == id }) }) }
+    suspend fun deleteProject(id: Int) = deleteQueued("project", id, { api().deleteProject(id) }) { publish(cur().let { d -> d.copy(projects = d.projects.filterNot { it.id == id }) }) }
 
-    // ---- Categories ----
+    // ---- Categories (online-only; trivial) ----
     suspend fun createCategory(body: JsonObject) = record({ api().createCategory(body) }, { it.category }, ::upsertCategory)
     suspend fun updateCategory(id: Int, body: JsonObject) = record({ api().updateCategory(id, body) }, { it.category }, ::upsertCategory)
     suspend fun deleteCategory(id: Int) = delete({ api().deleteCategory(id) }) { publish(cur().let { d -> d.copy(financeCategories = d.financeCategories.filterNot { it.id == id }) }) }
@@ -183,6 +187,83 @@ class FinanceRepository @Inject constructor(
 
     private suspend fun <T> get(call: suspend () -> Response<T>): T? = withContext(Dispatchers.IO) {
         runCatching { call().takeIf { it.isSuccessful }?.body() }.getOrNull()
+    }
+
+    // ---- Offline write queue (update/delete of existing records; create stays online) ----
+    /** Overlay [body]'s fields onto [current] (re-serialize → merge → decode) for an optimistic patch. */
+    private fun <R> mergeRecord(current: R, body: JsonObject, serializer: kotlinx.serialization.KSerializer<R>): R {
+        val base = json.encodeToJsonElement(serializer, current).jsonObject
+        return json.decodeFromJsonElement(serializer, JsonObject(base + body))
+    }
+
+    private suspend fun <W, R> update(
+        entity: String, id: Int, body: JsonObject, serializer: kotlinx.serialization.KSerializer<R>,
+        current: R?, upsert: (R) -> Unit,
+        call: suspend () -> Response<W>, pick: (W) -> R?,
+    ): Outcome<R> {
+        if (!connectivity.isOnline()) {
+            val c = current ?: return Outcome.Err(ErrorKind.NETWORK)
+            val merged = mergeRecord(c, body, serializer); upsert(merged)
+            outbox.addCoalesced(FinanceOp(entity, "update", id, body))
+            return Outcome.Ok(merged)
+        }
+        return withContext(Dispatchers.IO) {
+            try {
+                val res = call()
+                if (res.isSuccessful) {
+                    val r = res.body()?.let(pick) ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                    upsert(r); Outcome.Ok(r)
+                } else {
+                    Outcome.Err(if (res.code() == 409) ErrorKind.HTTP else ErrorKind.NETWORK) // server rejection ≠ offline
+                }
+            } catch (e: Exception) {
+                val c = current ?: return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+                val merged = mergeRecord(c, body, serializer); upsert(merged)
+                outbox.addCoalesced(FinanceOp(entity, "update", id, body))
+                Outcome.Ok(merged)
+            }
+        }
+    }
+
+    private suspend fun deleteQueued(entity: String, id: Int, call: suspend () -> Response<*>, removeCache: () -> Unit): Outcome<Unit> {
+        if (!connectivity.isOnline()) {
+            removeCache(); outbox.addCoalesced(FinanceOp(entity, "delete", id)); return Outcome.Ok(Unit)
+        }
+        return withContext(Dispatchers.IO) {
+            try {
+                if (call().isSuccessful) { removeCache(); Outcome.Ok(Unit) } else Outcome.Err(ErrorKind.NETWORK)
+            } catch (e: Exception) {
+                removeCache(); outbox.addCoalesced(FinanceOp(entity, "delete", id)); Outcome.Ok(Unit)
+            }
+        }
+    }
+
+    /** Replay queued offline ops FIFO. Stops on the first network failure (keeps it for later); a
+     *  server 409/404 during replay is treated as done (server state wins). Runs before each load. */
+    suspend fun replayPending() = withContext(Dispatchers.IO) {
+        if (!connectivity.isOnline() || sessionHolder.get() == null) return@withContext
+        for (op in outbox.all()) {
+            val done = try { runOp(op) } catch (_: Exception) { false }
+            if (done) outbox.remove(op) else break
+        }
+    }
+
+    private suspend fun runOp(op: FinanceOp): Boolean {
+        val a = api()
+        val res: Response<*> = when ("${op.entity}:${op.action}") {
+            "invoice:update" -> a.updateInvoice(op.id, op.body!!)
+            "invoice:delete" -> a.deleteInvoice(op.id)
+            "transaction:update" -> a.updateTransaction(op.id, op.body!!)
+            "transaction:delete" -> a.deleteTransaction(op.id)
+            "partner:update" -> a.updatePartner(op.id, op.body!!)
+            "partner:delete" -> a.deletePartner(op.id)
+            "paymentMethod:update" -> a.updatePaymentMethod(op.id, op.body!!)
+            "paymentMethod:delete" -> a.deletePaymentMethod(op.id)
+            "project:update" -> a.updateProject(op.id, op.body!!)
+            "project:delete" -> a.deleteProject(op.id)
+            else -> return true // unknown op → drop
+        }
+        return res.isSuccessful || res.code() == 409 || res.code() == 404
     }
 }
 
