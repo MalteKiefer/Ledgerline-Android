@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.finance.CategorySuggestion
 import de.ledgerline.app.domain.model.finance.DuplicateGroup
@@ -30,18 +31,41 @@ import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.common.SectionLabel
 import de.ledgerline.app.ui.theme.cardSurface
 
-/** Read-only insights: server-detected duplicate groups + merchant→category suggestions (applyable). */
+/** Read-only insights: tax reports (VAT advance + EÜR) + duplicates + category suggestions. */
 @Composable
 fun InsightsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
     var dups by remember { mutableStateOf<FinanceDuplicates?>(null) }
     var suggestions by remember { mutableStateOf<List<CategorySuggestion>>(emptyList()) }
+    var vatAdvance by remember { mutableStateOf<de.ledgerline.app.domain.model.finance.VatAdvanceReturn?>(null) }
+    var euer by remember { mutableStateOf<de.ledgerline.app.domain.model.finance.EuerReport?>(null) }
+    val year by vm.year.collectAsStateWithLifecycle()
     var refresh by remember { mutableStateOf(0) }
-    LaunchedEffect(refresh) {
+    LaunchedEffect(refresh, year) {
+        vatAdvance = vm.loadVatAdvance(year, null)
+        euer = vm.loadEuer(year)
         dups = vm.loadDuplicates()
         suggestions = vm.loadSuggestions()
     }
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.more_insights), onBack = onBack) }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            vatAdvance?.let { v ->
+                SectionLabel(stringResource(R.string.insights_vat_advance))
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (v.smallBusiness) Text(stringResource(R.string.insights_small_business), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ReportRow(stringResource(R.string.insights_output_vat), FinanceViewModel.money(v.outputVat))
+                    ReportRow(stringResource(R.string.insights_input_vat), FinanceViewModel.money(v.inputVat))
+                    ReportRow(stringResource(R.string.insights_payable), FinanceViewModel.money(v.payable), bold = true)
+                }
+            }
+            euer?.let { e ->
+                SectionLabel(stringResource(R.string.insights_euer))
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    ReportRow(stringResource(R.string.insights_income), FinanceViewModel.money(e.income.total))
+                    ReportRow(stringResource(R.string.insights_expenses), FinanceViewModel.money(e.expenses.total))
+                    ReportRow(stringResource(R.string.insights_profit), FinanceViewModel.money(e.profit), bold = true)
+                }
+            }
+
             SectionLabel(stringResource(R.string.insights_suggestions))
             if (suggestions.isEmpty()) {
                 Text(stringResource(R.string.insights_no_suggestions), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -62,6 +86,14 @@ fun InsightsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
             SectionLabel(stringResource(R.string.insights_duplicate_transactions))
             DupGroups(dups?.transactions.orEmpty())
         }
+    }
+}
+
+@Composable
+private fun ReportRow(label: String, value: String, bold: Boolean = false) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween) {
+        Text(label, style = if (bold) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
+        Text(value, style = if (bold) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium)
     }
 }
 

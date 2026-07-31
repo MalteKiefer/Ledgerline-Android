@@ -64,8 +64,9 @@ fun InvoicesTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit) {
                             Text(FinanceViewModel.money(inv.gross, inv.currency), style = MaterialTheme.typography.titleMedium)
                         }
                         val importedTag = if (inv.imported) stringResource(R.string.invoice_imported) else null
+                        val creditTag = if (inv.isCreditNote) stringResource(R.string.invoice_credit_note) else null
                         Text(
-                            listOfNotNull(customerName(inv), inv.issueDate, statusLabel(inv.status), importedTag).joinToString(" · "),
+                            listOfNotNull(customerName(inv), inv.issueDate, statusLabel(inv.status), creditTag, importedTag).joinToString(" · "),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -127,15 +128,30 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
             else src.forEach { l -> add(LineRow(jstr(l, "desc"), jstr(l, "qty").ifBlank { "1" }, jstr(l, "unitPrice"), jstr(l, "vatRate").ifBlank { defaultVat })) }
         }
     }
+    var invoiceEmail by remember { mutableStateOf(existing?.invoiceEmail ?: "") }
+    var discountValue by remember { mutableStateOf(existing?.discountValue ?: "") }
+    var discountPercent by remember { mutableStateOf((existing?.discountType ?: "percent") == "percent") }
+    var skontoPercent by remember { mutableStateOf(existing?.skontoPercent ?: "") }
+    var skontoDays by remember { mutableStateOf(existing?.skontoDays?.toString() ?: "") }
     var busy by remember { mutableStateOf(false) }
 
-    val net = lines.sumOf { it.net }
-    val vat = lines.sumOf { it.vatAmount }
+    val lineNet = lines.sumOf { it.net }
+    val discAmount = run {
+        val v = discountValue.replace(',', '.').toDoubleOrNull() ?: 0.0
+        if (v <= 0) 0.0 else if (discountPercent) lineNet * v / 100.0 else v
+    }
+    val netBase = (lineNet - discAmount).coerceAtLeast(0.0)
+    val factor = if (lineNet > 0) netBase / lineNet else 1.0 // scale each line's VAT by the discount
+    val vat = lines.sumOf { it.vatAmount } * factor
+    val net = netBase
     val gross = net + vat
 
     fun body(): JsonObject = buildJsonObject {
         existing?.let { put("version", it.version) }
-        put("customer", buildJsonObject { put("name", customer.trim()) })
+        put("customer", buildJsonObject {
+            put("name", customer.trim())
+            if (invoiceEmail.isNotBlank()) put("invoiceEmail", invoiceEmail.trim())
+        })
         put("issue_date", issueDate.trim())
         put("due_date", dueDate.trim())
         put("lines", kotlinx.serialization.json.buildJsonArray {
@@ -148,6 +164,13 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
                 })
             }
         })
+        if (discountValue.isNotBlank()) {
+            put("discount_type", if (discountPercent) "percent" else "amount")
+            put("discount_value", discountValue.replace(',', '.').trim())
+        }
+        if (skontoPercent.isNotBlank()) put("skonto_percent", skontoPercent.replace(',', '.').trim())
+        skontoDays.toIntOrNull()?.let { put("skonto_days", it) }
+        if (invoiceEmail.isNotBlank()) put("invoice_email", invoiceEmail.trim())
         put("net", roundStr(net))
         put("vat", roundStr(vat))
         put("gross", roundStr(gross))
@@ -192,15 +215,46 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
             }
             TextButton(onClick = { lines.add(LineRow("", "1", "", defaultVat)) }) { Text(stringResource(R.string.line_add)) }
 
+            Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SectionLabel(stringResource(R.string.invoice_discount))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    NumField(discountValue, { discountValue = it }, R.string.invoice_discount_value, Modifier.weight(1f))
+                    androidx.compose.material3.FilterChip(selected = discountPercent, onClick = { discountPercent = true }, label = { Text("%") })
+                    androidx.compose.material3.FilterChip(selected = !discountPercent, onClick = { discountPercent = false }, label = { Text("€") })
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumField(skontoPercent, { skontoPercent = it }, R.string.invoice_skonto_percent, Modifier.weight(1f))
+                    NumField(skontoDays, { skontoDays = it }, R.string.invoice_skonto_days, Modifier.weight(1f))
+                }
+            }
+
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 TotalRow(stringResource(R.string.invoice_net), FinanceViewModel.money(net))
                 TotalRow(stringResource(R.string.invoice_vat_amount), FinanceViewModel.money(vat))
                 TotalRow(stringResource(R.string.invoice_gross), FinanceViewModel.money(gross), bold = true)
             }
 
+            Field(invoiceEmail, { invoiceEmail = it }, R.string.invoice_email_field)
             Field(note, { note = it }, R.string.invoice_note)
 
             if (id != null) InvoicePdfSection(vm, id, hasPdf = existing?.pdfPath != null)
+
+            // Lifecycle actions for a finalized (numbered) non-credit-note invoice (web parity).
+            val finalized = existing?.number != null
+            if (id != null && finalized && existing?.isCreditNote != true) {
+                var msg by remember { mutableStateOf<String?>(null) }
+                msg?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val emailCtx = stringResource(R.string.invoice_email_sent)
+                    val dunCtx = stringResource(R.string.invoice_dun_sent)
+                    TextButton(onClick = { vm.emailInvoice(id, invoiceEmail.ifBlank { null }) { ok -> if (ok) msg = emailCtx } }) { Text(stringResource(R.string.invoice_email_send)) }
+                    TextButton(onClick = { vm.dunInvoice(id, invoiceEmail.ifBlank { null }) { ok -> if (ok) msg = dunCtx } }) { Text(stringResource(R.string.invoice_dun)) }
+                    TextButton(onClick = { vm.stornoInvoice(id) { ok -> if (ok) onBack() } }) { Text(stringResource(R.string.invoice_storno), color = MaterialTheme.colorScheme.error) }
+                }
+                if (existing != null && existing.reminderCount > 0) {
+                    Text(stringResource(R.string.invoice_reminder_level) + " " + existing.reminderCount, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
 
             if (id != null && existing?.number == null) {
                 TextButton(onClick = { vm.finalizeInvoice(id) { } }) { Text(stringResource(R.string.invoice_finalize)) }
@@ -646,12 +700,13 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: () -> Unit) {
     var email by remember(p) { mutableStateOf(p.companyEmail ?: "") }
     var vatId by remember(p) { mutableStateOf(p.companyVatId ?: "") }
     var iban by remember(p) { mutableStateOf(p.companyIban ?: "") }
+    var smallBusiness by remember(p) { mutableStateOf(p.smallBusiness ?: false) }
     var busy by remember { mutableStateOf(false) }
     AppScaffold(topBar = {
         AppTopBar(title = stringResource(R.string.more_company), onBack = onBack, actions = {
             TextButton(enabled = !busy, onClick = {
                 busy = true
-                vm.saveCompany(p.copy(companyName = name, companyAddress = address, companyEmail = email, companyVatId = vatId, companyIban = iban)) { ok -> busy = false; if (ok) onBack() }
+                vm.saveCompany(p.copy(companyName = name, companyAddress = address, companyEmail = email, companyVatId = vatId, companyIban = iban, smallBusiness = smallBusiness)) { ok -> busy = false; if (ok) onBack() }
             }) { Text(stringResource(R.string.action_save)) }
         })
     }) { pad ->
@@ -661,6 +716,10 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: () -> Unit) {
             Field(email, { email = it }, R.string.company_email)
             Field(vatId, { vatId = it }, R.string.company_vat_id)
             Field(iban, { iban = it }, R.string.company_iban)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.company_small_business), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                androidx.compose.material3.Switch(checked = smallBusiness, onCheckedChange = { smallBusiness = it })
+            }
         }
     }
 }

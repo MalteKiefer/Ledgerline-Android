@@ -1176,4 +1176,26 @@
     <string name="invoice_pdf">PDF</string>
     <string name="invoice_upload_pdf">Загрузить PDF</string>
     <string name="receipt_ocr">Скан (OCR)</string>
+    <string name="invoice_discount">Скидка и Skonto</string>
+    <string name="invoice_discount_value">Скидка</string>
+    <string name="invoice_skonto_percent">Skonto %</string>
+    <string name="invoice_skonto_days">Skonto дней</string>
+    <string name="invoice_email_field">Email для счёта</string>
+    <string name="invoice_email_send">Отправить</string>
+    <string name="invoice_email_sent">Счёт отправлен.</string>
+    <string name="invoice_dun">Напоминание</string>
+    <string name="invoice_dun_sent">Напоминание отправлено.</string>
+    <string name="invoice_storno">Сторно (кредит-нота)</string>
+    <string name="invoice_credit_note">кредит-нота</string>
+    <string name="invoice_reminder_level">Уровень напоминания</string>
+    <string name="insights_vat_advance">Декларация НДС (Zahllast)</string>
+    <string name="insights_small_business">§19 малый бизнес (без НДС)</string>
+    <string name="insights_output_vat">Исходящий НДС</string>
+    <string name="insights_input_vat">Входящий НДС</string>
+    <string name="insights_payable">К уплате</string>
+    <string name="insights_euer">Превышение доходов (EÜR)</string>
+    <string name="insights_income">Доходы</string>
+    <string name="insights_expenses">Расходы</string>
+    <string name="insights_profit">Прибыль</string>
+    <string name="company_small_business">§19 малый бизнес</string>
 </resources>

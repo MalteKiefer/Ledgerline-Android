@@ -1175,4 +1175,26 @@
     <string name="invoice_pdf">PDF</string>
     <string name="invoice_upload_pdf">Upload PDF</string>
     <string name="receipt_ocr">Scan (OCR)</string>
+    <string name="invoice_discount">Discount &amp; Skonto</string>
+    <string name="invoice_discount_value">Discount</string>
+    <string name="invoice_skonto_percent">Skonto %</string>
+    <string name="invoice_skonto_days">Skonto days</string>
+    <string name="invoice_email_field">Invoice email</string>
+    <string name="invoice_email_send">Email</string>
+    <string name="invoice_email_sent">Invoice emailed.</string>
+    <string name="invoice_dun">Send reminder</string>
+    <string name="invoice_dun_sent">Reminder sent.</string>
+    <string name="invoice_storno">Cancel (credit note)</string>
+    <string name="invoice_credit_note">credit note</string>
+    <string name="invoice_reminder_level">Reminder level</string>
+    <string name="insights_vat_advance">VAT return (Zahllast)</string>
+    <string name="insights_small_business">§19 small business (no VAT)</string>
+    <string name="insights_output_vat">Output VAT</string>
+    <string name="insights_input_vat">Input VAT</string>
+    <string name="insights_payable">Payable</string>
+    <string name="insights_euer">Income surplus (EÜR)</string>
+    <string name="insights_income">Income</string>
+    <string name="insights_expenses">Expenses</string>
+    <string name="insights_profit">Profit</string>
+    <string name="company_small_business">§19 Kleinunternehmer</string>
 </resources>
