@@ -125,23 +125,25 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
 
 ## 7. Stand & TODO (finance-pivot)
 
-**Erledigt:** Datenschicht (Modelle + `FinanceApi` + Repository cache-first/CRUD), biometrischer
-App-Lock, Finance-Shell + Kern-Screens, Nav, Manifest/DI/Entry-Points auf finance-only rewired,
-ZK-Stack gelöscht (355→~78 Quell-Dateien). `assembleDebug` grün. **On-device-Verifikation offen.**
+**Erledigt:** Datenschicht (Modelle + `FinanceApi` + Repository cache-first/CRUD + Offline-Write-Queue
+`FinanceOutbox` für update/delete), biometrischer App-Lock, Finance-Shell + alle Kern-Screens, Nav,
+Manifest/DI/Entry-Points auf finance-only rewired, ZK-Stack gelöscht (355→~77 Quell-Dateien). **4b
+UI-Tiefe weitgehend erledigt:** Dashboard-Jahr-Picker, Rechnungs-Positionen-Editor (Live-Summen),
+importierte Rechnung (Read-only-Kernfelder + Original-PDF via FileProvider/`DocOpener`), PDF-Upload,
+Belege anhängen/anzeigen/löschen (multipart), Bulk-CSV-Import (`core/finance/BankCsv`), OCR-Scan,
+Insights (Duplikate + Kategorie-Vorschläge), Account-Security (Passwort/2FA/Export-SAF/Löschen),
+Geräte + Notifications + Theme. Dead-Libs entfernt (lazysodium/PdfBox/BouncyCastle/mapsforge/Media3/
+credentials/autofill/documentfile). `LedgerlineApi` + tote dto getrimmt. Tests: `FinanceOutboxTest`,
+`BankCsvTest`. `assembleDebug` + Unit-Tests grün. **On-device-Verifikation weiter offen** (Gerät fiel
+wiederholt beim Install ab).
 
-**TODO:**
+**TODO (Rest):**
 - **On-device:** Pairing (QR) → biometrisch entsperren → `/finance/data` lädt → Rechnung/Umsatz
-  anlegen. FLAG_SECURE → visuell prüfen.
-- **2b Offline-Write-Queue** (per-record Replay + 409-version; provisional int-id-Remap für
-  Offline-Creates).
-- **4b UI-Tiefe:** Reports-Jahr-Picker, Rechnungs-Positionen-Editor, PDF-Ansicht/-Upload, Belege
-  (multipart) + Anzeige, Bulk-Bankauszug-Import, OCR-Beleg, Duplikate-/Kategorie-Vorschläge,
-  Konto-Screens (Geräte, Notifications, 2FA, Export/Löschen, Theme/Prefs, Firmenlogo).
-- **Cleanup:** `LedgerlineApi` + `dto` auf finance/Konto trimmen; ungenutzte Ressourcen (xml/
-  drawables der gelöschten Features) entfernen; Finance-Unit-Tests schreiben (alle 125 Alt-Tests
-  gelöscht).
-- **Libs:** mapsforge/lazysodium/BouncyCastle/PdfBox/credentials/ML-Kit aus `libs.versions.toml` +
-  `build.gradle.kts` entfernen (nicht mehr referenziert).
+  anlegen/PDF/Beleg/CSV-Import durchklicken. FLAG_SECURE → visuell prüfen.
+- **Bulk-Import:** MT940/CAMT.053-Formate (nur CSV fertig).
+- **Offline-Create** (provisional int-id-Remap über Fremdschlüssel) — bewusst verschoben (riskant).
+- **Firmenlogo** Upload/Anzeige (multipart `logo`/`remove_logo`); ungenutzte xml/drawables der
+  gelöschten Features entfernen; mehr Finance-Unit-Tests.
 
 ## 8. Referenzen
 - API: `../ledgerline/openapi.yaml` · `../ledgerline/routes/api.php`
