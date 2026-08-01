@@ -472,6 +472,25 @@ class WorkspaceRepository(
 
     // On Dispatchers.IO: opening + JSON-decoding every module + the sharded files slice is
     // CPU/IO-heavy and must not block the caller's main thread (large stores would ANR).
+    /**
+     * Recover NOTES from a retained history-version sealed root [ciphertext] (`/notes/store/history/{v}`):
+     * decode the old notes and re-add any whose id is missing from the current workspace (never
+     * overwrites a live note). Returns the count restored, or -1 on failure.
+     */
+    suspend fun recoverNotesFromHistoryRoot(ciphertext: String): Int = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext -1
+        val loaded = runCatching { notesEngine.historyLoad(ciphertext, vk) }.getOrNull() ?: return@withContext -1
+        val cur = cache.value.value?.manifest ?: when (val l = load()) {
+            is Outcome.Ok -> l.value.manifest
+            is Outcome.Err -> return@withContext -1
+        }
+        val have = cur.notes.mapTo(HashSet()) { it.id }
+        val add = loaded.records.map(WorkspaceRecordCodec::decodeNote).filter { it.id !in have }
+        if (add.isEmpty()) return@withContext 0
+        val out = save { m -> m.copy(notes = m.notes + add) }
+        if (out is Outcome.Ok) add.size else -1
+    }
+
     suspend fun load(): Outcome<Workspace> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)

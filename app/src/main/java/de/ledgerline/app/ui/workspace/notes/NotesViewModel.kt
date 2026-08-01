@@ -34,8 +34,19 @@ class NotesViewModel @Inject constructor(
     private val load: LoadWorkspace,
     private val cache: WorkspaceCache,
     private val mutate: MutateWorkspace,
+    private val workspaceRepo: de.ledgerline.app.data.WorkspaceRepository,
+    private val history: de.ledgerline.app.data.StoreHistoryRepository,
     settingsStore: SettingsStore,
 ) : ViewModel() {
+
+    // ---- Notes version history / recovery (v1.536) ----
+    suspend fun historyVersions() = history.list(de.ledgerline.app.data.StoreHistoryRepository.Store.NOTES)
+    suspend fun recoverVersion(version: Int): Int {
+        val v = history.fetch(de.ledgerline.app.data.StoreHistoryRepository.Store.NOTES, version) ?: return -1
+        val n = workspaceRepo.recoverNotesFromHistoryRoot(v.ciphertext)
+        if (n > 0) load.invoke()
+        return n
+    }
     private val _state = MutableStateFlow(NotesUi(loading = true))
     val state: StateFlow<NotesUi> = _state
 

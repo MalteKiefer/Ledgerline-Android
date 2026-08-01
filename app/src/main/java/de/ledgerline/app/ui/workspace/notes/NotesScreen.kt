@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.RestoreFromTrash
@@ -74,6 +75,14 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
     var deleteTarget by remember { mutableStateOf<String?>(null) }
     var deleteForeverTarget by remember { mutableStateOf<String?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
+    if (showHistory) {
+        de.ledgerline.app.ui.common.StoreHistoryDialog(
+            onDismiss = { showHistory = false },
+            load = { vm.historyVersions() },
+            recover = { vm.recoverVersion(it) },
+        )
+    }
 
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
@@ -130,6 +139,14 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
                             TextButton(onClick = { vm.setTrash(true) }) {
                                 Icon(Icons.Outlined.DeleteOutline, null, Modifier.padding(end = 4.dp).size(18.dp))
                                 Text(stringResource(R.string.trash_open, trashCount))
+                            }
+                        }
+                    }
+                    if (!showTrash) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { showHistory = true }) {
+                                Icon(Icons.Outlined.History, null, Modifier.padding(end = 4.dp).size(18.dp))
+                                Text(stringResource(R.string.history_title))
                             }
                         }
                     }
