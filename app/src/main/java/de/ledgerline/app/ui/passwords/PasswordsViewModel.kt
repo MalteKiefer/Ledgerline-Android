@@ -40,7 +40,17 @@ class PasswordsViewModel @Inject constructor(
     private val repo: PasswordsRepository,
     private val cache: PasswordsCache,
     private val vaultKeyHolder: VaultKeyHolder,
+    private val history: de.ledgerline.app.data.StoreHistoryRepository,
 ) : ViewModel() {
+
+    // ---- Version history / recovery (v1.536) ----
+    suspend fun historyVersions() = history.list(de.ledgerline.app.data.StoreHistoryRepository.Store.PASSWORDS)
+
+    /** Recover missing records from a retained version. Returns count restored, or -1 on failure. */
+    suspend fun recoverVersion(version: Int): Int {
+        val v = history.fetch(de.ledgerline.app.data.StoreHistoryRepository.Store.PASSWORDS, version) ?: return -1
+        return repo.recoverFromHistoryRoot(v.ciphertext)
+    }
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query

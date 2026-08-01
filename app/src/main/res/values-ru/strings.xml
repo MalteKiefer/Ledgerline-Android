@@ -1050,4 +1050,11 @@
     <string name="finance_eg_grund_sonstiges">Прочее</string>
     <string name="finance_eg_sig_big">Увеличить</string>
     <string name="finance_eg_sig_hint">Распишитесь пальцем — затем Сохранить.</string>
+    <string name="history_title">История версий</string>
+    <string name="history_loading">Загрузка…</string>
+    <string name="history_empty">Нет сохранённых версий.</string>
+    <string name="history_restore">Восстановить</string>
+    <string name="history_recover_ok">Восстановлено</string>
+    <string name="history_recover_none">Нечего восстанавливать из этой версии.</string>
+    <string name="history_recover_failed">Не удалось восстановить.</string>
 </resources>

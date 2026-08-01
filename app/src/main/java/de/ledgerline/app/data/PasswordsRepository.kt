@@ -148,6 +148,37 @@ class PasswordsRepository(
         return secrets to folders
     }
 
+    /**
+     * Recover records from a retained history-version sealed root [ciphertext] (`…/store/history/{v}`):
+     * decode it (its shard blobs are content-addressed and usually still present), then re-add any
+     * secret/folder whose id is MISSING from the current store (never overwrites a live record). Runs
+     * through the normal 409-safe [save], so the recovered records are re-sharded + persisted. Returns
+     * the number of records restored, or -1 if the version couldn't be decrypted/assembled.
+     */
+    suspend fun recoverFromHistoryRoot(ciphertext: String): Int = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext -1
+        // Load current first (repopulates the raw maps for live records so save re-emits them intact).
+        val cur = cache.value.value?.manifest ?: when (val l = load()) {
+            is Outcome.Ok -> l.value.manifest
+            is Outcome.Err -> return@withContext -1
+        }
+        val loaded = runCatching { engine.historyLoad(ciphertext, vk) }.getOrNull() ?: return@withContext -1
+        val haveSecrets = cur.secrets.mapTo(HashSet()) { it.id }
+        val haveFolders = cur.secretFolders.mapTo(HashSet()) { it.id }
+        // Decode ONLY the missing old records, capturing their raw additively (never clobber a live id).
+        val addSecrets = loaded.records.mapNotNull { obj ->
+            val s = SecretRecordCodec.decodeSecret(obj)
+            if (s.id in haveSecrets) null else { secretRawById[s.id] = obj; s }
+        }
+        val addFolders = loaded.folders.mapNotNull { obj ->
+            val f = SecretRecordCodec.decodeFolder(obj)
+            if (f.id in haveFolders) null else { folderRawById[f.id] = obj; f }
+        }
+        if (addSecrets.isEmpty() && addFolders.isEmpty()) return@withContext 0
+        val out = save { m -> m.copy(secrets = m.secrets + addSecrets, secretFolders = m.secretFolders + addFolders) }
+        if (out is Outcome.Ok) addSecrets.size + addFolders.size else -1
+    }
+
     private fun encodeSecrets(m: SecretsManifest): List<Pair<String, JsonObject>> =
         m.secrets.map { it.id to SecretRecordCodec.encodeSecret(it, secretRawById[it.id]) }
 

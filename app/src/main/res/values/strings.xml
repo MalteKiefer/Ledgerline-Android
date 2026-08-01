@@ -1049,4 +1049,11 @@
     <string name="finance_eg_grund_sonstiges">Other</string>
     <string name="finance_eg_sig_big">Enlarge</string>
     <string name="finance_eg_sig_hint">Sign with your finger — tap Save when done.</string>
+    <string name="history_title">Version history</string>
+    <string name="history_loading">Loading…</string>
+    <string name="history_empty">No retained versions.</string>
+    <string name="history_restore">Recover</string>
+    <string name="history_recover_ok">Restored</string>
+    <string name="history_recover_none">Nothing to recover from this version.</string>
+    <string name="history_recover_failed">Recovery failed.</string>
 </resources>

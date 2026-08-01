@@ -109,6 +109,25 @@ class ShardedStoreEngine(
         return Loaded(emptyList(), emptyList(), present = false)
     }
 
+    /**
+     * Read-only assemble of a HISTORICAL sealed-root ciphertext (from `…/store/history/{version}`)
+     * for recovery — decrypts the root + fetches its still-present shard/collection blobs online,
+     * WITHOUT touching [version]/[priorRoot] (so a later save's dirty-reuse base stays correct).
+     * Returns null when the root can't be decrypted/decoded (e.g. wrong VK). A durably-missing shard
+     * throws inside [fetchShard]; callers should catch and treat that version as unrecoverable.
+     */
+    suspend fun historyLoad(ciphertext: String, vk: ByteArray): Loaded? {
+        val plain = crypto.openManifest(ciphertext, vk) ?: return null
+        val root = runCatching { json.decodeFromString(ShardRoot.serializer(), plain) }.getOrNull() ?: return null
+        val records = coroutineScope {
+            root.shards.map { s -> async { fetchShard(s.ref, s.key ?: "", vk, allowNetwork = true) } }.awaitAll()
+        }.flatMap { it ?: emptyList() }
+        val folders = if (root.foldersRef != null) {
+            fetchShard(root.foldersRef!!, root.foldersKey ?: "", vk, allowNetwork = true).orEmpty()
+        } else emptyList()
+        return Loaded(records, folders, present = true)
+    }
+
     private suspend fun assemble(root: ShardRoot, vk: ByteArray, allowNetwork: Boolean): Loaded {
         priorRoot = SealedShardWriter.RootState(
             shardBits = root.shardBits,

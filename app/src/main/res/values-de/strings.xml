@@ -1047,4 +1047,11 @@
     <string name="finance_eg_grund_sonstiges">Sonstiges</string>
     <string name="finance_eg_sig_big">Vergrößern</string>
     <string name="finance_eg_sig_hint">Mit dem Finger unterschreiben — dann Speichern.</string>
+    <string name="history_title">Versionsverlauf</string>
+    <string name="history_loading">Wird geladen…</string>
+    <string name="history_empty">Keine gespeicherten Versionen.</string>
+    <string name="history_restore">Wiederherstellen</string>
+    <string name="history_recover_ok">Wiederhergestellt</string>
+    <string name="history_recover_none">Nichts aus dieser Version wiederherzustellen.</string>
+    <string name="history_recover_failed">Wiederherstellung fehlgeschlagen.</string>
 </resources>

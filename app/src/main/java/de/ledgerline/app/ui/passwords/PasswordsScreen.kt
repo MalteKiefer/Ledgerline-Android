@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Description
@@ -208,6 +209,14 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onMenu: (() -> Un
     val folderFilter by vm.folderFilter.collectAsStateWithLifecycle()
     var searchActive by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var overflow by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
+    if (showHistory) {
+        de.ledgerline.app.ui.common.StoreHistoryDialog(
+            onDismiss = { showHistory = false },
+            load = { vm.historyVersions() },
+            recover = { vm.recoverVersion(it) },
+        )
+    }
 
     Scaffold(
         modifier = modifier,
@@ -238,6 +247,11 @@ private fun PwList(vm: PasswordsViewModel, modifier: Modifier, onMenu: (() -> Un
                                     text = { Text(if (ui.trashCount > 0) stringResource(de.ledgerline.app.R.string.trash_open, ui.trashCount) else stringResource(de.ledgerline.app.R.string.pw_tab_all)) },
                                     leadingIcon = { Icon(Icons.Outlined.Delete, null) },
                                     onClick = { vm.setShowTrash(!showTrash); overflow = false },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(de.ledgerline.app.R.string.history_title)) },
+                                    leadingIcon = { Icon(Icons.Outlined.History, null) },
+                                    onClick = { showHistory = true; overflow = false },
                                 )
                                 if (folders.isNotEmpty()) {
                                     androidx.compose.material3.HorizontalDivider()
