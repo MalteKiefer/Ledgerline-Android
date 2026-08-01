@@ -1057,4 +1057,7 @@
     <string name="history_recover_ok">Восстановлено</string>
     <string name="history_recover_none">Нечего восстанавливать из этой версии.</string>
     <string name="history_recover_failed">Не удалось восстановить.</string>
+    <string name="finance_send_invoice">Отправить счёт</string>
+    <string name="finance_invoice_sent">Счёт отправлен.</string>
+    <string name="finance_invoice_send_failed">Не удалось отправить (проверьте настройки почты).</string>
 </resources>

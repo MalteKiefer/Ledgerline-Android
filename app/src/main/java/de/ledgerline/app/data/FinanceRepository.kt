@@ -38,6 +38,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MultipartBody
 import java.io.ByteArrayInputStream
 import java.net.HttpURLConnection
@@ -710,6 +711,30 @@ class FinanceRepository(
             cache.setCompany(res.body()?.company?.let(FinanceRecordCodec::companyFrom) ?: profile)
             true
         } catch (_: Exception) { false }
+    }
+
+    /**
+     * E-mail a finalized invoice as a PDF via the user's own invoice SMTP (POST /invoices/send). The
+     * PDF is rendered on-device from the decrypted invoice + company profile (ZK — only the finished
+     * PDF leaves, as an attachment). [to] defaults server-side to the customer's invoice e-mail.
+     * Returns true on success (false includes 501 = invoice mail not configured).
+     */
+    suspend fun sendInvoice(inv: de.ledgerline.app.domain.model.Invoice, to: String?): Boolean = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext false
+        val company = loadCompany() ?: CompanyProfile()
+        val pdf = runCatching { de.ledgerline.app.core.finance.InvoicePdf.render(inv, company) }.getOrNull() ?: return@withContext false
+        val recipient = (to?.ifBlank { null }) ?: inv.customer.email.ifBlank { null } ?: return@withContext false
+        runCatching {
+            val toBody = recipient.toRequestBody("text/plain".toMediaTypeOrNull())
+            val part = okhttp3.MultipartBody.Part.createFormData("pdf", "invoice.pdf", pdf.toRequestBody("application/pdf".toMediaTypeOrNull()))
+            apiProvider(session).invoicesSend(toBody, part).isSuccessful
+        }.getOrDefault(false)
+    }
+
+    /** Send a sample test e-mail through the saved invoice SMTP (POST /invoices/mail-test). */
+    suspend fun invoiceMailTest(): Boolean = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext false
+        runCatching { apiProvider(session).invoicesMailTest().isSuccessful }.getOrDefault(false)
     }
 
     // ---- helpers ----

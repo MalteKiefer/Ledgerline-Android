@@ -1054,4 +1054,7 @@
     <string name="history_recover_ok">Wiederhergestellt</string>
     <string name="history_recover_none">Nichts aus dieser Version wiederherzustellen.</string>
     <string name="history_recover_failed">Wiederherstellung fehlgeschlagen.</string>
+    <string name="finance_send_invoice">Rechnung per E-Mail</string>
+    <string name="finance_invoice_sent">Rechnung versendet.</string>
+    <string name="finance_invoice_send_failed">Senden fehlgeschlagen (E-Mail-Einstellungen prüfen).</string>
 </resources>

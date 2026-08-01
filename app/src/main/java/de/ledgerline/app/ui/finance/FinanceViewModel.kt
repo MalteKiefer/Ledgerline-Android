@@ -227,6 +227,10 @@ class FinanceViewModel @Inject constructor(
 
     fun trash(inv: Invoice, onDone: (Boolean) -> Unit = {}) = save(inv.copy(trashed = true), onDone)
 
+    /** E-mail the invoice PDF via the user's invoice SMTP (v1.536). [to] blank → customer email. */
+    fun sendInvoice(inv: Invoice, to: String?, onDone: (Boolean) -> Unit) =
+        viewModelScope.launch { onDone(repo.sendInvoice(inv, to)) }
+
     fun saveCompany(profile: CompanyProfile, onDone: (Boolean) -> Unit = {}) {
         viewModelScope.launch { onDone(repo.saveCompany(profile)) }
     }

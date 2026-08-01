@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.ui.platform.LocalContext
@@ -65,6 +66,21 @@ fun InvoiceDetailScreen(inv: Invoice, vm: FinanceViewModel, onBack: () -> Unit, 
                     if (inv.status == de.ledgerline.app.domain.model.InvoiceStatus.DRAFT && !inv.raw.containsKey("pdf")) {
                         androidx.compose.material3.IconButton(onClick = onEdit) {
                             androidx.compose.material3.Icon(Icons.Outlined.Edit, stringResource(R.string.finance_edit))
+                        }
+                    }
+                    // Email the invoice PDF via the user's invoice SMTP (finalized invoices only).
+                    if (inv.status != de.ledgerline.app.domain.model.InvoiceStatus.DRAFT) {
+                        val sending = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                        val sentMsg = stringResource(R.string.finance_invoice_sent)
+                        val failMsg = stringResource(R.string.finance_invoice_send_failed)
+                        androidx.compose.material3.IconButton(enabled = !sending.value, onClick = {
+                            sending.value = true
+                            vm.sendInvoice(inv, inv.customer.email.ifBlank { null }) { ok ->
+                                sending.value = false
+                                android.widget.Toast.makeText(ctx, if (ok) sentMsg else failMsg, android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            androidx.compose.material3.Icon(Icons.Outlined.Send, stringResource(R.string.finance_send_invoice))
                         }
                     }
                     androidx.compose.material3.IconButton(onClick = { vm.trash(inv) { onBack() } }) {

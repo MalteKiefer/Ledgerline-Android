@@ -1056,4 +1056,7 @@
     <string name="history_recover_ok">Restored</string>
     <string name="history_recover_none">Nothing to recover from this version.</string>
     <string name="history_recover_failed">Recovery failed.</string>
+    <string name="finance_send_invoice">Email invoice</string>
+    <string name="finance_invoice_sent">Invoice emailed.</string>
+    <string name="finance_invoice_send_failed">Send failed (check invoice email settings).</string>
 </resources>
