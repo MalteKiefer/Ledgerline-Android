@@ -51,7 +51,7 @@ class GallerySaveTest {
     // Fake API: galleryStore returns a manifest with one existing photo at version 5.
     // galleryStorePut → 409 on first call, then success (version 6) on second call.
     // All other methods throw NotImplementedError.
-    private class FakeApi(val manifestJson: String) : LedgerlineApi {
+    private class FakeApi(val manifestJson: String) : NotImplementedApi() {
         var puts = 0
         var lastReconcile: List<String>? = null
 
@@ -152,7 +152,6 @@ class GallerySaveTest {
         override suspend fun vault(): Response<VaultResponse> = throw NotImplementedError()
         override suspend fun vaultKeys(): Response<de.ledgerline.app.data.remote.dto.VaultKeysResponse> = throw NotImplementedError()
         override suspend fun putVaultKeys(body: de.ledgerline.app.data.remote.dto.PublishKeysRequest): Response<Unit> = throw NotImplementedError()
-        override suspend fun store(): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun moduleStore(module: String): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
         override suspend fun filesReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()

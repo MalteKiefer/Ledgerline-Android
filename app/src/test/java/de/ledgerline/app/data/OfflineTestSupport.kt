@@ -134,7 +134,6 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun vault(): Response<VaultResponse> = throw NotImplementedError()
     override suspend fun vaultKeys(): Response<de.ledgerline.app.data.remote.dto.VaultKeysResponse> = throw NotImplementedError()
     override suspend fun putVaultKeys(body: de.ledgerline.app.data.remote.dto.PublishKeysRequest): Response<Unit> = throw NotImplementedError()
-    override suspend fun store(): Response<StoreResponse> = throw NotImplementedError()
     // Empty by default (mirrors filesStore/notesStore) so a fake that doesn't exercise a module —
     // including the notes monolith the one-time migration probes — loads it as empty, not a throw.
     override suspend fun moduleStore(module: String): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
@@ -254,6 +253,31 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun passwordsStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun rawPassword(blob: String): Response<ResponseBody> = throw NotImplementedError()
     override suspend fun uploadPassword(file: okhttp3.MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
+    // v1.536 additions
+    override suspend fun moduleStoreHistory(module: String): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
+    override suspend fun moduleStoreHistoryVersion(module: String, version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
+    override suspend fun filesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
+    override suspend fun filesStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
+    override suspend fun galleryStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
+    override suspend fun galleryStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
+    override suspend fun notesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
+    override suspend fun notesStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
+    override suspend fun passwordsStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
+    override suspend fun passwordsStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
+    override suspend fun invoicesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
+    override suspend fun invoicesStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
+    override suspend fun invoicesSend(to: okhttp3.RequestBody, pdf: okhttp3.MultipartBody.Part): Response<Unit> = throw NotImplementedError()
+    override suspend fun invoicesMailTest(): Response<Unit> = throw NotImplementedError()
+    override suspend fun vaultBlobsUploadInit(vault: String, body: de.ledgerline.app.data.remote.dto.UploadInitRequest): Response<de.ledgerline.app.data.remote.dto.UploadInitResponse> = throw NotImplementedError()
+    override suspend fun vaultBlobsUploadPart(vault: String, token: okhttp3.RequestBody, part: okhttp3.RequestBody, chunk: okhttp3.MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadPartResponse> = throw NotImplementedError()
+    override suspend fun vaultBlobsUploadComplete(vault: String, body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<de.ledgerline.app.data.remote.dto.UploadResponse> = throw NotImplementedError()
+    override suspend fun vaultBlobsUploadAbort(vault: String, body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
+    override suspend fun vaultBlobDelete(vault: String, blob: String): Response<Unit> = throw NotImplementedError()
+    override suspend fun vaultBlobsReconcile(vault: String, body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
+    override suspend fun vaultBlobsUsage(vault: String): Response<de.ledgerline.app.data.remote.dto.UsageResponse> = throw NotImplementedError()
+    override suspend fun exploreUsage(): Response<de.ledgerline.app.data.remote.dto.UsageResponse> = throw NotImplementedError()
+    override suspend fun exploreBlob(blob: String): Response<ResponseBody> = throw NotImplementedError()
+    override suspend fun contactsNotify(body: de.ledgerline.app.data.remote.dto.ContactNotifyRequest): Response<de.ledgerline.app.data.remote.dto.ContactNotifyResponse> = throw NotImplementedError()
 }
 
 /**
