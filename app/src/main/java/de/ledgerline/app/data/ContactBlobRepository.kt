@@ -65,6 +65,19 @@ class ContactBlobRepository @VisibleForTesting internal constructor(
         } catch (_: Exception) { false }
     }
 
+    /**
+     * Relay a contact birthday/anniversary to the user's enabled notification channels (v1.536). The
+     * server intersects the requested [kind] with the user's saved channel prefs and forwards; the
+     * app sends only non-secret plaintext (title/body derived on-device). Returns true if forwarded.
+     */
+    suspend fun notify(kind: String, title: String, body: String): Boolean = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext false
+        runCatching {
+            apiProvider(session).contactsNotify(de.ledgerline.app.data.remote.dto.ContactNotifyRequest(kind, title, body))
+                .takeIf { it.isSuccessful }?.body()?.forwarded ?: false
+        }.getOrDefault(false)
+    }
+
     /** Encrypt [bytes] with a fresh per-blob key, Padmé-pad, and upload the avatar. */
     suspend fun uploadAvatar(bytes: ByteArray): Outcome<UploadedBlob> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)

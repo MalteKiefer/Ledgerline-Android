@@ -212,6 +212,14 @@ class ExploreRepository(
         }.getOrNull()
     }
 
+    /** Explore track-blob storage usage (used, quota) bytes, or null on failure (v1.536). */
+    suspend fun usage(): Pair<Long, Long>? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        runCatching {
+            apiProvider(session).exploreUsage().takeIf { it.isSuccessful }?.body()?.let { it.used to it.quota }
+        }.getOrNull()
+    }
+
     /** Reverse-geocode a coordinate to a place name via the server (coarse grid, never cached). */
     suspend fun reverse(lat: Double, lng: Double): String? = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext null

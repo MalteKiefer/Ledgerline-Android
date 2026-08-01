@@ -284,10 +284,7 @@ class SharedVaultRepository(
             val cipher = runCatching {
                 val r = api.rawFile(f.blob); if (r.isSuccessful) r.body()?.bytes() else null
             }.getOrNull() ?: return@withContext null
-            val reqBody = cipher.toRequestBody("application/octet-stream".toMediaTypeOrNull())
-            val body = okhttp3.MultipartBody.Part.createFormData("file", "blob.enc", reqBody)
-            val newRef = runCatching { api.vaultBlobUpload(vaultId, body) }.getOrNull()?.takeIf { it.isSuccessful }?.body()?.id
-                ?: return@withContext null
+            val newRef = uploadVaultBlob(api, vaultId, cipher) ?: return@withContext null
             val newKey = crypto.sealValue(fk, vk)
             val path = de.ledgerline.app.domain.share.ShareManifests.relPath(f.folder, folderId, byId)
             fileEntries += buildJsonObject {
@@ -349,6 +346,56 @@ class SharedVaultRepository(
             api.vaultStorePut(vaultId, de.ledgerline.app.data.remote.dto.SharedVaultStorePut(crypto.sealManifest(manifest.toString(), vk), version))
         }.getOrNull()
         if (put?.isSuccessful == true) vaultId else null
+    }
+
+    /**
+     * Upload an already-encrypted blob into a shared vault, transparently switching to the S3-multipart
+     * chunked route for large ciphertexts (≥ [ChunkedUpload.THRESHOLD]) so a huge blob never goes as a
+     * single multipart POST (proxies reject those). The bytes are already ciphertext — no re-encryption;
+     * we just split them into server-sized parts. Returns the new blob ref, or null on failure.
+     */
+    private suspend fun uploadVaultBlob(api: LedgerlineApi, vaultId: String, cipher: ByteArray): String? {
+        if (cipher.size < ChunkedUpload.THRESHOLD) {
+            val body = okhttp3.MultipartBody.Part.createFormData(
+                "file", "blob.enc", cipher.toRequestBody("application/octet-stream".toMediaTypeOrNull()),
+            )
+            return runCatching { api.vaultBlobUpload(vaultId, body) }.getOrNull()?.takeIf { it.isSuccessful }?.body()?.id
+        }
+        // Chunked: init → part…part → complete (abort on any failure).
+        val init = runCatching {
+            api.vaultBlobsUploadInit(vaultId, de.ledgerline.app.data.remote.dto.UploadInitRequest(cipher.size.toLong()))
+        }.getOrNull()?.takeIf { it.isSuccessful }?.body() ?: return null
+        val partSize = init.partSize.coerceAtLeast(1).toInt()
+        val parts = ArrayList<de.ledgerline.app.data.remote.dto.PartRef>()
+        var offset = 0; var partNum = 1
+        try {
+            while (offset < cipher.size) {
+                val end = minOf(offset + partSize, cipher.size)
+                val chunk = cipher.copyOfRange(offset, end)
+                val tokenBody = init.token.toRequestBody("text/plain".toMediaTypeOrNull())
+                val partBody = partNum.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+                val chunkPart = okhttp3.MultipartBody.Part.createFormData("chunk", "part$partNum", chunk.toRequestBody("application/octet-stream".toMediaTypeOrNull()))
+                val pr = runCatching { api.vaultBlobsUploadPart(vaultId, tokenBody, partBody, chunkPart) }.getOrNull()?.takeIf { it.isSuccessful }?.body()
+                    ?: run { runCatching { api.vaultBlobsUploadAbort(vaultId, de.ledgerline.app.data.remote.dto.UploadAbortRequest(init.token)) }; return null }
+                parts.add(de.ledgerline.app.data.remote.dto.PartRef(pr.part, pr.etag))
+                offset = end; partNum++
+            }
+            return runCatching {
+                api.vaultBlobsUploadComplete(vaultId, de.ledgerline.app.data.remote.dto.UploadCompleteRequest(init.token, parts))
+            }.getOrNull()?.takeIf { it.isSuccessful }?.body()?.id
+                ?: run { runCatching { api.vaultBlobsUploadAbort(vaultId, de.ledgerline.app.data.remote.dto.UploadAbortRequest(init.token)) }; null }
+        } catch (_: Exception) {
+            runCatching { api.vaultBlobsUploadAbort(vaultId, de.ledgerline.app.data.remote.dto.UploadAbortRequest(init.token)) }
+            return null
+        }
+    }
+
+    /** Vault blob storage usage (used, quota) bytes, or null on failure. */
+    suspend fun blobUsage(vaultId: String): Pair<Long, Long>? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        runCatching {
+            apiProvider(session).vaultBlobsUsage(vaultId).takeIf { it.isSuccessful }?.body()?.let { it.used to it.quota }
+        }.getOrNull()
     }
 
     /** Drop cached vault keys (on lock / logout). */
