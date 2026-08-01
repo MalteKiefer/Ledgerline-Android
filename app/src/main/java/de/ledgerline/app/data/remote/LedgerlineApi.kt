@@ -91,9 +91,6 @@ interface LedgerlineApi {
         @Body body: StorePutRequest,
     ): Response<StoreResponse>
 
-    @Deprecated("Store v3: the monolith /store was removed server-side. Use moduleStore/putModuleStore.")
-    @GET("api/v1/store")
-    suspend fun store(): Response<StoreResponse>
 
     @DELETE("api/v1/auth/session")
     suspend fun deleteSession(): Response<Unit>
@@ -509,4 +506,91 @@ interface LedgerlineApi {
 
     @POST("api/v1/explore/blobs/reconcile")
     suspend fun exploreReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
+
+    // ================= v1.536 additions =================
+
+    // ---- Store version history / recovery (per module + generic single-blob) ----
+    @GET("api/v1/store/{module}/history")
+    suspend fun moduleStoreHistory(@Path("module") module: String): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse>
+
+    @GET("api/v1/store/{module}/history/{version}")
+    suspend fun moduleStoreHistoryVersion(@Path("module") module: String, @Path("version") version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion>
+
+    @GET("api/v1/files/store/history")
+    suspend fun filesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse>
+
+    @GET("api/v1/files/store/history/{version}")
+    suspend fun filesStoreHistoryVersion(@Path("version") version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion>
+
+    @GET("api/v1/gallery/store/history")
+    suspend fun galleryStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse>
+
+    @GET("api/v1/gallery/store/history/{version}")
+    suspend fun galleryStoreHistoryVersion(@Path("version") version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion>
+
+    @GET("api/v1/notes/store/history")
+    suspend fun notesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse>
+
+    @GET("api/v1/notes/store/history/{version}")
+    suspend fun notesStoreHistoryVersion(@Path("version") version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion>
+
+    @GET("api/v1/passwords/store/history")
+    suspend fun passwordsStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse>
+
+    @GET("api/v1/passwords/store/history/{version}")
+    suspend fun passwordsStoreHistoryVersion(@Path("version") version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion>
+
+    @GET("api/v1/invoices/store/history")
+    suspend fun invoicesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse>
+
+    @GET("api/v1/invoices/store/history/{version}")
+    suspend fun invoicesStoreHistoryVersion(@Path("version") version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion>
+
+    // ---- Invoice email (via the user's own invoice SMTP) ----
+    @Multipart
+    @POST("api/v1/invoices/send")
+    suspend fun invoicesSend(@Part("to") to: okhttp3.RequestBody, @Part pdf: MultipartBody.Part): Response<Unit>
+
+    @POST("api/v1/invoices/mail-test")
+    suspend fun invoicesMailTest(): Response<Unit>
+
+    // ---- Shared-vault blob chunked upload + usage/reconcile ----
+    @POST("api/v1/vaults/{vault}/blobs/upload/init")
+    suspend fun vaultBlobsUploadInit(@Path("vault") vault: String, @Body body: de.ledgerline.app.data.remote.dto.UploadInitRequest): Response<de.ledgerline.app.data.remote.dto.UploadInitResponse>
+
+    @Multipart
+    @POST("api/v1/vaults/{vault}/blobs/upload/part")
+    suspend fun vaultBlobsUploadPart(
+        @Path("vault") vault: String,
+        @Part("token") token: okhttp3.RequestBody,
+        @Part("part") part: okhttp3.RequestBody,
+        @Part chunk: MultipartBody.Part,
+    ): Response<de.ledgerline.app.data.remote.dto.UploadPartResponse>
+
+    @POST("api/v1/vaults/{vault}/blobs/upload/complete")
+    suspend fun vaultBlobsUploadComplete(@Path("vault") vault: String, @Body body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse>
+
+    @POST("api/v1/vaults/{vault}/blobs/upload/abort")
+    suspend fun vaultBlobsUploadAbort(@Path("vault") vault: String, @Body body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit>
+
+    @DELETE("api/v1/vaults/{vault}/blobs/{blob}")
+    suspend fun vaultBlobDelete(@Path("vault") vault: String, @Path("blob") blob: String): Response<Unit>
+
+    @POST("api/v1/vaults/{vault}/blobs/reconcile")
+    suspend fun vaultBlobsReconcile(@Path("vault") vault: String, @Body body: ReconcileRequest): Response<ReconcileResponse>
+
+    @GET("api/v1/vaults/{vault}/blobs/usage")
+    suspend fun vaultBlobsUsage(@Path("vault") vault: String): Response<UsageResponse>
+
+    // ---- Explore usage + blob ----
+    @GET("api/v1/explore/usage")
+    suspend fun exploreUsage(): Response<UsageResponse>
+
+    @GET("api/v1/explore/blob/{blob}")
+    @Streaming
+    suspend fun exploreBlob(@Path("blob") blob: String): Response<ResponseBody>
+
+    // ---- Contact birthday/anniversary relay ----
+    @POST("api/v1/contacts/notify")
+    suspend fun contactsNotify(@Body body: de.ledgerline.app.data.remote.dto.ContactNotifyRequest): Response<de.ledgerline.app.data.remote.dto.ContactNotifyResponse>
 }
