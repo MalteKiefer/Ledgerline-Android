@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Search
@@ -127,6 +128,9 @@ fun ExploreScreen(
                     title = stringResource(R.string.dest_explore),
                     onMenu = onMenu,
                     actions = {
+                        IconButton(onClick = { vm.refresh() }) {
+                            Icon(androidx.compose.material.icons.Icons.Outlined.Refresh, contentDescription = stringResource(R.string.action_refresh))
+                        }
                         if (tab == ExploreTab.MAP) {
                             IconButton(onClick = { searchOpen = !searchOpen }) {
                                 Icon(

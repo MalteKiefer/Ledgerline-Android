@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Add
@@ -122,6 +123,9 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
                 title = stringResource(R.string.dest_finance),
                 onMenu = onMenu,
                 actions = {
+                    androidx.compose.material3.IconButton(onClick = { vm.load() }) {
+                        Icon(androidx.compose.material.icons.Icons.Outlined.Refresh, stringResource(R.string.action_refresh))
+                    }
                     androidx.compose.material3.IconButton(onClick = onStats) {
                         Icon(Icons.Outlined.QueryStats, stringResource(R.string.finance_stats_action))
                     }
@@ -143,6 +147,7 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
         },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
+        de.ledgerline.app.ui.common.PullRefresh(onRefresh = { vm.load() }) {
         Column(
             Modifier.fillMaxSize().verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp).padding(bottom = 100.dp),
@@ -180,6 +185,7 @@ private fun FinanceList(vm: FinanceViewModel, modifier: Modifier, onMenu: (() ->
                     }
                 }
             }
+        }
         }
         FloatingActionButton(
             onClick = onNew,

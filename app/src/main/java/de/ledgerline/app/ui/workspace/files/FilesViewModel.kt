@@ -257,6 +257,14 @@ class FilesViewModel @Inject constructor(
     fun allFolders(): List<NamedFolder> = cache.value.value?.manifest?.fileFolders.orEmpty()
 
     fun moveFile(id: String, folderId: String?) = viewModelScope.launch { mutate.invoke { FileOps.moveFile(it, id, folderId) } }
+
+    /** Create a new root folder [name] and move file [fileId] into it, atomically (from the move dialog). */
+    fun createFolderInto(name: String, fileId: String) = viewModelScope.launch {
+        val id = newId()
+        mutate.invoke { m ->
+            FileOps.moveFile(m.copy(fileFolders = m.fileFolders + NamedFolder(id, name, null)), fileId, id)
+        }
+    }
     fun toggleFavorite(id: String) = viewModelScope.launch { mutate.invoke { FileOps.toggleFavorite(it, id) } }
     fun setTags(id: String, tags: List<String>) = viewModelScope.launch { mutate.invoke { FileOps.setTags(it, id, tags) } }
 
