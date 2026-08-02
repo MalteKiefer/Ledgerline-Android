@@ -495,10 +495,17 @@ private fun PhotosTab(
         }
     }
 
-    // Show snackbar for upload_failed messages.
+    // Show snackbar for upload_failed / upload_queued messages.
     val failedPrefix = "upload_failed:"
+    val queuedPrefix = "upload_queued:"
     LaunchedEffect(message) {
         val msg = message ?: return@LaunchedEffect
+        if (msg.startsWith(queuedPrefix)) {
+            val count = msg.removePrefix(queuedPrefix).toIntOrNull() ?: 1
+            scope.launch { snackbarHostState.showSnackbar(context.resources.getString(R.string.gallery_upload_queued, count)) }
+            vm.clearMessage()
+            return@LaunchedEffect
+        }
         if (msg.startsWith(failedPrefix)) {
             val count = msg.removePrefix(failedPrefix).toIntOrNull() ?: 1
             scope.launch {

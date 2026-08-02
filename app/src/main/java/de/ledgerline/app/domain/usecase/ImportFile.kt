@@ -9,11 +9,17 @@ import java.io.InputStream
  * (folder = current cwd) and the share target (folder = the picked target folder).
  */
 interface ImportFile {
+    /**
+     * @param queue when true (normal path), a file that can't upload now (offline / recoverable error)
+     *   is sealed to the durable import queue to retry on reconnect (returns Ok — the entry appears
+     *   after the next sync). The replay path passes false so a re-run never re-queues.
+     */
     suspend fun invoke(
         name: String,
         mime: String,
         size: Long,
         folder: String?,
+        queue: Boolean = true,
         open: () -> InputStream,
     ): Outcome<Unit>
 }

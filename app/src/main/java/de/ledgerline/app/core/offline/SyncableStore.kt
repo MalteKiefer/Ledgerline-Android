@@ -13,4 +13,11 @@ interface SyncableStore {
     /** Replay every pending offline delta this repo owns onto the server head. Returns true when all
      *  owned keys are cleared (nothing left pending), false if something remained (retry later). */
     suspend fun replayPending(): Boolean
+
+    /**
+     * True when this store holds pending work that lives OUTSIDE the shared [SyncOutbox] (e.g. the
+     * blob-import queue), so a sync pass runs even when the manifest outbox is empty. Defaults false —
+     * outbox-only stores are already covered by [SyncOutbox.hasPending].
+     */
+    fun hasPendingWork(): Boolean = false
 }

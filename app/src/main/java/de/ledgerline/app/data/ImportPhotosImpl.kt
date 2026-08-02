@@ -46,9 +46,12 @@ class ImportPhotosImpl @Inject constructor(
     private val cache: GalleryCache,
     private val uploader: GalleryUploader,
     private val mutate: MutateGallery,
+    private val importQueue: ImportQueue,
+    private val connectivity: de.ledgerline.app.core.offline.Connectivity,
+    private val vaultKeyHolder: de.ledgerline.app.core.security.VaultKeyHolder,
 ) : ImportPhotos {
 
-    override suspend fun invoke(sources: List<PhotoSource>, report: (Int, Int) -> Unit): ImportResult {
+    override suspend fun invoke(sources: List<PhotoSource>, report: (Int, Int) -> Unit, queue: Boolean): ImportResult {
         // Sigs already in the index PLUS sigs reserved this run — a single guarded set so two
         // identical new photos in the same batch don't both upload (atomic check-and-reserve).
         val seen = HashSet(cache.value.value?.manifest?.photos?.mapNotNull { it.sig }.orEmpty())
@@ -59,8 +62,24 @@ class ImportPhotosImpl @Inject constructor(
         val progress = AtomicInteger(0)
         val quota = AtomicBoolean(false)
         val failed = java.util.Collections.synchronizedList(mutableListOf<PhotoSource>())
+        val queued = java.util.Collections.synchronizedList(mutableListOf<PhotoSource>())
         // Successful uploads awaiting index commit, paired with their source for failure roll-back.
         val uploaded = java.util.Collections.synchronizedList(mutableListOf<Pair<PhotoSource, GalleryPhoto>>())
+
+        val vk = vaultKeyHolder.get()
+
+        // Offline (with an unlocked vault): don't attempt a doomed upload — seal each fresh source to
+        // the durable import queue and report it as queued. Replay runs the full pipeline on reconnect.
+        if (queue && vk != null && !connectivity.isOnline()) {
+            for (src in sources) {
+                val sig = try { fileSig(src.openInput, src.size) } catch (_: Exception) { failed += src; tick(progress, total, report); continue }
+                if (!seen.add(sig)) { tick(progress, total, report); continue } // already present
+                importQueue.enqueuePhoto(vk, src.name, src.mime, src.size, sig, src.openInput, src.lat, src.lng)
+                queued += src
+                tick(progress, total, report)
+            }
+            return ImportResult(total, failed.size, failed.toList(), false, queued.toList())
+        }
 
         coroutineScope {
             val sem = Semaphore(LANES)
@@ -84,8 +103,16 @@ class ImportPhotosImpl @Inject constructor(
                             is Outcome.Ok -> uploaded += src to up.value
                             is Outcome.Err -> {
                                 if (up.kind == ErrorKind.QUOTA) quota.set(true)
-                                failed += src
-                                seenLock.withLock { seen.remove(sig) } // free the reservation for a retry
+                                // A recoverable upload failure (dropped socket, 5xx, 429) is not a loss:
+                                // seal the source to the durable queue and keep the sig reserved so it
+                                // isn't re-uploaded this run. QUOTA / hard errors go to failed as before.
+                                if (queue && vk != null && up.kind in de.ledgerline.app.core.offline.RECOVERABLE_SAVE_ERRORS) {
+                                    importQueue.enqueuePhoto(vk, src.name, src.mime, src.size, sig, src.openInput, src.lat, src.lng)
+                                    queued += src
+                                } else {
+                                    failed += src
+                                    seenLock.withLock { seen.remove(sig) } // free the reservation for a retry
+                                }
                             }
                         }
                         tick(progress, total, report)
@@ -107,6 +134,7 @@ class ImportPhotosImpl @Inject constructor(
             failed = failed.size,
             failedSources = failed.toList(),
             quotaExceeded = quota.get(),
+            queuedSources = queued.toList(),
         )
     }
 

@@ -95,7 +95,7 @@ class FilesViewModelTest {
 
     private fun vm() = FilesViewModel(
         load, cache, mutate, blobs, usage, de.ledgerline.app.core.security.LockGuard(),
-        ImportFileImpl(blobs, mutate), sharing, io.mockk.mockk(relaxed = true),
+        ImportFileImpl(blobs, mutate, io.mockk.mockk(relaxed = true), de.ledgerline.app.data.FakeConnectivity(online = true), de.ledgerline.app.core.security.VaultKeyHolder()), sharing, io.mockk.mockk(relaxed = true),
         de.ledgerline.app.core.offline.DegradedState(),
     )
 

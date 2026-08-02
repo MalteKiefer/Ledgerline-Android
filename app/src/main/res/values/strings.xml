@@ -435,6 +435,7 @@
     <string name="camera_switch">Switch camera</string>
     <string name="gallery_uploading">Uploading %1$d/%2$d</string>
     <string name="gallery_upload_failed">%1$d upload(s) failed</string>
+    <string name="gallery_upload_queued">%1$d queued — will upload when online</string>
     <string name="gallery_empty">No photos yet.</string>
     <string name="gallery_error">Couldn\'t load the gallery.</string>
     <string name="gallery_usage">%1$s used</string>

@@ -96,10 +96,13 @@ class GalleryBackupManager @VisibleForTesting internal constructor(
             }.join()
             val r = result ?: return
 
-            // Succeeded = every candidate whose source is NOT in failedSources (upload or commit
-            // failure). Deduped items count as succeeded — their photo is already in the index.
+            // Succeeded = every candidate whose source is NOT failed AND NOT queued. Deduped items
+            // count as succeeded (already in the index). Queued items (sealed to the durable import
+            // queue during a transient error) are neither marked nor deleted — the queue replay (or
+            // the next backup scan, sig-deduped) finishes them, so the original must stay on-device.
             val failedSet = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<PhotoSource, Boolean>())
             failedSet.addAll(r.failedSources)
+            failedSet.addAll(r.queuedSources)
             val succeeded = pairs.filterNot { failedSet.contains(it.second) }
             if (succeeded.isEmpty()) return
 

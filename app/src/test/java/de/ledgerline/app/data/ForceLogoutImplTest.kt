@@ -79,6 +79,7 @@ class ForceLogoutImplTest {
             blobCache = blobCache,
             vaultParamsCache = de.ledgerline.app.core.offline.VaultParamsCache(tmp.newFile("vault_params.json")),
             syncOutbox = de.ledgerline.app.core.offline.SyncOutbox(tmp.newFolder("outbox"), io.mockk.mockk(relaxed = true)),
+            importQueue = ImportQueue(tmp.newFolder("import_queue"), io.mockk.mockk(relaxed = true)),
             backupStateStore = backupStateStore,
             rememberedVault = rememberedVault,
             placeRepository = placeRepository,
