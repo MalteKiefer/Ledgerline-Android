@@ -435,6 +435,24 @@ muss der Nutzer am Gerät prüfen. Immer light **und** dark testen.
   `wipe:true` → alles lokal löschen + neu pairen), geprüft bei Unlock + BackgroundSync.
 
 ## 11. Offline-Verfügbarkeit (Kern-Anforderung)
+
+> **Write-Robustheit gehärtet (2026-08-02, v0.9.1):** JEDER Store-Write queued jetzt bei
+> Offline **und** bei jedem wiederherstellbaren Serverfehler (`RECOVERABLE_SAVE_ERRORS` =
+> `{NETWORK, HTTP, RATE_LIMITED}` in `core/offline/SaveErrors.kt`; 5xx/429/erschöpftes-409
+> kollabiert zu `HTTP`) → durable VK-versiegelte Outbox + optimistischer Cache; nur echt
+> unrettbare Fehler (DECRYPT/WRONG_PASSPHRASE/GONE) reverten. Vorher enqueten Gallery/Health/
+> Explore NUR bei `NETWORK` (→ 5xx/429 verlor still die Bearbeitung); Passwords verlor bei
+> erschöpftem-409; **Finance hatte gar keine Outbox** (verlor sogar offline). Alle gefixt:
+> `FinanceRepository` implementiert jetzt `SyncableStore` (+ `collectionsOf`/`applyDelta`/
+> `enqueueFinance`/`replayPending` über invoices + 4 Collections, per-Collection-Replay über die
+> byte-exakten Online-Saves mit `queue=false`; Invoice-Replay pausiert bei `degraded`), in
+> `OfflineModule` registriert. **Reconnect-Drain:** `ReconnectSyncTrigger` (NetworkCallback →
+> `syncNow` sofort bei Netz-Rückkehr) + `BackgroundSync` drained die Outbox jetzt auch bei
+> auto-refresh=0 und ungated vom Offline-Master-Schalter. Tests: `WorkspaceSaveTest`,
+> `FinanceRepositoryTest` (recoverable-error + offline queued). **Offen:** Blob-Bytes-Outbox
+> (ein fehlgeschlagener Foto-/Datei-Import-Upload wird noch nicht resumable gequeued — nur
+> Manifest-Deltas; Immich-artiger Nachhol-Upload = Folgearbeit).
+
 Kein Sync außerhalb dieser App. **Lokaler Cache = Ciphertext** (versiegelte Manifeste +
 Blob-Bytes, wie vom Server). Entschlüsselt nur in-memory bei Zugriff (VK nötig). Gesperrt =
 kein Zugriff. Online → ziehen+cachen; offline → aus Cache. Schreib-Ops offline in **Queue** →
@@ -499,8 +517,23 @@ Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
    verschlüsselt zu Temp-Datei → Teile ≥ Server-`partSize`, konstanter Speicher) für Dateien
    ≥64 MiB; `FileBlobRepository.upload` schaltet ab dem Schwellwert um. API/DTOs für Files
    **und** Gallery vorhanden (`{files,gallery}/upload/{init,part,complete,abort}`).
-   **Offen:** Gallery-Original streamt noch aus In-Memory-Bytes (`GalleryUploader`) — für
-   Riesen-Videos den Import auf Stream-from-URI + Chunked umstellen (OOM-Fix, wie iOS).
+   **Gallery-Original streamt (2026-08-02):** `GalleryUploader.upload` + `ImportPhotos` streamen
+   Original **und** `/gallery/process`-Plaintext aus `PhotoSource.openInput` (re-openable URI-Stream),
+   nie voll in RAM — Chunked ab 64 MiB. Die alte „In-Memory-Bytes"-Notiz war stale.
+   **Upload-Durchsatz + Backup-Härtung (2026-08-02):** `ImportPhotosImpl` neu — **4 parallele Lanes**
+   (Semaphore) statt sequenziell, **atomarer Sig-Reserve** (Mutex, kein Doppel-Upload identischer
+   Fotos in einem Batch), **gebatchter Index-Commit** (`COMMIT_BATCH=8` statt ein voller Sharded-
+   Store-PUT pro Foto); Commit sequenziell → Optimistic-Version bleibt konsistent. **Quota-aware:**
+   413 → `ErrorKind.QUOTA` (Gallery+Files single-shot), stoppt den Batch, `ImportResult.quotaExceeded`.
+   **Delete-after-backup (iOS-Parität, `BackupPolicy.deleteAfterUpload`):** Opt-in
+   `backup_delete_after`; `GalleryBackupManager` markiert **pro-erfolgreichem** Item (nicht mehr
+   all-or-nothing) und queued die Original-URIs (`BackupStateStore.pendingDelete`). Löschung nie
+   silent — Scoped-Storage: UI drained die Queue via `MediaStore.createTrashRequest` (30-Tage-
+   Papierkorb, OS-Consent-Dialog pro Batch) in Settings→Kamera-Backup. Tests: `ImportPhotosImplTest`
+   (dedup/batch/quota/commit-fail), `GalleryBackupManagerTest` (per-succeeded mark + enqueue).
+   **Bewusst deferred:** `ml=false`-Fast-Path (`/gallery/process?ml=false` + `/gallery/analyze`-
+   Backfill, wie iOS `mlPending`) — würde Faces+FaceCrops einen zweiten Backfill-Pass + Record-Migration
+   kosten; der Inline-`process` (ml=true) ist korrekt, nur langsamer pro Foto. On-device-Verifikation offen.
 2. **Files-Store (sharded `/files/store`) — ERLEDIGT (2026-07-26, on-device-Verifikation offen).**
    `WorkspaceRepository` lädt/schreibt die Files-Slice jetzt über den v3-Sharded-Store (identische
    Engine wie Gallery), der App-Contract `WorkspaceManifest`/`save(mutate)` bleibt unverändert —
@@ -813,7 +846,7 @@ Supply-Chain). **Bei jeder Änderung mitpflegen.**
 - **Share-Link-Krypto (2026-07-25):** `ShareCrypto` (SK im URL-Fragment, per-file-key re-wrap
   + Manifest-Seal unter SK), fixture-verifiziert (`ShareCryptoInstrumentedTest`). REST/UI = §14 R-S3/S4.
 - **Verbleibend:** Sharing-Flows (Invite/Accept/Rotate, TOFU-Map), Share-REST/UI, Passkeys — §14.
-- **Unbekannte Felder (Integrität) — GESCHLOSSEN (2026-07-26, Rebuild-Phase 0).** Notes/Todos/
+- **Unbekannte Felder (Integrität) — GESCHLOSSEN (2026-07-26, Rebuild-Phase 0).** <!-- banned-token-ok: historical release-note reference --> Notes/Todos/
   Bookmarks/Contacts nutzen jetzt den **Raw-JSON-Overlay** (`WorkspaceRecordCodec`, wie
   `FileRecordCodec`): jeder Record trägt sein originales `@Transient raw:JsonObject`, beim Save
   werden nur die bekannten Felder web-shaped überlagert (presence-aware) → **jedes unbekannte
@@ -851,7 +884,7 @@ Prüfung (Maven-Central + Google-Maven-Metadata, Prereleases ausschließen):
 Nach jedem Bump: `:app:testDebugUnitTest` + `:app:assembleDebug` grün, Krypto-Interop-
 Tests grün (`PQKEMKatTest` on-JVM, `*InstrumentedTest` + **`CryptoKatTest`** on-device).
 
-> **Interop-KATs (Phase 8, 2026-07-27):** `CryptoKatTest` (androidTest) prüft **byte-exakt** gegen
+> **Interop-KATs (Phase 8, 2026-07-27):** <!-- banned-token-ok: historical release-note reference --> `CryptoKatTest` (androidTest) prüft **byte-exakt** gegen
 > eine **unabhängige** libsodium (PyNaCl, andere Bindung an dieselbe C-Lib): Argon2id-VK-Derivation,
 > secretbox seal+open, secretstream-Decrypt+Framing. Fixtures `androidTest/assets/crypto_kat.json`,
 > reproduzierbar via `tools/gen_crypto_kat.py`. sealManifest-Byte-Exaktheit = CanonicalJson

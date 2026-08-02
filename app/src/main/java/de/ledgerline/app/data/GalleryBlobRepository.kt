@@ -156,7 +156,10 @@ class GalleryBlobRepository @VisibleForTesting internal constructor(
         try {
             val part = MultipartBody.Part.createFormData("file", name, body)
             val res = api.galleryUpload(part)
-            if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
+            if (!res.isSuccessful) {
+                // 413 = storage quota exceeded (server-defined) — a distinct, non-retryable failure.
+                return@withContext Outcome.Err(if (res.code() == 413) ErrorKind.QUOTA else ErrorKind.NETWORK)
+            }
             Outcome.Ok(UploadedBlob(res.body()!!.id, enc.sealKey(), size))
         } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
     }

@@ -367,47 +367,54 @@ fun MapsforgeMap(
 
         val existing = offlineMaps.filter { it.exists() && it.length() > 0 }
         var download: TileDownloadLayer? = null
-        when {
-            existing.isNotEmpty() -> {
-                val store: MapDataStore = if (existing.size == 1) {
-                    MapFile(existing.first())
-                } else {
-                    MultiMapDataStore(MultiMapDataStore.DataPolicy.RETURN_ALL).apply {
-                        existing.forEach { addMapDataStore(MapFile(it), false, false) }
-                    }
+        // Offline and online are NOT mutually exclusive: an offline `.map` (esp. the tiny bundled
+        // world base map) renders opaque-but-empty at street zoom, so if we stop there with online
+        // enabled the map looks blank. Instead layer online OSM tiles ON TOP of the offline
+        // renderer — online shows wherever the network answers, and offline shows through where a
+        // tile fails (no connectivity). When online is off, only the offline renderer is added.
+        if (existing.isNotEmpty()) {
+            val store: MapDataStore = if (existing.size == 1) {
+                MapFile(existing.first())
+            } else {
+                MultiMapDataStore(MultiMapDataStore.DataPolicy.RETURN_ALL).apply {
+                    existing.forEach { addMapDataStore(MapFile(it), false, false) }
                 }
-                // Terrain relief: attach a hillshading config if enabled and DEM tiles are present.
-                val hills = if (hillshading && demFolder != null && (demFolder.listFiles()?.any { it.name.endsWith(".hgt.zip") || it.name.endsWith(".hgt") } == true)) {
-                    runCatching {
-                        val src = org.mapsforge.map.layer.hills.MemoryCachingHgtReaderTileSource(
-                            org.mapsforge.map.layer.hills.DemFolderFS(demFolder),
-                            org.mapsforge.map.layer.hills.SimpleShadingAlgorithm(),
-                            AndroidGraphicFactory.INSTANCE,
-                        )
-                        org.mapsforge.map.layer.hills.HillsRenderConfig(src).apply { indexOnThread() }
-                    }.getOrNull()
-                } else null
-                val renderer = if (hills != null) {
-                    TileRendererLayer(tileCache, store, mapView.model.mapViewPosition, false, true, false, AndroidGraphicFactory.INSTANCE, hills)
-                } else {
-                    TileRendererLayer(tileCache, store, mapView.model.mapViewPosition, AndroidGraphicFactory.INSTANCE)
-                }
-                renderer.setXmlRenderTheme(MapsforgeThemes.DEFAULT)
-                layers.add(0, renderer)
             }
-            onlineEnabled -> {
-                val source = OpenStreetMapMapnik.INSTANCE
-                source.userAgent = "de.ledgerline.app"
-                val dl = TileDownloadLayer(
-                    tileCache,
-                    mapView.model.mapViewPosition,
-                    source,
-                    AndroidGraphicFactory.INSTANCE,
-                )
-                layers.add(0, dl)
-                dl.onResume()
-                download = dl
+            // Terrain relief: attach a hillshading config if enabled and DEM tiles are present.
+            val hills = if (hillshading && demFolder != null && (demFolder.listFiles()?.any { it.name.endsWith(".hgt.zip") || it.name.endsWith(".hgt") } == true)) {
+                runCatching {
+                    val src = org.mapsforge.map.layer.hills.MemoryCachingHgtReaderTileSource(
+                        org.mapsforge.map.layer.hills.DemFolderFS(demFolder),
+                        org.mapsforge.map.layer.hills.SimpleShadingAlgorithm(),
+                        AndroidGraphicFactory.INSTANCE,
+                    )
+                    org.mapsforge.map.layer.hills.HillsRenderConfig(src).apply { indexOnThread() }
+                }.getOrNull()
+            } else null
+            val renderer = if (hills != null) {
+                TileRendererLayer(tileCache, store, mapView.model.mapViewPosition, false, true, false, AndroidGraphicFactory.INSTANCE, hills)
+            } else {
+                TileRendererLayer(tileCache, store, mapView.model.mapViewPosition, AndroidGraphicFactory.INSTANCE)
             }
+            renderer.setXmlRenderTheme(MapsforgeThemes.DEFAULT)
+            layers.add(0, renderer)
+        }
+        if (onlineEnabled) {
+            val source = OpenStreetMapMapnik.INSTANCE
+            source.userAgent = "de.ledgerline.app"
+            val dl = TileDownloadLayer(
+                tileCache,
+                mapView.model.mapViewPosition,
+                source,
+                AndroidGraphicFactory.INSTANCE,
+            )
+            // Insert just ABOVE the offline renderer (index 1) but BELOW all overlays (track,
+            // markers, tap) so online tiles cover the blank offline base yet never hide the GPS
+            // track or photo pins. With no offline renderer, online is the base (index 0).
+            val idx = if (existing.isNotEmpty()) 1 else 0
+            layers.add(idx, dl)
+            dl.onResume()
+            download = dl
         }
         mapView.invalidate()
         onDispose { download?.onPause() }

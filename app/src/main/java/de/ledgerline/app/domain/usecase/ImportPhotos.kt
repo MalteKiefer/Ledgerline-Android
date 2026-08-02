@@ -19,7 +19,14 @@ data class PhotoSource(
  * Result of an [ImportPhotos] run: number of sources uploaded/deduped vs. failed, plus the
  * sources that failed (read error or upload error) so the caller can offer a retry.
  */
-data class ImportResult(val done: Int, val failed: Int, val failedSources: List<PhotoSource> = emptyList())
+data class ImportResult(
+    val done: Int,
+    val failed: Int,
+    val failedSources: List<PhotoSource> = emptyList(),
+    /** True if the server rejected an upload for exceeding the storage quota (HTTP 413) — the
+     *  run stops early so it doesn't hammer a full account; the caller can warn the user. */
+    val quotaExceeded: Boolean = false,
+)
 
 /**
  * Uploads a batch of photos into the gallery index: read bytes, compute the sha-256

@@ -13,6 +13,7 @@ import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.core.offline.OfflinePrefs
 import de.ledgerline.app.core.offline.SyncableStore
 import de.ledgerline.app.data.ExploreRepository
+import de.ledgerline.app.data.FinanceRepository
 import de.ledgerline.app.data.GalleryRepository
 import de.ledgerline.app.data.HealthRepository
 import de.ledgerline.app.data.PasswordsRepository
@@ -59,4 +60,8 @@ abstract class OfflineModule {
     @Binds
     @IntoSet
     abstract fun gallerySyncable(impl: GalleryRepository): SyncableStore
+
+    @Binds
+    @IntoSet
+    abstract fun financeSyncable(impl: FinanceRepository): SyncableStore
 }

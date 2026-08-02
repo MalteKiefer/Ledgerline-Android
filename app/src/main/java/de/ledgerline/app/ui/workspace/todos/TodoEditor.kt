@@ -14,8 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,6 +49,7 @@ import de.ledgerline.app.ui.workspace.common.formatDue
 import de.ledgerline.app.ui.common.TextInputDialog
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
@@ -80,10 +84,15 @@ fun TodoEditor(
     var due by rememberSaveable { mutableStateOf(initial.due) }
     var description by rememberSaveable { mutableStateOf(initial.description) }
     var url by rememberSaveable { mutableStateOf(initial.url) }
-    var tagsText by rememberSaveable { mutableStateOf(Tags.formatTags(initial.tags)) }
+    var tags by remember { mutableStateOf(initial.tags) }
+    var tagDraft by rememberSaveable { mutableStateOf("") }
 
     var showNewList by rememberSaveable { mutableStateOf(false) }
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showTimePicker by rememberSaveable { mutableStateOf(false) }
+    // Calendar day picked in step 1, carried into the time picker (step 2) to build a
+    // `yyyy-MM-ddTHH:mm` due (web/iOS parity: date + wall-clock time, no timezone).
+    var pendingDate by rememberSaveable { mutableStateOf<String?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -98,7 +107,7 @@ fun TodoEditor(
                 actions = {
                     TextButton(
                         enabled = todoTitle.isNotBlank(),
-                        onClick = { onSave(todoTitle, listId, priority, due, description, url, Tags.parseTags(tagsText)) },
+                        onClick = { onSave(todoTitle, listId, priority, due, description, url, Tags.mergeDraft(tags, tagDraft)) },
                     ) { Text(stringResource(R.string.action_save)) }
                 },
             )
@@ -188,11 +197,11 @@ fun TodoEditor(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = tagsText,
-                onValueChange = { tagsText = it },
-                label = { Text(stringResource(R.string.tags_hint)) },
-                singleLine = true,
+            de.ledgerline.app.ui.workspace.common.TagInput(
+                tags = tags,
+                onTagsChange = { tags = it },
+                draft = tagDraft,
+                onDraftChange = { tagDraft = it },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -206,10 +215,12 @@ fun TodoEditor(
             confirmButton = {
                 TextButton(onClick = {
                     state.selectedDateMillis?.let { millis ->
-                        due = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString()
-                    }
-                    showDatePicker = false
-                }) { Text(stringResource(R.string.action_save)) }
+                        // Step 1 → carry the picked day into the time picker (step 2).
+                        pendingDate = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().toString()
+                        showDatePicker = false
+                        showTimePicker = true
+                    } ?: run { showDatePicker = false }
+                }) { Text(stringResource(R.string.action_next)) }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
@@ -219,6 +230,31 @@ fun TodoEditor(
         ) {
             DatePicker(state = state)
         }
+    }
+
+    if (showTimePicker) {
+        // Pre-select from an existing time component, else 09:00.
+        val existing = due.substringAfter('T', "").takeIf { it.length >= 5 }
+        val initHour = existing?.substring(0, 2)?.toIntOrNull() ?: 9
+        val initMin = existing?.substring(3, 5)?.toIntOrNull() ?: 0
+        val timeState = rememberTimePickerState(initialHour = initHour, initialMinute = initMin, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDate?.let { d -> due = "%sT%02d:%02d".format(d, timeState.hour, timeState.minute) }
+                    showTimePicker = false
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = {
+                // "Date only" — keep the day without a time (legacy shape still accepted).
+                TextButton(onClick = {
+                    pendingDate?.let { d -> due = d }
+                    showTimePicker = false
+                }) { Text(stringResource(R.string.todo_due_date_only)) }
+            },
+            text = { TimePicker(state = timeState) },
+        )
     }
 
     if (showNewList) {

@@ -87,19 +87,31 @@ class GalleryBackupManager @VisibleForTesting internal constructor(
                 .filter { it.mediaStoreId !in known }
             if (candidates.isEmpty()) return
 
-            val sources = candidates.map { it.toSource() }
-            // OperationManager.run is fire-and-forget (returns a Job); join it so we read
-            // the result only AFTER ImportPhotos has actually finished.
+            // Keep each candidate paired with its source so we can map an [ImportResult]'s
+            // failedSources (identity subset) back to the device item that failed.
+            val pairs = candidates.map { it to it.toSource() }
             var result: ImportResult? = null
-            operationManager.run(OpKind.BACKUP, total = sources.size) { report ->
-                result = importPhotos.invoke(sources, report)
+            operationManager.run(OpKind.BACKUP, total = pairs.size) { report ->
+                result = importPhotos.invoke(pairs.map { it.second }, report)
             }.join()
-            // Mark this batch backed-up ONLY when every item succeeded or deduped
-            // (failed == 0). ImportResult reports counts, not which ids failed, so if any
-            // item failed we mark nothing and retry the whole batch next run — the ones
-            // that already uploaded dedup instantly by sig, so only the failures re-run.
-            if (result?.failed == 0) {
-                state.mark(candidates.map { it.mediaStoreId }.toSet())
+            val r = result ?: return
+
+            // Succeeded = every candidate whose source is NOT in failedSources (upload or commit
+            // failure). Deduped items count as succeeded — their photo is already in the index.
+            val failedSet = java.util.Collections.newSetFromMap(java.util.IdentityHashMap<PhotoSource, Boolean>())
+            failedSet.addAll(r.failedSources)
+            val succeeded = pairs.filterNot { failedSet.contains(it.second) }
+            if (succeeded.isEmpty()) return
+
+            // Mark per-succeeded (not all-or-nothing) so a partial batch's failures retry next
+            // run while the ones that landed don't re-upload; the sig dedup covers any overlap.
+            state.mark(succeeded.map { it.first.mediaStoreId }.toSet())
+
+            // Delete-after-backup: queue the succeeded originals' content-URIs. The actual
+            // removal needs a scoped-storage consent dialog (this runs headless), so the UI
+            // drains the queue via MediaStore.createTrashRequest.
+            if (settings.backupDeleteAfter.first()) {
+                state.enqueueDelete(succeeded.map { it.first.uri.toString() })
             }
         } finally {
             running.set(false)

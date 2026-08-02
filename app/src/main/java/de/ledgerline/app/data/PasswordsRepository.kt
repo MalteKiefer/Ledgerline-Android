@@ -374,7 +374,10 @@ class PasswordsRepository(
         if (allowOfflineQueue && !connectivity.isOnline()) return enqueueOffline(vk, base, curNext)
         var attempts = 0
         while (true) {
-            if (attempts++ >= 5) return Outcome.Err(ErrorKind.HTTP)
+            // Exhausted the 409-rebase retries (sustained write contention) → don't drop the edit:
+            // queue it to the durable outbox to replay onto a later server head (replay path, which
+            // passes allowOfflineQueue=false, still reports failure so its outbox is retained).
+            if (attempts++ >= 5) return if (allowOfflineQueue) enqueueOffline(vk, base, curNext) else Outcome.Err(ErrorKind.HTTP)
             val records = encodeSecrets(curNext)
             val folders = encodeFolders(curNext)
             when (val out = engine.sealAndPut(vk, records, folders, engine.version)) {

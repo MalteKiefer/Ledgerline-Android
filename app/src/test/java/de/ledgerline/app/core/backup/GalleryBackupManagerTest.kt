@@ -38,10 +38,12 @@ class GalleryBackupManagerTest {
         enabled: Boolean = true,
         albums: Set<String> = setOf("b1"),
         wifiOk: Boolean = true,
+        deleteAfter: Boolean = false,
     ): GalleryBackupManager {
         val settings = mockk<SettingsStore>()
         every { settings.backupEnabled } returns kotlinx.coroutines.flow.flowOf(enabled)
         every { settings.backupAlbumIds } returns kotlinx.coroutines.flow.flowOf(albums)
+        every { settings.backupDeleteAfter } returns kotlinx.coroutines.flow.flowOf(deleteAfter)
         every { settings.prefetchWifiOnly } returns kotlinx.coroutines.flow.flowOf(true)
         every { settings.prefetchChargingOnly } returns kotlinx.coroutines.flow.flowOf(false)
         val sessions = mockk<SessionHolder>(); every { sessions.get() } returns session
@@ -89,7 +91,7 @@ class GalleryBackupManagerTest {
 
     @Test fun `uploads only unknown items and marks them`() = runTest {
         val scanner = mockk<BackupScanner>(); every { scanner.scan(any()) } returns listOf(item(1), item(2))
-        val state = mockk<BackupStateStore>()
+        val state = mockk<BackupStateStore>(relaxed = true)
         coEvery { state.backedUpIds() } returns setOf(1L)
         val markSlot = slot<Set<Long>>()
         coEvery { state.mark(capture(markSlot)) } returns Unit
@@ -101,5 +103,48 @@ class GalleryBackupManagerTest {
 
         assertEquals(1, srcSlot.captured.size)
         assertEquals(setOf(2L), markSlot.captured)
+    }
+
+    @Test fun `only succeeded items are marked, failed one retried`() = runTest {
+        val scanner = mockk<BackupScanner>(); every { scanner.scan(any()) } returns listOf(item(1), item(2))
+        val state = mockk<BackupStateStore>(relaxed = true)
+        coEvery { state.backedUpIds() } returns emptySet()
+        val markSlot = slot<Set<Long>>()
+        coEvery { state.mark(capture(markSlot)) } returns Unit
+        val importPhotos = mockk<ImportPhotos>()
+        val srcSlot = slot<List<PhotoSource>>()
+        // Item #2's source fails → it must NOT be marked (retried next run); #1 is marked.
+        coEvery { importPhotos.invoke(capture(srcSlot), any()) } answers {
+            val srcs = firstArg<List<PhotoSource>>()
+            ImportResult(done = 2, failed = 1, failedSources = listOf(srcs[1]))
+        }
+
+        manager(scanner, importPhotos, state).runNow()
+
+        assertEquals(setOf(1L), markSlot.captured)
+    }
+
+    @Test fun `deleteAfter enqueues succeeded originals`() = runTest {
+        val scanner = mockk<BackupScanner>(); every { scanner.scan(any()) } returns listOf(item(1))
+        val state = mockk<BackupStateStore>(relaxed = true)
+        coEvery { state.backedUpIds() } returns emptySet()
+        val importPhotos = mockk<ImportPhotos>()
+        coEvery { importPhotos.invoke(any(), any()) } returns ImportResult(done = 1, failed = 0)
+
+        manager(scanner, importPhotos, state, deleteAfter = true).runNow()
+
+        coVerify(exactly = 1) { state.enqueueDelete(any()) }
+    }
+
+    @Test fun `deleteAfter off never enqueues`() = runTest {
+        val scanner = mockk<BackupScanner>(); every { scanner.scan(any()) } returns listOf(item(1))
+        val state = mockk<BackupStateStore>(relaxed = true)
+        coEvery { state.backedUpIds() } returns emptySet()
+        val importPhotos = mockk<ImportPhotos>()
+        coEvery { importPhotos.invoke(any(), any()) } returns ImportResult(done = 1, failed = 0)
+
+        manager(scanner, importPhotos, state, deleteAfter = false).runNow()
+
+        coVerify(exactly = 0) { state.enqueueDelete(any()) }
     }
 }

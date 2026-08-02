@@ -84,8 +84,9 @@ fun NotesScreen(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMode
         )
     }
 
+    val messageText = message?.let { stringResource(it) }
     LaunchedEffect(message) {
-        message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
+        messageText?.let { snackbar.showSnackbar(it); vm.clearMessage() }
     }
 
     // --- Editor / detail takes over the whole screen ---

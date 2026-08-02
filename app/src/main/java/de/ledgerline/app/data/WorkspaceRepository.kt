@@ -7,6 +7,7 @@ import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.core.crypto.CanonicalJson
 import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.OfflineFlags
+import de.ledgerline.app.core.offline.RECOVERABLE_SAVE_ERRORS
 import de.ledgerline.app.core.offline.StoreEnvelope
 import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.VaultKeyHolder
@@ -640,11 +641,29 @@ class WorkspaceRepository(
         val base = cache.value.value?.manifest
             ?: (load() as? Outcome.Ok)?.value?.manifest
             ?: WorkspaceManifest()
+        val next = mutate(base)
         // Offline: queue the edit + optimistic cache instead of the multi-store PUT below.
-        if (!connectivity.isOnline()) return@withContext enqueueOffline(vk, base, mutate(base))
-        val out = saveOnline(mutate = mutate)
-        // Connection dropped mid-flight → fall back to the outbox rather than losing the edit.
-        if (out is Outcome.Err && out.kind == ErrorKind.NETWORK) enqueueOffline(vk, base, mutate(base)) else out
+        if (!connectivity.isOnline()) return@withContext enqueueOffline(vk, base, next)
+        // Optimistic: reflect the edit in the shared cache IMMEDIATELY so the UI (a trashed row
+        // disappearing, a new note appearing) updates without waiting on the network PUT. Since
+        // saveOnline runs with baseOverride=base, the mutation is applied exactly once (no double-
+        // toggle). On a hard error we revert to the pre-edit snapshot.
+        val prior = cache.value.value
+        cache.set(Workspace(next, prior?.version ?: 0))
+        val out = saveOnline(baseOverride = base, mutate = mutate)
+        when {
+            // Any RECOVERABLE failure — dropped connection, rate limit, a 5xx, or a
+            // version-conflict/other HTTP error that exhausted the online retry loop —
+            // must NOT discard the edit: keep the optimistic cache and persist the delta
+            // to the durable outbox so it replays later. Previously only NETWORK errors
+            // fell back to the outbox; every other error reverted the cache with no
+            // durable copy, silently losing the edit (e.g. a todo created during a
+            // transient server hiccup / conflict never reached the server and vanished).
+            out is Outcome.Err && out.kind in RECOVERABLE_SAVE_ERRORS -> enqueueOffline(vk, base, next)
+            // Genuinely unrecoverable (can't seal/decrypt, session gone) → revert the edit.
+            out is Outcome.Err -> { if (prior != null) cache.set(prior) else cache.clear(); out }
+            else -> out
+        }
     }
 
     /**

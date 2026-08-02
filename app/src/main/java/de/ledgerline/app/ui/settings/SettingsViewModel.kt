@@ -255,6 +255,19 @@ class SettingsViewModel @Inject constructor(
 
     fun backupNow() = backupManager.maybeRun()
 
+    /** "Delete device originals after backup" opt-in. */
+    val backupDeleteAfter: StateFlow<Boolean> = settingsStore.backupDeleteAfter
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setBackupDeleteAfter(on: Boolean) = viewModelScope.launch { settingsStore.setBackupDeleteAfter(on) }
+
+    /** Content-URIs of backed-up originals queued for device removal (consent-gated in the UI). */
+    val pendingDeleteUris: StateFlow<Set<String>> = backupStateStore.pendingDelete
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    /** Called after the OS confirms the trash request, to drop those URIs from the queue. */
+    fun onOriginalsDeleted(uris: Collection<String>) = viewModelScope.launch { backupStateStore.clearPendingDelete(uris) }
+
     /** Current idle-lock timeout in minutes, backed by the plaintext settings store. */
     val timeoutMinutes: StateFlow<Int> = settingsStore.timeoutMinutes
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_TIMEOUT_MINUTES)
@@ -371,6 +384,14 @@ class SettingsViewModel @Inject constructor(
 
     fun setContactSort(sort: ContactSort) {
         viewModelScope.launch { settingsStore.setContactSort(sort) }
+    }
+
+    /** How a contact name is displayed (Last, First vs First Last). */
+    val contactNameOrder: StateFlow<de.ledgerline.app.data.ContactNameOrder> = settingsStore.contactNameOrder
+        .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.data.ContactNameOrder.LAST_FIRST)
+
+    fun setContactNameOrder(order: de.ledgerline.app.data.ContactNameOrder) {
+        viewModelScope.launch { settingsStore.setContactNameOrder(order) }
     }
 
     /** Date display format. */

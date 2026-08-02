@@ -22,6 +22,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -72,20 +76,27 @@ fun NoteDetailScreen(
 
     var title by rememberSaveable(note.id) { mutableStateOf(note.title) }
     var content by rememberSaveable(note.id) { mutableStateOf(note.content) }
-    var tagsText by rememberSaveable(note.id) { mutableStateOf(Tags.formatTags(note.tags)) }
+    var tags by remember(note.id) { mutableStateOf(note.tags) }
+    var tagDraft by rememberSaveable(note.id) { mutableStateOf("") }
 
     // Keep the latest editor values available to the back handler without re-registering it.
     val latestTitle by rememberUpdatedState(title)
     val latestContent by rememberUpdatedState(content)
-    val latestTags by rememberUpdatedState(tagsText)
-    val save: () -> Unit = {
-        val parsedTags = Tags.parseTags(latestTags)
-        if (latestTitle != note.title || latestContent != note.content || parsedTags != note.tags) {
-            onSave(latestTitle, latestContent, parsedTags)
-        }
+    val latestTags by rememberUpdatedState(tags)
+    val latestDraft by rememberUpdatedState(tagDraft)
+    // Returns true when an actual change was persisted (drives the "saved" confirmation).
+    val save: () -> Boolean = {
+        val finalTags = Tags.mergeDraft(latestTags, latestDraft)
+        val changed = latestTitle != note.title || latestContent != note.content || finalTags != note.tags
+        if (changed) onSave(latestTitle, latestContent, finalTags)
+        changed
     }
 
     BackHandler { save(); onBack() }
+
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val savedMsg = stringResource(R.string.note_saved)
 
     var confirmDelete by remember { mutableStateOf(false) }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -102,6 +113,7 @@ fun NoteDetailScreen(
 
     Scaffold(
         modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.tab_notes)) },
@@ -128,7 +140,12 @@ fun NoteDetailScreen(
                     IconButton(onClick = { confirmDelete = true }) {
                         Icon(Icons.Outlined.Delete, stringResource(R.string.note_delete))
                     }
-                    IconButton(onClick = save) {
+                    IconButton(onClick = {
+                        val saved = save()
+                        keyboard?.hide()
+                        preview = true            // leave edit mode on save
+                        if (saved) scope.launch { snackbar.showSnackbar(savedMsg) }
+                    }) {
                         Icon(Icons.Outlined.Check, stringResource(R.string.action_save))
                     }
                 },
@@ -167,11 +184,11 @@ fun NoteDetailScreen(
                     ),
                     modifier = Modifier.fillMaxWidth().focusRequester(titleFocus),
                 )
-                OutlinedTextField(
-                    value = tagsText,
-                    onValueChange = { tagsText = it },
-                    label = { Text(stringResource(R.string.tags_hint)) },
-                    singleLine = true,
+                de.ledgerline.app.ui.workspace.common.TagInput(
+                    tags = tags,
+                    onTagsChange = { tags = it },
+                    draft = tagDraft,
+                    onDraftChange = { tagDraft = it },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(

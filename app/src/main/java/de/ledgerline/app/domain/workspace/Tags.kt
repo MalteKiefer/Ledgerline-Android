@@ -27,4 +27,14 @@ object Tags {
     /** True when [tags] contains [tag] by exact, case-insensitive match. */
     fun contains(tags: List<String>, tag: String): Boolean =
         tags.any { it.equals(tag, ignoreCase = true) }
+
+    /**
+     * Fold a still-uncommitted chip-input [draft] into [tags] (parse it, append, drop
+     * case-insensitive duplicates). Lets an editor save a tag the user typed but didn't
+     * yet turn into a chip with comma/enter — no silent loss.
+     */
+    fun mergeDraft(tags: List<String>, draft: String): List<String> {
+        val extra = parseTags(draft).filter { p -> tags.none { it.equals(p, ignoreCase = true) } }
+        return tags + extra
+    }
 }

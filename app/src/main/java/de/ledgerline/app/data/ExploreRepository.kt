@@ -143,7 +143,8 @@ class ExploreRepository(
             ?: ExploreManifest()
         if (!connectivity.isOnline()) return@withContext enqueueOffline(vk, base, mutate(base))
         val out = pushOptimistic(session, vk, cache.value.value?.let { it.manifest to it.version }, mutate)
-        if (out is Outcome.Err && out.kind == ErrorKind.NETWORK) enqueueOffline(vk, base, mutate(base)) else out
+        // Any recoverable server failure (5xx/429/exhausted-409) → durable outbox + optimistic cache.
+        if (out is Outcome.Err && out.kind in de.ledgerline.app.core.offline.RECOVERABLE_SAVE_ERRORS) enqueueOffline(vk, base, mutate(base)) else out
     }
 
     /** The raw optimistic seal+PUT (no offline handling) — shared by [save] and [replayPending]. */

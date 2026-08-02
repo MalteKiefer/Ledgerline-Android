@@ -53,6 +53,11 @@ class ContactsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     private var sort: ContactSort = ContactSort.FIRST
+
+    /** Chosen name-display order (Last, First vs First Last) for the list/detail. */
+    val nameOrder: StateFlow<de.ledgerline.app.data.ContactNameOrder> = settings.contactNameOrder
+        .stateIn(viewModelScope, SharingStarted.Eagerly, de.ledgerline.app.data.ContactNameOrder.LAST_FIRST)
+
     private val _state = MutableStateFlow(ContactsUi(loading = true))
     val state: StateFlow<ContactsUi> = _state
 
@@ -322,12 +327,7 @@ class ContactsViewModel @Inject constructor(
         }
     }
 
-    private fun displayName(c: Contact): String = when {
-        c.last.isNotBlank() && c.first.isNotBlank() -> "${c.last}, ${c.first}"
-        c.last.isNotBlank() -> c.last
-        c.first.isNotBlank() -> c.first
-        else -> c.fn.ifBlank { c.org }
-    }
+    private fun displayName(c: Contact): String = contactDisplayName(c, nameOrder.value)
 
     /** Sort key per the chosen [ContactSort]; falls back to the display name when empty. */
     private fun sortKey(c: Contact): String = when (sort) {
