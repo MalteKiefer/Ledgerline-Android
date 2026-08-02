@@ -141,6 +141,7 @@
     <string name="todo_due_hint">Fälligkeitsdatum (z. B. 2026-07-15)</string>
     <string name="todo_due_set">Fälligkeit setzen</string>
     <string name="todo_due_clear">Fälligkeit entfernen</string>
+    <string name="todo_due_date_only">Nur Datum</string>
     <string name="todo_manage_lists">Listen verwalten</string>
     <string name="todo_all_lists">Alle Listen</string>
     <string name="list_rename">Liste umbenennen</string>
@@ -148,6 +149,8 @@
 
     <!-- Notiz-CRUD -->
     <string name="note_new">Neue Notiz</string>
+    <string name="note_saved">Notiz gespeichert</string>
+    <string name="note_save_failed">Speichern fehlgeschlagen</string>
     <string name="note_untitled">Ohne Titel</string>
     <string name="note_title_hint">Titel</string>
     <string name="note_body_hint">Schreib etwas…</string>
@@ -267,6 +270,10 @@
     <string name="settings_backup_album_count">%1$d Elemente</string>
     <string name="settings_backup_status">%1$d Fotos gesichert</string>
     <string name="settings_backup_now">Jetzt sichern</string>
+    <string name="settings_backup_cleanup">Nach dem Backup</string>
+    <string name="settings_backup_delete_title">Originale vom Gerät löschen</string>
+    <string name="settings_backup_delete_subtitle">Nach dem Sichern die Gerätekopien in den Papierkorb verschieben (30 Tage wiederherstellbar). Android fragt jedes Mal nach Bestätigung.</string>
+    <string name="settings_backup_delete_pending">%1$d gesicherte(s) Original(e) löschen</string>
     <string name="settings_lock_note">Dein Tresor bleibt mit deiner Passphrase gesperrt. Biometrie kann eine gespeicherte Sitzung entsperren, wo aktiviert; der Schlüssel verlässt dieses Gerät nie.</string>
     <string name="settings_language">Sprache</string>
     <string name="settings_language_system">Systemstandard</string>
@@ -279,6 +286,9 @@
     <string name="settings_contact_sort_first">Nach Vorname</string>
     <string name="settings_contact_sort_last">Nach Nachname</string>
     <string name="settings_contact_sort_display">Nach Anzeigename</string>
+    <string name="settings_contact_name_order">Namensanzeige</string>
+    <string name="settings_contact_name_last_first">Nachname, Vorname</string>
+    <string name="settings_contact_name_first_last">Vorname Nachname</string>
     <string name="settings_date_format">Datumsformat</string>
     <string name="settings_date_format_system">Systemstandard</string>
     <string name="settings_date_format_dmy">TT.MM.JJJJ</string>
@@ -394,6 +404,7 @@
     <string name="lock_remember_subtitle">Vault entsperren</string>
     <string name="action_cancel">Abbrechen</string>
     <string name="action_save">Speichern</string>
+    <string name="action_next">Weiter</string>
     <string name="action_back">Zurück</string>
     <string name="action_settings">Einstellungen</string>
     <string name="action_more">Mehr</string>
@@ -519,7 +530,8 @@
     <string name="share_import">Importieren</string>
     <string name="share_imported">%1$d importiert</string>
     <string name="share_import_failed">%1$d fehlgeschlagen</string>
-    <string name="tags_hint">Tags (kommagetrennt)</string>
+    <string name="tags_hint">Tag hinzufügen</string>
+    <string name="tag_remove">Tag entfernen</string>
     <string name="open_with">Öffnen mit</string>
     <string name="settings_link_chooser">Beim Öffnen von Links Browser fragen</string>
 

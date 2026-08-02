@@ -34,11 +34,13 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val prefetchChargingOnlyKey = booleanPreferencesKey("prefetch_charging_only")
     private val linkChooserKey = booleanPreferencesKey("link_chooser_enabled")
     private val contactSortKey = stringPreferencesKey("contact_sort")
+    private val contactNameOrderKey = stringPreferencesKey("contact_name_order")
     private val dateFormatKey = stringPreferencesKey("date_format")
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val dynamicColorKey = booleanPreferencesKey("dynamic_color")
     private val backupEnabledKey = booleanPreferencesKey("backup_enabled")
     private val backupAlbumsKey = stringSetPreferencesKey("backup_album_ids")
+    private val backupDeleteAfterKey = booleanPreferencesKey("backup_delete_after")
     private val keepScreenOnKey = booleanPreferencesKey("keep_screen_on")
     private val keepScreenOnMinutesKey = intPreferencesKey("keep_screen_on_minutes")
     private val rememberVaultKey = booleanPreferencesKey("remember_vault")
@@ -197,6 +199,16 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
         context.settingsDataStore.edit { it[contactSortKey] = sort.name }
     }
 
+    /** How a contact name is displayed. Defaults to [ContactNameOrder.LAST_FIRST] (web/iOS parity). */
+    val contactNameOrder: Flow<ContactNameOrder> =
+        context.settingsDataStore.data.map {
+            runCatching { ContactNameOrder.valueOf(it[contactNameOrderKey] ?: "") }.getOrDefault(ContactNameOrder.LAST_FIRST)
+        }
+
+    suspend fun setContactNameOrder(order: ContactNameOrder) {
+        context.settingsDataStore.edit { it[contactNameOrderKey] = order.name }
+    }
+
     /** Date display format. Defaults to [DateFormatPref.SYSTEM] (device locale). */
     val dateFormat: Flow<DateFormatPref> =
         context.settingsDataStore.data.map {
@@ -306,6 +318,19 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
 
     suspend fun setBackupAlbumIds(ids: Set<String>) {
         context.settingsDataStore.edit { it[backupAlbumsKey] = ids }
+    }
+
+    /**
+     * Whether device originals are removed after a successful backup. OFF by default.
+     * Deletion is never silent: the removed items go to the Android trash (30-day
+     * recoverable) and the OS shows its own per-batch consent dialog (scoped storage —
+     * the app doesn't own the camera roll). See [BackupStateStore] pending-delete queue.
+     */
+    val backupDeleteAfter: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[backupDeleteAfterKey] ?: false }
+
+    suspend fun setBackupDeleteAfter(enabled: Boolean) {
+        context.settingsDataStore.edit { it[backupDeleteAfterKey] = enabled }
     }
 
     /**

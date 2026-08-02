@@ -391,7 +391,9 @@ class GalleryRepository(
         // fail earlier at the uploader, so they never reach here offline.)
         if (!connectivity.isOnline()) return@withContext enqueueOffline(vk, base, mutate(base))
         val out = saveOnline(mutate = mutate)
-        if (out is Outcome.Err && out.kind == ErrorKind.NETWORK) enqueueOffline(vk, base, mutate(base)) else out
+        // Any recoverable server failure (5xx/429/exhausted-409) → durable outbox + optimistic cache,
+        // never a silent drop of a gallery metadata edit (album, trash, photo entry).
+        if (out is Outcome.Err && out.kind in de.ledgerline.app.core.offline.RECOVERABLE_SAVE_ERRORS) enqueueOffline(vk, base, mutate(base)) else out
     }
 
     private suspend fun saveOnline(

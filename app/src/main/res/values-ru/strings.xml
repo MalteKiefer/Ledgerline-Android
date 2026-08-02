@@ -142,6 +142,7 @@
     <string name="todo_due_hint">Срок выполнения (напр. 2026-07-15)</string>
     <string name="todo_due_set">Установить срок</string>
     <string name="todo_due_clear">Убрать срок</string>
+    <string name="todo_due_date_only">Только дата</string>
     <string name="todo_manage_lists">Управление списками</string>
     <string name="todo_all_lists">Все списки</string>
     <string name="list_rename">Переименовать список</string>
@@ -149,6 +150,8 @@
 
     <!-- Note CRUD -->
     <string name="note_new">Новая заметка</string>
+    <string name="note_saved">Заметка сохранена</string>
+    <string name="note_save_failed">Не удалось сохранить</string>
     <string name="note_untitled">Без названия</string>
     <string name="note_title_hint">Название</string>
     <string name="note_body_hint">Напишите что-нибудь…</string>
@@ -283,6 +286,10 @@
     <string name="settings_backup_album_count">%1$d элементов</string>
     <string name="settings_backup_status">Скопировано фото: %1$d</string>
     <string name="settings_backup_now">Копировать сейчас</string>
+    <string name="settings_backup_cleanup">После копирования</string>
+    <string name="settings_backup_delete_title">Удалять оригиналы с устройства</string>
+    <string name="settings_backup_delete_subtitle">После копирования перемещать копии на устройстве в корзину (восстановление в течение 30 дней). Android запрашивает подтверждение каждый раз.</string>
+    <string name="settings_backup_delete_pending">Удалить оригиналов: %1$d</string>
     <string name="settings_lock_note">Ваше хранилище остаётся заблокированным паролем. Биометрия может разблокировать сохранённую сессию, где это включено; ключ шифрования никогда не покидает это устройство.</string>
     <string name="settings_language">Язык</string>
     <string name="settings_language_system">Системный по умолчанию</string>
@@ -295,6 +302,9 @@
     <string name="settings_contact_sort_first">По имени</string>
     <string name="settings_contact_sort_last">По фамилии</string>
     <string name="settings_contact_sort_display">По отображаемому имени</string>
+    <string name="settings_contact_name_order">Отображение имени</string>
+    <string name="settings_contact_name_last_first">Фамилия, имя</string>
+    <string name="settings_contact_name_first_last">Имя фамилия</string>
     <string name="settings_date_format">Формат даты</string>
     <string name="settings_date_format_system">Системный по умолчанию</string>
     <string name="settings_date_format_dmy">ДД.ММ.ГГГГ</string>
@@ -412,6 +422,7 @@
     <string name="lock_remember_subtitle">Разблокируйте хранилище</string>
     <string name="action_cancel">Отмена</string>
     <string name="action_save">Сохранить</string>
+    <string name="action_next">Далее</string>
     <string name="action_back">Назад</string>
     <string name="action_settings">Настройки</string>
     <string name="action_more">Ещё</string>
@@ -522,7 +533,8 @@
     <string name="share_import">Импортировать</string>
     <string name="share_imported">Импортировано элементов: %1$d</string>
     <string name="share_import_failed">Не удалось: %1$d</string>
-    <string name="tags_hint">Теги (через запятую)</string>
+    <string name="tags_hint">Добавить тег</string>
+    <string name="tag_remove">Удалить тег</string>
     <string name="open_with">Открыть с помощью</string>
     <string name="settings_link_chooser">Спрашивать, каким браузером открывать ссылки</string>
 

@@ -18,6 +18,7 @@ class LedgerlineApp : Application() {
     interface AppEntryPoint {
         fun backgroundSync(): BackgroundSync
         fun serverReachability(): de.ledgerline.app.core.ServerReachability
+        fun reconnectSyncTrigger(): de.ledgerline.app.core.offline.ReconnectSyncTrigger
     }
 
     override fun onCreate() {
@@ -38,5 +39,7 @@ class LedgerlineApp : Application() {
         ep.backgroundSync().start()
         // Check server reachability (GET /up) first + every 60s; drives the app's offline mode.
         ep.serverReachability().start()
+        // Replay the offline write outbox the moment the network returns (not just on the next tick).
+        ep.reconnectSyncTrigger().start()
     }
 }

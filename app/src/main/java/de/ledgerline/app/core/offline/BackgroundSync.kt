@@ -58,7 +58,10 @@ class BackgroundSync @Inject constructor(
                 val seconds = runCatching { settingsStore.backgroundRefreshSeconds.first() }
                     .getOrDefault(SettingsStore.DEFAULT_BACKGROUND_REFRESH_SECONDS)
                 if (seconds <= 0) {
-                    // Auto-refresh off: idle-poll so a settings change is picked up promptly.
+                    // Auto-refresh off: still drain any pending offline write outbox (self-gates on
+                    // locked/offline/empty) so a queued edit isn't stranded forever, then idle-poll
+                    // so a settings change is picked up promptly.
+                    runCatching { syncEngine.syncNow() }
                     delay(OFF_POLL_MS)
                     continue
                 }
@@ -77,6 +80,10 @@ class BackgroundSync @Inject constructor(
         // Report sync activity (also delivers the wipe flag) so the web devices list shows this
         // client as syncing — a heartbeat this tick means we're actively refreshing.
         accountRepository.heartbeat("syncing")
+        // Drain the offline write outbox FIRST, ungated by the offline-cache master switch: an edit
+        // can be queued on a server error even when caching is off, and it must still replay. syncNow
+        // self-gates on locked/offline/empty, so this is a cheap no-op when there's nothing to push.
+        runCatching { syncEngine.syncNow() }
         // Periodically (≤ every 12 h) check installed offline maps for newer server versions.
         val now = System.currentTimeMillis()
         if (now - lastMapCheck > 12L * 3600_000L) {
@@ -85,9 +92,6 @@ class BackgroundSync @Inject constructor(
         }
         if (!offlineFlags.enabled()) return
         if (vaultKeyHolder.get() != null) {
-            // Push any offline write deltas up first (so the pulls below see the authoritative
-            // server state), then refresh the caches.
-            runCatching { syncEngine.syncNow() }
             load.invoke()
             passwordsRepo.load()
             prefetcher.maybePrefetchOnUnlock()

@@ -141,6 +141,7 @@
     <string name="todo_due_hint">Due date (e.g. 2026-07-15)</string>
     <string name="todo_due_set">Set due date</string>
     <string name="todo_due_clear">Clear due date</string>
+    <string name="todo_due_date_only">Date only</string>
     <string name="todo_manage_lists">Manage lists</string>
     <string name="todo_all_lists">All lists</string>
     <string name="list_rename">Rename list</string>
@@ -148,6 +149,8 @@
 
     <!-- Note CRUD -->
     <string name="note_new">New note</string>
+    <string name="note_saved">Note saved</string>
+    <string name="note_save_failed">Save failed</string>
     <string name="note_untitled">Untitled</string>
     <string name="note_title_hint">Title</string>
     <string name="note_body_hint">Write something…</string>
@@ -282,6 +285,10 @@
     <string name="settings_backup_album_count">%1$d items</string>
     <string name="settings_backup_status">%1$d photos backed up</string>
     <string name="settings_backup_now">Back up now</string>
+    <string name="settings_backup_cleanup">After backup</string>
+    <string name="settings_backup_delete_title">Delete originals from device</string>
+    <string name="settings_backup_delete_subtitle">Once backed up, move device copies to the trash (30-day recoverable). Android asks you to confirm each time.</string>
+    <string name="settings_backup_delete_pending">Delete %1$d backed-up original(s)</string>
     <string name="settings_lock_note">Your vault stays locked with your passphrase. Biometrics may unlock a saved session where enabled; the encryption key never leaves this device.</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_system">System default</string>
@@ -294,6 +301,9 @@
     <string name="settings_contact_sort_first">By first name</string>
     <string name="settings_contact_sort_last">By last name</string>
     <string name="settings_contact_sort_display">By display name</string>
+    <string name="settings_contact_name_order">Name display</string>
+    <string name="settings_contact_name_last_first">Last name, first name</string>
+    <string name="settings_contact_name_first_last">First name last name</string>
     <string name="settings_date_format">Date format</string>
     <string name="settings_date_format_system">System default</string>
     <string name="settings_date_format_dmy">DD.MM.YYYY</string>
@@ -411,6 +421,7 @@
     <string name="lock_remember_subtitle">Unlock your vault</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_save">Save</string>
+    <string name="action_next">Next</string>
     <string name="action_back">Back</string>
     <string name="action_settings">Settings</string>
     <string name="action_more">More</string>
@@ -521,7 +532,8 @@
     <string name="share_import">Import</string>
     <string name="share_imported">Imported %1$d item(s)</string>
     <string name="share_import_failed">%1$d failed</string>
-    <string name="tags_hint">Tags (comma-separated)</string>
+    <string name="tags_hint">Add tag</string>
+    <string name="tag_remove">Remove tag</string>
     <string name="open_with">Open with</string>
     <string name="settings_link_chooser">Ask which browser to open links</string>
 

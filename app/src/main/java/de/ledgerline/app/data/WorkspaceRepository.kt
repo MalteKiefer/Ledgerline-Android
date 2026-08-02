@@ -7,6 +7,7 @@ import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.core.crypto.CanonicalJson
 import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.offline.OfflineFlags
+import de.ledgerline.app.core.offline.RECOVERABLE_SAVE_ERRORS
 import de.ledgerline.app.core.offline.StoreEnvelope
 import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.VaultKeyHolder
@@ -101,16 +102,6 @@ class WorkspaceRepository(
         /** SyncOutbox key for offline workspace write deltas (one aggregate delta for all modules). */
         const val OUTBOX = "workspace"
         val LIST_KEYS = listOf("notes", "todos", "todoLists", "bookmarks", "bookmarkFolders", "contacts", "files", "fileFolders")
-
-        /**
-         * saveOnline failures that are transient/retryable → the edit is queued to the
-         * durable outbox and replayed later instead of being dropped. A sealed store PUT
-         * only ever fails with these on the server side (409-conflict exhaustion, 429,
-         * 5xx); the module store validates no record content, so there is no permanent
-         * 4xx to loop on. DECRYPT / WRONG_PASSPHRASE / GONE are NOT here — those can't be
-         * fixed by retrying and the edit is reverted instead.
-         */
-        val RECOVERABLE_SAVE_ERRORS = setOf(ErrorKind.NETWORK, ErrorKind.HTTP, ErrorKind.RATE_LIMITED)
     }
 
     override val syncLabel: String = "workspace"

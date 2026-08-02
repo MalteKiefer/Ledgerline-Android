@@ -16,7 +16,7 @@ plugins {
 // Marketing semver base; bump on real releases. The build metadata (commit count,
 // short SHA, branch, UTC build date) is derived from git so every build is uniquely
 // identifiable and versionCode grows monotonically without manual edits.
-val versionBase = "0.9.0"
+val versionBase = "0.9.1"
 
 fun git(vararg args: String): String? = runCatching {
     ProcessBuilder(listOf("git", *args))

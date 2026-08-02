@@ -176,6 +176,7 @@ fun SettingsContent(
     val account by vm.account.collectAsStateWithLifecycle()
     val avatar by vm.avatar.collectAsStateWithLifecycle()
     val contactSort by vm.contactSort.collectAsStateWithLifecycle()
+    val contactNameOrder by vm.contactNameOrder.collectAsStateWithLifecycle()
     val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
     val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val displayPrefs by vm.displayPrefs.collectAsStateWithLifecycle()
@@ -186,6 +187,8 @@ fun SettingsContent(
     val backupAlbumIds by vm.backupAlbumIds.collectAsStateWithLifecycle()
     val albums by vm.albums.collectAsStateWithLifecycle()
     val backedUpCount by vm.backedUpCount.collectAsStateWithLifecycle()
+    val backupDeleteAfter by vm.backupDeleteAfter.collectAsStateWithLifecycle()
+    val pendingDeleteUris by vm.pendingDeleteUris.collectAsStateWithLifecycle()
 
     var route by rememberSaveable { mutableStateOf(SettingsRoute.ROOT) }
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
@@ -213,6 +216,22 @@ fun SettingsContent(
     // Result is ignored: backup runs regardless; the permission grant allows reading media.
     val mediaLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
+    // "Delete originals after backup": the scoped-storage trash request needs OS consent (the
+    // app doesn't own the camera roll). On approval, drop those URIs from the pending queue.
+    var trashRequested by remember { mutableStateOf<List<String>>(emptyList()) }
+    val trashLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+            if (res.resultCode == android.app.Activity.RESULT_OK) vm.onOriginalsDeleted(trashRequested)
+            trashRequested = emptyList()
+        }
+    val requestTrash: () -> Unit = req@{
+        val uris = pendingDeleteUris.mapNotNull { runCatching { android.net.Uri.parse(it) }.getOrNull() }
+        if (uris.isEmpty()) return@req
+        trashRequested = pendingDeleteUris.toList()
+        val pi = android.provider.MediaStore.createTrashRequest(context.contentResolver, uris, true)
+        trashLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build())
+    }
 
     // The offline-map manager owns its own full-screen scaffold; render it directly.
     if (route == SettingsRoute.OFFLINE_MAPS) {
@@ -261,6 +280,8 @@ fun SettingsContent(
                     onSelectLang = { tag -> applyLanguage(context, tag); currentLang = tag; vm.pushLocale(tag) },
                     contactSort = contactSort,
                     onSelectContactSort = vm::setContactSort,
+                    contactNameOrder = contactNameOrder,
+                    onSelectNameOrder = vm::setContactNameOrder,
                     dateFormat = dateFormat,
                     onSelectDateFormat = vm::setDateFormat,
                     themeMode = themeMode,
@@ -360,6 +381,10 @@ fun SettingsContent(
                     onToggleAlbum = vm::toggleAlbum,
                     onBackupNow = vm::backupNow,
                     onLoadAlbums = vm::loadAlbums,
+                    deleteAfter = backupDeleteAfter,
+                    onSetDeleteAfter = vm::setBackupDeleteAfter,
+                    pendingDeleteCount = pendingDeleteUris.size,
+                    onDeletePending = requestTrash,
                 )
 
                 SettingsRoute.ACCOUNT -> AccountSettings(
@@ -785,6 +810,8 @@ private fun AppearanceSettings(
     onSelectLang: (String) -> Unit,
     contactSort: ContactSort,
     onSelectContactSort: (ContactSort) -> Unit,
+    contactNameOrder: de.ledgerline.app.data.ContactNameOrder,
+    onSelectNameOrder: (de.ledgerline.app.data.ContactNameOrder) -> Unit,
     dateFormat: DateFormatPref,
     onSelectDateFormat: (DateFormatPref) -> Unit,
     themeMode: de.ledgerline.app.data.ThemeMode,
@@ -831,6 +858,11 @@ private fun AppearanceSettings(
             RadioRow(stringResource(R.string.settings_contact_sort_last), contactSort == ContactSort.LAST) { onSelectContactSort(ContactSort.LAST) }
             SettingsRowDivider()
             RadioRow(stringResource(R.string.settings_contact_sort_display), contactSort == ContactSort.DISPLAY) { onSelectContactSort(ContactSort.DISPLAY) }
+        }
+        SettingsSection(stringResource(R.string.settings_contact_name_order)) {
+            RadioRow(stringResource(R.string.settings_contact_name_last_first), contactNameOrder == de.ledgerline.app.data.ContactNameOrder.LAST_FIRST) { onSelectNameOrder(de.ledgerline.app.data.ContactNameOrder.LAST_FIRST) }
+            SettingsRowDivider()
+            RadioRow(stringResource(R.string.settings_contact_name_first_last), contactNameOrder == de.ledgerline.app.data.ContactNameOrder.FIRST_LAST) { onSelectNameOrder(de.ledgerline.app.data.ContactNameOrder.FIRST_LAST) }
         }
         SettingsSection(stringResource(R.string.settings_date_format)) {
             RadioRow(stringResource(R.string.settings_date_format_system), dateFormat == DateFormatPref.SYSTEM) { onSelectDateFormat(DateFormatPref.SYSTEM) }
@@ -1075,6 +1107,10 @@ private fun BackupSettings(
     onToggleAlbum: (String) -> Unit,
     onBackupNow: () -> Unit,
     onLoadAlbums: () -> Unit,
+    deleteAfter: Boolean,
+    onSetDeleteAfter: (Boolean) -> Unit,
+    pendingDeleteCount: Int,
+    onDeletePending: () -> Unit,
 ) {
     LaunchedEffect(enabled) { if (enabled) onLoadAlbums() }
     SubScreen(padding) {
@@ -1082,6 +1118,29 @@ private fun BackupSettings(
             SwitchRow(stringResource(R.string.settings_backup_title), stringResource(R.string.settings_backup_subtitle), enabled, onSetEnabled)
         }
         if (enabled) {
+            SettingsSection(stringResource(R.string.settings_backup_cleanup)) {
+                SwitchRow(
+                    stringResource(R.string.settings_backup_delete_title),
+                    stringResource(R.string.settings_backup_delete_subtitle),
+                    deleteAfter,
+                    onSetDeleteAfter,
+                )
+                if (pendingDeleteCount > 0) {
+                    SettingsRowDivider()
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onDeletePending() }.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconChip(Icons.Outlined.DeleteSweep, tint = Brand.tintOrange, size = 32.dp)
+                        Spacer(Modifier.width(14.dp))
+                        Text(
+                            stringResource(R.string.settings_backup_delete_pending, pendingDeleteCount),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
             SettingsSection(stringResource(R.string.settings_backup_albums), hint = stringResource(R.string.settings_backup_status, backedUpCount)) {
                 albums.forEachIndexed { i, a ->
                     if (i > 0) SettingsRowDivider()

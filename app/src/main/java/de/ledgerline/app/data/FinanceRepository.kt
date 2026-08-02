@@ -9,9 +9,14 @@ import de.ledgerline.app.core.crypto.Crypto
 import de.ledgerline.app.core.crypto.GallerySharding
 import de.ledgerline.app.domain.model.PaymentMethod
 import de.ledgerline.app.core.offline.BlobDiskCache
+import de.ledgerline.app.core.offline.Connectivity
 import de.ledgerline.app.core.offline.OfflineFlags
+import de.ledgerline.app.core.offline.RECOVERABLE_SAVE_ERRORS
+import de.ledgerline.app.core.offline.StoreDelta
 import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.offline.StoreEnvelope
+import de.ledgerline.app.core.offline.SyncOutbox
+import de.ledgerline.app.core.offline.SyncableStore
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
@@ -64,8 +69,10 @@ class FinanceRepository(
     private val storeCache: StoreDiskCache,
     private val offlineFlags: OfflineFlags,
     private val blobCache: BlobDiskCache,
+    private val connectivity: Connectivity,
+    private val syncOutbox: SyncOutbox,
     private val apiProvider: (Session) -> LedgerlineApi,
-) {
+) : SyncableStore {
     @Inject constructor(
         sessionHolder: SessionHolder,
         vaultKeyHolder: VaultKeyHolder,
@@ -74,14 +81,21 @@ class FinanceRepository(
         storeCache: StoreDiskCache,
         offlineFlags: OfflineFlags,
         blobCache: BlobDiskCache,
+        connectivity: Connectivity,
+        syncOutbox: SyncOutbox,
     ) : this(
         sessionHolder, vaultKeyHolder, crypto, cache, storeCache, offlineFlags, blobCache,
+        connectivity, syncOutbox,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
+
+    override val syncLabel: String = "finance"
 
     private companion object {
         const val KEY = "invoices_root"
         const val COMPANY_KEY = "invoices_company"
+        /** SyncOutbox key for offline finance write deltas (invoices + all 4 collections). */
+        const val OUTBOX = "finance"
     }
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
@@ -236,7 +250,7 @@ class FinanceRepository(
 
     // ---- save (invoices only; every other root key preserved) ----
 
-    suspend fun save(mutate: (List<Invoice>) -> List<Invoice>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
+    suspend fun save(queue: Boolean = true, mutate: (List<Invoice>) -> List<Invoice>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         var base = cache.value.value
@@ -246,19 +260,23 @@ class FinanceRepository(
         // Refuse to re-shard invoices while a shard is missing — it would drop those records.
         if (degraded) return@withContext Outcome.Err(ErrorKind.HTTP)
         var next = mutate(base!!.manifest.invoices)
+        // The intended manifest, computed from the ORIGINAL base — this is what we queue on any
+        // offline/recoverable failure (a clean record-level delta that replays onto a later head).
+        val myNext = base!!.manifest.copy(invoices = next)
+        if (queue && !connectivity.isOnline()) return@withContext enqueueFinance(vk, base!!.manifest, myNext)
         val writer = SealedShardWriter { bytes, name -> uploadBytes(vk, bytes, name) }
 
         repeat(5) {
             val records = next.map { it.id to FinanceRecordCodec.encodeInvoice(it) }
             val result = writer.build(records, emptyList(), priorShards)
-                ?: return@withContext Outcome.Err(ErrorKind.NETWORK) // a shard upload failed
+                ?: return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK) // a shard upload failed
             val rootJson = mergeRoot(priorRootRaw, result.rootJson)
             val rootCipher = crypto.sealManifest(CanonicalJson.encode(rootJson), vk)
             val guard = result.shardRefs + collectionRefs(priorRootRaw) + receiptBlobs(base!!.manifest.transactions)
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
-                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+                return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK)
             }
             when {
                 put.isSuccessful -> {
@@ -273,14 +291,14 @@ class FinanceRepository(
                 put.code() == HttpURLConnection.HTTP_CONFLICT -> {
                     val fresh = when (val l = load()) {
                         is Outcome.Ok -> l.value.manifest.invoices
-                        is Outcome.Err -> return@withContext l
+                        is Outcome.Err -> return@withContext if (queue && l.kind in RECOVERABLE_SAVE_ERRORS) enqueueFinance(vk, base!!.manifest, myNext) else l
                     }
                     next = mutate(fresh)
                 }
-                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+                else -> return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
             }
         }
-        Outcome.Err(ErrorKind.HTTP)
+        recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
     }
 
     // ---- save payment methods (only the paymentMethods collection; every other root key preserved) ----
@@ -291,18 +309,20 @@ class FinanceRepository(
      * are carried through verbatim, and all their blob refs go into the `shards[]` guard so the
      * server never frees them. 409-rebase like the invoice save.
      */
-    suspend fun savePaymentMethods(mutate: (List<PaymentMethod>) -> List<PaymentMethod>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
+    suspend fun savePaymentMethods(queue: Boolean = true, mutate: (List<PaymentMethod>) -> List<PaymentMethod>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         var base = cache.value.value
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
         var next = mutate(base!!.manifest.paymentMethods)
+        val myNext = base!!.manifest.copy(paymentMethods = next)
+        if (queue && !connectivity.isOnline()) return@withContext enqueueFinance(vk, base!!.manifest, myNext)
 
         repeat(5) {
             val items = next.map(FinanceRecordCodec::encodePaymentMethod)
             val coll = sealCollection(vk, items, priorRootRaw["payRef"]?.jsonPrimitive?.contentOrNull, priorRootRaw["payHash"]?.jsonPrimitive?.contentOrNull, priorRootRaw["payKey"]?.jsonPrimitive?.contentOrNull)
-                ?: return@withContext Outcome.Err(ErrorKind.NETWORK) // upload failed
+                ?: return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK) // upload failed
             val root = priorRootRaw.toMutableMap()
             root["v"] = JsonPrimitive(3); root["suite"] = JsonPrimitive(1)
             if (coll.ref == null) {
@@ -316,7 +336,7 @@ class FinanceRepository(
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
-                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+                return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK)
             }
             when {
                 put.isSuccessful -> {
@@ -330,14 +350,14 @@ class FinanceRepository(
                 put.code() == HttpURLConnection.HTTP_CONFLICT -> {
                     val fresh = when (val l = load()) {
                         is Outcome.Ok -> { base = l.value; l.value.manifest.paymentMethods }
-                        is Outcome.Err -> return@withContext l
+                        is Outcome.Err -> return@withContext if (queue && l.kind in RECOVERABLE_SAVE_ERRORS) enqueueFinance(vk, base!!.manifest, myNext) else l
                     }
                     next = mutate(fresh)
                 }
-                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+                else -> return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
             }
         }
-        Outcome.Err(ErrorKind.HTTP)
+        recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
     }
 
     /**
@@ -345,18 +365,20 @@ class FinanceRepository(
      * replaced — everything else (invoices' shards, paymentMethods, financeCategories, inline data)
      * is preserved verbatim and guarded. 409-rebase. Mirrors [savePaymentMethods].
      */
-    suspend fun saveTransactions(mutate: (List<de.ledgerline.app.domain.model.Transaction>) -> List<de.ledgerline.app.domain.model.Transaction>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
+    suspend fun saveTransactions(queue: Boolean = true, mutate: (List<de.ledgerline.app.domain.model.Transaction>) -> List<de.ledgerline.app.domain.model.Transaction>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         var base = cache.value.value
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
         var next = mutate(base!!.manifest.transactions)
+        val myNext = base!!.manifest.copy(transactions = next)
+        if (queue && !connectivity.isOnline()) return@withContext enqueueFinance(vk, base!!.manifest, myNext)
 
         repeat(5) {
             val items = next.map(FinanceRecordCodec::encodeTransaction)
             val coll = sealCollection(vk, items, priorRootRaw["txRef"]?.jsonPrimitive?.contentOrNull, priorRootRaw["txHash"]?.jsonPrimitive?.contentOrNull, priorRootRaw["txKey"]?.jsonPrimitive?.contentOrNull)
-                ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                ?: return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK)
             val root = priorRootRaw.toMutableMap()
             root["v"] = JsonPrimitive(3); root["suite"] = JsonPrimitive(1)
             if (coll.ref == null) {
@@ -370,7 +392,7 @@ class FinanceRepository(
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
-                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+                return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK)
             }
             when {
                 put.isSuccessful -> {
@@ -384,14 +406,14 @@ class FinanceRepository(
                 put.code() == HttpURLConnection.HTTP_CONFLICT -> {
                     val fresh = when (val l = load()) {
                         is Outcome.Ok -> { base = l.value; l.value.manifest.transactions }
-                        is Outcome.Err -> return@withContext l
+                        is Outcome.Err -> return@withContext if (queue && l.kind in RECOVERABLE_SAVE_ERRORS) enqueueFinance(vk, base!!.manifest, myNext) else l
                     }
                     next = mutate(fresh)
                 }
-                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+                else -> return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
             }
         }
-        Outcome.Err(ErrorKind.HTTP)
+        recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
     }
 
     // ---- statement import (transactions + optional invoice auto-match in ONE write) ----
@@ -483,18 +505,20 @@ class FinanceRepository(
      * Re-seal the `projects` collection and PUT the root with only `projRef`/`projKey`/`projHash`
      * replaced — everything else preserved + guarded, 409-rebase. Mirrors [savePaymentMethods].
      */
-    suspend fun saveProjects(mutate: (List<de.ledgerline.app.domain.model.Project>) -> List<de.ledgerline.app.domain.model.Project>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
+    suspend fun saveProjects(queue: Boolean = true, mutate: (List<de.ledgerline.app.domain.model.Project>) -> List<de.ledgerline.app.domain.model.Project>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         var base = cache.value.value
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
         var next = mutate(base!!.manifest.projects)
+        val myNext = base!!.manifest.copy(projects = next)
+        if (queue && !connectivity.isOnline()) return@withContext enqueueFinance(vk, base!!.manifest, myNext)
 
         repeat(5) {
             val items = next.map(FinanceRecordCodec::encodeProject)
             val coll = sealCollection(vk, items, priorRootRaw["projRef"]?.jsonPrimitive?.contentOrNull, priorRootRaw["projHash"]?.jsonPrimitive?.contentOrNull, priorRootRaw["projKey"]?.jsonPrimitive?.contentOrNull)
-                ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                ?: return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK)
             val root = priorRootRaw.toMutableMap()
             root["v"] = JsonPrimitive(3); root["suite"] = JsonPrimitive(1)
             if (coll.ref == null) { root.remove("projRef"); root.remove("projKey"); root.remove("projHash") }
@@ -505,7 +529,7 @@ class FinanceRepository(
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
-                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+                return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK)
             }
             when {
                 put.isSuccessful -> {
@@ -519,29 +543,31 @@ class FinanceRepository(
                 put.code() == HttpURLConnection.HTTP_CONFLICT -> {
                     val fresh = when (val l = load()) {
                         is Outcome.Ok -> { base = l.value; l.value.manifest.projects }
-                        is Outcome.Err -> return@withContext l
+                        is Outcome.Err -> return@withContext if (queue && l.kind in RECOVERABLE_SAVE_ERRORS) enqueueFinance(vk, base!!.manifest, myNext) else l
                     }
                     next = mutate(fresh)
                 }
-                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+                else -> return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
             }
         }
-        Outcome.Err(ErrorKind.HTTP)
+        recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
     }
 
     /** Re-seal the `partners` collection (partRef) — everything else preserved + guarded, 409-rebase. */
-    suspend fun savePartners(mutate: (List<de.ledgerline.app.domain.model.Partner>) -> List<de.ledgerline.app.domain.model.Partner>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
+    suspend fun savePartners(queue: Boolean = true, mutate: (List<de.ledgerline.app.domain.model.Partner>) -> List<de.ledgerline.app.domain.model.Partner>): Outcome<FinanceStore> = withContext(Dispatchers.IO) {
         val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
         var base = cache.value.value
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
         var next = mutate(base!!.manifest.partners)
+        val myNext = base!!.manifest.copy(partners = next)
+        if (queue && !connectivity.isOnline()) return@withContext enqueueFinance(vk, base!!.manifest, myNext)
 
         repeat(5) {
             val items = next.map(FinanceRecordCodec::encodePartner)
             val coll = sealCollection(vk, items, priorRootRaw["partRef"]?.jsonPrimitive?.contentOrNull, priorRootRaw["partHash"]?.jsonPrimitive?.contentOrNull, priorRootRaw["partKey"]?.jsonPrimitive?.contentOrNull)
-                ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                ?: return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK)
             val root = priorRootRaw.toMutableMap()
             root["v"] = JsonPrimitive(3); root["suite"] = JsonPrimitive(1)
             if (coll.ref == null) { root.remove("partRef"); root.remove("partKey"); root.remove("partHash") }
@@ -552,7 +578,7 @@ class FinanceRepository(
             val put = try {
                 api().invoicesStorePut(StorePutRequest(rootCipher, version, guard))
             } catch (e: Exception) {
-                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+                return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.NETWORK)
             }
             when {
                 put.isSuccessful -> {
@@ -566,14 +592,14 @@ class FinanceRepository(
                 put.code() == HttpURLConnection.HTTP_CONFLICT -> {
                     val fresh = when (val l = load()) {
                         is Outcome.Ok -> { base = l.value; l.value.manifest.partners }
-                        is Outcome.Err -> return@withContext l
+                        is Outcome.Err -> return@withContext if (queue && l.kind in RECOVERABLE_SAVE_ERRORS) enqueueFinance(vk, base!!.manifest, myNext) else l
                     }
                     next = mutate(fresh)
                 }
-                else -> return@withContext Outcome.Err(ErrorKind.HTTP)
+                else -> return@withContext recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
             }
         }
-        Outcome.Err(ErrorKind.HTTP)
+        recover(queue, vk, base!!.manifest, myNext, ErrorKind.HTTP)
     }
 
     /** Seal a collection array to a content blob; reuse the prior blob if the canonical bytes match. */
@@ -735,6 +761,80 @@ class FinanceRepository(
     suspend fun invoiceMailTest(): Boolean = withContext(Dispatchers.IO) {
         val session = sessionHolder.get() ?: return@withContext false
         runCatching { apiProvider(session).invoicesMailTest().isSuccessful }.getOrDefault(false)
+    }
+
+    // ---- offline write outbox (record-level delta across invoices + the 4 collections) ----
+
+    private fun collectionsOf(m: FinanceManifest): Map<String, Map<String, JsonObject>> = mapOf(
+        "invoices" to m.invoices.associate { it.id to FinanceRecordCodec.encodeInvoice(it) },
+        "paymentMethods" to m.paymentMethods.associate { it.id to FinanceRecordCodec.encodePaymentMethod(it) },
+        "transactions" to m.transactions.associate { it.id to FinanceRecordCodec.encodeTransaction(it) },
+        "projects" to m.projects.associate { it.id to FinanceRecordCodec.encodeProject(it) },
+        "partners" to m.partners.associate { it.id to FinanceRecordCodec.encodePartner(it) },
+    )
+
+    /** Apply a queued collection delta onto a live list (upserts win, deletes drop; last-write-wins). */
+    private fun <T> mergeRecords(
+        list: List<T>,
+        cd: de.ledgerline.app.core.offline.CollectionDelta?,
+        id: (T) -> String,
+        decode: (JsonObject) -> T?,
+    ): List<T> {
+        if (cd == null || cd.isEmpty) return list
+        val byId = list.associateByTo(LinkedHashMap()) { id(it) }
+        cd.deletes.forEach { byId.remove(it) }
+        cd.upserts.forEach { (rid, obj) -> decode(obj)?.let { byId[rid] = it } }
+        return byId.values.toList()
+    }
+
+    /**
+     * Queue the base→next record delta to the durable, VK-sealed [SyncOutbox] and keep the optimistic
+     * cache — so a finance edit made offline or during a transient server error is never silently lost;
+     * [replayPending] replays it onto a later server head. Mirrors the other repositories' contract.
+     */
+    private fun recover(queue: Boolean, vk: ByteArray, base: FinanceManifest, next: FinanceManifest, kind: ErrorKind): Outcome<FinanceStore> =
+        if (queue && kind in RECOVERABLE_SAVE_ERRORS) enqueueFinance(vk, base, next) else Outcome.Err(kind)
+
+    private fun enqueueFinance(vk: ByteArray, base: FinanceManifest, next: FinanceManifest): Outcome<FinanceStore> {
+        val delta = StoreDelta.diff(collectionsOf(base), collectionsOf(next))
+        if (!delta.isEmpty) syncOutbox.append(OUTBOX, delta, vk)
+        val store = FinanceStore(next, version)
+        cache.set(store)
+        return Outcome.Ok(store)
+    }
+
+    /**
+     * Replay pending offline finance edits onto the current server head, one collection at a time via
+     * the existing (byte-exact) online save paths with queuing disabled. Reloads the head first so each
+     * save 409-rebases onto the winner. Invoice edits are skipped while degraded (a missing shard would
+     * drop records) — the outbox is retained and retried once the full set loads. Clears on full drain.
+     */
+    override suspend fun replayPending(): Boolean = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext false
+        val delta = syncOutbox.pending(OUTBOX, vk) ?: return@withContext true
+        if (delta.isEmpty) { syncOutbox.clear(OUTBOX); return@withContext true }
+        if (!connectivity.isOnline()) return@withContext false
+        if (load() is Outcome.Err) return@withContext false // fresh head into cache; 409 loops rebase on it
+        var ok = true
+        fun cd(k: String) = delta.collections[k]?.takeIf { !it.isEmpty }
+        cd("invoices")?.let { c ->
+            ok = if (degraded) false // can't safely re-shard now; keep the outbox and retry later
+            else ok && save(queue = false) { list -> mergeRecords(list, c, { it.id }, FinanceRecordCodec::decodeInvoice) } is Outcome.Ok
+        }
+        cd("paymentMethods")?.let { c ->
+            ok = ok && savePaymentMethods(queue = false) { list -> mergeRecords(list, c, { it.id }, FinanceRecordCodec::decodePaymentMethod) } is Outcome.Ok
+        }
+        cd("transactions")?.let { c ->
+            ok = ok && saveTransactions(queue = false) { list -> mergeRecords(list, c, { it.id }, FinanceRecordCodec::decodeTransaction) } is Outcome.Ok
+        }
+        cd("projects")?.let { c ->
+            ok = ok && saveProjects(queue = false) { list -> mergeRecords(list, c, { it.id }, FinanceRecordCodec::decodeProject) } is Outcome.Ok
+        }
+        cd("partners")?.let { c ->
+            ok = ok && savePartners(queue = false) { list -> mergeRecords(list, c, { it.id }, FinanceRecordCodec::decodePartner) } is Outcome.Ok
+        }
+        if (ok) syncOutbox.clear(OUTBOX)
+        ok
     }
 
     // ---- helpers ----

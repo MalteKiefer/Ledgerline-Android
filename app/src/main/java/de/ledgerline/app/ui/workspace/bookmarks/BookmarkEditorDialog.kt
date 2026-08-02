@@ -48,7 +48,8 @@ fun BookmarkEditorDialog(
     var title by rememberSaveable { mutableStateOf(initial.title) }
     var description by rememberSaveable { mutableStateOf(initial.description) }
     var folderId by rememberSaveable { mutableStateOf(initial.folderId) }
-    var tagsText by rememberSaveable { mutableStateOf(Tags.formatTags(initial.tags)) }
+    var tags by remember { mutableStateOf(initial.tags) }
+    var tagDraft by rememberSaveable { mutableStateOf("") }
     var showNewFolder by rememberSaveable { mutableStateOf(false) }
 
     AlertDialog(
@@ -77,11 +78,11 @@ fun BookmarkEditorDialog(
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = tagsText,
-                    onValueChange = { tagsText = it },
-                    label = { Text(stringResource(R.string.tags_hint)) },
-                    singleLine = true,
+                de.ledgerline.app.ui.workspace.common.TagInput(
+                    tags = tags,
+                    onTagsChange = { tags = it },
+                    draft = tagDraft,
+                    onDraftChange = { tagDraft = it },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 val folderName = folders.firstOrNull { it.id == folderId }?.name
@@ -104,7 +105,7 @@ fun BookmarkEditorDialog(
         confirmButton = {
             TextButton(
                 enabled = url.isNotBlank(),
-                onClick = { onSave(url, title, description, folderId, Tags.parseTags(tagsText)) },
+                onClick = { onSave(url, title, description, folderId, Tags.mergeDraft(tags, tagDraft)) },
             ) { Text(stringResource(R.string.action_save)) }
         },
         dismissButton = {

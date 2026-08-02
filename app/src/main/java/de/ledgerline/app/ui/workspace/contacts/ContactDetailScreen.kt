@@ -109,6 +109,7 @@ fun ContactDetailScreen(
     onBack: () -> Unit,
     dateFormat: DateFormatPref = DateFormatPref.SYSTEM,
     linkChooser: Boolean = true,
+    nameOrder: de.ledgerline.app.data.ContactNameOrder = de.ledgerline.app.data.ContactNameOrder.LAST_FIRST,
     modifier: Modifier = Modifier,
 ) {
     val fs = LocalFullscreen.current
@@ -194,7 +195,7 @@ fun ContactDetailScreen(
             ) {
                 ContactAvatar(contact, loadAvatar, 112.dp)
                 Text(
-                    contactDisplayName(contact).ifBlank { stringResource(R.string.contact_untitled) },
+                    contactDisplayName(contact, nameOrder).ifBlank { stringResource(R.string.contact_untitled) },
                     style = MaterialTheme.typography.headlineSmall,
                     textAlign = TextAlign.Center,
                 )
@@ -384,7 +385,8 @@ private fun ContactEditor(
     var bday by remember(contact.id) { mutableStateOf(contact.bday) }
     var anniversary by remember(contact.id) { mutableStateOf(contact.anniversary) }
     var note by remember(contact.id) { mutableStateOf(contact.note) }
-    var tagsText by remember(contact.id) { mutableStateOf(Tags.formatTags(contact.categories)) }
+    var tags by remember(contact.id) { mutableStateOf(contact.categories) }
+    var tagDraft by remember(contact.id) { mutableStateOf("") }
 
     val emails = remember(contact.id) { contact.emails.map { EditableLabeled(it.value, it.type) }.toMutableStateList() }
     val phones = remember(contact.id) { contact.phones.map { EditableLabeled(it.value, it.type) }.toMutableStateList() }
@@ -412,7 +414,7 @@ private fun ContactEditor(
         },
         bday = bday.trim(), anniversary = anniversary.trim(),
         note = note.trim(),
-        categories = Tags.parseTags(tagsText),
+        categories = Tags.mergeDraft(tags, tagDraft),
     )
 
     Scaffold(
@@ -486,7 +488,13 @@ private fun ContactEditor(
             Field(bday, { bday = it }, R.string.contact_bday)
             Field(anniversary, { anniversary = it }, R.string.contact_anniversary)
             Field(note, { note = it }, R.string.contact_note, singleLine = false)
-            Field(tagsText, { tagsText = it }, R.string.tags_hint)
+            de.ledgerline.app.ui.workspace.common.TagInput(
+                tags = tags,
+                onTagsChange = { tags = it },
+                draft = tagDraft,
+                onDraftChange = { tagDraft = it },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }

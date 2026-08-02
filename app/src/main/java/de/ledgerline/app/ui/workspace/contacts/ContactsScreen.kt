@@ -71,9 +71,13 @@ import de.ledgerline.app.ui.workspace.common.SearchField
 import de.ledgerline.app.ui.workspace.common.TagFilterRow
 import de.ledgerline.app.ui.workspace.common.TrashBar
 
-/** The display name shown in list rows / detail — always "Last, First" when both exist. */
-internal fun contactDisplayName(c: Contact): String = when {
-    c.last.isNotBlank() && c.first.isNotBlank() -> "${c.last}, ${c.first}"
+/** The display name shown in list rows / detail, per the chosen [order]. */
+internal fun contactDisplayName(
+    c: Contact,
+    order: de.ledgerline.app.data.ContactNameOrder = de.ledgerline.app.data.ContactNameOrder.LAST_FIRST,
+): String = when {
+    c.last.isNotBlank() && c.first.isNotBlank() ->
+        if (order == de.ledgerline.app.data.ContactNameOrder.FIRST_LAST) "${c.first} ${c.last}" else "${c.last}, ${c.first}"
     c.last.isNotBlank() -> c.last
     c.first.isNotBlank() -> c.first
     else -> c.fn.ifBlank { c.org }
@@ -109,6 +113,7 @@ fun ContactsScreen(
     val syncing by vm.syncing.collectAsStateWithLifecycle()
     val dateFormat by vm.dateFormat.collectAsStateWithLifecycle()
     val linkChooser by vm.linkChooser.collectAsStateWithLifecycle()
+    val nameOrder by vm.nameOrder.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
@@ -179,6 +184,7 @@ fun ContactsScreen(
                 onBack = { openId = null; pendingNew = null },
                 dateFormat = dateFormat,
                 linkChooser = linkChooser,
+                nameOrder = nameOrder,
                 modifier = modifier,
             )
             return
@@ -288,12 +294,14 @@ fun ContactsScreen(
                                     if (showTrash) {
                                         TrashContactRow(
                                             contact = c,
+                                            nameOrder = nameOrder,
                                             onRestore = { vm.restore(c.id) },
                                             onDeleteForever = { deleteForeverTarget = c.id },
                                         )
                                     } else {
                                         ContactRow(
                                             contact = c,
+                                            nameOrder = nameOrder,
                                             loadAvatar = { vm.avatar(it) },
                                             onOpen = { openId = c.id },
                                             onToggleFavorite = { vm.toggleFavorite(c.id) },
@@ -364,6 +372,7 @@ internal fun ContactAvatar(
 @Composable
 private fun ContactRow(
     contact: Contact,
+    nameOrder: de.ledgerline.app.data.ContactNameOrder,
     loadAvatar: suspend (Contact) -> android.graphics.Bitmap?,
     onOpen: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -371,7 +380,7 @@ private fun ContactRow(
     val subtitle = listOf(contact.org, contact.title).filter { it.isNotBlank() }.joinToString(" · ")
     ListItem(
         headlineContent = {
-            Text(contactDisplayName(contact).ifBlank { stringResource(R.string.contact_untitled) })
+            Text(contactDisplayName(contact, nameOrder).ifBlank { stringResource(R.string.contact_untitled) })
         },
         supportingContent = if (subtitle.isNotBlank()) {
             { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -392,10 +401,10 @@ private fun ContactRow(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TrashContactRow(contact: Contact, onRestore: () -> Unit, onDeleteForever: () -> Unit) {
+private fun TrashContactRow(contact: Contact, nameOrder: de.ledgerline.app.data.ContactNameOrder, onRestore: () -> Unit, onDeleteForever: () -> Unit) {
     ListItem(
         headlineContent = {
-            Text(contactDisplayName(contact).ifBlank { stringResource(R.string.contact_untitled) })
+            Text(contactDisplayName(contact, nameOrder).ifBlank { stringResource(R.string.contact_untitled) })
         },
         trailingContent = {
             Row {

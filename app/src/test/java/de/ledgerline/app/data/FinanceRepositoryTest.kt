@@ -70,7 +70,7 @@ class FinanceRepositoryTest {
                 return Response.success(StoreResponse(body.ciphertext, body.version + 1))
             }
         }
-        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), FakeConnectivity(online = true), tmpOutbox(), apiProvider = { api })
 
         assertTrue(repo.load() is Outcome.Ok)
         val res = repo.save { list ->
@@ -112,7 +112,7 @@ class FinanceRepositoryTest {
                 return Response.success(StoreResponse(body.ciphertext, body.version + 1))
             }
         }
-        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), FakeConnectivity(online = true), tmpOutbox(), apiProvider = { api })
 
         assertTrue(repo.load() is Outcome.Ok)
         val res = repo.savePaymentMethods { list ->
@@ -146,7 +146,7 @@ class FinanceRepositoryTest {
             override suspend fun uploadInvoice(file: MultipartBody.Part): Response<UploadResponse> = Response.success(UploadResponse("newtx"))
             override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> { putBody = body; return Response.success(StoreResponse(body.ciphertext, body.version + 1)) }
         }
-        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), FakeConnectivity(online = true), tmpOutbox(), apiProvider = { api })
 
         assertTrue(repo.load() is Outcome.Ok)
         val res = repo.saveTransactions { list ->
@@ -174,7 +174,7 @@ class FinanceRepositoryTest {
             override suspend fun uploadInvoice(file: MultipartBody.Part): Response<UploadResponse> = Response.success(UploadResponse("newpart"))
             override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> { putBody = body; return Response.success(StoreResponse(body.ciphertext, body.version + 1)) }
         }
-        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), FakeConnectivity(online = true), tmpOutbox(), apiProvider = { api })
 
         assertTrue(repo.load() is Outcome.Ok)
         assertTrue(repo.savePartners { listOf(de.ledgerline.app.domain.model.Partner(id = "pt1", name = "ACME", category = "Software")) + it } is Outcome.Ok)
@@ -199,7 +199,7 @@ class FinanceRepositoryTest {
             override suspend fun uploadInvoice(file: MultipartBody.Part): Response<UploadResponse> = Response.success(UploadResponse("newtx"))
             override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> { putBody = body; return Response.success(StoreResponse(body.ciphertext, body.version + 1)) }
         }
-        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        val repo = FinanceRepository(sh, vh, crypto, FinanceCache(), tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), FakeConnectivity(online = true), tmpOutbox(), apiProvider = { api })
         assertTrue(repo.load() is Outcome.Ok)
 
         // A booking carrying a receipt whose document is content blob "rcptblob".
@@ -223,15 +223,72 @@ class FinanceRepositoryTest {
         val store = tmpStoreCache()   // the sealed disk cache shared across "app restarts"
 
         // Online: profile loads and is sealed into the offline cache.
-        val repo1 = FinanceRepository(sh, vh, crypto, FinanceCache(), store, FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        val repo1 = FinanceRepository(sh, vh, crypto, FinanceCache(), store, FakeOfflineFlags(), tmpBlobCache(), FakeConnectivity(online = true), tmpOutbox(), apiProvider = { api })
         assertEquals("IntellyTec GmbH", repo1.loadCompany()?.name)
 
         // Restart offline (fresh in-memory cache, same disk): the network throws but the sealed
         // disk cache still yields the profile.
         online = false
-        val repo2 = FinanceRepository(sh, vh, crypto, FinanceCache(), store, FakeOfflineFlags(), tmpBlobCache(), apiProvider = { api })
+        val repo2 = FinanceRepository(sh, vh, crypto, FinanceCache(), store, FakeOfflineFlags(), tmpBlobCache(), FakeConnectivity(online = true), tmpOutbox(), apiProvider = { api })
         val cached = repo2.loadCompany()
         assertEquals("IntellyTec GmbH", cached?.name)
         assertEquals("DE123", cached?.vatId)
+    }
+
+    private fun invoice(id: String) =
+        Invoice(id = id, issueDate = "2026-06-15", lines = listOf(InvoiceLine(desc = "X", qty = 1.0, unitPrice = 100.0, vatRate = 19.0)))
+
+    /**
+     * Regression (data loss): a created invoice whose root PUT fails with a recoverable server error
+     * (5xx / 429 / exhausted-409 → ErrorKind.HTTP) must NOT be dropped — it stays in the optimistic
+     * cache AND is queued to the durable outbox so [replayPending] can push it onto a later head.
+     */
+    @Test fun invoice_save_with_recoverable_error_is_queued_not_dropped() = runBlocking {
+        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[],"caps":{}}"""
+        val api = object : NotImplementedApi() {
+            override suspend fun invoicesStore(): Response<StoreResponse> = Response.success(StoreResponse("SEALED:$rootJson", 5))
+            override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse> = Response.success(de.ledgerline.app.data.remote.dto.CompanyResponse(CompanyDto()))
+            override suspend fun uploadInvoice(file: MultipartBody.Part): Response<UploadResponse> = Response.success(UploadResponse("shard1"))
+            override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> = Response.error(500, "".toResponseBody(null))
+        }
+        val outbox = tmpOutbox()
+        val cache = FinanceCache()
+        val repo = FinanceRepository(sh, vh, crypto, cache, tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), FakeConnectivity(online = true), outbox, apiProvider = { api })
+        assertTrue(repo.load() is Outcome.Ok)
+
+        val res = repo.save { list -> listOf(invoice("inv1")) + list }
+
+        assertTrue(res is Outcome.Ok)                                  // optimistic, not an error
+        assertEquals(1, (res as Outcome.Ok).value.manifest.invoices.size)
+        assertTrue(outbox.hasPending())                               // durably queued, not dropped
+        assertEquals(1, cache.value.value!!.manifest.invoices.size)   // stays visible in the UI
+    }
+
+    /** An invoice created while OFFLINE queues immediately (no doomed PUT) + keeps the optimistic cache. */
+    @Test fun invoice_save_offline_is_queued() = runBlocking {
+        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val rootJson = """{"v":3,"suite":1,"shardBits":0,"shards":[],"caps":{}}"""
+        var puts = 0
+        val api = object : NotImplementedApi() {
+            override suspend fun invoicesStore(): Response<StoreResponse> = Response.success(StoreResponse("SEALED:$rootJson", 5))
+            override suspend fun company(): Response<de.ledgerline.app.data.remote.dto.CompanyResponse> = Response.success(de.ledgerline.app.data.remote.dto.CompanyResponse(CompanyDto()))
+            override suspend fun invoicesStorePut(body: StorePutRequest): Response<StoreResponse> { puts++; return Response.success(StoreResponse(body.ciphertext, 6)) }
+        }
+        val outbox = tmpOutbox()
+        val cache = FinanceCache()
+        val conn = FakeConnectivity(online = true)
+        val repo = FinanceRepository(sh, vh, crypto, cache, tmpStoreCache(), FakeOfflineFlags(), tmpBlobCache(), conn, outbox, apiProvider = { api })
+        assertTrue(repo.load() is Outcome.Ok)
+        conn.online = false
+
+        val res = repo.save { list -> listOf(invoice("inv1")) + list }
+
+        assertTrue(res is Outcome.Ok)
+        assertEquals(0, puts)                    // never attempted a doomed PUT
+        assertTrue(outbox.hasPending())          // queued
+        assertEquals(1, cache.value.value!!.manifest.invoices.size)
     }
 }

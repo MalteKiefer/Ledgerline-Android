@@ -62,9 +62,9 @@ class NotesViewModel @Inject constructor(
     private val _trashCount = MutableStateFlow(0)
     val trashCount: StateFlow<Int> = _trashCount
 
-    /** Transient one-shot user message (failure); cleared once shown. */
-    private val _message = MutableStateFlow<String?>(null)
-    val message: StateFlow<String?> = _message
+    /** Transient one-shot user message as a string resource id (save ok/failed); cleared once shown. */
+    private val _message = MutableStateFlow<Int?>(null)
+    val message: StateFlow<Int?> = _message
 
     /** Live text-search query; filters the active (non-trash) list. */
     private val _query = MutableStateFlow("")
@@ -111,6 +111,9 @@ class NotesViewModel @Inject constructor(
      */
     fun saveNote(id: String, title: String, content: String, tags: List<String>) {
         if (title.isBlank() && content.isBlank()) return
+        // Success feedback is shown in the detail/editor screen itself (a local snackbar on the
+        // Save action); only surface FAILURES here for the list. Avoids a duplicate toast when
+        // the editor closes back to the list.
         write { m -> NoteOps.upsertNote(m, id, title, content, nowIso(), tags) }
     }
 
@@ -142,9 +145,13 @@ class NotesViewModel @Inject constructor(
 
     fun clearMessage() { _message.value = null }
 
-    private inline fun write(crossinline mutation: (WorkspaceManifest) -> WorkspaceManifest) =
+    private inline fun write(successRes: Int? = null, crossinline mutation: (WorkspaceManifest) -> WorkspaceManifest) =
         viewModelScope.launch {
-            if (mutate.invoke { m -> mutation(m) } is Outcome.Err) _message.value = "Save failed"
+            if (mutate.invoke { m -> mutation(m) } is Outcome.Err) {
+                _message.value = de.ledgerline.app.R.string.note_save_failed
+            } else {
+                successRes?.let { _message.value = it }
+            }
         }
 
     private fun newId(): String = de.ledgerline.app.core.Ids.newId()
