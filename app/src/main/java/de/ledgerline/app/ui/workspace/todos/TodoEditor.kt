@@ -172,6 +172,7 @@ fun TodoEditor(
                             Icon(Icons.Outlined.ArrowDropDown, null)
                         }
                     },
+                    colors = de.ledgerline.app.ui.common.pickerFieldColors(),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 // Transparent overlay to capture taps (a disabled TextField swallows clicks),
@@ -304,6 +305,7 @@ private fun PickerField(
             enabled = false,
             label = { Text(label) },
             trailingIcon = { Icon(Icons.Outlined.ArrowDropDown, null) },
+            colors = de.ledgerline.app.ui.common.pickerFieldColors(),
             modifier = Modifier.fillMaxWidth(),
         )
         // Transparent overlay to capture taps (a disabled TextField swallows clicks).

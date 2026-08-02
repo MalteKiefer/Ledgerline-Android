@@ -426,6 +426,7 @@
     <string name="action_back">Назад</string>
     <string name="action_settings">Настройки</string>
     <string name="action_more">Ещё</string>
+    <string name="action_refresh">Обновить</string>
 
     <!-- Gallery -->
     <string name="gallery_add">Добавить фото</string>

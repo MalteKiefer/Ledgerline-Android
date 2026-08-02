@@ -58,8 +58,9 @@ fun HomeScreen(
     val usage by vm.usage.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.refresh() }
 
+    de.ledgerline.app.ui.common.PullRefresh(onRefresh = { vm.refresh() }, modifier = modifier) {
     Column(
-        modifier
+        Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp)
@@ -120,6 +121,7 @@ fun HomeScreen(
             SpaceTile(Icons.Outlined.Bookmarks, Brand.tintOrange, stringResource(R.string.menu_bookmarks), counts.bookmarks, Modifier.weight(1f)) { onOpen(WorkspaceDest.Bookmarks) }
             SpaceTile(Icons.Outlined.Contacts, Brand.tintBlue, stringResource(R.string.menu_contacts), counts.contacts, Modifier.weight(1f)) { onOpen(WorkspaceDest.Contacts) }
         }
+    }
     }
 }
 

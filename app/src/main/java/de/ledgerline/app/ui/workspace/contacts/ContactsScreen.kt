@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.ImportExport
 import androidx.compose.material.icons.outlined.PersonAdd
@@ -204,6 +205,9 @@ fun ContactsScreen(
                 actions = {
                     if (syncing) {
                         CircularProgressIndicator(Modifier.size(24.dp).padding(end = 8.dp), strokeWidth = 2.dp)
+                    }
+                    IconButton(onClick = { vm.refresh() }) {
+                        Icon(androidx.compose.material.icons.Icons.Outlined.Refresh, stringResource(R.string.action_refresh))
                     }
                     IconButton(onClick = { syncMenuOpen = true }, enabled = !syncing) {
                         Icon(Icons.Outlined.ImportExport, stringResource(R.string.contacts_sync))

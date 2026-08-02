@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.automirrored.outlined.Label
@@ -203,6 +204,9 @@ fun FilesScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, vm:
                     title = stringResource(R.string.tab_files),
                     onMenu = onMenu,
                     actions = {
+                        IconButton(onClick = { vm.refresh() }) {
+                            Icon(androidx.compose.material.icons.Icons.Outlined.Refresh, contentDescription = stringResource(R.string.action_refresh))
+                        }
                         IconButton(onClick = { searchActive = !searchActive; if (!searchActive) vm.setQuery("") }) {
                             Icon(
                                 Icons.Outlined.Search,
@@ -456,6 +460,7 @@ fun FilesScreen(modifier: Modifier = Modifier, onMenu: (() -> Unit)? = null, vm:
             folders = vm.allFolders(),
             current = file.folder,
             onMove = { folderId -> vm.moveFile(file.id, folderId); moveTarget = null },
+            onCreateFolder = { name -> vm.createFolderInto(name, file.id); moveTarget = null },
             onDismiss = { moveTarget = null },
         )
     }
@@ -636,8 +641,10 @@ private fun MoveFileDialog(
     folders: List<NamedFolder>,
     current: String?,
     onMove: (String?) -> Unit,
+    onCreateFolder: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var showNewFolder by remember { mutableStateOf(false) }
     androidx.compose.material3.AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {},
@@ -659,9 +666,26 @@ private fun MoveFileDialog(
                         modifier = Modifier.fillMaxWidth().clickable { onMove(f.id) },
                     )
                 }
+                item {
+                    ListItem(
+                        headlineContent = { Text(stringResource(R.string.file_new_folder)) },
+                        leadingContent = { Icon(Icons.Outlined.CreateNewFolder, null) },
+                        modifier = Modifier.fillMaxWidth().clickable { showNewFolder = true },
+                    )
+                }
             }
         },
     )
+    if (showNewFolder) {
+        TextInputDialog(
+            title = stringResource(R.string.file_new_folder),
+            label = stringResource(R.string.folder_name),
+            confirmLabel = stringResource(R.string.action_create),
+            initial = "",
+            onConfirm = { name -> showNewFolder = false; onCreateFolder(name) },
+            onDismiss = { showNewFolder = false },
+        )
+    }
 }
 
 /** Saved file versions with restore. */

@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -119,6 +120,9 @@ fun HealthScreen(
                 title = stringResource(R.string.dest_health),
                 onMenu = onMenu,
                 actions = {
+                    IconButton(onClick = { vm.load() }) {
+                        Icon(androidx.compose.material.icons.Icons.Outlined.Refresh, stringResource(R.string.action_refresh))
+                    }
                     IconButton(onClick = { shareCsv(context, HealthCompute.csv(manifest.entries, selected, units), selected) }) {
                         Icon(Icons.Outlined.IosShare, stringResource(R.string.health_export_csv))
                     }
@@ -127,6 +131,7 @@ fun HealthScreen(
         },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
+            de.ledgerline.app.ui.common.PullRefresh(onRefresh = { vm.load() }) {
             Column(
                 Modifier
                     .fillMaxSize()
@@ -171,6 +176,7 @@ fun HealthScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
+            }
             }
 
             FloatingActionButton(
