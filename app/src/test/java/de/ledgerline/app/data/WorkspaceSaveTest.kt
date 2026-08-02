@@ -9,6 +9,9 @@ import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
 import de.ledgerline.app.domain.model.Note
 import de.ledgerline.app.domain.model.Session
+import de.ledgerline.app.domain.model.TodoItem
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -48,7 +51,7 @@ class WorkspaceSaveTest {
      * The notes monolith (`/store/notes`) is empty (base default) so the one-time migration
      * is a no-op. All modules empty so load succeeds and unchanged modules are never PUT.
      */
-    private class FakeApi : NotImplementedApi() {
+    private open class FakeApi : NotImplementedApi() {
         var notesPuts = 0
         var lastNotesShards: List<String>? = null
         override suspend fun uploadNote(file: okhttp3.MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadResponse> =
@@ -94,6 +97,34 @@ class WorkspaceSaveTest {
         assertTrue(repo.replayPending())
         assertTrue("the queued note must be pushed on replay", fakeApi.notesPuts >= 1)
         assertTrue(!outbox.hasPending()) // drained
+    }
+
+    /**
+     * Regression (data loss): a todo created while ONLINE but whose module-store PUT fails
+     * with a transient/recoverable error (5xx, 429, or exhausted 409 retries → ErrorKind.HTTP)
+     * must NOT be silently discarded. Before the fix, save() reverted the optimistic cache and
+     * did NOT enqueue, so the edit vanished from the device and never reached the server. It
+     * must instead land in the durable outbox (and stay in the cache) so it replays later.
+     */
+    @Test fun online_save_with_recoverable_error_is_queued_not_dropped() = runBlocking {
+        val session = Session("https://h", "tok", "sha256/x", null)
+        val sh = SessionHolder().apply { set(session) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val cache = WorkspaceCache()
+        val fakeApi = object : FakeApi() {
+            override suspend fun moduleStore(module: String): Response<StoreResponse> =
+                Response.success(StoreResponse(null, 0)) // empty base for the todos module
+            override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> =
+                Response.error(500, "".toResponseBody("text/plain".toMediaType())) // transient server error
+        }
+        val outbox = tmpOutbox()
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), outbox, FakeConnectivity(online = true), apiProvider = { fakeApi })
+
+        repo.load()
+        repo.save { m -> m.copy(todos = m.todos + TodoItem(id = "t1", title = "Must not vanish")) }
+
+        assertTrue("edit kept in the optimistic cache", cache.value.value!!.manifest.todos.any { it.id == "t1" })
+        assertTrue("edit persisted to the durable outbox for replay", outbox.hasPending())
     }
 
     @Test fun save_writes_notes_to_sharded_store() = runBlocking {
