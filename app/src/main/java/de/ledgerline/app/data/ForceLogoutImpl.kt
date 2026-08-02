@@ -34,6 +34,7 @@ class ForceLogoutImpl @Inject constructor(
     private val blobCache: BlobDiskCache,
     private val vaultParamsCache: de.ledgerline.app.core.offline.VaultParamsCache,
     private val syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
+    private val importQueue: ImportQueue,
     private val backupStateStore: BackupStateStore,
     private val rememberedVault: RememberedVaultStore,
     private val placeRepository: PlaceRepository,
@@ -74,6 +75,7 @@ class ForceLogoutImpl @Inject constructor(
         blobCache.clear()
         vaultParamsCache.clear()
         syncOutbox.clearAll()
+        importQueue.clearAll() // sealed plaintext source copies of queued imports
         backupStateStore.clear()
         rememberedVault.clear()
         placeRepository.clear()

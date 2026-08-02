@@ -70,7 +70,7 @@ class GalleryBackupManagerTest {
         val scanner = mockk<BackupScanner>(); every { scanner.scan(any()) } returns listOf(item(1))
         val state = mockk<BackupStateStore>(relaxed = true)
         manager(scanner, importPhotos, state, vk = null).runNow()
-        coVerify(exactly = 0) { importPhotos.invoke(any(), any()) }
+        coVerify(exactly = 0) { importPhotos.invoke(any(), any(), any()) }
     }
 
     @Test fun `disabled does nothing`() = runTest {
@@ -78,7 +78,7 @@ class GalleryBackupManagerTest {
         val scanner = mockk<BackupScanner>(); every { scanner.scan(any()) } returns listOf(item(1))
         val state = mockk<BackupStateStore>(relaxed = true)
         manager(scanner, importPhotos, state, enabled = false).runNow()
-        coVerify(exactly = 0) { importPhotos.invoke(any(), any()) }
+        coVerify(exactly = 0) { importPhotos.invoke(any(), any(), any()) }
     }
 
     @Test fun `constraint blocked does nothing`() = runTest {
@@ -86,7 +86,7 @@ class GalleryBackupManagerTest {
         val scanner = mockk<BackupScanner>(); every { scanner.scan(any()) } returns listOf(item(1))
         val state = mockk<BackupStateStore>(relaxed = true)
         manager(scanner, importPhotos, state, wifiOk = false).runNow()
-        coVerify(exactly = 0) { importPhotos.invoke(any(), any()) }
+        coVerify(exactly = 0) { importPhotos.invoke(any(), any(), any()) }
     }
 
     @Test fun `uploads only unknown items and marks them`() = runTest {
@@ -97,7 +97,7 @@ class GalleryBackupManagerTest {
         coEvery { state.mark(capture(markSlot)) } returns Unit
         val importPhotos = mockk<ImportPhotos>()
         val srcSlot = slot<List<PhotoSource>>()
-        coEvery { importPhotos.invoke(capture(srcSlot), any()) } returns ImportResult(done = 1, failed = 0)
+        coEvery { importPhotos.invoke(capture(srcSlot), any(), any()) } returns ImportResult(done = 1, failed = 0)
 
         manager(scanner, importPhotos, state).runNow()
 
@@ -114,7 +114,7 @@ class GalleryBackupManagerTest {
         val importPhotos = mockk<ImportPhotos>()
         val srcSlot = slot<List<PhotoSource>>()
         // Item #2's source fails → it must NOT be marked (retried next run); #1 is marked.
-        coEvery { importPhotos.invoke(capture(srcSlot), any()) } answers {
+        coEvery { importPhotos.invoke(capture(srcSlot), any(), any()) } answers {
             val srcs = firstArg<List<PhotoSource>>()
             ImportResult(done = 2, failed = 1, failedSources = listOf(srcs[1]))
         }
@@ -129,7 +129,7 @@ class GalleryBackupManagerTest {
         val state = mockk<BackupStateStore>(relaxed = true)
         coEvery { state.backedUpIds() } returns emptySet()
         val importPhotos = mockk<ImportPhotos>()
-        coEvery { importPhotos.invoke(any(), any()) } returns ImportResult(done = 1, failed = 0)
+        coEvery { importPhotos.invoke(any(), any(), any()) } returns ImportResult(done = 1, failed = 0)
 
         manager(scanner, importPhotos, state, deleteAfter = true).runNow()
 
@@ -141,7 +141,7 @@ class GalleryBackupManagerTest {
         val state = mockk<BackupStateStore>(relaxed = true)
         coEvery { state.backedUpIds() } returns emptySet()
         val importPhotos = mockk<ImportPhotos>()
-        coEvery { importPhotos.invoke(any(), any()) } returns ImportResult(done = 1, failed = 0)
+        coEvery { importPhotos.invoke(any(), any(), any()) } returns ImportResult(done = 1, failed = 0)
 
         manager(scanner, importPhotos, state, deleteAfter = false).runNow()
 

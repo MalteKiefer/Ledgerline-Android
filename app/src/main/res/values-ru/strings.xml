@@ -436,6 +436,7 @@
     <string name="camera_switch">Переключить камеру</string>
     <string name="gallery_uploading">Загрузка %1$d/%2$d</string>
     <string name="gallery_upload_failed">Не удалось загрузить: %1$d</string>
+    <string name="gallery_upload_queued">В очереди: %1$d — загрузка при подключении</string>
     <string name="gallery_empty">Пока нет фотографий.</string>
     <string name="gallery_error">Не удалось загрузить галерею.</string>
     <string name="gallery_usage">Использовано %1$s</string>

@@ -40,7 +40,7 @@ class ImportPhotosImplTest {
         coEvery { mutate.invoke(any()) } returns Outcome.Ok(mockk(relaxed = true))
         val bytes = ByteArray(2048) { it.toByte() }
 
-        val r = ImportPhotosImpl(cache(), uploader, mutate).invoke(listOf(source(bytes), source(bytes))) { _, _ -> }
+        val r = ImportPhotosImpl(cache(), uploader, mutate, io.mockk.mockk(relaxed = true), FakeConnectivity(online = true), de.ledgerline.app.core.security.VaultKeyHolder()).invoke(listOf(source(bytes), source(bytes)), { _, _ -> })
 
         assertEquals(2, r.done)
         assertEquals(0, r.failed)
@@ -54,7 +54,7 @@ class ImportPhotosImplTest {
         val uploader = mockk<GalleryUploader>(relaxed = true)
         val mutate = mockk<MutateGallery>(relaxed = true)
 
-        val r = ImportPhotosImpl(cache(sig), uploader, mutate).invoke(listOf(source(bytes))) { _, _ -> }
+        val r = ImportPhotosImpl(cache(sig), uploader, mutate, io.mockk.mockk(relaxed = true), FakeConnectivity(online = true), de.ledgerline.app.core.security.VaultKeyHolder()).invoke(listOf(source(bytes)), { _, _ -> })
 
         assertEquals(0, r.failed)
         coVerify(exactly = 0) { uploader.upload(any(), any(), any(), any(), any(), any(), any(), any()) }
@@ -67,7 +67,7 @@ class ImportPhotosImplTest {
         coEvery { mutate.invoke(any()) } returns Outcome.Ok(mockk(relaxed = true))
         val sources = (0 until 10).map { source(ByteArray(1024) { b -> (b + it).toByte() }, "IMG_$it.jpg") }
 
-        ImportPhotosImpl(cache(), uploader, mutate).invoke(sources) { _, _ -> }
+        ImportPhotosImpl(cache(), uploader, mutate, io.mockk.mockk(relaxed = true), FakeConnectivity(online = true), de.ledgerline.app.core.security.VaultKeyHolder()).invoke(sources, { _, _ -> })
 
         coVerify(exactly = 2) { mutate.invoke(any()) } // 8 + 2
     }
@@ -77,7 +77,7 @@ class ImportPhotosImplTest {
         coEvery { uploader.upload(any(), any(), any(), any(), any(), any(), any(), any()) } returns Outcome.Err(ErrorKind.QUOTA)
         val mutate = mockk<MutateGallery>(relaxed = true)
 
-        val r = ImportPhotosImpl(cache(), uploader, mutate).invoke(listOf(source(ByteArray(512) { 1 }))) { _, _ -> }
+        val r = ImportPhotosImpl(cache(), uploader, mutate, io.mockk.mockk(relaxed = true), FakeConnectivity(online = true), de.ledgerline.app.core.security.VaultKeyHolder()).invoke(listOf(source(ByteArray(512) { 1 })), { _, _ -> })
 
         assertTrue(r.quotaExceeded)
         assertEquals(1, r.failed)
@@ -90,7 +90,7 @@ class ImportPhotosImplTest {
         coEvery { mutate.invoke(any()) } returns Outcome.Err(ErrorKind.NETWORK)
         val src = source(ByteArray(700) { 3 })
 
-        val r = ImportPhotosImpl(cache(), uploader, mutate).invoke(listOf(src)) { _, _ -> }
+        val r = ImportPhotosImpl(cache(), uploader, mutate, io.mockk.mockk(relaxed = true), FakeConnectivity(online = true), de.ledgerline.app.core.security.VaultKeyHolder()).invoke(listOf(src), { _, _ -> })
 
         assertEquals(1, r.failed)
         assertEquals(listOf(src), r.failedSources)

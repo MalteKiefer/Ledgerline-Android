@@ -21,8 +21,9 @@ class OfflineSyncEngine @Inject constructor(
 ) {
     private val mutex = Mutex()
 
-    /** True when there is at least one pending offline write waiting to sync. */
-    fun hasPending(): Boolean = outbox.hasPending()
+    /** True when there is at least one pending offline write waiting to sync (manifest outbox OR a
+     *  store's own out-of-band queue, e.g. pending blob imports). */
+    fun hasPending(): Boolean = outbox.hasPending() || stores.any { it.hasPendingWork() }
 
     /**
      * Replay every store's pending deltas. Returns true when the outbox is fully drained. Safe to
@@ -31,7 +32,7 @@ class OfflineSyncEngine @Inject constructor(
     suspend fun syncNow(): Boolean = mutex.withLock {
         if (vaultKeyHolder.get() == null) return false
         if (!connectivity.isOnline()) return false
-        if (!outbox.hasPending()) return true
+        if (!hasPending()) return true
         var allClear = true
         for (store in stores) {
             allClear = try {

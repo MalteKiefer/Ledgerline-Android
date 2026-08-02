@@ -26,6 +26,9 @@ data class ImportResult(
     /** True if the server rejected an upload for exceeding the storage quota (HTTP 413) — the
      *  run stops early so it doesn't hammer a full account; the caller can warn the user. */
     val quotaExceeded: Boolean = false,
+    /** Sources that couldn't upload now (offline / recoverable error) and were sealed to the durable
+     *  import queue to retry on reconnect — neither a success nor a hard failure. */
+    val queuedSources: List<PhotoSource> = emptyList(),
 )
 
 /**
@@ -38,5 +41,10 @@ data class ImportResult(
  * overlay + service notification.
  */
 interface ImportPhotos {
-    suspend fun invoke(sources: List<PhotoSource>, report: (Int, Int) -> Unit): ImportResult
+    /**
+     * @param queue when true (the normal path), a source that can't upload now (offline or a
+     *   recoverable server error) is sealed to the durable import queue to retry on reconnect.
+     *   The replay path passes false so a re-run never re-queues.
+     */
+    suspend fun invoke(sources: List<PhotoSource>, report: (Int, Int) -> Unit, queue: Boolean = true): ImportResult
 }

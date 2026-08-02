@@ -137,7 +137,7 @@ class GalleryViewModelTest {
         },
         uploader: GalleryUploader = fakeUploader(FakeGalleryUploadApi(ProcessResponse())),
         mutate: MutateGallery = FakeMutateGallery(cache),
-        importPhotos: ImportPhotos = ImportPhotosImpl(cache, uploader, mutate),
+        importPhotos: ImportPhotos = ImportPhotosImpl(cache, uploader, mutate, io.mockk.mockk(relaxed = true), de.ledgerline.app.data.FakeConnectivity(online = true), de.ledgerline.app.core.security.VaultKeyHolder()),
         operationManager: OperationManager = testOperationManager(),
         blobs: FakeBlobs = FakeBlobs(),
         embedText: EmbedText = FakeEmbedText(),

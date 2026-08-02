@@ -17,6 +17,7 @@ import de.ledgerline.app.data.FinanceRepository
 import de.ledgerline.app.data.GalleryRepository
 import de.ledgerline.app.data.HealthRepository
 import de.ledgerline.app.data.PasswordsRepository
+import de.ledgerline.app.data.PendingImportRepository
 import de.ledgerline.app.data.WorkspaceRepository
 import javax.inject.Singleton
 
@@ -64,4 +65,8 @@ abstract class OfflineModule {
     @Binds
     @IntoSet
     abstract fun financeSyncable(impl: FinanceRepository): SyncableStore
+
+    @Binds
+    @IntoSet
+    abstract fun pendingImportSyncable(impl: PendingImportRepository): SyncableStore
 }

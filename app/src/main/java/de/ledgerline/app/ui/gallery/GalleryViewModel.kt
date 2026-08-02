@@ -354,7 +354,10 @@ class GalleryViewModel @Inject constructor(
             loadUsage()
             lastFailedImports = result.failedSources
             _failedImportCount.value = result.failedSources.size
-            if (result.failed > 0) _message.value = "upload_failed:${result.failed}"
+            when {
+                result.queuedSources.isNotEmpty() -> _message.value = "upload_queued:${result.queuedSources.size}"
+                result.failed > 0 -> _message.value = "upload_failed:${result.failed}"
+            }
         }
     }
 

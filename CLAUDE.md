@@ -449,9 +449,23 @@ muss der Nutzer am Gerät prüfen. Immer light **und** dark testen.
 > `OfflineModule` registriert. **Reconnect-Drain:** `ReconnectSyncTrigger` (NetworkCallback →
 > `syncNow` sofort bei Netz-Rückkehr) + `BackgroundSync` drained die Outbox jetzt auch bei
 > auto-refresh=0 und ungated vom Offline-Master-Schalter. Tests: `WorkspaceSaveTest`,
-> `FinanceRepositoryTest` (recoverable-error + offline queued). **Offen:** Blob-Bytes-Outbox
-> (ein fehlgeschlagener Foto-/Datei-Import-Upload wird noch nicht resumable gequeued — nur
-> Manifest-Deltas; Immich-artiger Nachhol-Upload = Folgearbeit).
+> `FinanceRepositoryTest` (recoverable-error + offline queued).
+>
+> **Blob-Import-Outbox — ERLEDIGT (2026-08-02, v0.9.2):** ein fehlgeschlagener/offline Foto- oder
+> Datei-**Import** wird jetzt durable gequeued + bei Reconnect nachgeholt (nicht nur Manifest-Deltas).
+> `ImportQueue` (data) versiegelt die Klartext-Quellbytes pro Item **VK-sealed auf Disk**
+> (`SealedImportBlob` = Blob-Upload-Framing; kein Klartext at-rest, ZK-konform) + einen VK-sealed
+> Index (Name/MIME/Geo/Ordner/encFileKey/sig); Dedupe per `ContentSig` (windowed Hash). `ImportPhotosImpl`
+> + `ImportFileImpl` bekommen `queue`-Param + `Connectivity`/`VaultKeyHolder`: offline ODER
+> wiederherstellbarer Upload-Fehler → in die Queue (Foto-`ImportResult.queuedSources`, Datei → Ok). Replay:
+> `PendingImportRepository : SyncableStore` (`hasPendingWork` neu am Interface → `OfflineSyncEngine`
+> läuft auch bei leerer Manifest-Outbox) fährt die volle Upload+Append-Pipeline aus der versiegelten
+> Quelle (lazily-decrypting Stream, konstanter Speicher) mit `queue=false`; entfernt Item bei Erfolg.
+> `GalleryBackupManager` schließt `queuedSources` von Mark/Delete aus (sig-dedup verhindert Doppel).
+> `ForceLogout` wischt die Queue (`ImportQueue.clearAll`). Tests: `ImportQueueTest` (seal→decrypt-
+> Roundtrip/Dedupe/Remove). UI: „N in Warteschlange" statt „fehlgeschlagen". **Grenze:** transiente
+> SAF/SEND-URIs werden durch Bytes-Sealing at-enqueue abgedeckt (kein `takePersistableUriPermission`
+> nötig); Kamera-Backup läuft weiterhin nur online.
 
 Kein Sync außerhalb dieser App. **Lokaler Cache = Ciphertext** (versiegelte Manifeste +
 Blob-Bytes, wie vom Server). Entschlüsselt nur in-memory bei Zugriff (VK nötig). Gesperrt =
