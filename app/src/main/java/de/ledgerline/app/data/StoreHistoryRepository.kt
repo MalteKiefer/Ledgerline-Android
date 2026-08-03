@@ -27,7 +27,7 @@ class StoreHistoryRepository(
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
-    enum class Store { FILES, GALLERY, NOTES, PASSWORDS, INVOICES, CONTACTS }
+    enum class Store { FILES, GALLERY, NOTES, PASSWORDS, INVOICES, CONTACTS, TODOS, BOOKMARKS }
 
     /** Retained versions of [store], newest first. Empty on failure. */
     suspend fun list(store: Store): List<StoreHistoryEntry> = withContext(Dispatchers.IO) {
@@ -40,6 +40,9 @@ class StoreHistoryRepository(
                 Store.PASSWORDS -> api.passwordsStoreHistory()
                 Store.INVOICES -> api.invoicesStoreHistory()
                 Store.CONTACTS -> api.contactsStoreHistory()
+                // Monolith modules keep history under /store/{module}/history.
+                Store.TODOS -> api.moduleStoreHistory("todos")
+                Store.BOOKMARKS -> api.moduleStoreHistory("bookmarks")
             }
         }.getOrNull() ?: return@withContext emptyList()
         (res.body() as? de.ledgerline.app.data.remote.dto.StoreHistoryResponse)?.versions.orEmpty()
@@ -56,6 +59,8 @@ class StoreHistoryRepository(
                 Store.PASSWORDS -> api.passwordsStoreHistoryVersion(version)
                 Store.INVOICES -> api.invoicesStoreHistoryVersion(version)
                 Store.CONTACTS -> api.contactsStoreHistoryVersion(version)
+                Store.TODOS -> api.moduleStoreHistoryVersion("todos", version)
+                Store.BOOKMARKS -> api.moduleStoreHistoryVersion("bookmarks", version)
             }.takeIf { it.isSuccessful }?.body()
         }.getOrNull()
     }

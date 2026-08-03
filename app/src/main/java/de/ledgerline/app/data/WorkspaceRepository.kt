@@ -560,6 +560,28 @@ class WorkspaceRepository(
         if (out is Outcome.Ok) add.size else -1
     }
 
+    /**
+     * Recover TODOS (+ their lists) from a retained MONOLITH module history root
+     * (`/store/todos/history/{v}` → sealed `{v:3, todos:[…], todoLists:[…]}`): re-add any whose id is
+     * missing from the current workspace (never overwrites a live record). For todos that vanished to
+     * a stale-version clobber. Returns the count restored, or -1 on failure.
+     */
+    suspend fun recoverTodosFromHistoryRoot(ciphertext: String): Int = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext -1
+        val plain = crypto.openManifest(ciphertext, vk) ?: return@withContext -1
+        val cur = cache.value.value?.manifest ?: when (val l = load()) {
+            is Outcome.Ok -> l.value.manifest
+            is Outcome.Err -> return@withContext -1
+        }
+        val haveT = cur.todos.mapTo(HashSet()) { it.id }
+        val haveL = cur.todoLists.mapTo(HashSet()) { it.id }
+        val addT = records(plain, "todos").map(WorkspaceRecordCodec::decodeTodo).filter { it.id !in haveT }
+        val addL = records(plain, "todoLists").map(WorkspaceRecordCodec::decodeTodoList).filter { it.id !in haveL }
+        if (addT.isEmpty() && addL.isEmpty()) return@withContext 0
+        val out = save { m -> m.copy(todos = m.todos + addT, todoLists = m.todoLists + addL) }
+        if (out is Outcome.Ok) addT.size + addL.size else -1
+    }
+
     // On Dispatchers.IO: opening + JSON-decoding every module + the sharded files slice is
     // CPU/IO-heavy and must not block the caller's main thread (large stores would ANR).
     /**

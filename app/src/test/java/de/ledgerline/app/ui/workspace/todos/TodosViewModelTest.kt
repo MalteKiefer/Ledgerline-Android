@@ -62,35 +62,35 @@ class TodosViewModelTest {
     }
 
     @Test fun items_hide_trashed_and_put_open_first() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         // all-lists filter: open before done, higher priority before lower
         assertEquals(listOf("Open one", "Work item", "Done one"), vm.state.value.items.map { it.title })
     }
 
     @Test fun active_list_filter_restricts_items() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         vm.setActiveList("l2")
         assertEquals(listOf("Work item"), vm.state.value.items.map { it.title })
     }
 
     @Test fun toggleDone_flips_and_reflows() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         vm.toggleDone("t2")
         assertEquals(true, vm.todoById("t2")?.done)
     }
 
     @Test fun addTodo_appends_and_shows() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         vm.addTodo("Fresh", "l1", "normal", "", "", "", emptyList())
         assertEquals(true, vm.state.value.items.any { it.title == "Fresh" })
     }
 
     @Test fun deleteList_orphans_todos_and_clears_filter() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         vm.setActiveList("l1")
         vm.deleteList("l1")
@@ -99,7 +99,7 @@ class TodosViewModelTest {
     }
 
     @Test fun trashCount_and_trash_view_ignore_list_filter() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         assertEquals(1, vm.trashCount.value)
         vm.setActiveList("l2")   // filter that would exclude the l1-scoped trashed item
@@ -108,7 +108,7 @@ class TodosViewModelTest {
     }
 
     @Test fun setQuery_filters_active_list() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         vm.setQuery("work")
         assertEquals(listOf("Work item"), vm.state.value.items.map { it.title })
@@ -117,7 +117,7 @@ class TodosViewModelTest {
     }
 
     @Test fun setQuery_does_not_affect_trash_view() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         vm.setTrash(true)
         vm.setQuery("nomatch")
@@ -125,14 +125,14 @@ class TodosViewModelTest {
     }
 
     @Test fun allTags_is_sorted_distinct_union_of_non_trashed() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         // "Urgent"/"urgent" collapse case-insensitively (first-seen casing); "secret" trashed → excluded.
         assertEquals(listOf("chore", "Urgent"), vm.allTags.value)
     }
 
     @Test fun setActiveTag_filters_case_insensitively_and_combines_with_list() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         vm.setActiveTag("urgent")
         assertEquals(listOf("t2", "t4"), vm.state.value.items.map { it.id })
@@ -141,7 +141,7 @@ class TodosViewModelTest {
     }
 
     @Test fun activeTag_ignored_in_trash_view() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         vm.setActiveTag("urgent")   // no trashed todo has "urgent"
         vm.setTrash(true)
@@ -149,7 +149,7 @@ class TodosViewModelTest {
     }
 
     @Test fun restore_deleteForever_and_emptyTrash() = runTest {
-        val vm = TodosViewModel(load, cache, mutate, settingsStore)
+        val vm = TodosViewModel(load, cache, mutate, io.mockk.mockk(relaxed = true), io.mockk.mockk(relaxed = true), settingsStore)
         vm.refresh()
         vm.restore("t3")
         assertEquals(false, vm.todoById("t3")?.trashed)

@@ -85,6 +85,14 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
     var editorFor by remember { mutableStateOf<EditorTarget?>(null) }
     var deleteForeverTarget by remember { mutableStateOf<String?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
+    if (showHistory) {
+        de.ledgerline.app.ui.common.StoreHistoryDialog(
+            onDismiss = { showHistory = false },
+            load = { vm.historyVersions() },
+            recover = { vm.recoverVersion(it) },
+        )
+    }
 
     LaunchedEffect(message) {
         message?.let { snackbar.showSnackbar(it); vm.clearMessage() }
@@ -165,6 +173,7 @@ fun TodosScreen(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMode
                             onRenameList = { id, name -> vm.renameList(id, name) },
                             onDeleteList = { vm.deleteList(it) },
                             onOpenTrash = { vm.setTrash(true) },
+                            onHistory = { showHistory = true },
                         )
                     }
                     if (!showTrash) SearchField(query = query, onQueryChange = { vm.setQuery(it) })
@@ -245,6 +254,7 @@ private fun TodosToolbar(
     onRenameList: (String, String) -> Unit,
     onDeleteList: (String) -> Unit,
     onOpenTrash: () -> Unit,
+    onHistory: () -> Unit,
 ) {
     var filterExpanded by remember { mutableStateOf(false) }
     var manageExpanded by remember { mutableStateOf(false) }
@@ -286,6 +296,10 @@ private fun TodosToolbar(
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.todo_new_list)) },
                     onClick = { manageExpanded = false; showNewList = true },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.history_title)) },
+                    onClick = { manageExpanded = false; onHistory() },
                 )
                 if (trashCount > 0) {
                     DropdownMenuItem(
