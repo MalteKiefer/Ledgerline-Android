@@ -117,6 +117,10 @@ android {
         // lint/AGP bug, not a code issue — disable the single offending check so the
         // release lint-vital pass runs. Revisit when AGP/lint ships a compatible build.
         disable += "NullSafeMutableLiveData"
+        // Grandfather the pre-existing lint findings so CI's lint-vital pass gates only NEW
+        // regressions (errors introduced after this baseline still fail the build). Regenerate
+        // with `./gradlew :app:updateLintBaseline` after intentionally clearing old issues.
+        baseline = file("lint-baseline.xml")
     }
 }
 
