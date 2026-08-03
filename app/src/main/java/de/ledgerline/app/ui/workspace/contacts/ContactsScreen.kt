@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Merge
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.ImportExport
@@ -237,6 +238,11 @@ fun ContactsScreen(
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.contacts_import_vcf)) },
                             onClick = { syncMenuOpen = false; importVcfLauncher.launch(arrayOf("text/vcard", "text/x-vcard", "text/*", "*/*")) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.contacts_dedup)) },
+                            leadingIcon = { Icon(androidx.compose.material.icons.Icons.Outlined.Merge, null) },
+                            onClick = { syncMenuOpen = false; vm.mergeDuplicates() },
                         )
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.history_title)) },

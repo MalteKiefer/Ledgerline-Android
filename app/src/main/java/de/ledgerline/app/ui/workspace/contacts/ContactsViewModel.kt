@@ -337,12 +337,89 @@ class ContactsViewModel @Inject constructor(
         )
     }
 
-    /** Dedup keys: normalized name, each email, each phone (digits only). */
+    /**
+     * Merge duplicate contacts (same person stored more than once — e.g. from a re-import before the
+     * format-independent matching): cluster by shared [contactKeys] (union-find), keep one survivor
+     * per cluster, fold every duplicate's fields into it (union lists, fill blanks, union categories,
+     * keep an avatar), then remove the duplicates. Loss-free — nothing unique is dropped.
+     */
+    fun mergeDuplicates() = viewModelScope.launch {
+        if (_syncing.value) return@launch
+        _syncing.value = true
+        try {
+            val live = cache.value.value?.manifest?.contacts.orEmpty().filter { !it.trashed }
+            val parent = HashMap<String, String>()
+            fun find(x: String): String { var r = x; while (parent[r] != null && parent[r] != r) r = parent[r]!!; return r }
+            fun union(a: String, b: String) { parent.putIfAbsent(a, a); parent.putIfAbsent(b, b); parent[find(a)] = find(b) }
+            live.forEach { parent.putIfAbsent(it.id, it.id) }
+            val keyToId = HashMap<String, String>()
+            live.forEach { c -> contactKeys(c).forEach { k -> keyToId[k]?.let { union(c.id, it) } ?: run { keyToId[k] = c.id } } }
+
+            val updById = HashMap<String, Contact>()
+            val removeIds = HashSet<String>()
+            var mergedDups = 0
+            live.groupBy { find(it.id) }.values.forEach { members ->
+                if (members.size < 2) return@forEach
+                val survivor = members.firstOrNull { !it.avatarRef.isNullOrBlank() }
+                    ?: members.maxByOrNull { fieldScore(it) } ?: members.first()
+                var s = survivor
+                members.filter { it.id != survivor.id }.forEach { dup -> s = mergeContacts(s, dup); removeIds.add(dup.id); mergedDups++ }
+                updById[survivor.id] = s.copy(updated = nowIso())
+            }
+            if (removeIds.isEmpty()) { msg(R.string.contacts_dedup_none); return@launch }
+            // Direct manifest rewrite (not updateContact, which would re-pull the survivor's old avatar).
+            mutate.invoke { m -> m.copy(contacts = m.contacts.mapNotNull { c -> if (c.id in removeIds) null else updById[c.id] ?: c }) }
+            reconcileAvatars() // freed duplicate-avatar blobs
+            msg(R.string.contacts_dedup_done, mergedDups)
+        } catch (e: Exception) {
+            msg(R.string.contact_save_failed)
+        } finally {
+            _syncing.value = false
+        }
+    }
+
+    /** Fold contact [b]'s data into [a] (a wins scalars/avatar; lists + categories unioned). */
+    private fun mergeContacts(a: Contact, b: Contact): Contact {
+        fun pick(cur: String, alt: String) = cur.ifBlank { alt }
+        fun ml(cur: List<de.ledgerline.app.domain.model.LabeledValue>, alt: List<de.ledgerline.app.domain.model.LabeledValue>) =
+            cur + alt.filter { d -> d.value.isNotBlank() && cur.none { it.value.equals(d.value, ignoreCase = true) } }
+        return a.copy(
+            fn = pick(a.fn, b.fn), first = pick(a.first, b.first), last = pick(a.last, b.last), middle = pick(a.middle, b.middle),
+            prefix = pick(a.prefix, b.prefix), suffix = pick(a.suffix, b.suffix), nickname = pick(a.nickname, b.nickname),
+            org = pick(a.org, b.org), department = pick(a.department, b.department), title = pick(a.title, b.title), role = pick(a.role, b.role),
+            vatId = pick(a.vatId, b.vatId),
+            emails = ml(a.emails, b.emails), phones = ml(a.phones, b.phones), impp = ml(a.impp, b.impp), urls = ml(a.urls, b.urls),
+            addresses = a.addresses + b.addresses.filter { it !in a.addresses },
+            bday = pick(a.bday, b.bday), anniversary = pick(a.anniversary, b.anniversary), note = pick(a.note, b.note),
+            categories = (a.categories + b.categories).distinct(),
+            favorite = a.favorite || b.favorite,
+            avatarRef = a.avatarRef ?: b.avatarRef, avatarKey = if (!a.avatarRef.isNullOrBlank()) a.avatarKey else b.avatarKey,
+            uid = a.uid ?: b.uid, personId = a.personId ?: b.personId, personName = a.personName ?: b.personName,
+        )
+    }
+
+    private fun fieldScore(c: Contact): Int =
+        listOf(c.fn, c.first, c.last, c.org, c.title, c.note, c.bday).count { it.isNotBlank() } +
+            c.emails.size + c.phones.size + c.addresses.size + (if (!c.avatarRef.isNullOrBlank()) 2 else 0)
+
+    /**
+     * Match/dedup keys, FORMAT-INDEPENDENT so the same person matches regardless of how the name is
+     * stored (a device `fn` "John Doe" vs a vault first/last "Doe"/"John") or how a phone is written
+     * (`+49 170…` vs `0170…`):
+     *  - name = the case-folded name tokens (fn+first+middle+last+nickname) **sorted** (order-free);
+     *  - email = exact case-folded value;
+     *  - phone = the last 9 significant digits (strips country code + leading zero + formatting).
+     */
     private fun contactKeys(c: Contact): Set<String> {
         val ks = HashSet<String>()
-        displayName(c).trim().lowercase().takeIf { it.isNotBlank() }?.let { ks.add("n:$it") }
+        val nameTokens = "${c.fn} ${c.first} ${c.middle} ${c.last} ${c.nickname}"
+            .split(' ', '\t', ',', '\n', '\r').map { it.trim().lowercase() }.filter { it.isNotBlank() }
+        if (nameTokens.isNotEmpty()) ks.add("n:" + nameTokens.toSortedSet().joinToString(" "))
         c.emails.forEach { e -> e.value.trim().lowercase().takeIf { it.isNotBlank() }?.let { ks.add("e:$it") } }
-        c.phones.forEach { p -> p.value.filter { it.isDigit() }.takeIf { it.isNotBlank() }?.let { ks.add("p:$it") } }
+        c.phones.forEach { p ->
+            val d = p.value.filter { it.isDigit() }
+            if (d.isNotBlank()) ks.add("p:" + if (d.length >= 7) d.takeLast(9) else d)
+        }
         return ks
     }
 

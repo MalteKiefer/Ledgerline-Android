@@ -585,6 +585,9 @@
     <string name="contacts_import_none">No new contacts</string>
     <string name="contacts_import_done">%1$d added, %2$d updated</string>
     <string name="contacts_import_failed">Import failed</string>
+    <string name="contacts_dedup">Merge duplicates</string>
+    <string name="contacts_dedup_done">%1$d duplicates merged</string>
+    <string name="contacts_dedup_none">No duplicates found</string>
     <string name="address_street">Street</string>
     <string name="address_zip">ZIP</string>
     <string name="address_city">City</string>

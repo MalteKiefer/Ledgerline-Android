@@ -586,6 +586,9 @@
     <string name="contacts_import_none">Нет новых контактов</string>
     <string name="contacts_import_done">Добавлено: %1$d, обновлено: %2$d</string>
     <string name="contacts_import_failed">Ошибка импорта</string>
+    <string name="contacts_dedup">Объединить дубликаты</string>
+    <string name="contacts_dedup_done">Объединено дубликатов: %1$d</string>
+    <string name="contacts_dedup_none">Дубликаты не найдены</string>
     <string name="address_street">Улица</string>
     <string name="address_zip">Индекс</string>
     <string name="address_city">Город</string>

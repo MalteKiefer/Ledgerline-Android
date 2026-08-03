@@ -583,6 +583,9 @@
     <string name="contacts_import_none">Keine neuen Kontakte</string>
     <string name="contacts_import_done">%1$d hinzugefügt, %2$d aktualisiert</string>
     <string name="contacts_import_failed">Import fehlgeschlagen</string>
+    <string name="contacts_dedup">Duplikate zusammenführen</string>
+    <string name="contacts_dedup_done">%1$d Duplikate zusammengeführt</string>
+    <string name="contacts_dedup_none">Keine Duplikate gefunden</string>
     <string name="address_street">Straße</string>
     <string name="address_zip">PLZ</string>
     <string name="address_city">Stadt</string>
