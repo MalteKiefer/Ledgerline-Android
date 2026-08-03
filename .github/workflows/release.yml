@@ -1,0 +1,71 @@
+name: Release APK
+
+# Every push to main builds a SIGNED release APK and publishes it as a GitHub Release.
+# The tag/version is derived from the app version: versionName (marketing base) + versionCode
+# (monotonic git commit count, unique per commit) -> "v<name>-<code>", so each push is a distinct
+# release with no tag collisions.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # create releases + upload the APK asset
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build · Sign · Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history — versionCode = git rev-list --count HEAD
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Decode signing keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/release.jks"
+
+      - name: Build signed release APK
+        run: ./gradlew :app:assembleRelease --console=plain
+        env:
+          LL_KEYSTORE_FILE: ${{ runner.temp }}/release.jks
+          LL_KEYSTORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          LL_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          LL_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Resolve version
+        id: v
+        run: |
+          NAME=$(grep -E 'val versionBase' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')
+          CODE=$(git rev-list --count HEAD)
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Version $NAME ($CODE)"
+
+      - name: Stage APK
+        run: cp app/build/outputs/apk/release/app-release.apk "ledgerline-${{ steps.v.outputs.name }}-${{ steps.v.outputs.code }}.apk"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.v.outputs.name }}-${{ steps.v.outputs.code }}"
+          gh release create "$TAG" \
+            "ledgerline-${{ steps.v.outputs.name }}-${{ steps.v.outputs.code }}.apk" \
+            --target "${{ github.sha }}" \
+            --title "Ledgerline v${{ steps.v.outputs.name }} (${{ steps.v.outputs.code }})" \
+            --notes "Automated signed release from ${{ github.sha }}."
