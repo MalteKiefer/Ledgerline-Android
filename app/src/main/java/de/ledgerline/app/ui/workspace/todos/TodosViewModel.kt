@@ -86,9 +86,10 @@ class TodosViewModel @Inject constructor(
 
     fun refresh() = viewModelScope.launch {
         _state.value = _state.value.copy(loading = true, error = false)
-        if (load.invoke() is Outcome.Err) {
-            _state.value = _state.value.copy(loading = false, error = true)
-        }
+        // Clear loading on success too: the cache StateFlow dedups an identical refresh, so the
+        // collector may never fire recompute() — without this the pull-to-refresh spinner hangs.
+        if (load.invoke() is Outcome.Err) _state.value = _state.value.copy(loading = false, error = true)
+        else recompute()
     }
 
     fun setActiveList(id: String?) {

@@ -63,10 +63,18 @@ internal suspend inline fun <M, W> optimisticSave(
     onSaved: (W) -> Unit,
     onEnvelope: (StoreEnvelope) -> Unit,
 ): Outcome<W> {
-    var base: M? = cached?.first
-    var version: Int? = cached?.second
+    // DATA-LOSS FIX: never seed the write base from a cached (manifest, version) pair.
+    // The two can drift — e.g. a concurrent/replay write bumps the tracked version without
+    // refreshing the cached manifest — and then a PUT whose stale version happens to match
+    // the server overwrites the server's records with NO 409 (silent clobber; this is how
+    // Health/Explore records vanished). Always fetch the current (content, version) together
+    // before the first PUT so a version-matched write is only ever additive. `cached` is
+    // intentionally ignored for the base; it stays in the signature for call-site stability.
+    @Suppress("UNUSED_EXPRESSION") cached
+    var base: M? = null
+    var version: Int? = null
 
-    repeat(4) {
+    repeat(5) {
         if (base == null || version == null) {
             val res = fetch()
             if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)

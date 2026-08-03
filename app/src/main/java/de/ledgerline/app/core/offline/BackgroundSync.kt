@@ -52,6 +52,16 @@ class BackgroundSync @Inject constructor(
     fun start() {
         if (started) return
         started = true
+        // Drain the offline write outbox the instant the vault is unlocked. syncNow gates on the
+        // VK, so an edit queued while locked (or from a prior save error) would otherwise wait for
+        // a periodic tick — and with a fast idle-lock the tick keeps landing while re-locked, so a
+        // queued edit can stay stranded for a long time. Firing on the unlocked→true transition
+        // covers every unlock path (passphrase, biometric quick-unlock, autofill, share).
+        scope.launch {
+            vaultKeyHolder.unlocked.collect { unlocked ->
+                if (unlocked) runCatching { syncEngine.syncNow() }
+            }
+        }
         scope.launch {
             delay(INITIAL_DELAY_MS)
             while (true) {

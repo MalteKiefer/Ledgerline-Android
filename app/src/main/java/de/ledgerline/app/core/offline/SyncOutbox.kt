@@ -40,11 +40,22 @@ class SyncOutbox(private val root: File, private val crypto: Crypto) {
         val f = fileFor(storeKey)
         if (!f.exists()) return null
         return try {
-            val plain = crypto.openManifest(f.readText(), vk) ?: return null
+            // A file that exists but won't open (openManifest → null) was sealed under a VK that no
+            // longer decrypts it — e.g. the vault was reset/re-provisioned (a "wipe everything"), so
+            // the old VK is gone. Such an entry can NEVER replay; left in place it makes replayPending
+            // return early forever without clearing, so every sync stays "pending" and never drains.
+            // Self-heal: delete the dead entry (its data is unrecoverable anyway) so sync unblocks.
+            val plain = crypto.openManifest(f.readText(), vk) ?: return dropDead(f)
             json.decodeFromString(StoreDelta.serializer(), plain)
         } catch (_: Exception) {
-            null
+            dropDead(f) // corrupt / unparseable → same as undecryptable: it can never replay
         }
+    }
+
+    /** Delete an unreplayable (undecryptable/corrupt) outbox entry and report "nothing pending". */
+    private fun dropDead(f: File): StoreDelta? {
+        runCatching { f.delete() }
+        return null
     }
 
     /** Compose [delta] onto any existing pending delta for [storeKey] and persist (atomic). */

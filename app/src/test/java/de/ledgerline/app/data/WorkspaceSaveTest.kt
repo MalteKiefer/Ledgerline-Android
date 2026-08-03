@@ -127,6 +127,43 @@ class WorkspaceSaveTest {
         assertTrue("edit persisted to the durable outbox for replay", outbox.hasPending())
     }
 
+    /**
+     * Regression (silent clobber → data loss): the phone's cached (base, version) can drift so a
+     * module PUT's version matches the server while the base is MISSING records the server already
+     * has (e.g. a concurrent/replay write bumped the version without refreshing the cache). The old
+     * code PUT `base + edit` at the matching version and the server accepted it with NO 409 — the
+     * server's records were silently overwritten (todos/health/notes vanished). The fetch-first fix
+     * re-reads the current server slice before every PUT, so the write is only ever additive.
+     */
+    @Test fun online_save_does_not_clobber_server_records_when_base_is_stale() = runBlocking {
+        val session = Session("https://h", "tok", "sha256/x", null)
+        val sh = SessionHolder().apply { set(session) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val cache = WorkspaceCache()
+        var serverTodos = """{"v":3,"todos":[]}""" // empty at load → drives base todos = []
+        var lastTodosPut: String? = null
+        val fakeApi = object : FakeApi() {
+            override suspend fun moduleStore(module: String): Response<StoreResponse> =
+                if (module == "todos") Response.success(StoreResponse("SEALED:$serverTodos", 9))
+                else Response.success(StoreResponse(null, 0))
+            // Lenient server: always accepts (simulates the drifted version happening to match → no 409).
+            override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> {
+                if (module == "todos") lastTodosPut = body.ciphertext
+                return Response.success(StoreResponse(body.ciphertext, body.version + 1))
+            }
+        }
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(online = true), apiProvider = { fakeApi })
+
+        repo.load() // base todos = [] (server empty at load time)
+        // A concurrent client adds a todo the phone's cache never saw:
+        val web1 = WorkspaceRecordCodec.encodeTodo(TodoItem(id = "web1", title = "From web"))
+        serverTodos = """{"v":3,"todos":[$web1]}"""
+        repo.save { m -> m.copy(todos = m.todos + TodoItem(id = "t1", title = "From phone")) }
+
+        assertTrue("the server's record must survive the save", lastTodosPut!!.contains("web1"))
+        assertTrue("the phone's edit must be written", lastTodosPut!!.contains("t1"))
+    }
+
     @Test fun save_writes_notes_to_sharded_store() = runBlocking {
         val session = Session("https://h", "tok", "sha256/x", null)
         val sh = SessionHolder().apply { set(session) }

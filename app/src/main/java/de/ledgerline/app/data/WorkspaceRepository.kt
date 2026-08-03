@@ -712,10 +712,18 @@ class WorkspaceRepository(
             // missing shard's slot and make the loss permanent. Reject the write loudly.
             if (degraded.files.value) return@withContext Outcome.Err(ErrorKind.HTTP)
             val writer = newFilesWriter(api, vk)
-            var version = filesVersion
             var attempts = 0
             while (true) {
                 if (attempts++ >= 5) return@withContext Outcome.Err(ErrorKind.HTTP)
+                // DATA-LOSS FIX (same as the module loop): rebase the files base + version
+                // together on the CURRENT server root before building/sealing — a cached slice
+                // paired with a matching `filesVersion` would otherwise PUT stale files at a
+                // matching version and silently drop the server's files/folders with no 409.
+                val (sf, sfo) = loadFilesSlice(api, vk)
+                val version = filesVersion
+                curBase = curBase!!.copy(files = sf, fileFolders = sfo)
+                curNext = mutate(curBase!!)
+                if (curNext.files == curBase!!.files && curNext.fileFolders == curBase!!.fileFolders) break
                 val result = writer.build(curNext.files, curNext.fileFolders, priorFilesRoot)
                     ?: return@withContext Outcome.Err(ErrorKind.NETWORK) // a shard/collection upload failed
                 val rootCipher = crypto.sealManifest(CanonicalJson.encode(result.rootJson), vk)
@@ -734,14 +742,7 @@ class WorkspaceRepository(
                         if (offlineFlags.enabled()) storeCache.put(FILES_ROOT_KEY, StoreEnvelope(rootCipher, filesVersion))
                         break
                     }
-                    put.code() == 409 -> {
-                        // Reload the winning root (rebases version + priorFilesRoot + raw maps),
-                        // re-merge onto the base, re-apply mutate.
-                        val (sf, sfo) = loadFilesSlice(api, vk)
-                        version = filesVersion
-                        curBase = curBase!!.copy(files = sf, fileFolders = sfo)
-                        curNext = mutate(curBase!!)
-                    }
+                    put.code() == 409 -> {} // someone else wrote concurrently — loop re-fetches
                     else -> return@withContext Outcome.Err(ErrorKind.HTTP)
                 }
             }
@@ -750,19 +751,22 @@ class WorkspaceRepository(
         // Sharded /notes/store slice: same dirty-save + 409-rebase loop as files, via [notesEngine].
         // On 409 reload the winning notes (rebases version + priorRoot), re-apply mutate, retry.
         if (curNext.notes != curBase!!.notes) {
-            var version = notesEngine.version
             var attempts = 0
             while (true) {
                 if (attempts++ >= 5) return@withContext Outcome.Err(ErrorKind.HTTP)
+                // DATA-LOSS FIX (same as the module loop): always rebase the notes base on the
+                // CURRENT server slice before sealing — the cached `curBase.notes` can be stale
+                // while `notesEngine.version` matches the server, which would PUT stale records at
+                // a matching version and silently drop the server's notes with no 409.
+                val fresh = loadNotesSlice(vk)
+                val version = notesEngine.version
+                curBase = curBase!!.copy(notes = fresh)
+                curNext = mutate(curBase!!)
+                if (curNext.notes == curBase!!.notes) break // already reflected server-side
                 val recs = curNext.notes.map { it.id to WorkspaceRecordCodec.encodeNote(it) }
                 when (notesEngine.sealAndPut(vk, recs, emptyList(), version)) {
                     is ShardedStoreEngine.PutOutcome.Ok -> break
-                    ShardedStoreEngine.PutOutcome.Conflict -> {
-                        val fresh = loadNotesSlice(vk)
-                        version = notesEngine.version
-                        curBase = curBase!!.copy(notes = fresh)
-                        curNext = mutate(curBase!!)
-                    }
+                    ShardedStoreEngine.PutOutcome.Conflict -> {} // loop re-fetches
                     ShardedStoreEngine.PutOutcome.Error -> return@withContext Outcome.Err(ErrorKind.NETWORK)
                 }
             }
@@ -770,10 +774,34 @@ class WorkspaceRepository(
 
         for (spec in specs) {
             if (!spec.changed(curBase!!, curNext)) continue
-            var version = versions[spec.key] ?: 0
             var attempts = 0
             while (true) {
-                if (attempts++ >= 4) return@withContext Outcome.Err(ErrorKind.HTTP)
+                if (attempts++ >= 5) return@withContext Outcome.Err(ErrorKind.HTTP)
+                // DATA-LOSS FIX: always base this module's write on the CURRENT server slice —
+                // fetch its (content, version) together and re-merge, so `version` can never be
+                // out of step with the base content. The old code PUT with `versions[spec.key]`
+                // (a separately-maintained map) against `curBase` from the cache; if a prior op
+                // (e.g. an outbox replay) bumped the version without refreshing the cache, the
+                // version happened to match the server and the PUT overwrote the server's records
+                // WITHOUT a 409 — silent clobber (the todos disappeared). Re-fetching first makes
+                // curBase's slice == the exact server state at `version`, so a version-matched PUT
+                // is only ever additive. It also makes an idempotent replay a no-op (see break).
+                val res = try {
+                    api.moduleStore(spec.key)
+                } catch (e: Exception) {
+                    return@withContext Outcome.Err(ErrorKind.NETWORK, e)
+                }
+                if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
+                val body = res.body()!!
+                val version = body.version
+                val freshPlain = body.ciphertext?.let {
+                    crypto.openManifest(it, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
+                } ?: spec.emptyPlain()
+                curBase = spec.merge(curBase!!, freshPlain)
+                curNext = mutate(curBase!!)
+                versions[spec.key] = version
+                if (!spec.changed(curBase!!, curNext)) break // mutation already present server-side
+
                 val ciphertext = crypto.sealManifest(spec.encode(curNext), vk)
                 val put = try {
                     api.putModuleStore(spec.key, StorePutRequest(ciphertext, version))
@@ -787,22 +815,7 @@ class WorkspaceRepository(
                         if (offlineFlags.enabled()) storeCache.put(spec.cacheKey(), StoreEnvelope(ciphertext, nv))
                         break
                     }
-                    put.code() == 409 -> {
-                        // Reload just this module, re-merge, re-apply mutate, retry.
-                        val res = try {
-                            api.moduleStore(spec.key)
-                        } catch (e: Exception) {
-                            return@withContext Outcome.Err(ErrorKind.NETWORK, e)
-                        }
-                        if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.NETWORK)
-                        val body = res.body()!!
-                        version = body.version
-                        val freshPlain = body.ciphertext?.let {
-                            crypto.openManifest(it, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
-                        } ?: spec.emptyPlain()
-                        curBase = spec.merge(curBase!!, freshPlain)
-                        curNext = mutate(curBase!!)
-                    }
+                    put.code() == 409 -> {} // someone else wrote concurrently — loop re-fetches
                     else -> return@withContext Outcome.Err(ErrorKind.HTTP)
                 }
             }
