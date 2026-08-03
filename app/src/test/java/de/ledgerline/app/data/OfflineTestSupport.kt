@@ -222,6 +222,12 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun contactsReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
     override suspend fun contactsUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
     override suspend fun contactsRaw(blob: String): Response<ResponseBody> = throw NotImplementedError()
+    // Empty by default (mirrors notesStore) so a fake that doesn't exercise contacts loads empty.
+    override suspend fun contactsStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
+    override suspend fun contactsStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
+    override suspend fun contactsRawBatch(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<okhttp3.ResponseBody> = throw NotImplementedError()
+    override suspend fun contactsStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
+    override suspend fun contactsStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
     override suspend fun deleteContactBlob(blob: String): Response<Unit> = throw NotImplementedError()
     override suspend fun galleryReverse(lat: Double, lng: Double): Response<de.ledgerline.app.data.remote.dto.ReverseResponse> = throw NotImplementedError()
     override suspend fun mapsRoute(points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse> = throw NotImplementedError()

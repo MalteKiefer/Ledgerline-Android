@@ -60,6 +60,15 @@ class ShardedStoreEngine(
 
     data class Loaded(val records: List<JsonObject>, val folders: List<JsonObject>, val present: Boolean)
 
+    /**
+     * The living blob set of the last load — shard blobs + the folders collection blob. For a store
+     * whose records share a blob ledger with OTHER blobs (e.g. contacts record-shards + avatars), the
+     * caller unions this with those other refs before reporting to `/…/blobs/reconcile`.
+     */
+    fun shardRefs(): List<String> =
+        priorRoot.shards.map { it.ref }.filter { it.isNotEmpty() } +
+            listOfNotNull(priorRoot.folders?.ref?.takeIf { it.isNotEmpty() })
+
     /** Load the sharded store: root → shard blobs (parallel) + optional folders collection. */
     suspend fun load(vk: ByteArray): Loaded {
         val res = try { storeGet() } catch (_: Exception) { return cachedOr(vk) }

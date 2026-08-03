@@ -15,6 +15,7 @@ import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.domain.model.BookmarksManifest
+import de.ledgerline.app.domain.model.Contact
 import de.ledgerline.app.domain.model.ContactsManifest
 import de.ledgerline.app.domain.model.FileEntry
 import de.ledgerline.app.domain.model.FilesRoot
@@ -99,6 +100,8 @@ class WorkspaceRepository(
         const val FILES_ROOT_KEY = "workspace_files_root"
         /** Offline-cache key for the sharded notes-store **root** envelope. */
         const val NOTES_ROOT_KEY = "workspace_notes_root"
+        /** Offline-cache key for the sharded contacts-store **root** envelope. */
+        const val CONTACTS_ROOT_KEY = "workspace_contacts_root"
         /** SyncOutbox key for offline workspace write deltas (one aggregate delta for all modules). */
         const val OUTBOX = "workspace"
         val LIST_KEYS = listOf("notes", "todos", "todoLists", "bookmarks", "bookmarkFolders", "contacts", "files", "fileFolders")
@@ -172,6 +175,28 @@ class WorkspaceRepository(
         )
     }
 
+    /**
+     * Sharded `/contacts/store` (web v1.539). Same content-addressed engine as notes (recordKey only,
+     * no collections). Record shards share the avatar blob ledger + the `/contacts` endpoints. The
+     * engine's own reconcile is **disabled** (reconcile = null) because the living set must UNION the
+     * record shards with the avatar blobs — done in [reconcileContacts] after a full online load.
+     */
+    private val contactsEngine by lazy {
+        ShardedStoreEngine(
+            crypto = crypto,
+            blobCache = blobCache,
+            storeCache = storeCache,
+            offlineFlags = offlineFlags,
+            rootCacheKey = CONTACTS_ROOT_KEY,
+            storeGet = { apiProvider(sessionHolder.get()!!).contactsStore() },
+            storePut = { apiProvider(sessionHolder.get()!!).contactsStorePut(it) },
+            rawBlob = { apiProvider(sessionHolder.get()!!).contactsRaw(it) },
+            uploadBlobApi = { apiProvider(sessionHolder.get()!!).contactsUpload(it) },
+            reconcile = null, // union with avatars in reconcileContacts()
+            rawBatch = { refs -> apiProvider(sessionHolder.get()!!).contactsRawBatch(de.ledgerline.app.data.remote.dto.ReconcileRequest(refs)) },
+        )
+    }
+
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonEncoder = Json { encodeDefaults = true }
     // coerceInputValues: the sharded files root may carry `"files": null` alongside the shard
@@ -240,12 +265,7 @@ class WorkspaceRepository(
             },
             changed = { a, b -> a.bookmarks != b.bookmarks || a.bookmarkFolders != b.bookmarkFolders },
         ),
-        ModuleSpec(
-            key = "contacts",
-            encode = { m -> encModule { it["contacts"] = arr(m.contacts.map(WorkspaceRecordCodec::encodeContact)) } },
-            merge = { m, plain -> m.copy(contacts = records(plain, "contacts").map(WorkspaceRecordCodec::decodeContact)) },
-            changed = { a, b -> a.contacts != b.contacts },
-        ),
+        // NOTE: contacts graduated to its own sharded slice ([contactsEngine]) — no longer a module.
     )
 
     /** Build a `{v:3, …}` module manifest JSON string; [fill] adds the record arrays. */
@@ -471,6 +491,75 @@ class WorkspaceRepository(
         return old
     }
 
+    /** Load the sharded contacts slice via [contactsEngine]; migrate the monolith once while empty. */
+    private suspend fun loadContactsSlice(vk: ByteArray): List<Contact> {
+        val loaded = try {
+            contactsEngine.load(vk)
+        } catch (_: ShardedStoreEngine.AuthException) {
+            throw AuthException()
+        }
+        var contacts = loaded.records.map(WorkspaceRecordCodec::decodeContact)
+        if (contacts.isEmpty()) migrateContactsFromMonolith(vk)?.let { contacts = it }
+        return contacts
+    }
+
+    /**
+     * One-time dual-read migration from the old monolith `/store/contacts` to the sharded
+     * `/contacts/store` (byte-exact with the web `migrateContactsFromMonolith`): read the monolith,
+     * move any contacts into the sharded store, then blank the monolith (`{v:3,contacts:[]}`) so a
+     * later "delete all" never re-imports. Guarded on the sharded store being empty. Returns the
+     * migrated contacts, or null when there was nothing to migrate.
+     */
+    private suspend fun migrateContactsFromMonolith(vk: ByteArray): List<Contact>? {
+        val session = sessionHolder.get() ?: return null
+        val api = apiProvider(session)
+        val res = try { api.moduleStore("contacts") } catch (_: Exception) { return null }
+        if (!res.isSuccessful) return null
+        val body = res.body() ?: return null
+        val ct = body.ciphertext ?: return null
+        val plain = crypto.openManifest(ct, vk) ?: return null
+        val old = records(plain, "contacts").map(WorkspaceRecordCodec::decodeContact)
+        if (old.isEmpty()) return null
+        val recs = old.map { it.id to WorkspaceRecordCodec.encodeContact(it) }
+        if (contactsEngine.sealAndPut(vk, recs, emptyList(), contactsEngine.version) !is ShardedStoreEngine.PutOutcome.Ok) return null
+        runCatching {
+            val empty = crypto.sealManifest(encModule { it["contacts"] = arr(emptyList()) }, vk)
+            api.putModuleStore("contacts", StorePutRequest(empty, body.version))
+        }
+        return old
+    }
+
+    /**
+     * Report the contacts living blob set = record-shard refs UNION avatar refs, so the daily orphan
+     * sweep never frees a shard OR an avatar that is still referenced (they share one blob ledger).
+     * Best-effort; only after a full ONLINE load (never cache/offline/partial). See spec §6.
+     */
+    private suspend fun reconcileContacts(manifest: WorkspaceManifest) {
+        val session = sessionHolder.get() ?: return
+        val refs = (contactsEngine.shardRefs() + manifest.contacts.mapNotNull { it.avatarRef }).distinct()
+        if (refs.isEmpty()) return
+        runCatching { apiProvider(session).contactsReconcile(de.ledgerline.app.data.remote.dto.ReconcileRequest(refs)) }
+    }
+
+    /**
+     * Recover CONTACTS from a retained history-version sealed root (`/contacts/store/history/{v}`):
+     * re-add any contact whose id is missing from the current workspace. Returns the count restored,
+     * or -1 on failure. Mirrors [recoverNotesFromHistoryRoot].
+     */
+    suspend fun recoverContactsFromHistoryRoot(ciphertext: String): Int = withContext(Dispatchers.IO) {
+        val vk = vaultKeyHolder.get() ?: return@withContext -1
+        val loaded = runCatching { contactsEngine.historyLoad(ciphertext, vk) }.getOrNull() ?: return@withContext -1
+        val cur = cache.value.value?.manifest ?: when (val l = load()) {
+            is Outcome.Ok -> l.value.manifest
+            is Outcome.Err -> return@withContext -1
+        }
+        val have = cur.contacts.mapTo(HashSet()) { it.id }
+        val add = loaded.records.map(WorkspaceRecordCodec::decodeContact).filter { it.id !in have }
+        if (add.isEmpty()) return@withContext 0
+        val out = save { m -> m.copy(contacts = m.contacts + add) }
+        if (out is Outcome.Ok) add.size else -1
+    }
+
     // On Dispatchers.IO: opening + JSON-decoding every module + the sharded files slice is
     // CPU/IO-heavy and must not block the caller's main thread (large stores would ANR).
     /**
@@ -503,8 +592,11 @@ class WorkspaceRepository(
             runCatching { cachedWorkspace(api, vk) }.getOrNull()?.let { cache.set(Workspace(withPending(it.manifest, vk), it.version)) }
         }
         try {
+            val agg = fetchAggregate(api, vk)
+            // Reclaim orphaned contact blobs (shards ∪ avatars) — only on this full online load.
+            runCatching { reconcileContacts(agg) }
             // Layer any un-synced offline edits on top of the fresh server aggregate.
-            Outcome.Ok(Workspace(withPending(fetchAggregate(api, vk), vk), 0))
+            Outcome.Ok(Workspace(withPending(agg, vk), 0))
         } catch (_: AuthException) {
             // 401 → forced-logout path; never fall back to cache.
             Outcome.Err(ErrorKind.HTTP)
@@ -521,20 +613,23 @@ class WorkspaceRepository(
      * + caches) and by [replayPending] (which needs a clean base to diff the pending delta against).
      * Throws [AuthException]/[DecryptException]/network exceptions like the module fetch.
      */
-    private suspend fun fetchAggregate(api: LedgerlineApi, vk: ByteArray): WorkspaceManifest {
-        val loaded = coroutineScope {
-            val filesDeferred = async { loadFilesSlice(api, vk) }
-            val notesDeferred = async { loadNotesSlice(vk) }
-            val mods = specs.map { spec -> async { spec to fetchModule(api, spec, vk) } }.awaitAll()
-            Triple(mods, filesDeferred.await(), notesDeferred.await())
-        }
-        val (mods, filesSlice, notesSlice) = loaded
+    private suspend fun fetchAggregate(api: LedgerlineApi, vk: ByteArray): WorkspaceManifest = coroutineScope {
+        val filesDeferred = async { loadFilesSlice(api, vk) }
+        val notesDeferred = async { loadNotesSlice(vk) }
+        val contactsDeferred = async { loadContactsSlice(vk) }
+        val mods = specs.map { spec -> async { spec to fetchModule(api, spec, vk) } }.awaitAll()
+        val filesSlice = filesDeferred.await()
+        val notesSlice = notesDeferred.await()
+        val contactsSlice = contactsDeferred.await()
         var agg = WorkspaceManifest(v = 3)
         for ((spec, ml) in mods) {
             versions[spec.key] = ml.version
             if (ml.plain != null) agg = spec.merge(agg, ml.plain)
         }
-        return agg.copy(files = filesSlice.first, fileFolders = filesSlice.second, notes = notesSlice)
+        agg.copy(
+            files = filesSlice.first, fileFolders = filesSlice.second,
+            notes = notesSlice, contacts = contactsSlice,
+        )
     }
 
     /**
@@ -554,8 +649,10 @@ class WorkspaceRepository(
         val files = runCatching { cachedFilesSliceOr(api, vk) }.getOrNull() ?: (emptyList<FileEntry>() to emptyList())
         val notes = runCatching { notesEngine.loadCached(vk)?.records?.map(WorkspaceRecordCodec::decodeNote) }
             .getOrNull().orEmpty()
-        if (files.first.isNotEmpty() || files.second.isNotEmpty() || notes.isNotEmpty()) any = true
-        agg = agg.copy(files = files.first, fileFolders = files.second, notes = notes)
+        val contacts = runCatching { contactsEngine.loadCached(vk)?.records?.map(WorkspaceRecordCodec::decodeContact) }
+            .getOrNull().orEmpty()
+        if (files.first.isNotEmpty() || files.second.isNotEmpty() || notes.isNotEmpty() || contacts.isNotEmpty()) any = true
+        agg = agg.copy(files = files.first, fileFolders = files.second, notes = notes, contacts = contacts)
         return if (any) Workspace(agg, 0) else null
     }
 
@@ -765,6 +862,27 @@ class WorkspaceRepository(
                 if (curNext.notes == curBase!!.notes) break // already reflected server-side
                 val recs = curNext.notes.map { it.id to WorkspaceRecordCodec.encodeNote(it) }
                 when (notesEngine.sealAndPut(vk, recs, emptyList(), version)) {
+                    is ShardedStoreEngine.PutOutcome.Ok -> break
+                    ShardedStoreEngine.PutOutcome.Conflict -> {} // loop re-fetches
+                    ShardedStoreEngine.PutOutcome.Error -> return@withContext Outcome.Err(ErrorKind.NETWORK)
+                }
+            }
+        }
+
+        // Sharded /contacts/store slice: identical fetch-first dirty-save + 409-rebase as notes.
+        if (curNext.contacts != curBase!!.contacts) {
+            var attempts = 0
+            while (true) {
+                if (attempts++ >= 5) return@withContext Outcome.Err(ErrorKind.HTTP)
+                // Fetch-first (data-loss fix): rebase on the CURRENT server contacts before sealing so
+                // a version-matched PUT is only ever additive (never a silent clobber).
+                val fresh = loadContactsSlice(vk)
+                val version = contactsEngine.version
+                curBase = curBase!!.copy(contacts = fresh)
+                curNext = mutate(curBase!!)
+                if (curNext.contacts == curBase!!.contacts) break // already reflected server-side
+                val recs = curNext.contacts.map { it.id to WorkspaceRecordCodec.encodeContact(it) }
+                when (contactsEngine.sealAndPut(vk, recs, emptyList(), version)) {
                     is ShardedStoreEngine.PutOutcome.Ok -> break
                     ShardedStoreEngine.PutOutcome.Conflict -> {} // loop re-fetches
                     ShardedStoreEngine.PutOutcome.Error -> return@withContext Outcome.Err(ErrorKind.NETWORK)

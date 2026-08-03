@@ -506,6 +506,21 @@ iOS (`v0.6.x`) ist beim Contract + Sharing/Passwords voraus, hat aber Notes/Todo
 Contacts NICHT. Ehrlich geführt, nicht schöngeredet.
 
 **P0 — Store-v3-Contract-Drift:**
+0. **Contacts → Sharded-Store — ERLEDIGT (2026-08-03, on-device-Verifikation offen).** Web v1.539
+   hat Contacts vom Monolith `/store/contacts` auf den **sharded** `/contacts/store` graduiert (wie
+   Notes/Passwords/Invoices). Android: neuer `contactsEngine` (ShardedStoreEngine, `rootCacheKey=
+   workspace_contacts_root`, `reconcile=null`), Contacts aus dem Modul-Fan-out entfernt, Load/Save als
+   Sharded-Slice **identisch zur Notes-Slice** inkl. **fetch-first** (der Clobber-Fix — Version+Inhalt
+   zusammen neu laden vor dem PUT). Record-Shards teilen die **Avatar-Blob-Infra** (`/contacts/*`,
+   `contact_blobs`-Ledger) — kein neuer Blob-Endpoint; neu nur `contactsStore`/`Put`/`RawBatch`/
+   `store/history` in `LedgerlineApi`. **One-Time-Dual-Read-Migration** (`migrateContactsFromMonolith`,
+   guard „Sharded leer"): Monolith lesen → in Sharded → Monolith byte-exakt blanken (`{v:3,contacts:[]}`).
+   **Reconcile-Union (KRITISCH):** `reconcileContacts` meldet `shardRefs() ∪ avatarRefs` an
+   `/contacts/blobs/reconcile` (sonst räumt der Orphan-Sweep Shards ODER Avatare weg — gemeinsames
+   Ledger), nur nach vollem Online-Load. Unbekannte `ContactRecord`-Felder durchgereicht (Raw-Overlay).
+   Tests: `WorkspaceSaveTest.{save_writes_contacts_to_sharded_store, load_migrates_contacts_from_monolith_to_sharded}`.
+   Falle beim Bau: Kotlin erlaubt **verschachtelte** Block-Kommentare → `/*` in einem KDoc (`` `/contacts/*` ``)
+   öffnete einen nested Comment und brach die Klasse; im KDoc keine `/*`-Sequenzen.
 1. **Workspace-Module-Stores — ERLEDIGT (2026-07-24).** `WorkspaceRepository` fächert
    jetzt auf `GET/PUT /store/{notes,todos,bookmarks,contacts}` auf (per-Modul-Version,
    409-Merge pro Modul, per-Modul-Offline-Cache `workspace_<mod>`). App-Contract

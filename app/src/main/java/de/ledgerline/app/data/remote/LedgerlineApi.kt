@@ -335,7 +335,6 @@ interface LedgerlineApi {
     @GET("api/v1/contacts/usage")
     suspend fun contactsUsage(): Response<UsageResponse>
 
-    // Deferred: orphaned-blob garbage-collection not yet wired (CLAUDE.md §6).
     @POST("api/v1/contacts/blobs/reconcile")
     suspend fun contactsReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
 
@@ -346,6 +345,24 @@ interface LedgerlineApi {
     @GET("api/v1/contacts/raw/{blob}")
     @Streaming
     suspend fun contactsRaw(@Path("blob") blob: String): Response<ResponseBody>
+
+    // --- Contacts sharded store (web v1.539: contacts graduated off the monolith to /contacts/store;
+    // record shards reuse the avatar blob infra — /contacts/{upload,raw,raw-batch,blobs/reconcile}). ---
+    @GET("api/v1/contacts/store")
+    suspend fun contactsStore(): Response<StoreResponse>
+
+    @PUT("api/v1/contacts/store")
+    suspend fun contactsStorePut(@Body body: StorePutRequest): Response<StoreResponse>
+
+    @POST("api/v1/contacts/raw-batch")
+    @Streaming
+    suspend fun contactsRawBatch(@Body body: ReconcileRequest): Response<ResponseBody>
+
+    @GET("api/v1/contacts/store/history")
+    suspend fun contactsStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse>
+
+    @GET("api/v1/contacts/store/history/{version}")
+    suspend fun contactsStoreHistoryVersion(@Path("version") version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion>
 
     @DELETE("api/v1/contacts/blob/{blob}")
     suspend fun deleteContactBlob(@Path("blob") blob: String): Response<Unit>

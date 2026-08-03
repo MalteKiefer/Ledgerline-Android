@@ -73,6 +73,19 @@ class WorkspaceSaveTest {
             lastFilesShards = body.shards
             return Response.success(StoreResponse(body.ciphertext, body.version + 1))
         }
+
+        // Sharded contacts store (record shards reuse the avatar blob infra); start empty, capture PUT.
+        var contactsPuts = 0
+        var lastContactsShards: List<String>? = null
+        override suspend fun contactsUpload(file: okhttp3.MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadResponse> =
+            Response.success(de.ledgerline.app.data.remote.dto.UploadResponse("uploaded-contact-blob"))
+        override suspend fun contactsStorePut(body: StorePutRequest): Response<StoreResponse> {
+            contactsPuts++
+            lastContactsShards = body.shards
+            return Response.success(StoreResponse(body.ciphertext, body.version + 1))
+        }
+        override suspend fun contactsReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> =
+            Response.success(de.ledgerline.app.data.remote.dto.ReconcileResponse())
     }
 
     @Test fun offline_note_save_queues_then_replays() = runBlocking {
@@ -225,6 +238,52 @@ class WorkspaceSaveTest {
         // Monolith blanked byte-exact at its own version.
         assertEquals("""SEALED:{"v":3,"notes":[]}""", fakeApi.monolithBlank)
         assertEquals(7, fakeApi.monolithVersion)
+    }
+
+    @Test fun save_writes_contacts_to_sharded_store() = runBlocking {
+        val session = Session("https://h", "tok", "sha256/x", null)
+        val sh = SessionHolder().apply { set(session) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val cache = WorkspaceCache()
+        val fakeApi = FakeApi()
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { fakeApi })
+
+        // A contact mutation seals + PUTs the sharded /contacts/store (no longer a monolith module).
+        val result = repo.save { m -> m.copy(contacts = m.contacts + de.ledgerline.app.domain.model.Contact(id = "c1", fn = "New")) }
+
+        assertTrue(result is Outcome.Ok)
+        assertEquals("c1", (result as Outcome.Ok).value.manifest.contacts.single().id)
+        assertEquals(1, fakeApi.contactsPuts)
+        // The contact's record-shard blob ref is carried in the referential-integrity guard.
+        assertTrue(fakeApi.lastContactsShards!!.contains("uploaded-contact-blob"))
+    }
+
+    /** One-time monolith→sharded migration for contacts: old `/store/contacts` moved + blanked. */
+    @Test fun load_migrates_contacts_from_monolith_to_sharded() = runBlocking {
+        val session = Session("https://h", "tok", "sha256/x", null)
+        val sh = SessionHolder().apply { set(session) }
+        val vh = VaultKeyHolder().apply { set(ByteArray(32)) }
+        val cache = WorkspaceCache()
+        val fakeApi = object : FakeApi() {
+            var monolithBlank: String? = null
+            var monolithVersion = -1
+            override suspend fun moduleStore(module: String): Response<StoreResponse> =
+                if (module == "contacts") Response.success(StoreResponse("""SEALED:{"v":3,"contacts":[{"id":"c1","fn":"Legacy"}]}""", 4))
+                else Response.success(StoreResponse(null, 0))
+            override suspend fun putModuleStore(module: String, body: StorePutRequest): Response<StoreResponse> {
+                assertEquals("contacts", module)
+                monolithBlank = body.ciphertext; monolithVersion = body.version
+                return Response.success(StoreResponse(body.ciphertext, body.version + 1))
+            }
+        }
+        val repo = WorkspaceRepository(sh, vh, fakeCrypto, cache, tmpStoreCache(), FakeOfflineFlags(), de.ledgerline.app.core.offline.DegradedState(), tmpBlobCache(), tmpOutbox(), FakeConnectivity(), apiProvider = { fakeApi })
+
+        val result = repo.load()
+        assertTrue(result is Outcome.Ok)
+        assertEquals("Legacy", (result as Outcome.Ok).value.manifest.contacts.single().fn)
+        assertEquals(1, fakeApi.contactsPuts) // moved into the sharded store
+        assertEquals("""SEALED:{"v":3,"contacts":[]}""", fakeApi.monolithBlank) // monolith blanked byte-exact
+        assertEquals(4, fakeApi.monolithVersion)
     }
 
     @Test fun save_writes_folder_mutation_to_sharded_files_store() = runBlocking {
