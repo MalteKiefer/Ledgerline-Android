@@ -218,4 +218,4 @@ distribution; a future F-Droid effort should build libsodium from source.
 
 ## License
 
-All rights reserved (no license granted yet). © Kiefer Networks.
+[MIT](LICENSE) © 2026 Malte Kiefer.
