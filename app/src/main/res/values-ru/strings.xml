@@ -579,6 +579,13 @@
     <string name="contacts_export_vcf">Экспорт vCard (.vcf)</string>
     <string name="contacts_import_vcf">Импорт vCard (.vcf)</string>
     <string name="contacts_vcf_imported">Импортировано контактов: %1$d</string>
+    <string name="contact_save_failed">Не удалось сохранить</string>
+    <string name="contact_upload_failed">Не удалось загрузить</string>
+    <string name="contacts_export_done">Экспортировано контактов: %1$d</string>
+    <string name="contacts_export_failed">Ошибка экспорта</string>
+    <string name="contacts_import_none">Нет новых контактов</string>
+    <string name="contacts_import_done">Добавлено: %1$d, обновлено: %2$d</string>
+    <string name="contacts_import_failed">Ошибка импорта</string>
     <string name="address_street">Улица</string>
     <string name="address_zip">Индекс</string>
     <string name="address_city">Город</string>

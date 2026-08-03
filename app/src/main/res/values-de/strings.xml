@@ -576,6 +576,13 @@
     <string name="contacts_export_vcf">vCard exportieren (.vcf)</string>
     <string name="contacts_import_vcf">vCard importieren (.vcf)</string>
     <string name="contacts_vcf_imported">%1$d Kontakte importiert</string>
+    <string name="contact_save_failed">Speichern fehlgeschlagen</string>
+    <string name="contact_upload_failed">Upload fehlgeschlagen</string>
+    <string name="contacts_export_done">%1$d Kontakte exportiert</string>
+    <string name="contacts_export_failed">Export fehlgeschlagen</string>
+    <string name="contacts_import_none">Keine neuen Kontakte</string>
+    <string name="contacts_import_done">%1$d hinzugefügt, %2$d aktualisiert</string>
+    <string name="contacts_import_failed">Import fehlgeschlagen</string>
     <string name="address_street">Straße</string>
     <string name="address_zip">PLZ</string>
     <string name="address_city">Stadt</string>

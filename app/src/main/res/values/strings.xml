@@ -578,6 +578,13 @@
     <string name="contacts_export_vcf">Export vCard (.vcf)</string>
     <string name="contacts_import_vcf">Import vCard (.vcf)</string>
     <string name="contacts_vcf_imported">Imported %1$d contacts</string>
+    <string name="contact_save_failed">Save failed</string>
+    <string name="contact_upload_failed">Upload failed</string>
+    <string name="contacts_export_done">%1$d contacts exported</string>
+    <string name="contacts_export_failed">Export failed</string>
+    <string name="contacts_import_none">No new contacts</string>
+    <string name="contacts_import_done">%1$d added, %2$d updated</string>
+    <string name="contacts_import_failed">Import failed</string>
     <string name="address_street">Street</string>
     <string name="address_zip">ZIP</string>
     <string name="address_city">City</string>

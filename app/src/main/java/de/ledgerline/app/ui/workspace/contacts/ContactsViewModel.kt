@@ -1,5 +1,7 @@
 package de.ledgerline.app.ui.workspace.contacts
 
+import de.ledgerline.app.R
+
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.lifecycle.ViewModel
@@ -44,7 +46,10 @@ class ContactsViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val workspaceRepo: de.ledgerline.app.data.WorkspaceRepository,
     private val history: de.ledgerline.app.data.StoreHistoryRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
 ) : ViewModel() {
+
+    private fun msg(resId: Int, vararg args: Any) { _message.value = context.getString(resId, *args) }
 
     // ---- Contacts version history / recovery (sharded /contacts/store, web v1.539) ----
     suspend fun historyVersions() = history.list(de.ledgerline.app.data.StoreHistoryRepository.Store.CONTACTS)
@@ -194,19 +199,19 @@ class ContactsViewModel @Inject constructor(
         when (val r = blobs.uploadAvatar(bytes)) {
             is Outcome.Ok -> {
                 if (mutate.invoke { m -> ContactOps.setAvatar(m, id, r.value.id, r.value.encFileKey, nowIso()) } is Outcome.Err) {
-                    _message.value = "Save failed"
+                    msg(R.string.contact_save_failed)
                 } else if (!old.isNullOrBlank()) {
                     blobs.deleteBlobs(listOf(old))
                 }
             }
-            is Outcome.Err -> _message.value = "Upload failed"
+            is Outcome.Err -> msg(R.string.contact_upload_failed)
         }
     }
 
     fun removeAvatar(id: String) = viewModelScope.launch {
         val old = contactById(id)?.avatarRef
         if (mutate.invoke { m -> ContactOps.clearAvatar(m, id, nowIso()) } is Outcome.Err) {
-            _message.value = "Save failed"
+            msg(R.string.contact_save_failed)
         } else if (!old.isNullOrBlank()) {
             blobs.deleteBlobs(listOf(old))
         }
@@ -232,49 +237,63 @@ class ContactsViewModel @Inject constructor(
                 DeviceContactsSync.ExportItem(c, avatar)
             }
             val n = deviceSync.export(items)
-            _message.value = "Exported $n contacts"
+            msg(R.string.contacts_export_done, n)
         } catch (e: Exception) {
-            _message.value = "Export failed"
+            msg(R.string.contacts_export_failed)
         } finally {
             _syncing.value = false
         }
     }
 
-    /** Pull device contacts we don't already have into the vault (dedup by name/email/phone). */
+    /**
+     * Pull device contacts into the vault: contacts that MATCH an existing one (by name/email/phone)
+     * are UPDATED (scalar fields refreshed if the device has a value; email/phone/url/address lists
+     * unioned — never destructive), the rest are added new. Matched via [contactKeys].
+     */
     fun importFromDevice() = viewModelScope.launch {
         if (_syncing.value) return@launch
         _syncing.value = true
         try {
             val imported = deviceSync.import()
-            val seen = HashSet<String>()
-            cache.value.value?.manifest?.contacts.orEmpty().filter { !it.trashed }
-                .forEach { seen.addAll(contactKeys(it)) }
-
-            val toAdd = ArrayList<DeviceContactsSync.Imported>()
-            for (imp in imported) {
-                val ks = contactKeys(imp.contact)
-                if (ks.any { it in seen }) continue
-                seen.addAll(ks)
-                toAdd.add(imp)
-            }
-            if (toAdd.isEmpty()) {
-                _message.value = "No new contacts"
-                return@launch
-            }
+            val existing = cache.value.value?.manifest?.contacts.orEmpty().filter { !it.trashed }
+            // key → existing contact (first-wins) to resolve a device contact to the one it updates.
+            val byKey = HashMap<String, Contact>()
+            existing.forEach { c -> contactKeys(c).forEach { byKey.putIfAbsent(it, c) } }
 
             val now = nowIso()
-            val normalized = toAdd.map { ContactOps.normalize(it.contact, newId(), now) }
-            if (mutate.invoke { m -> ContactOps.addContacts(m, normalized) } is Outcome.Err) {
-                _message.value = "Save failed"
+            val toAdd = ArrayList<Pair<Contact, DeviceContactsSync.Imported>>()   // normalized-new, source
+            val toUpdate = ArrayList<Pair<Contact, DeviceContactsSync.Imported>>() // merged-existing, source
+            val claimed = HashSet<String>() // existing ids already matched this run
+            for (imp in imported) {
+                val match = contactKeys(imp.contact).firstNotNullOfOrNull { byKey[it] }
+                    ?.takeIf { it.id !in claimed }
+                if (match != null) {
+                    claimed.add(match.id)
+                    toUpdate.add(mergeDeviceContact(match, imp.contact, now) to imp)
+                } else {
+                    toAdd.add(ContactOps.normalize(imp.contact, newId(), now) to imp)
+                }
+            }
+            if (toAdd.isEmpty() && toUpdate.isEmpty()) {
+                msg(R.string.contacts_import_none)
                 return@launch
             }
 
-            // Upload any photos, then fold all avatar links into one manifest write.
+            if (mutate.invoke { m ->
+                    var mm = ContactOps.addContacts(m, toAdd.map { it.first })
+                    toUpdate.forEach { (c, _) -> mm = ContactOps.updateContact(mm, c.id, c, now) }
+                    mm
+                } is Outcome.Err) {
+                msg(R.string.contact_save_failed)
+                return@launch
+            }
+
+            // Upload any photos (new + updated that carry a device photo), fold avatar links in one write.
             val avatarUpdates = ArrayList<Triple<String, String, String>>()
-            toAdd.forEachIndexed { i, imp ->
-                val photo = imp.photo ?: return@forEachIndexed
+            (toAdd + toUpdate).forEach { (c, imp) ->
+                val photo = imp.photo ?: return@forEach
                 when (val r = blobs.uploadAvatar(photo)) {
-                    is Outcome.Ok -> avatarUpdates.add(Triple(normalized[i].id, r.value.id, r.value.encFileKey))
+                    is Outcome.Ok -> avatarUpdates.add(Triple(c.id, r.value.id, r.value.encFileKey))
                     is Outcome.Err -> Unit
                 }
             }
@@ -283,12 +302,39 @@ class ContactsViewModel @Inject constructor(
                     avatarUpdates.fold(m) { acc, (id, ref, key) -> ContactOps.setAvatar(acc, id, ref, key, nowIso()) }
                 }
             }
-            _message.value = "Imported ${toAdd.size} contacts"
+            msg(R.string.contacts_import_done, toAdd.size, toUpdate.size)
         } catch (e: Exception) {
-            _message.value = "Import failed"
+            msg(R.string.contacts_import_failed)
         } finally {
             _syncing.value = false
         }
+    }
+
+    /**
+     * Non-destructive refresh of an existing vault contact from a device contact: overwrite scalar
+     * fields only when the device provides a value; union the email/phone/impp/url/address lists (add
+     * device entries not already present). Vault-only data (id, categories, favorite, avatar, personId,
+     * uid, trashed, raw) is preserved.
+     */
+    private fun mergeDeviceContact(existing: Contact, dev: Contact, nowIso: String): Contact {
+        fun pick(cur: String, new: String) = new.ifBlank { cur }
+        fun mergeLabeled(cur: List<de.ledgerline.app.domain.model.LabeledValue>, new: List<de.ledgerline.app.domain.model.LabeledValue>) =
+            cur + new.filter { d -> d.value.isNotBlank() && cur.none { it.value.equals(d.value, ignoreCase = true) } }
+        return existing.copy(
+            fn = pick(existing.fn, dev.fn),
+            first = pick(existing.first, dev.first), last = pick(existing.last, dev.last), middle = pick(existing.middle, dev.middle),
+            prefix = pick(existing.prefix, dev.prefix), suffix = pick(existing.suffix, dev.suffix), nickname = pick(existing.nickname, dev.nickname),
+            org = pick(existing.org, dev.org), department = pick(existing.department, dev.department),
+            title = pick(existing.title, dev.title), role = pick(existing.role, dev.role),
+            emails = mergeLabeled(existing.emails, dev.emails),
+            phones = mergeLabeled(existing.phones, dev.phones),
+            impp = mergeLabeled(existing.impp, dev.impp),
+            urls = mergeLabeled(existing.urls, dev.urls),
+            addresses = existing.addresses + dev.addresses.filter { it !in existing.addresses },
+            bday = pick(existing.bday, dev.bday), anniversary = pick(existing.anniversary, dev.anniversary),
+            note = pick(existing.note, dev.note),
+            updated = nowIso,
+        )
     }
 
     /** Dedup keys: normalized name, each email, each phone (digits only). */
@@ -309,7 +355,7 @@ class ContactsViewModel @Inject constructor(
 
     private inline fun write(crossinline mutation: (WorkspaceManifest) -> WorkspaceManifest) =
         viewModelScope.launch {
-            if (mutate.invoke { m -> mutation(m) } is Outcome.Err) _message.value = "Save failed"
+            if (mutate.invoke { m -> mutation(m) } is Outcome.Err) msg(R.string.contact_save_failed)
         }
 
     private fun newId(): String = de.ledgerline.app.core.Ids.newId()
@@ -333,7 +379,7 @@ class ContactsViewModel @Inject constructor(
         if (parsed.isEmpty()) { onDone(0); return }
         viewModelScope.launch {
             val ok = mutate.invoke { m -> m.copy(contacts = m.contacts + parsed) } is Outcome.Ok
-            if (!ok) _message.value = "Import failed"
+            if (!ok) msg(R.string.contacts_import_failed)
             onDone(if (ok) parsed.size else 0)
         }
     }
