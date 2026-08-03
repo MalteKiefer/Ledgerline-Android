@@ -257,6 +257,12 @@ class FinanceRepository(
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
+        // DATA-LOSS FIX: pair the write version with THIS base snapshot. `version` is a shared field
+        // that a prior save in a multi-store replay can bump ahead of the cache (if it throws between
+        // the version bump and cache.set), and a version-matched PUT would then clobber the server's
+        // records with the stale base. Resetting to base.version makes the first PUT additive (or a
+        // clean 409 → load()-rebase), the same guarantee the gallery store gets from bundling version.
+        version = base!!.version
         // Refuse to re-shard invoices while a shard is missing — it would drop those records.
         if (degraded) return@withContext Outcome.Err(ErrorKind.HTTP)
         var next = mutate(base!!.manifest.invoices)
@@ -315,6 +321,12 @@ class FinanceRepository(
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
+        // DATA-LOSS FIX: pair the write version with THIS base snapshot. `version` is a shared field
+        // that a prior save in a multi-store replay can bump ahead of the cache (if it throws between
+        // the version bump and cache.set), and a version-matched PUT would then clobber the server's
+        // records with the stale base. Resetting to base.version makes the first PUT additive (or a
+        // clean 409 → load()-rebase), the same guarantee the gallery store gets from bundling version.
+        version = base!!.version
         var next = mutate(base!!.manifest.paymentMethods)
         val myNext = base!!.manifest.copy(paymentMethods = next)
         if (queue && !connectivity.isOnline()) return@withContext enqueueFinance(vk, base!!.manifest, myNext)
@@ -371,6 +383,12 @@ class FinanceRepository(
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
+        // DATA-LOSS FIX: pair the write version with THIS base snapshot. `version` is a shared field
+        // that a prior save in a multi-store replay can bump ahead of the cache (if it throws between
+        // the version bump and cache.set), and a version-matched PUT would then clobber the server's
+        // records with the stale base. Resetting to base.version makes the first PUT additive (or a
+        // clean 409 → load()-rebase), the same guarantee the gallery store gets from bundling version.
+        version = base!!.version
         var next = mutate(base!!.manifest.transactions)
         val myNext = base!!.manifest.copy(transactions = next)
         if (queue && !connectivity.isOnline()) return@withContext enqueueFinance(vk, base!!.manifest, myNext)
@@ -434,6 +452,12 @@ class FinanceRepository(
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
+        // DATA-LOSS FIX: pair the write version with THIS base snapshot. `version` is a shared field
+        // that a prior save in a multi-store replay can bump ahead of the cache (if it throws between
+        // the version bump and cache.set), and a version-matched PUT would then clobber the server's
+        // records with the stale base. Resetting to base.version makes the first PUT additive (or a
+        // clean 409 → load()-rebase), the same guarantee the gallery store gets from bundling version.
+        version = base!!.version
         val writer = SealedShardWriter { bytes, name -> uploadBytes(vk, bytes, name) }
 
         repeat(5) {
@@ -511,6 +535,12 @@ class FinanceRepository(
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
+        // DATA-LOSS FIX: pair the write version with THIS base snapshot. `version` is a shared field
+        // that a prior save in a multi-store replay can bump ahead of the cache (if it throws between
+        // the version bump and cache.set), and a version-matched PUT would then clobber the server's
+        // records with the stale base. Resetting to base.version makes the first PUT additive (or a
+        // clean 409 → load()-rebase), the same guarantee the gallery store gets from bundling version.
+        version = base!!.version
         var next = mutate(base!!.manifest.projects)
         val myNext = base!!.manifest.copy(projects = next)
         if (queue && !connectivity.isOnline()) return@withContext enqueueFinance(vk, base!!.manifest, myNext)
@@ -560,6 +590,12 @@ class FinanceRepository(
         if (base == null) {
             when (val l = load()) { is Outcome.Ok -> base = l.value; is Outcome.Err -> return@withContext l }
         }
+        // DATA-LOSS FIX: pair the write version with THIS base snapshot. `version` is a shared field
+        // that a prior save in a multi-store replay can bump ahead of the cache (if it throws between
+        // the version bump and cache.set), and a version-matched PUT would then clobber the server's
+        // records with the stale base. Resetting to base.version makes the first PUT additive (or a
+        // clean 409 → load()-rebase), the same guarantee the gallery store gets from bundling version.
+        version = base!!.version
         var next = mutate(base!!.manifest.partners)
         val myNext = base!!.manifest.copy(partners = next)
         if (queue && !connectivity.isOnline()) return@withContext enqueueFinance(vk, base!!.manifest, myNext)

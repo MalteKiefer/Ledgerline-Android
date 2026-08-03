@@ -378,6 +378,20 @@ class PasswordsRepository(
             // queue it to the durable outbox to replay onto a later server head (replay path, which
             // passes allowOfflineQueue=false, still reports failure so its outbox is retained).
             if (attempts++ >= 5) return if (allowOfflineQueue) enqueueOffline(vk, base, curNext) else Outcome.Err(ErrorKind.HTTP)
+            // DATA-LOSS FIX (same as the WorkspaceRepository slices): always rebase on the CURRENT
+            // server root before sealing — `engine.version` is tracked separately from the cached
+            // base, and if it drifts ahead a version-matched PUT would clobber the server's records
+            // with the stale base + edit and NO 409. Reloading first makes the base == the exact
+            // server state at that version, so the write is only ever additive (idempotent replay).
+            val loaded = try {
+                engine.load(vk)
+            } catch (_: ShardedStoreEngine.AuthException) {
+                return Outcome.Err(ErrorKind.HTTP)
+            } catch (e: Exception) {
+                return if (allowOfflineQueue) enqueueOffline(vk, base, curNext) else Outcome.Err(ErrorKind.NETWORK, e)
+            }
+            val (s0, f0) = decodeLoaded(loaded)
+            curNext = mutate(SecretsManifest(secrets = s0, secretFolders = f0))
             val records = encodeSecrets(curNext)
             val folders = encodeFolders(curNext)
             when (val out = engine.sealAndPut(vk, records, folders, engine.version)) {
@@ -387,16 +401,16 @@ class PasswordsRepository(
                     return Outcome.Ok(store)
                 }
                 ShardedStoreEngine.PutOutcome.Conflict -> {
-                    // Reload the winning root (rebases engine.version + priorRoot + raw maps),
-                    // re-apply mutate onto it, retry.
-                    val loaded = try {
+                    // Concurrent writer won the version race — loop re-fetches (rebases
+                    // engine.version + priorRoot + raw maps) and re-applies mutate.
+                    val loaded2 = try {
                         engine.load(vk)
                     } catch (_: ShardedStoreEngine.AuthException) {
                         return Outcome.Err(ErrorKind.HTTP)
                     } catch (e: Exception) {
                         return if (allowOfflineQueue) enqueueOffline(vk, base, curNext) else Outcome.Err(ErrorKind.NETWORK, e)
                     }
-                    val (s, f) = decodeLoaded(loaded)
+                    val (s, f) = decodeLoaded(loaded2)
                     curNext = mutate(SecretsManifest(secrets = s, secretFolders = f))
                 }
                 ShardedStoreEngine.PutOutcome.Error ->
