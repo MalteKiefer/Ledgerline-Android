@@ -53,8 +53,8 @@ import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
-/** The four supported priority values, highest urgency first. */
-private val PRIORITIES = listOf("urgent", "high", "normal", "low")
+/** The supported priority values, highest urgency first (web parity: high/normal/low). */
+private val PRIORITIES = listOf("high", "normal", "low")
 
 /**
  * Full-screen create/edit form for a todo. Used for both create (pass a blank

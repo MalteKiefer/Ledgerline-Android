@@ -178,12 +178,12 @@ class TodosViewModel @Inject constructor(
 
     private fun newId(): String = de.ledgerline.app.core.Ids.newId()
 
+    // Web parity (todos.js): { high:0, normal:1, low:2 }; unknown (incl. legacy "urgent") -> normal.
     private fun priorityRank(priority: String): Int = when (priority.lowercase()) {
-        "urgent" -> 0
-        "high" -> 1
-        "normal" -> 2
-        "low" -> 3
-        else -> 2
+        "high" -> 0
+        "normal" -> 1
+        "low" -> 2
+        else -> 1
     }
 
     private fun recompute() {
