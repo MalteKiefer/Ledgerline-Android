@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.ImportExport
@@ -123,6 +124,14 @@ fun ContactsScreen(
     var deleteForeverTarget by remember { mutableStateOf<String?>(null) }
     var confirmEmptyTrash by remember { mutableStateOf(false) }
     var syncMenuOpen by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
+    if (showHistory) {
+        de.ledgerline.app.ui.common.StoreHistoryDialog(
+            onDismiss = { showHistory = false },
+            load = { vm.historyVersions() },
+            recover = { vm.recoverVersion(it) },
+        )
+    }
     val scope = rememberCoroutineScope()
 
     // vCard (.vcf) file export/import via the Storage Access Framework.
@@ -228,6 +237,11 @@ fun ContactsScreen(
                         DropdownMenuItem(
                             text = { Text(stringResource(R.string.contacts_import_vcf)) },
                             onClick = { syncMenuOpen = false; importVcfLauncher.launch(arrayOf("text/vcard", "text/x-vcard", "text/*", "*/*")) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.history_title)) },
+                            leadingIcon = { Icon(Icons.Outlined.History, null) },
+                            onClick = { syncMenuOpen = false; showHistory = true },
                         )
                     }
                 },

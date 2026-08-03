@@ -42,7 +42,18 @@ class ContactsViewModel @Inject constructor(
     private val thumbs: ThumbCache,
     private val deviceSync: DeviceContactsSync,
     private val settings: SettingsStore,
+    private val workspaceRepo: de.ledgerline.app.data.WorkspaceRepository,
+    private val history: de.ledgerline.app.data.StoreHistoryRepository,
 ) : ViewModel() {
+
+    // ---- Contacts version history / recovery (sharded /contacts/store, web v1.539) ----
+    suspend fun historyVersions() = history.list(de.ledgerline.app.data.StoreHistoryRepository.Store.CONTACTS)
+    suspend fun recoverVersion(version: Int): Int {
+        val v = history.fetch(de.ledgerline.app.data.StoreHistoryRepository.Store.CONTACTS, version) ?: return -1
+        val n = workspaceRepo.recoverContactsFromHistoryRoot(v.ciphertext)
+        if (n > 0) load.invoke()
+        return n
+    }
 
     /** Date display format, for the detail screen to render birthdays/anniversaries. */
     val dateFormat: StateFlow<DateFormatPref> = settings.dateFormat
