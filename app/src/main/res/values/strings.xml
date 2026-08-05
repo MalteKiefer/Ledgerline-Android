@@ -862,6 +862,9 @@
     <string name="calendar_feed_holidays">Public holidays</string>
     <string name="calendar_subscriptions">Subscriptions (.ics)</string>
     <string name="calendar_add_subscription">Add subscription</string>
+    <string name="calendar_manage">Manage calendars</string>
+    <string name="calendar_add_calendar">Add calendar</string>
+    <string name="calendar_set_default">Set as default</string>
     <string name="action_edit">Edit</string>
     <string name="health_add">Add measurement</string>
     <string name="health_edit">Edit measurement</string>

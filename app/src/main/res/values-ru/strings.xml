@@ -863,6 +863,9 @@
     <string name="calendar_feed_holidays">Праздники</string>
     <string name="calendar_subscriptions">Подписки (.ics)</string>
     <string name="calendar_add_subscription">Добавить подписку</string>
+    <string name="calendar_manage">Управление календарями</string>
+    <string name="calendar_add_calendar">Добавить календарь</string>
+    <string name="calendar_set_default">По умолчанию</string>
     <string name="action_edit">Изменить</string>
     <string name="health_add">Добавить измерение</string>
     <string name="health_edit">Изменить измерение</string>

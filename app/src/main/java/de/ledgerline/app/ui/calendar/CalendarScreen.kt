@@ -24,8 +24,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Repeat
@@ -86,6 +89,7 @@ fun CalendarScreen(
     var editorFor by remember { mutableStateOf<CalendarEvent?>(null) }
     var creating by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showCalendars by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -140,6 +144,10 @@ fun CalendarScreen(
                         DropdownMenuItem(
                             text = { Text(stringResourceSafe(R.string.calendar_export)) },
                             onClick = { menuOpen = false; exportLauncher.launch("ledgerline.ics") },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResourceSafe(R.string.calendar_manage)) },
+                            onClick = { menuOpen = false; showCalendars = true },
                         )
                     }
                 },
@@ -261,6 +269,18 @@ fun CalendarScreen(
             onAddSub = { name, url -> vm.addSubscription(name, url) },
             onRemoveSub = { id -> vm.removeSubscription(id) },
             onDismiss = { showSettings = false },
+        )
+    }
+
+    if (showCalendars) {
+        CalendarsManageDialog(
+            calendars = ui.calendars,
+            onAdd = { name, color -> vm.addCalendar(name, color) },
+            onRename = { id, name -> vm.renameCalendar(id, name) },
+            onColor = { id, color -> vm.setCalendarColor(id, color) },
+            onDefault = { id -> vm.setDefaultCalendar(id) },
+            onDelete = { id -> vm.deleteCalendar(id) },
+            onDismiss = { showCalendars = false },
         )
     }
 }
@@ -421,6 +441,82 @@ private fun CalendarFeedsDialog(
             }
         },
     )
+}
+
+private val CAL_PALETTE = listOf("#7066f5", "#9e70fa", "#3b9fd6", "#59ad6b", "#e2915a", "#3fae9f", "#d1607e", "#6b7280")
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun CalendarsManageDialog(
+    calendars: List<de.ledgerline.app.domain.model.CalendarModel>,
+    onAdd: (String, String) -> Unit,
+    onRename: (String, String) -> Unit,
+    onColor: (String, String) -> Unit,
+    onDefault: (String) -> Unit,
+    onDelete: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var newName by remember { mutableStateOf("") }
+    var newColor by remember { mutableStateOf(CAL_PALETTE.first()) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) } },
+        title = { Text(stringResourceSafe(R.string.calendar_manage)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                calendars.forEach { c ->
+                    androidx.compose.runtime.key(c.id) {
+                        var name by remember { mutableStateOf(c.name) }
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                androidx.compose.material3.OutlinedTextField(
+                                    value = name, onValueChange = { name = it },
+                                    singleLine = true, modifier = Modifier.weight(1f),
+                                    trailingIcon = {
+                                        if (name.isNotBlank() && name != c.name) {
+                                            IconButton(onClick = { onRename(c.id, name.trim()) }) { Icon(Icons.Outlined.Check, stringResourceSafe(R.string.action_save)) }
+                                        }
+                                    },
+                                )
+                                IconButton(onClick = { onDefault(c.id) }) {
+                                    Icon(if (c.isDefault) Icons.Outlined.Star else Icons.Outlined.StarBorder, stringResourceSafe(R.string.calendar_set_default))
+                                }
+                                IconButton(onClick = { onDelete(c.id) }, enabled = calendars.size > 1) {
+                                    Icon(Icons.Outlined.Close, stringResourceSafe(R.string.action_delete))
+                                }
+                            }
+                            ColorPalette(selected = c.color) { onColor(c.id, it) }
+                        }
+                    }
+                }
+                androidx.compose.material3.HorizontalDivider()
+                Text(stringResourceSafe(R.string.calendar_add_calendar), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                androidx.compose.material3.OutlinedTextField(newName, { newName = it }, label = { Text(stringResourceSafe(R.string.calendar_field_title)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                ColorPalette(selected = newColor) { newColor = it }
+                TextButton(
+                    onClick = { if (newName.isNotBlank()) { onAdd(newName.trim(), newColor); newName = "" } },
+                    enabled = newName.isNotBlank(),
+                ) { Text(stringResourceSafe(R.string.calendar_add_calendar)) }
+            }
+        },
+    )
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ColorPalette(selected: String, onPick: (String) -> Unit) {
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        CAL_PALETTE.forEach { hex ->
+            val sel = hex.equals(selected, ignoreCase = true)
+            Box(
+                Modifier
+                    .size(26.dp)
+                    .background(parseHex(hex), CircleShape)
+                    .then(if (sel) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                    .clickable { onPick(hex) },
+            )
+        }
+    }
 }
 
 // ---- helpers ----

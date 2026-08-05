@@ -226,6 +226,41 @@ class CalendarViewModel @Inject constructor(
     fun defaultCalendarId(): String =
         ui.value.calendars.firstOrNull { it.isDefault }?.id ?: ui.value.calendars.firstOrNull()?.id ?: ""
 
+    // ---- Calendar CRUD ----
+
+    fun addCalendar(name: String, color: String) = viewModelScope.launch {
+        repo.save { m ->
+            val cal = de.ledgerline.app.domain.model.CalendarModel(
+                id = de.ledgerline.app.core.Ids.newId(), name = name, color = color, isDefault = m.calendars.isEmpty(),
+            )
+            m.copy(calendars = m.calendars + cal)
+        }
+    }
+
+    fun renameCalendar(id: String, name: String) = viewModelScope.launch {
+        repo.save { m -> m.copy(calendars = m.calendars.map { if (it.id == id) it.copy(name = name) else it }) }
+    }
+
+    fun setCalendarColor(id: String, color: String) = viewModelScope.launch {
+        repo.save { m -> m.copy(calendars = m.calendars.map { if (it.id == id) it.copy(color = color) else it }) }
+    }
+
+    fun setDefaultCalendar(id: String) = viewModelScope.launch {
+        repo.save { m -> m.copy(calendars = m.calendars.map { it.copy(isDefault = it.id == id) }) }
+    }
+
+    /** Delete a calendar; its events move to a remaining calendar. No-op if it is the only one. */
+    fun deleteCalendar(id: String) = viewModelScope.launch {
+        repo.save { m ->
+            if (m.calendars.size <= 1) return@save m
+            val remaining = m.calendars.filterNot { it.id == id }
+            val fallback = remaining.firstOrNull { it.isDefault }?.id ?: remaining.first().id
+            val cals = if (remaining.none { it.isDefault }) remaining.mapIndexed { i, c -> c.copy(isDefault = i == 0) } else remaining
+            val events = m.events.map { if (it.calendarId == id) it.copy(calendarId = fallback) else it }
+            m.copy(calendars = cals, events = events)
+        }
+    }
+
     /** Persist the birthday/holiday feed settings into the sealed store (preserving other keys). */
     fun saveSettings(birthdays: Boolean, holidayCountries: List<String>) = viewModelScope.launch {
         repo.save { m ->
