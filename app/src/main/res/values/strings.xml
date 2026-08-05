@@ -421,6 +421,7 @@
     <string name="lock_remember_subtitle">Unlock your vault</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_save">Save</string>
+    <string name="action_ok">OK</string>
     <string name="action_next">Next</string>
     <string name="action_back">Back</string>
     <string name="action_settings">Settings</string>
@@ -833,6 +834,16 @@
     <string name="calendar_next">Next month</string>
     <string name="calendar_loading">Loading…</string>
     <string name="calendar_no_events">No events</string>
+    <string name="calendar_new_event">New event</string>
+    <string name="calendar_edit_event">Edit event</string>
+    <string name="calendar_all_day">All day</string>
+    <string name="calendar_start">Start</string>
+    <string name="calendar_end">End</string>
+    <string name="calendar_field_title">Title</string>
+    <string name="calendar_field_location">Location</string>
+    <string name="calendar_field_notes">Notes</string>
+    <string name="calendar_add">Add event</string>
+    <string name="action_edit">Edit</string>
     <string name="health_add">Add measurement</string>
     <string name="health_edit">Edit measurement</string>
     <string name="health_master">Body data</string>

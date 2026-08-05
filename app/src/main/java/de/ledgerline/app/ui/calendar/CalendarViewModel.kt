@@ -56,6 +56,50 @@ class CalendarViewModel @Inject constructor(
         if (repo.load() is Outcome.Err) { /* cache flow keeps the last good state; UI shows it */ }
     }
 
+    // ---- Mutations (create/edit/delete) ----
+
+    /** Insert or update an event; creates a default calendar on first use if none exists. */
+    fun saveEvent(
+        id: String?,
+        calendarId: String,
+        title: String,
+        description: String,
+        allDay: Boolean,
+        start: String,
+        end: String,
+        tz: String,
+        location: de.ledgerline.app.domain.model.EventLocation?,
+    ) = viewModelScope.launch {
+        repo.save { m ->
+            var cals = m.calendars
+            var cid = calendarId
+            if (cid.isBlank() || cals.none { it.id == cid }) {
+                cid = cals.firstOrNull { it.isDefault }?.id ?: cals.firstOrNull()?.id ?: ""
+                if (cid.isBlank()) {
+                    val c = de.ledgerline.app.domain.model.CalendarModel(
+                        id = de.ledgerline.app.core.Ids.newId(), name = "Kalender", color = "#7066f5", isDefault = true,
+                    )
+                    cals = cals + c
+                    cid = c.id
+                }
+            }
+            val existing = m.events.firstOrNull { it.id == id }
+            val ev = (existing ?: de.ledgerline.app.domain.model.CalendarEvent(id = de.ledgerline.app.core.Ids.newId(), calendarId = cid, title = title, start = start)).copy(
+                calendarId = cid, title = title, description = description, allDay = allDay,
+                start = start, end = end, tz = tz, location = location, status = "confirmed",
+            )
+            val events = if (existing != null) m.events.map { if (it.id == ev.id) ev else it } else m.events + ev
+            m.copy(calendars = cals, events = events)
+        }
+    }
+
+    fun deleteEvent(id: String) = viewModelScope.launch {
+        repo.save { m -> m.copy(events = m.events.filterNot { it.id == id }) }
+    }
+
+    fun defaultCalendarId(): String =
+        ui.value.calendars.firstOrNull { it.isDefault }?.id ?: ui.value.calendars.firstOrNull()?.id ?: ""
+
     fun prevMonth() { _month.value = _month.value.minusMonths(1) }
     fun nextMonth() { _month.value = _month.value.plusMonths(1) }
     fun goToday() { _month.value = YearMonth.now(); _selectedDay.value = LocalDate.now() }

@@ -422,6 +422,7 @@
     <string name="lock_remember_subtitle">Разблокируйте хранилище</string>
     <string name="action_cancel">Отмена</string>
     <string name="action_save">Сохранить</string>
+    <string name="action_ok">OK</string>
     <string name="action_next">Далее</string>
     <string name="action_back">Назад</string>
     <string name="action_settings">Настройки</string>
@@ -834,6 +835,16 @@
     <string name="calendar_next">Следующий месяц</string>
     <string name="calendar_loading">Загрузка…</string>
     <string name="calendar_no_events">Нет событий</string>
+    <string name="calendar_new_event">Новое событие</string>
+    <string name="calendar_edit_event">Изменить событие</string>
+    <string name="calendar_all_day">Весь день</string>
+    <string name="calendar_start">Начало</string>
+    <string name="calendar_end">Конец</string>
+    <string name="calendar_field_title">Название</string>
+    <string name="calendar_field_location">Место</string>
+    <string name="calendar_field_notes">Заметка</string>
+    <string name="calendar_add">Добавить событие</string>
+    <string name="action_edit">Изменить</string>
     <string name="health_add">Добавить измерение</string>
     <string name="health_edit">Изменить измерение</string>
     <string name="health_master">Личные данные</string>

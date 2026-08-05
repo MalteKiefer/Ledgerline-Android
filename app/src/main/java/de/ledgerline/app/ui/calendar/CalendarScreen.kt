@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -20,12 +21,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +72,23 @@ fun CalendarScreen(
     val month by vm.month.collectAsStateWithLifecycle()
     val selectedDay by vm.selectedDay.collectAsStateWithLifecycle()
     var detail by remember { mutableStateOf<CalendarEvent?>(null) }
+    var editorFor by remember { mutableStateOf<CalendarEvent?>(null) }
+    var creating by remember { mutableStateOf(false) }
+
+    if (creating || editorFor != null) {
+        val target = editorFor
+        CalendarEventEditor(
+            initial = target,
+            defaultDay = selectedDay,
+            onSave = { id, title, desc, allDay, start, end, tz, loc ->
+                vm.saveEvent(id, target?.calendarId ?: vm.defaultCalendarId(), title, desc, allDay, start, end, tz, loc)
+            },
+            onDelete = target?.let { e -> { vm.deleteEvent(e.id); editorFor = null; creating = false } },
+            onBack = { editorFor = null; creating = false },
+            modifier = modifier,
+        )
+        return
+    }
 
     AppScaffold(
         modifier = modifier,
@@ -87,10 +107,10 @@ fun CalendarScreen(
             )
         },
     ) { padding ->
+      Box(Modifier.fillMaxSize().padding(padding)) {
         Column(
             Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp),
         ) {
@@ -175,10 +195,19 @@ fun CalendarScreen(
             }
             Spacer(Modifier.size(24.dp))
         }
+        FloatingActionButton(
+            onClick = { creating = true },
+            modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(20.dp),
+        ) { Icon(Icons.Outlined.Add, stringResourceSafe(R.string.calendar_add)) }
+      }
     }
 
     detail?.let { e ->
-        EventDetailDialog(e, vm.colorFor(e.calendarId), vm.calendarName(e.calendarId)) { detail = null }
+        EventDetailDialog(
+            e, vm.colorFor(e.calendarId), vm.calendarName(e.calendarId),
+            onEdit = { detail = null; editorFor = e },
+            onDismiss = { detail = null },
+        )
     }
 }
 
@@ -250,11 +279,12 @@ private fun EventRow(e: CalendarEvent, color: Color, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EventDetailDialog(e: CalendarEvent, colorHex: String, calendarName: String, onDismiss: () -> Unit) {
+private fun EventDetailDialog(e: CalendarEvent, colorHex: String, calendarName: String, onEdit: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(),
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) } },
+        confirmButton = { TextButton(onClick = onEdit) { Text(stringResourceSafe(R.string.action_edit)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) } },
         icon = { Icon(Icons.Outlined.Event, null, tint = parseHex(colorHex)) },
         title = { Text(e.title.ifBlank { "—" }) },
         text = {
