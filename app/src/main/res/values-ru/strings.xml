@@ -861,6 +861,8 @@
     <string name="calendar_feeds_title">Ленты</string>
     <string name="calendar_feed_birthdays">Дни рождения контактов</string>
     <string name="calendar_feed_holidays">Праздники</string>
+    <string name="calendar_subscriptions">Подписки (.ics)</string>
+    <string name="calendar_add_subscription">Добавить подписку</string>
     <string name="action_edit">Изменить</string>
     <string name="health_add">Добавить измерение</string>
     <string name="health_edit">Изменить измерение</string>

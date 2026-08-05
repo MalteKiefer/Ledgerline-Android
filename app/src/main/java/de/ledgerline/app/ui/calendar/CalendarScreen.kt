@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Refresh
@@ -79,6 +80,8 @@ fun CalendarScreen(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val month by vm.month.collectAsStateWithLifecycle()
     val selectedDay by vm.selectedDay.collectAsStateWithLifecycle()
+    // Observed so the grid/day-list recompose when subscription overlays finish fetching.
+    val subEvents by vm.subEvents.collectAsStateWithLifecycle()
     var detail by remember { mutableStateOf<CalendarEvent?>(null) }
     var editorFor by remember { mutableStateOf<CalendarEvent?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -143,6 +146,7 @@ fun CalendarScreen(
             )
         },
     ) { padding ->
+      androidx.compose.runtime.key(subEvents) {
       Box(Modifier.fillMaxSize().padding(padding)) {
         Column(
             Modifier
@@ -236,6 +240,7 @@ fun CalendarScreen(
             modifier = Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(20.dp),
         ) { Icon(Icons.Outlined.Add, stringResourceSafe(R.string.calendar_add)) }
       }
+      }
     }
 
     detail?.let { e ->
@@ -251,7 +256,10 @@ fun CalendarScreen(
         CalendarFeedsDialog(
             birthdaysOn = ui.birthdaysOn,
             countries = ui.holidayCountries,
+            subscriptions = ui.subscriptions,
             onSave = { b, c -> vm.saveSettings(b, c); showSettings = false },
+            onAddSub = { name, url -> vm.addSubscription(name, url) },
+            onRemoveSub = { id -> vm.removeSubscription(id) },
             onDismiss = { showSettings = false },
         )
     }
@@ -363,18 +371,26 @@ private fun EventDetailDialog(e: CalendarEvent, colorHex: String, calendarName: 
 private fun CalendarFeedsDialog(
     birthdaysOn: Boolean,
     countries: List<String>,
+    subscriptions: List<de.ledgerline.app.ui.calendar.Subscription>,
     onSave: (Boolean, List<String>) -> Unit,
+    onAddSub: (String, String) -> Unit,
+    onRemoveSub: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var birthdays by remember { mutableStateOf(birthdaysOn) }
     val selected = remember { androidx.compose.runtime.mutableStateListOf<String>().apply { addAll(countries) } }
+    var subName by remember { mutableStateOf("") }
+    var subUrl by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = { onSave(birthdays, selected.toList()) }) { Text(stringResourceSafe(R.string.action_save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_cancel)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) } },
         title = { Text(stringResourceSafe(R.string.calendar_feeds_title)) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResourceSafe(R.string.calendar_feed_birthdays), Modifier.weight(1f))
                     Switch(checked = birthdays, onCheckedChange = { birthdays = it })
@@ -389,6 +405,19 @@ private fun CalendarFeedsDialog(
                         )
                     }
                 }
+                Text(stringResourceSafe(R.string.calendar_subscriptions), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                subscriptions.forEach { s ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(s.name.ifBlank { s.url }, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                        IconButton(onClick = { onRemoveSub(s.id) }) { Icon(Icons.Outlined.Close, stringResourceSafe(R.string.action_delete)) }
+                    }
+                }
+                androidx.compose.material3.OutlinedTextField(subName, { subName = it }, label = { Text(stringResourceSafe(R.string.calendar_field_title)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                androidx.compose.material3.OutlinedTextField(subUrl, { subUrl = it }, label = { Text("https:// / webcal://") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                TextButton(
+                    onClick = { if (subUrl.isNotBlank()) { onAddSub(subName.trim(), subUrl.trim()); subName = ""; subUrl = "" } },
+                    enabled = subUrl.isNotBlank(),
+                ) { Text(stringResourceSafe(R.string.calendar_add_subscription)) }
             }
         },
     )

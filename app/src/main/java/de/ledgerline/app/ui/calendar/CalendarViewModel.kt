@@ -33,7 +33,10 @@ data class CalendarUi(
     val holidayCountries: List<String> = emptyList(),
     val birthdaysColor: String = de.ledgerline.app.core.calendar.CalendarFeeds.COLOR_BIRTHDAYS,
     val holidaysColor: String = de.ledgerline.app.core.calendar.CalendarFeeds.COLOR_HOLIDAYS,
+    val subscriptions: List<Subscription> = emptyList(),
 )
+
+data class Subscription(val id: String, val name: String, val url: String, val color: String = "#3b9fd6")
 
 /**
  * Drives the Calendar module: reads the decrypted `store/calendar` manifest from [CalendarCache]
@@ -59,6 +62,17 @@ class CalendarViewModel @Inject constructor(
                     holidayCountries = (s["holidayCountries"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList(),
                     birthdaysColor = (s["birthdaysColor"] as? JsonPrimitive)?.contentOrNull ?: de.ledgerline.app.core.calendar.CalendarFeeds.COLOR_BIRTHDAYS,
                     holidaysColor = (s["holidaysColor"] as? JsonPrimitive)?.contentOrNull ?: de.ledgerline.app.core.calendar.CalendarFeeds.COLOR_HOLIDAYS,
+                    subscriptions = (s["subscriptions"] as? JsonArray).orEmpty().mapNotNull { el ->
+                        (el as? JsonObject)?.let {
+                            val id = (it["id"] as? JsonPrimitive)?.contentOrNull ?: return@mapNotNull null
+                            Subscription(
+                                id = id,
+                                name = (it["name"] as? JsonPrimitive)?.contentOrNull ?: "",
+                                url = (it["url"] as? JsonPrimitive)?.contentOrNull ?: "",
+                                color = (it["color"] as? JsonPrimitive)?.contentOrNull ?: "#3b9fd6",
+                            )
+                        }
+                    },
                 )
             }
         }
@@ -70,10 +84,64 @@ class CalendarViewModel @Inject constructor(
     private val _selectedDay = MutableStateFlow(LocalDate.now())
     val selectedDay: StateFlow<LocalDate> = _selectedDay
 
+    private val _subEvents = MutableStateFlow<List<CalendarEvent>>(emptyList())
+    /** Read-only events fetched from public .ics subscriptions; the screen observes this to recompose. */
+    val subEvents: StateFlow<List<CalendarEvent>> = _subEvents
+
     init { refresh() }
 
     fun refresh() = viewModelScope.launch {
-        if (repo.load() is Outcome.Err) { /* cache flow keeps the last good state; UI shows it */ }
+        repo.load()
+        refreshSubscriptions()
+    }
+
+    /** Fetch every subscribed .ics via the server proxy and overlay it read-only. */
+    fun refreshSubscriptions() = viewModelScope.launch {
+        val subs = ui.value.subscriptions
+        if (subs.isEmpty()) { _subEvents.value = emptyList(); return@launch }
+        val tz = java.time.ZoneId.systemDefault().id
+        val all = ArrayList<CalendarEvent>()
+        for (sub in subs) {
+            val ics = repo.fetchIcs(sub.url) ?: continue
+            de.ledgerline.app.core.calendar.ICal.parseIcs(ics).forEachIndexed { i, p ->
+                all.add(
+                    CalendarEvent(
+                        id = "sub:${sub.id}:$i", calendarId = "sub:${sub.id}", title = p.title, description = p.description,
+                        allDay = p.allDay, start = p.start, end = p.end, tz = tz, rrule = p.rrule, exdates = p.exdates,
+                        location = p.locationLabel.takeIf { it.isNotBlank() }?.let { de.ledgerline.app.domain.model.EventLocation(label = it) },
+                        status = "confirmed",
+                    ),
+                )
+            }
+        }
+        _subEvents.value = all
+    }
+
+    fun addSubscription(name: String, url: String) = viewModelScope.launch {
+        repo.save { m ->
+            val subs = (m.settings["subscriptions"] as? JsonArray)?.toMutableList() ?: mutableListOf()
+            subs.add(
+                JsonObject(
+                    mapOf(
+                        "id" to JsonPrimitive(de.ledgerline.app.core.Ids.newId()),
+                        "name" to JsonPrimitive(name),
+                        "url" to JsonPrimitive(url),
+                        "color" to JsonPrimitive("#3b9fd6"),
+                    ),
+                ),
+            )
+            val cur = m.settings.toMutableMap(); cur["subscriptions"] = JsonArray(subs); m.copy(settings = JsonObject(cur))
+        }
+        refreshSubscriptions()
+    }
+
+    fun removeSubscription(id: String) = viewModelScope.launch {
+        repo.save { m ->
+            val subs = (m.settings["subscriptions"] as? JsonArray).orEmpty()
+                .filter { ((it as? JsonObject)?.get("id") as? JsonPrimitive)?.contentOrNull != id }
+            val cur = m.settings.toMutableMap(); cur["subscriptions"] = JsonArray(subs); m.copy(settings = JsonObject(cur))
+        }
+        refreshSubscriptions()
     }
 
     // ---- Mutations (create/edit/delete) ----
@@ -170,7 +238,8 @@ class CalendarViewModel @Inject constructor(
 
     fun isFeed(calendarId: String): Boolean =
         calendarId == de.ledgerline.app.core.calendar.CalendarFeeds.BIRTHDAYS ||
-            calendarId == de.ledgerline.app.core.calendar.CalendarFeeds.HOLIDAYS
+            calendarId == de.ledgerline.app.core.calendar.CalendarFeeds.HOLIDAYS ||
+            calendarId.startsWith("sub:")
 
     /** Read-only birthday + holiday feed events intersecting [rangeStart, rangeEnd]. */
     private fun feedEvents(rangeStart: LocalDate, rangeEnd: LocalDate): List<CalendarEvent> {
@@ -197,16 +266,19 @@ class CalendarViewModel @Inject constructor(
     fun goToday() { _month.value = YearMonth.now(); _selectedDay.value = LocalDate.now() }
     fun selectDay(d: LocalDate) { _selectedDay.value = d }
 
-    /** Hex colour of the event's calendar / feed (falls back to the brand indigo). */
-    fun colorFor(calendarId: String): String = when (calendarId) {
-        de.ledgerline.app.core.calendar.CalendarFeeds.BIRTHDAYS -> ui.value.birthdaysColor
-        de.ledgerline.app.core.calendar.CalendarFeeds.HOLIDAYS -> ui.value.holidaysColor
+    /** Hex colour of the event's calendar / feed / subscription (falls back to the brand indigo). */
+    fun colorFor(calendarId: String): String = when {
+        calendarId == de.ledgerline.app.core.calendar.CalendarFeeds.BIRTHDAYS -> ui.value.birthdaysColor
+        calendarId == de.ledgerline.app.core.calendar.CalendarFeeds.HOLIDAYS -> ui.value.holidaysColor
+        calendarId.startsWith("sub:") -> ui.value.subscriptions.firstOrNull { "sub:${it.id}" == calendarId }?.color ?: "#3b9fd6"
         else -> ui.value.calendars.firstOrNull { it.id == calendarId }?.color ?: "#7066f5"
     }
 
-    /** Display name of the event's calendar, or "" if unknown. */
-    fun calendarName(calendarId: String): String =
-        ui.value.calendars.firstOrNull { it.id == calendarId }?.name ?: ""
+    /** Display name of the event's calendar / subscription, or "" if unknown. */
+    fun calendarName(calendarId: String): String = when {
+        calendarId.startsWith("sub:") -> ui.value.subscriptions.firstOrNull { "sub:${it.id}" == calendarId }?.name ?: ""
+        else -> ui.value.calendars.firstOrNull { it.id == calendarId }?.name ?: ""
+    }
 
     /** Days (yyyy-MM-dd) of every per-occurrence override, keyed base|day, so masters skip them. */
     private fun overrideKeys(events: List<CalendarEvent>): Set<String> =
@@ -231,7 +303,7 @@ class CalendarViewModel @Inject constructor(
 
     /** Events touching [date] (recurrences expanded, overrides applied), all-day first then by time. */
     fun eventsForDay(date: LocalDate): List<CalendarEvent> {
-        val events = ui.value.events
+        val events = ui.value.events + _subEvents.value
         val overrides = overrideKeys(events)
         val out = ArrayList<CalendarEvent>()
         for (e in events) {
@@ -258,7 +330,7 @@ class CalendarViewModel @Inject constructor(
     fun daysWithEvents(month: YearMonth): Set<LocalDate> {
         val first = month.atDay(1)
         val last = month.atEndOfMonth()
-        val events = ui.value.events
+        val events = ui.value.events + _subEvents.value
         val overrides = overrideKeys(events)
         val out = HashSet<LocalDate>()
         for (e in events) {

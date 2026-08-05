@@ -171,6 +171,20 @@ class CalendarRepository(
         if (out is Outcome.Ok) { syncOutbox.clear(KEY); true } else false
     }
 
+    /** Fetch a subscribed public .ics via the SSRF-guarded server proxy; null on any failure. */
+    suspend fun fetchIcs(url: String): String? = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext null
+        runCatching { apiProvider(session).calendarIcsFetch(url).takeIf { it.isSuccessful }?.body()?.ics }.getOrNull()
+    }
+
+    /** Register the upcoming opaque reminder fire-times (ZK — no event content). */
+    suspend fun registerReminders(rows: List<de.ledgerline.app.data.remote.dto.ReminderRow>): Boolean = withContext(Dispatchers.IO) {
+        val session = sessionHolder.get() ?: return@withContext false
+        runCatching {
+            apiProvider(session).calendarReminders(de.ledgerline.app.data.remote.dto.RemindersRequest(rows)).isSuccessful
+        }.getOrDefault(false)
+    }
+
     private fun cachedOr(err: Outcome<CalendarStore>, vk: ByteArray): Outcome<CalendarStore> =
         cachedOrStore(
             cachingEnabled = offlineFlags.enabled(),
