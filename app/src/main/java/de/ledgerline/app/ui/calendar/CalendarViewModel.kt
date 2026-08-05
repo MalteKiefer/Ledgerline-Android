@@ -53,7 +53,7 @@ class CalendarViewModel @Inject constructor(
     cache: CalendarCache,
     private val workspaceCache: de.ledgerline.app.core.WorkspaceCache,
     private val settingsStore: de.ledgerline.app.data.SettingsStore,
-    private val notifier: de.ledgerline.app.core.calendar.CalendarNotifier,
+    private val scheduler: de.ledgerline.app.core.calendar.CalendarReminderScheduler,
 ) : ViewModel() {
 
     val ui: StateFlow<CalendarUi> = cache.value
@@ -116,40 +116,7 @@ class CalendarViewModel @Inject constructor(
      * 90 days) and register them as opaque UTC timestamps with the server so a notification can fire
      * when the app is closed. ZK — only ids + times are sent, never titles/content.
      */
-    fun registerAllReminders() = viewModelScope.launch {
-        val now = LocalDateTime.now()
-        val today = LocalDate.now()
-        val horizon = today.plusDays(90)
-        val rows = ArrayList<de.ledgerline.app.data.remote.dto.ReminderRow>()
-        val local = ArrayList<de.ledgerline.app.core.calendar.LocalReminder>()
-        outer@ for (e in ui.value.events) {
-            if (e.reminders.isEmpty() || e.status == "cancelled") continue
-            val days = if (e.rrule.isBlank()) listOfNotNull(dateOf(e.start))
-            else de.ledgerline.app.core.calendar.CalendarRecurrence.occurrences(e.start, e.rrule, e.exdates, today, horizon)
-            for (day in days) {
-                if (day.isAfter(horizon)) continue
-                val startTime = if (!e.allDay && e.start.contains('T')) e.start.substringAfter('T').take(5) else "00:00"
-                val startDt = runCatching { LocalDateTime.parse("${day}T$startTime") }.getOrNull() ?: day.atStartOfDay()
-                for (mins in e.reminders) {
-                    val fire = startDt.minusMinutes(mins.toLong())
-                    if (fire.isBefore(now)) continue
-                    val instant = fire.atZone(ZoneId.systemDefault()).toInstant()
-                    rows.add(
-                        de.ledgerline.app.data.remote.dto.ReminderRow(
-                            event_id = e.id,
-                            recurrence_id = if (e.rrule.isNotBlank()) day.toString() else null,
-                            remind_at = DateTimeFormatter.ISO_INSTANT.format(instant),
-                        ),
-                    )
-                    local.add(de.ledgerline.app.core.calendar.LocalReminder(instant.toEpochMilli(), e.title.ifBlank { "—" }))
-                    if (rows.size >= 2000) break@outer
-                }
-            }
-        }
-        repo.registerReminders(rows)
-        // Local on-device notifications (opt-in) — schedule the soonest reminders via AlarmManager.
-        if (settingsStore.calendarNotificationsEnabled.first()) notifier.schedule(local) else notifier.cancelAll()
-    }
+    fun registerAllReminders() = viewModelScope.launch { scheduler.rescheduleFromStore() }
 
     /** Fetch every subscribed .ics via the server proxy and overlay it read-only. */
     fun refreshSubscriptions() = viewModelScope.launch {

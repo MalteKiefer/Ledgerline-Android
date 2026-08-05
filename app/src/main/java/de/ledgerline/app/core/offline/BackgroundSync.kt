@@ -43,6 +43,7 @@ class BackgroundSync @Inject constructor(
     private val settingsStore: SettingsStore,
     private val offlineMapStore: de.ledgerline.app.core.map.OfflineMapStore,
     private val syncEngine: OfflineSyncEngine,
+    private val calendarReminderScheduler: de.ledgerline.app.core.calendar.CalendarReminderScheduler,
     @ApplicationScope private val scope: CoroutineScope,
 ) {
     @Volatile
@@ -59,7 +60,12 @@ class BackgroundSync @Inject constructor(
         // covers every unlock path (passphrase, biometric quick-unlock, autofill, share).
         scope.launch {
             vaultKeyHolder.unlocked.collect { unlocked ->
-                if (unlocked) runCatching { syncEngine.syncNow() }
+                if (unlocked) {
+                    runCatching { syncEngine.syncNow() }
+                    // Reschedule calendar reminders on every unlock so a reminder created elsewhere
+                    // (e.g. the web) gets its local alarm without opening the Calendar screen.
+                    runCatching { calendarReminderScheduler.rescheduleFromStore() }
+                }
             }
         }
         scope.launch {
@@ -100,6 +106,12 @@ class BackgroundSync @Inject constructor(
             lastMapCheck = now
             runCatching { offlineMapStore.checkUpdates() }
         }
+        // Re-arm calendar reminders periodically (≤ every 15 min) so a reminder created on another
+        // client is picked up during a long-lived session too. Ungated by the offline switch.
+        if (vaultKeyHolder.get() != null && now - lastReminderReschedule > 15L * 60_000L) {
+            lastReminderReschedule = now
+            runCatching { calendarReminderScheduler.rescheduleFromStore() }
+        }
         if (!offlineFlags.enabled()) return
         if (vaultKeyHolder.get() != null) {
             load.invoke()
@@ -112,6 +124,7 @@ class BackgroundSync @Inject constructor(
     }
 
     private var lastMapCheck = 0L
+    private var lastReminderReschedule = 0L
 
     private companion object {
         const val INITIAL_DELAY_MS = 20_000L
