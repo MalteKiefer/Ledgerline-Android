@@ -841,6 +841,8 @@
     <string name="calendar_field_location">Ort</string>
     <string name="calendar_field_notes">Notiz</string>
     <string name="calendar_add">Termin hinzufügen</string>
+    <string name="calendar_import">.ics importieren</string>
+    <string name="calendar_export">.ics exportieren</string>
     <string name="calendar_repeat">Wiederholung</string>
     <string name="repeat_none">Keine</string>
     <string name="repeat_daily">Täglich</string>

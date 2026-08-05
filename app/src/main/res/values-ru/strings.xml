@@ -844,6 +844,8 @@
     <string name="calendar_field_location">Место</string>
     <string name="calendar_field_notes">Заметка</string>
     <string name="calendar_add">Добавить событие</string>
+    <string name="calendar_import">Импорт .ics</string>
+    <string name="calendar_export">Экспорт .ics</string>
     <string name="calendar_repeat">Повтор</string>
     <string name="repeat_none">Нет</string>
     <string name="repeat_daily">Ежедневно</string>

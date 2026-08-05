@@ -91,6 +91,15 @@ interface LedgerlineApi {
         @Body body: StorePutRequest,
     ): Response<StoreResponse>
 
+    // ---- Calendar helpers (ZK): SSRF-guarded public iCal proxy + opaque reminder queue ----
+    @GET("api/v1/calendar/ics-fetch")
+    suspend fun calendarIcsFetch(@Query("url") url: String): Response<de.ledgerline.app.data.remote.dto.IcsFetchResponse>
+
+    @PUT("api/v1/calendar/reminders")
+    suspend fun calendarReminders(
+        @Body body: de.ledgerline.app.data.remote.dto.RemindersRequest,
+    ): Response<de.ledgerline.app.data.remote.dto.RemindersResponse>
+
 
     @DELETE("api/v1/auth/session")
     suspend fun deleteSession(): Response<Unit>

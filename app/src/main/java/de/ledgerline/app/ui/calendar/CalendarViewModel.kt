@@ -118,6 +118,43 @@ class CalendarViewModel @Inject constructor(
         repo.save { m -> m.copy(events = m.events.filterNot { it.id == id }) }
     }
 
+    // ---- iCalendar import / export ----
+
+    /** Parse an .ics body and append its VEVENTs to the default calendar. */
+    fun importIcs(text: String) = viewModelScope.launch {
+        val parsed = de.ledgerline.app.core.calendar.ICal.parseIcs(text)
+        if (parsed.isEmpty()) return@launch
+        val tz = java.time.ZoneId.systemDefault().id
+        repo.save { m ->
+            var cals = m.calendars
+            var cid = cals.firstOrNull { it.isDefault }?.id ?: cals.firstOrNull()?.id ?: ""
+            if (cid.isBlank()) {
+                val c = de.ledgerline.app.domain.model.CalendarModel(de.ledgerline.app.core.Ids.newId(), "Kalender", "#7066f5", true)
+                cals = cals + c; cid = c.id
+            }
+            val added = parsed.map { p ->
+                de.ledgerline.app.domain.model.CalendarEvent(
+                    id = de.ledgerline.app.core.Ids.newId(), calendarId = cid, title = p.title, description = p.description,
+                    allDay = p.allDay, start = p.start, end = p.end, tz = tz, rrule = p.rrule, exdates = p.exdates,
+                    location = p.locationLabel.takeIf { it.isNotBlank() }?.let { de.ledgerline.app.domain.model.EventLocation(label = it) },
+                    status = "confirmed",
+                )
+            }
+            m.copy(calendars = cals, events = m.events + added)
+        }
+    }
+
+    /** Serialise all real (non-feed) events to an iCalendar string for SAF export/share. */
+    fun exportIcs(): String {
+        val events = ui.value.events.map { e ->
+            de.ledgerline.app.core.calendar.ICal.ExportEvent(
+                id = e.id, title = e.title, start = e.start, end = e.end, allDay = e.allDay,
+                rrule = e.rrule, exdates = e.exdates, locationLabel = e.location?.label ?: "", description = e.description,
+            )
+        }
+        return de.ledgerline.app.core.calendar.ICal.buildIcs(events, "Ledgerline")
+    }
+
     fun defaultCalendarId(): String =
         ui.value.calendars.firstOrNull { it.isDefault }?.id ?: ui.value.calendars.firstOrNull()?.id ?: ""
 

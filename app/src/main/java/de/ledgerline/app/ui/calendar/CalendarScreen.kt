@@ -1,5 +1,7 @@
 package de.ledgerline.app.ui.calendar
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,9 +28,12 @@ import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Today
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -78,6 +83,17 @@ fun CalendarScreen(
     var editorFor by remember { mutableStateOf<CalendarEvent?>(null) }
     var creating by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let {
+            val text = runCatching { context.contentResolver.openInputStream(it)?.bufferedReader()?.use { r -> r.readText() } }.getOrNull()
+            if (!text.isNullOrBlank()) vm.importIcs(text)
+        }
+    }
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/calendar")) { uri ->
+        uri?.let { runCatching { context.contentResolver.openOutputStream(it)?.use { os -> os.write(vm.exportIcs().toByteArray()) } } }
+    }
 
     if (creating || editorFor != null) {
         val target = editorFor
@@ -109,6 +125,19 @@ fun CalendarScreen(
                     }
                     IconButton(onClick = { vm.refresh() }) {
                         Icon(Icons.Outlined.Refresh, stringResourceSafe(R.string.action_refresh))
+                    }
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Outlined.MoreVert, stringResourceSafe(R.string.action_more))
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResourceSafe(R.string.calendar_import)) },
+                            onClick = { menuOpen = false; importLauncher.launch(arrayOf("text/calendar", "text/*", "application/octet-stream")) },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResourceSafe(R.string.calendar_export)) },
+                            onClick = { menuOpen = false; exportLauncher.launch("ledgerline.ics") },
+                        )
                     }
                 },
             )

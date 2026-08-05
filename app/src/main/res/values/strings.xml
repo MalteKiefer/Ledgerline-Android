@@ -843,6 +843,8 @@
     <string name="calendar_field_location">Location</string>
     <string name="calendar_field_notes">Notes</string>
     <string name="calendar_add">Add event</string>
+    <string name="calendar_import">Import .ics</string>
+    <string name="calendar_export">Export .ics</string>
     <string name="calendar_repeat">Repeat</string>
     <string name="repeat_none">None</string>
     <string name="repeat_daily">Daily</string>
