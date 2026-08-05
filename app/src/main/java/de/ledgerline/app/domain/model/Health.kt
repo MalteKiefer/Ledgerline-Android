@@ -180,13 +180,15 @@ object HealthRecordCodec {
         out["heightCm"] = p.heightCm?.let(::numToken) ?: JsonNull
         setOrNull(out, "sex", if (p.sex.isEmpty()) null else JsonPrimitive(p.sex))
         out["weightGoalKg"] = p.weightGoalKg?.let(::numToken) ?: JsonNull
-        out["units"] = JsonObject(
-            linkedMapOf(
-                "weight" to JsonPrimitive(p.units.weight),
-                "glucose" to JsonPrimitive(p.units.glucose),
-                "temp" to JsonPrimitive(p.units.temp),
-            ),
-        )
+        // Overlay the three typed unit tokens onto the ORIGINAL units object so any other
+        // keys the web/legacy `healthProfile.units` carried (e.g. distance/elevation/clock,
+        // now global display-prefs) survive an Android read-modify-write instead of being
+        // dropped — same no-field-loss guarantee as the rest of the raw overlay.
+        val units = (p.raw["units"] as? JsonObject)?.toMutableMap() ?: LinkedHashMap()
+        units["weight"] = JsonPrimitive(p.units.weight)
+        units["glucose"] = JsonPrimitive(p.units.glucose)
+        units["temp"] = JsonPrimitive(p.units.temp)
+        out["units"] = JsonObject(units)
         return JsonObject(out)
     }
 
