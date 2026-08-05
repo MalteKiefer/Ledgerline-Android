@@ -277,6 +277,10 @@ class WorkspaceRepository(
 
     private fun arr(items: List<JsonObject>): kotlinx.serialization.json.JsonArray = kotlinx.serialization.json.JsonArray(items)
 
+    /** A decrypted module slice's plaintext JSON as a [JsonObject] (empty object on parse failure). */
+    private fun parseSlice(plain: String): JsonObject =
+        (json.parseToJsonElement(plain) as? JsonObject) ?: JsonObject(emptyMap())
+
     /** The [key] record array of a decrypted module manifest, as raw [JsonObject]s. */
     private fun records(plain: String, key: String): List<JsonObject> =
         (json.parseToJsonElement(plain).jsonObject[key] as? kotlinx.serialization.json.JsonArray)
@@ -914,18 +918,14 @@ class WorkspaceRepository(
 
         for (spec in specs) {
             if (!spec.changed(curBase!!, curNext)) continue
+            // 3-way rebase (spec §4): our delta is base-slice → ours-slice; on a 409 we replay ONLY
+            // that delta onto the freshly-fetched winner via ManifestMerge (never re-PUT our stale
+            // copy, which would drop the winner's records). base/ours stay fixed across retries.
+            val baseSliceJson = parseSlice(spec.encode(curBase!!))
+            val oursSliceJson = parseSlice(spec.encode(curNext))
             var attempts = 0
             while (true) {
-                if (attempts++ >= 5) return@withContext Outcome.Err(ErrorKind.HTTP)
-                // DATA-LOSS FIX: always base this module's write on the CURRENT server slice —
-                // fetch its (content, version) together and re-merge, so `version` can never be
-                // out of step with the base content. The old code PUT with `versions[spec.key]`
-                // (a separately-maintained map) against `curBase` from the cache; if a prior op
-                // (e.g. an outbox replay) bumped the version without refreshing the cache, the
-                // version happened to match the server and the PUT overwrote the server's records
-                // WITHOUT a 409 — silent clobber (the todos disappeared). Re-fetching first makes
-                // curBase's slice == the exact server state at `version`, so a version-matched PUT
-                // is only ever additive. It also makes an idempotent replay a no-op (see break).
+                if (attempts++ >= 8) return@withContext Outcome.Err(ErrorKind.HTTP)
                 val res = try {
                     api.moduleStore(spec.key)
                 } catch (e: Exception) {
@@ -937,12 +937,14 @@ class WorkspaceRepository(
                 val freshPlain = body.ciphertext?.let {
                     crypto.openManifest(it, vk) ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
                 } ?: spec.emptyPlain()
-                curBase = spec.merge(curBase!!, freshPlain)
-                curNext = mutate(curBase!!)
                 versions[spec.key] = version
-                if (!spec.changed(curBase!!, curNext)) break // mutation already present server-side
+                val serverSliceJson = parseSlice(freshPlain)
+                val merged = de.ledgerline.app.core.offline.ManifestMerge.mergeManifest(baseSliceJson, oursSliceJson, serverSliceJson)
+                val mergedPlain = json.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), merged)
+                // Nothing left to write once our delta is already present on the winner.
+                if (merged == serverSliceJson) { curNext = spec.merge(curNext, mergedPlain); break }
 
-                val ciphertext = crypto.sealManifest(spec.encode(curNext), vk)
+                val ciphertext = crypto.sealManifest(mergedPlain, vk)
                 val put = try {
                     api.putModuleStore(spec.key, StorePutRequest(ciphertext, version))
                 } catch (e: Exception) {
@@ -952,10 +954,11 @@ class WorkspaceRepository(
                     put.isSuccessful -> {
                         val nv = put.body()?.version ?: (version + 1)
                         versions[spec.key] = nv
+                        curNext = spec.merge(curNext, mergedPlain) // reflect the merged slice in the cache
                         if (offlineFlags.enabled()) storeCache.put(spec.cacheKey(), StoreEnvelope(ciphertext, nv))
                         break
                     }
-                    put.code() == 409 -> {} // someone else wrote concurrently — loop re-fetches
+                    put.code() == 409 -> {} // winner changed — loop re-fetches + re-merges the same delta
                     else -> return@withContext Outcome.Err(ErrorKind.HTTP)
                 }
             }

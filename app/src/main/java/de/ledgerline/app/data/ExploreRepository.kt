@@ -167,6 +167,8 @@ class ExploreRepository(
             wrap = { m, v -> ExploreStore(m, v) },
             onSaved = { cache.set(it) },
             onEnvelope = { env -> if (offlineFlags.enabled()) storeCache.put(KEY, env) },
+            toJson = { m -> ExploreTrackCodec.encodeManifest(m) },
+            fromJson = { j -> ExploreTrackCodec.decodeManifest(j) },
         )
     }
 

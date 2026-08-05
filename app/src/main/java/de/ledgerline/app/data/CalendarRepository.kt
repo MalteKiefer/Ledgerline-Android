@@ -158,6 +158,8 @@ class CalendarRepository(
             wrap = { m, v -> CalendarStore(m, v) },
             onSaved = { cache.set(it) },
             onEnvelope = { env -> if (offlineFlags.enabled()) storeCache.put(KEY, env) },
+            toJson = { m -> CalendarRecordCodec.encodeManifest(m) },
+            fromJson = { j -> CalendarRecordCodec.decodeManifest(j) },
         )
     }
 

@@ -2,6 +2,7 @@ package de.ledgerline.app.data
 
 import de.ledgerline.app.core.ErrorKind
 import de.ledgerline.app.core.Outcome
+import de.ledgerline.app.core.offline.ManifestMerge
 import de.ledgerline.app.core.offline.StoreEnvelope
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
@@ -62,52 +63,56 @@ internal suspend inline fun <M, W> optimisticSave(
     wrap: (M, Int) -> W,
     onSaved: (W) -> Unit,
     onEnvelope: (StoreEnvelope) -> Unit,
+    // 3-way rebase support: convert a manifest to/from its sealed JSON root. On a 409 the write is
+    // NOT a blind re-PUT of our stale copy (which drops the winner's records) — instead our delta
+    // (base → ours) is replayed onto the freshly-fetched winner via [ManifestMerge]. Defaults keep
+    // the old "re-apply mutate" behaviour for callers that don't (yet) supply a JSON view.
+    noinline toJson: ((M) -> kotlinx.serialization.json.JsonObject)? = null,
+    noinline fromJson: ((kotlinx.serialization.json.JsonObject) -> M)? = null,
 ): Outcome<W> {
-    // DATA-LOSS FIX: never seed the write base from a cached (manifest, version) pair.
-    // The two can drift — e.g. a concurrent/replay write bumps the tracked version without
-    // refreshing the cached manifest — and then a PUT whose stale version happens to match
-    // the server overwrites the server's records with NO 409 (silent clobber; this is how
-    // Health/Explore records vanished). Always fetch the current (content, version) together
-    // before the first PUT so a version-matched write is only ever additive. `cached` is
-    // intentionally ignored for the base; it stays in the signature for call-site stability.
+    // DATA-LOSS FIX: never seed the write base from a cached (manifest, version) pair — always fetch
+    // the current (content, version) together so a version-matched write is only ever additive.
     @Suppress("UNUSED_EXPRESSION") cached
-    var base: M? = null
-    var version: Int? = null
 
-    repeat(5) {
-        if (base == null || version == null) {
-            val res = fetch()
-            if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
-            val body = res.body()!!
-            base = decodeManifest(body.ciphertext, open, decode, empty)
-                ?: return Outcome.Err(ErrorKind.DECRYPT)
-            version = body.version
-        }
+    // Load the base we mutate from (fetch-first).
+    val res0 = fetch()
+    if (!res0.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
+    val body0 = res0.body()!!
+    val base: M = decodeManifest(body0.ciphertext, open, decode, empty) ?: return Outcome.Err(ErrorKind.DECRYPT)
+    val ours: M = mutate(base)
 
-        val next = mutate(base!!)
-        val ciphertext = seal(next)
+    var candidate: M = ours
+    var version: Int = body0.version
+
+    repeat(8) {
+        val ciphertext = seal(candidate)
         val putRes = try {
-            put(StorePutRequest(ciphertext, version!!))
+            put(StorePutRequest(ciphertext, version))
         } catch (e: Exception) {
             return Outcome.Err(ErrorKind.NETWORK, e)
         }
-
         when {
             putRes.isSuccessful -> {
-                val newVersion = putRes.body()?.version ?: (version!! + 1)
-                val wrapped = wrap(next, newVersion)
+                val newVersion = putRes.body()?.version ?: (version + 1)
+                val wrapped = wrap(candidate, newVersion)
                 onSaved(wrapped)
                 onEnvelope(StoreEnvelope(ciphertext, newVersion))
                 return Outcome.Ok(wrapped)
             }
             putRes.code() == 409 -> {
-                // Reload fresh server state, then loop to re-apply mutate.
+                // Fetch the winning manifest and rebase OUR delta (base → ours) onto it.
                 val res = fetch()
                 if (!res.isSuccessful) return Outcome.Err(ErrorKind.NETWORK)
-                val body = res.body()!!
-                base = decodeManifest(body.ciphertext, open, decode, empty)
+                val serverBody = res.body()!!
+                val serverM: M = decodeManifest(serverBody.ciphertext, open, decode, empty)
                     ?: return Outcome.Err(ErrorKind.DECRYPT)
-                version = body.version
+                version = serverBody.version
+                candidate = if (toJson != null && fromJson != null) {
+                    fromJson(ManifestMerge.mergeManifest(toJson(base), toJson(ours), toJson(serverM)))
+                } else {
+                    // Fallback (no JSON view supplied): re-apply the mutation onto the winner.
+                    mutate(serverM)
+                }
             }
             else -> return Outcome.Err(ErrorKind.HTTP)
         }

@@ -165,6 +165,8 @@ class HealthRepository(
             wrap = { m, v -> HealthStore(m, v) },
             onSaved = { cache.set(it) },
             onEnvelope = { env -> if (offlineFlags.enabled()) storeCache.put(KEY, env) },
+            toJson = { m -> HealthRecordCodec.encodeManifest(m) },
+            fromJson = { j -> HealthRecordCodec.decodeManifest(j) },
         )
     }
 
