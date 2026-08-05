@@ -547,28 +547,17 @@ class GalleryViewModel @Inject constructor(
         // Sort by capture date (EXIF taken_at), falling back to upload time — matches
         // the web timeline (newest first). Parse to an epoch so mixed ISO / EXIF
         // (`2026:07:11 ...`) formats compare correctly instead of clustering by the
-        // just-uploaded order.
-        //
-        // Runs OFF the main thread: on a large library the sort + day-grouping (per-photo
-        // date parsing) is heavy enough to block the UI — done on the main thread it ANR'd
-        // the app right after an import (verified on-device). Snapshot the filter flags so
-        // the background pass sees a consistent view.
+        // just-uploaded order. Cheap now that the date regex is compiled once
+        // ([EXIF_DATE_PREFIX]) — the per-photo `Regex(...)` compile was the ANR cause.
         val all = cache.value.value?.manifest?.photos.orEmpty()
         _trashCount.value = all.count { it.trashed }
-        val showTrash = _showTrash.value
-        val favOnly = _favoritesOnly.value
-        viewModelScope.launch {
-            val ui = withContext(Dispatchers.Default) {
-                // Normal grid = untrashed; trash view = only trashed. Both newest-first.
-                // The favorites filter only applies to the normal (non-trash) grid.
-                val photos = all
-                    .filter { it.trashed == showTrash }
-                    .filter { !favOnly || showTrash || it.favorite }
-                    .sortedByDescending { epochOf(it.taken_at ?: it.created) }
-                GalleryUi(false, false, photos, groupByDay(photos))
-            }
-            _state.value = ui
-        }
+        // Normal grid = untrashed; trash view = only trashed. Both newest-first.
+        // The favorites filter only applies to the normal (non-trash) grid.
+        val photos = all
+            .filter { it.trashed == _showTrash.value }
+            .filter { !_favoritesOnly.value || _showTrash.value || it.favorite }
+            .sortedByDescending { epochOf(it.taken_at ?: it.created) }
+        _state.value = GalleryUi(false, false, photos, groupByDay(photos))
     }
 
     /** Best-effort epoch millis from an ISO-8601 or EXIF (`yyyy:MM:dd HH:mm:ss`)

@@ -260,6 +260,8 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun rawPassword(blob: String): Response<ResponseBody> = throw NotImplementedError()
     override suspend fun uploadPassword(file: okhttp3.MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
     // v1.536 additions
+    override suspend fun calendarIcsFetch(url: String): Response<de.ledgerline.app.data.remote.dto.IcsFetchResponse> = throw NotImplementedError()
+    override suspend fun calendarReminders(body: de.ledgerline.app.data.remote.dto.RemindersRequest): Response<de.ledgerline.app.data.remote.dto.RemindersResponse> = throw NotImplementedError()
     override suspend fun moduleStoreHistory(module: String): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
     override suspend fun moduleStoreHistoryVersion(module: String, version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
     override suspend fun filesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
