@@ -14,6 +14,7 @@ import androidx.lifecycle.LifecycleOwner
 import dagger.hilt.android.AndroidEntryPoint
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.VaultAuthorizers
+import de.ledgerline.app.core.ops.OpKind
 import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.core.security.LockGuard
 import de.ledgerline.app.core.security.VaultLocker
@@ -50,10 +51,21 @@ class MainActivity : FragmentActivity() {
     private var keepScreenOnMinutes = SettingsStore.DEFAULT_KEEP_SCREEN_ON_MINUTES
     private var keepScreenReleaseJob: Job? = null
 
+    // While a data-moving op (manual upload / camera backup) is active we FORCE the screen
+    // to stay on regardless of the user's keep-awake setting or timer: letting the display
+    // sleep lets the device doze, which drops the network mid-transfer and aborts the upload.
+    // This overrides the setting only for the op's duration, then restores normal behaviour.
+    private var opForcedScreenOn = false
+
     /** Apply FLAG_KEEP_SCREEN_ON per the current setting, arming the release timer. */
     private fun armKeepScreen() {
         keepScreenReleaseJob?.cancel()
         keepScreenReleaseJob = null
+        // An active upload/backup pins the flag on — never let the setting or a timer drop it.
+        if (opForcedScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            return
+        }
         if (!keepScreenOn) {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             return
@@ -114,6 +126,18 @@ class MainActivity : FragmentActivity() {
                     keepScreenOnMinutes = min
                     armKeepScreen()
                 }
+        }
+
+        // Force the screen awake while an upload/backup is in flight so the device can't
+        // doze and abort the transfer; release it (back to the user setting) when it drains.
+        lifecycleScope.launch {
+            operationManager.active.collect { ops ->
+                val force = ops.any { it.kind == OpKind.UPLOAD || it.kind == OpKind.BACKUP }
+                if (force != opForcedScreenOn) {
+                    opForcedScreenOn = force
+                    armKeepScreen()
+                }
+            }
         }
 
         // Cold-start: accept a validated pairing deep link from the launch intent.

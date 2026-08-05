@@ -62,6 +62,18 @@ class BackgroundOpService : Service() {
         return START_NOT_STICKY
     }
 
+    // Android 14+ time-limits a `dataSync` foreground service and calls onTimeout; if we don't
+    // leave the foreground promptly the platform force-crashes the process. Stop gracefully — the
+    // tracked operation keeps running in the app scope (OperationManager), and while a manual
+    // upload/backup is active MainActivity pins KEEP_SCREEN_ON so the process is not reaped.
+    override fun onTimeout(startId: Int) {
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    // API 35+ delivers the FGS type alongside; same handling.
+    override fun onTimeout(startId: Int, fgsType: Int) = onTimeout(startId)
+
     override fun onDestroy() {
         serviceScope.cancel()
         super.onDestroy()
