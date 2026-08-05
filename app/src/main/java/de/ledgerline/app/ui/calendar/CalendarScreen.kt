@@ -27,9 +27,12 @@ import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Switch
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -74,6 +77,7 @@ fun CalendarScreen(
     var detail by remember { mutableStateOf<CalendarEvent?>(null) }
     var editorFor by remember { mutableStateOf<CalendarEvent?>(null) }
     var creating by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
 
     if (creating || editorFor != null) {
         val target = editorFor
@@ -97,6 +101,9 @@ fun CalendarScreen(
                 title = stringResourceSafe(R.string.dest_calendar),
                 onMenu = onMenu,
                 actions = {
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Outlined.Tune, stringResourceSafe(R.string.calendar_feeds_title))
+                    }
                     IconButton(onClick = { vm.goToday() }) {
                         Icon(Icons.Outlined.Today, stringResourceSafe(R.string.calendar_today))
                     }
@@ -205,8 +212,18 @@ fun CalendarScreen(
     detail?.let { e ->
         EventDetailDialog(
             e, vm.colorFor(e.calendarId), vm.calendarName(e.calendarId),
+            canEdit = !vm.isFeed(e.calendarId),
             onEdit = { detail = null; editorFor = e },
             onDismiss = { detail = null },
+        )
+    }
+
+    if (showSettings) {
+        CalendarFeedsDialog(
+            birthdaysOn = ui.birthdaysOn,
+            countries = ui.holidayCountries,
+            onSave = { b, c -> vm.saveSettings(b, c); showSettings = false },
+            onDismiss = { showSettings = false },
         )
     }
 }
@@ -279,12 +296,15 @@ private fun EventRow(e: CalendarEvent, color: Color, onClick: () -> Unit) {
 }
 
 @Composable
-private fun EventDetailDialog(e: CalendarEvent, colorHex: String, calendarName: String, onEdit: () -> Unit, onDismiss: () -> Unit) {
+private fun EventDetailDialog(e: CalendarEvent, colorHex: String, calendarName: String, canEdit: Boolean, onEdit: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(),
-        confirmButton = { TextButton(onClick = onEdit) { Text(stringResourceSafe(R.string.action_edit)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) } },
+        confirmButton = {
+            if (canEdit) TextButton(onClick = onEdit) { Text(stringResourceSafe(R.string.action_edit)) }
+            else TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) }
+        },
+        dismissButton = { if (canEdit) TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) } },
         icon = { Icon(Icons.Outlined.Event, null, tint = parseHex(colorHex)) },
         title = { Text(e.title.ifBlank { "—" }) },
         text = {
@@ -304,6 +324,42 @@ private fun EventDetailDialog(e: CalendarEvent, colorHex: String, calendarName: 
                     }
                 }
                 if (e.description.isNotBlank()) Text(e.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+    )
+}
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun CalendarFeedsDialog(
+    birthdaysOn: Boolean,
+    countries: List<String>,
+    onSave: (Boolean, List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var birthdays by remember { mutableStateOf(birthdaysOn) }
+    val selected = remember { androidx.compose.runtime.mutableStateListOf<String>().apply { addAll(countries) } }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = { onSave(birthdays, selected.toList()) }) { Text(stringResourceSafe(R.string.action_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_cancel)) } },
+        title = { Text(stringResourceSafe(R.string.calendar_feeds_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResourceSafe(R.string.calendar_feed_birthdays), Modifier.weight(1f))
+                    Switch(checked = birthdays, onCheckedChange = { birthdays = it })
+                }
+                Text(stringResourceSafe(R.string.calendar_feed_holidays), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    de.ledgerline.app.core.calendar.Holidays.COUNTRIES.forEach { c ->
+                        FilterChip(
+                            selected = selected.contains(c),
+                            onClick = { if (selected.contains(c)) selected.remove(c) else selected.add(c) },
+                            label = { Text(c) },
+                        )
+                    }
+                }
             }
         },
     )

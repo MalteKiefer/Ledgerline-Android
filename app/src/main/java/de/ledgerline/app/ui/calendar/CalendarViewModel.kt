@@ -14,6 +14,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.YearMonth
@@ -24,6 +29,10 @@ data class CalendarUi(
     val error: Boolean = false,
     val calendars: List<CalendarModel> = emptyList(),
     val events: List<CalendarEvent> = emptyList(),
+    val birthdaysOn: Boolean = false,
+    val holidayCountries: List<String> = emptyList(),
+    val birthdaysColor: String = de.ledgerline.app.core.calendar.CalendarFeeds.COLOR_BIRTHDAYS,
+    val holidaysColor: String = de.ledgerline.app.core.calendar.CalendarFeeds.COLOR_HOLIDAYS,
 )
 
 /**
@@ -35,12 +44,23 @@ data class CalendarUi(
 class CalendarViewModel @Inject constructor(
     private val repo: CalendarRepository,
     cache: CalendarCache,
+    private val workspaceCache: de.ledgerline.app.core.WorkspaceCache,
 ) : ViewModel() {
 
     val ui: StateFlow<CalendarUi> = cache.value
         .map { store ->
             if (store == null) CalendarUi(loading = true)
-            else CalendarUi(false, false, store.manifest.calendars, store.manifest.events)
+            else {
+                val s = store.manifest.settings
+                CalendarUi(
+                    loading = false, error = false,
+                    calendars = store.manifest.calendars, events = store.manifest.events,
+                    birthdaysOn = (s["birthdays"] as? JsonPrimitive)?.booleanOrNull ?: false,
+                    holidayCountries = (s["holidayCountries"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull } ?: emptyList(),
+                    birthdaysColor = (s["birthdaysColor"] as? JsonPrimitive)?.contentOrNull ?: de.ledgerline.app.core.calendar.CalendarFeeds.COLOR_BIRTHDAYS,
+                    holidaysColor = (s["holidaysColor"] as? JsonPrimitive)?.contentOrNull ?: de.ledgerline.app.core.calendar.CalendarFeeds.COLOR_HOLIDAYS,
+                )
+            }
         }
         .stateIn(viewModelScope, SharingStarted.Eagerly, CalendarUi(loading = true))
 
@@ -101,14 +121,51 @@ class CalendarViewModel @Inject constructor(
     fun defaultCalendarId(): String =
         ui.value.calendars.firstOrNull { it.isDefault }?.id ?: ui.value.calendars.firstOrNull()?.id ?: ""
 
+    /** Persist the birthday/holiday feed settings into the sealed store (preserving other keys). */
+    fun saveSettings(birthdays: Boolean, holidayCountries: List<String>) = viewModelScope.launch {
+        repo.save { m ->
+            val cur = m.settings.toMutableMap()
+            cur["birthdays"] = JsonPrimitive(birthdays)
+            cur["holidayCountries"] = JsonArray(holidayCountries.map { JsonPrimitive(it) })
+            m.copy(settings = JsonObject(cur))
+        }
+    }
+
+    fun isFeed(calendarId: String): Boolean =
+        calendarId == de.ledgerline.app.core.calendar.CalendarFeeds.BIRTHDAYS ||
+            calendarId == de.ledgerline.app.core.calendar.CalendarFeeds.HOLIDAYS
+
+    /** Read-only birthday + holiday feed events intersecting [rangeStart, rangeEnd]. */
+    private fun feedEvents(rangeStart: LocalDate, rangeEnd: LocalDate): List<CalendarEvent> {
+        val u = ui.value
+        val out = ArrayList<CalendarEvent>()
+        val y0 = rangeStart.year
+        val y1 = rangeEnd.year
+        if (u.birthdaysOn) {
+            val contacts = workspaceCache.value.value?.manifest?.contacts.orEmpty().map {
+                de.ledgerline.app.core.calendar.CalendarFeeds.FeedContact(
+                    id = it.id, name = it.fn.ifBlank { "${it.first} ${it.last}".trim() }, bday = it.bday, anniversary = it.anniversary,
+                )
+            }
+            out += de.ledgerline.app.core.calendar.CalendarFeeds.birthdayEvents(contacts, y0, y1)
+        }
+        for (country in u.holidayCountries) {
+            out += de.ledgerline.app.core.calendar.CalendarFeeds.holidayEvents(country, y0, y1)
+        }
+        return out.filter { CalendarViewModel.dateOf(it.start)?.let { d -> !d.isBefore(rangeStart) && !d.isAfter(rangeEnd) } ?: false }
+    }
+
     fun prevMonth() { _month.value = _month.value.minusMonths(1) }
     fun nextMonth() { _month.value = _month.value.plusMonths(1) }
     fun goToday() { _month.value = YearMonth.now(); _selectedDay.value = LocalDate.now() }
     fun selectDay(d: LocalDate) { _selectedDay.value = d }
 
-    /** Hex colour of the event's calendar (falls back to the brand indigo). */
-    fun colorFor(calendarId: String): String =
-        ui.value.calendars.firstOrNull { it.id == calendarId }?.color ?: "#7066f5"
+    /** Hex colour of the event's calendar / feed (falls back to the brand indigo). */
+    fun colorFor(calendarId: String): String = when (calendarId) {
+        de.ledgerline.app.core.calendar.CalendarFeeds.BIRTHDAYS -> ui.value.birthdaysColor
+        de.ledgerline.app.core.calendar.CalendarFeeds.HOLIDAYS -> ui.value.holidaysColor
+        else -> ui.value.calendars.firstOrNull { it.id == calendarId }?.color ?: "#7066f5"
+    }
 
     /** Display name of the event's calendar, or "" if unknown. */
     fun calendarName(calendarId: String): String =
@@ -156,6 +213,7 @@ class CalendarViewModel @Inject constructor(
                 }
             }
         }
+        out += feedEvents(date, date)
         return out.sortedWith(compareByDescending<CalendarEvent> { it.allDay }.thenBy { it.start })
     }
 
@@ -187,6 +245,7 @@ class CalendarViewModel @Inject constructor(
                 }
             }
         }
+        for (f in feedEvents(first, last)) dateOf(f.start)?.let { out.add(it) }
         return out
     }
 
