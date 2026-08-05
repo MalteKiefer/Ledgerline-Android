@@ -107,8 +107,8 @@ fun CalendarScreen(
         CalendarEventEditor(
             initial = target,
             defaultDay = selectedDay,
-            onSave = { id, title, desc, allDay, start, end, tz, loc, rrule ->
-                vm.saveEvent(id, target?.calendarId ?: vm.defaultCalendarId(), title, desc, allDay, start, end, tz, loc, rrule)
+            onSave = { id, title, desc, allDay, start, end, tz, loc, rrule, reminders ->
+                vm.saveEvent(id, target?.calendarId ?: vm.defaultCalendarId(), title, desc, allDay, start, end, tz, loc, rrule, reminders)
             },
             onDelete = target?.let { e -> { vm.deleteEvent(e.id); editorFor = null; creating = false } },
             onBack = { editorFor = null; creating = false },

@@ -58,7 +58,7 @@ import java.time.format.FormatStyle
 fun CalendarEventEditor(
     initial: CalendarEvent?,
     defaultDay: LocalDate,
-    onSave: (id: String?, title: String, description: String, allDay: Boolean, start: String, end: String, tz: String, location: EventLocation?, rrule: String) -> Unit,
+    onSave: (id: String?, title: String, description: String, allDay: Boolean, start: String, end: String, tz: String, location: EventLocation?, rrule: String, reminders: List<Int>) -> Unit,
     onDelete: (() -> Unit)?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -84,6 +84,8 @@ fun CalendarEventEditor(
     var count by remember { mutableStateOf(initRule?.count ?: 10) }
     var until by remember { mutableStateOf(initRule?.until ?: startDate.plusMonths(3)) }
     var pickUntil by remember { mutableStateOf(false) }
+
+    val reminders = remember { androidx.compose.runtime.mutableStateListOf<Int>().apply { initial?.reminders?.let { addAll(it) } } }
 
     // date/time picker targets: null = closed; else which field is being edited.
     var pickDate by remember { mutableStateOf<String?>(null) }   // "start" | "end"
@@ -205,6 +207,25 @@ fun CalendarEventEditor(
                 }
             }
 
+            // ---- Reminders ----
+            Text(stringResource(R.string.calendar_reminders), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            val reminderPresets = listOf(
+                0 to stringResource(R.string.reminder_at_time),
+                10 to stringResource(R.string.reminder_10m),
+                30 to stringResource(R.string.reminder_30m),
+                60 to stringResource(R.string.reminder_1h),
+                1440 to stringResource(R.string.reminder_1d),
+            )
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                reminderPresets.forEach { (mins, label) ->
+                    androidx.compose.material3.FilterChip(
+                        selected = reminders.contains(mins),
+                        onClick = { if (reminders.contains(mins)) reminders.remove(mins) else reminders.add(mins) },
+                        label = { Text(label) },
+                    )
+                }
+            }
+
             PrimaryGradientButton(
                 text = stringResource(R.string.action_save),
                 onClick = {
@@ -222,7 +243,7 @@ fun CalendarEventEditor(
                         freq, interval, byday.toList(), ends, count, until.toString(),
                     )
                     onSave(initial?.id, title.trim(), description.trim(), allDay, start, end, tz,
-                        locationLabel.trim().takeIf { it.isNotBlank() }?.let { EventLocation(label = it) }, rrule)
+                        locationLabel.trim().takeIf { it.isNotBlank() }?.let { EventLocation(label = it) }, rrule, reminders.toList())
                     onBack()
                 },
                 enabled = title.isNotBlank(),

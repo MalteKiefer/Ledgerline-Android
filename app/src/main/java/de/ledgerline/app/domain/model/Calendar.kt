@@ -47,6 +47,8 @@ data class CalendarEvent(
     /** This record overrides one occurrence (day) of [overrideOf]. */
     val recurrenceId: String = "",
     val overrideOf: String = "",
+    /** Reminder lead times in minutes-before-start. */
+    val reminders: List<Int> = emptyList(),
     val status: String = "confirmed",
     val raw: JsonObject = JsonObject(emptyMap()),
 )
@@ -118,6 +120,9 @@ object CalendarRecordCodec {
             exdates = (o["exdates"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.map { it.take(10) },
             recurrenceId = str(o, "recurrenceId"),
             overrideOf = str(o, "overrideOf"),
+            reminders = (o["reminders"] as? JsonArray).orEmpty().mapNotNull { r ->
+                ((r as? JsonObject)?.get("minutesBefore") as? JsonPrimitive)?.content?.toIntOrNull()
+            },
             status = str(o, "status").ifBlank { "confirmed" },
             raw = o,
         )
@@ -161,6 +166,9 @@ object CalendarRecordCodec {
         if (e.exdates.isNotEmpty()) out["exdates"] = JsonArray(e.exdates.map { JsonPrimitive(it) }) else out.remove("exdates")
         if (e.recurrenceId.isNotBlank()) out["recurrenceId"] = JsonPrimitive(e.recurrenceId) else out.remove("recurrenceId")
         if (e.overrideOf.isNotBlank()) out["overrideOf"] = JsonPrimitive(e.overrideOf) else out.remove("overrideOf")
+        if (e.reminders.isNotEmpty()) {
+            out["reminders"] = JsonArray(e.reminders.map { JsonObject(mapOf("minutesBefore" to JsonPrimitive(it), "method" to JsonPrimitive("push"))) })
+        } else out.remove("reminders")
         if (e.location != null) {
             val locOut = (e.raw["location"] as? JsonObject)?.toMutableMap() ?: LinkedHashMap()
             locOut["label"] = JsonPrimitive(e.location.label)

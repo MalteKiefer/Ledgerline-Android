@@ -866,6 +866,12 @@
     <string name="calendar_manage">Управление календарями</string>
     <string name="calendar_add_calendar">Добавить календарь</string>
     <string name="calendar_set_default">По умолчанию</string>
+    <string name="calendar_reminders">Напоминания</string>
+    <string name="reminder_at_time">В момент</string>
+    <string name="reminder_10m">10 мин</string>
+    <string name="reminder_30m">30 мин</string>
+    <string name="reminder_1h">1 час</string>
+    <string name="reminder_1d">1 день</string>
     <string name="action_edit">Изменить</string>
     <string name="health_add">Добавить измерение</string>
     <string name="health_edit">Изменить измерение</string>

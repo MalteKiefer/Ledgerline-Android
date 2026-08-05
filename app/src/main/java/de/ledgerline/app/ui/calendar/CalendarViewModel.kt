@@ -20,8 +20,11 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 data class CalendarUi(
@@ -93,6 +96,43 @@ class CalendarViewModel @Inject constructor(
     fun refresh() = viewModelScope.launch {
         repo.load()
         refreshSubscriptions()
+        registerAllReminders()
+    }
+
+    /**
+     * Compute the upcoming reminder fire-times across all events (recurrences expanded for the next
+     * 90 days) and register them as opaque UTC timestamps with the server so a notification can fire
+     * when the app is closed. ZK — only ids + times are sent, never titles/content.
+     */
+    fun registerAllReminders() = viewModelScope.launch {
+        val now = LocalDateTime.now()
+        val today = LocalDate.now()
+        val horizon = today.plusDays(90)
+        val rows = ArrayList<de.ledgerline.app.data.remote.dto.ReminderRow>()
+        outer@ for (e in ui.value.events) {
+            if (e.reminders.isEmpty() || e.status == "cancelled") continue
+            val days = if (e.rrule.isBlank()) listOfNotNull(dateOf(e.start))
+            else de.ledgerline.app.core.calendar.CalendarRecurrence.occurrences(e.start, e.rrule, e.exdates, today, horizon)
+            for (day in days) {
+                if (day.isAfter(horizon)) continue
+                val startTime = if (!e.allDay && e.start.contains('T')) e.start.substringAfter('T').take(5) else "00:00"
+                val startDt = runCatching { LocalDateTime.parse("${day}T$startTime") }.getOrNull() ?: day.atStartOfDay()
+                for (mins in e.reminders) {
+                    val fire = startDt.minusMinutes(mins.toLong())
+                    if (fire.isBefore(now)) continue
+                    val instant = fire.atZone(ZoneId.systemDefault()).toInstant()
+                    rows.add(
+                        de.ledgerline.app.data.remote.dto.ReminderRow(
+                            event_id = e.id,
+                            recurrence_id = if (e.rrule.isNotBlank()) day.toString() else null,
+                            remind_at = DateTimeFormatter.ISO_INSTANT.format(instant),
+                        ),
+                    )
+                    if (rows.size >= 2000) break@outer
+                }
+            }
+        }
+        repo.registerReminders(rows)
     }
 
     /** Fetch every subscribed .ics via the server proxy and overlay it read-only. */
@@ -158,6 +198,7 @@ class CalendarViewModel @Inject constructor(
         tz: String,
         location: de.ledgerline.app.domain.model.EventLocation?,
         rrule: String = "",
+        reminders: List<Int> = emptyList(),
     ) = viewModelScope.launch {
         repo.save { m ->
             var cals = m.calendars
@@ -175,15 +216,17 @@ class CalendarViewModel @Inject constructor(
             val existing = m.events.firstOrNull { it.id == id }
             val ev = (existing ?: de.ledgerline.app.domain.model.CalendarEvent(id = de.ledgerline.app.core.Ids.newId(), calendarId = cid, title = title, start = start)).copy(
                 calendarId = cid, title = title, description = description, allDay = allDay,
-                start = start, end = end, tz = tz, location = location, rrule = rrule, status = "confirmed",
+                start = start, end = end, tz = tz, location = location, rrule = rrule, reminders = reminders, status = "confirmed",
             )
             val events = if (existing != null) m.events.map { if (it.id == ev.id) ev else it } else m.events + ev
             m.copy(calendars = cals, events = events)
         }
+        registerAllReminders()
     }
 
     fun deleteEvent(id: String) = viewModelScope.launch {
         repo.save { m -> m.copy(events = m.events.filterNot { it.id == id }) }
+        registerAllReminders()
     }
 
     // ---- iCalendar import / export ----

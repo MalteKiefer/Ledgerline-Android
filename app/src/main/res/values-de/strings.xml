@@ -863,6 +863,12 @@
     <string name="calendar_manage">Kalender verwalten</string>
     <string name="calendar_add_calendar">Kalender hinzufügen</string>
     <string name="calendar_set_default">Als Standard</string>
+    <string name="calendar_reminders">Erinnerungen</string>
+    <string name="reminder_at_time">Zur Zeit</string>
+    <string name="reminder_10m">10 Min</string>
+    <string name="reminder_30m">30 Min</string>
+    <string name="reminder_1h">1 Std</string>
+    <string name="reminder_1d">1 Tag</string>
     <string name="action_edit">Bearbeiten</string>
     <string name="health_add">Messung hinzufügen</string>
     <string name="health_edit">Messung bearbeiten</string>
