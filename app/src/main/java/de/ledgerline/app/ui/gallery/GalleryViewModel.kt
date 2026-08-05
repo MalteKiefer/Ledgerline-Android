@@ -548,15 +548,27 @@ class GalleryViewModel @Inject constructor(
         // the web timeline (newest first). Parse to an epoch so mixed ISO / EXIF
         // (`2026:07:11 ...`) formats compare correctly instead of clustering by the
         // just-uploaded order.
+        //
+        // Runs OFF the main thread: on a large library the sort + day-grouping (per-photo
+        // date parsing) is heavy enough to block the UI — done on the main thread it ANR'd
+        // the app right after an import (verified on-device). Snapshot the filter flags so
+        // the background pass sees a consistent view.
         val all = cache.value.value?.manifest?.photos.orEmpty()
         _trashCount.value = all.count { it.trashed }
-        // Normal grid = untrashed; trash view = only trashed. Both newest-first.
-        // The favorites filter only applies to the normal (non-trash) grid.
-        val photos = all
-            .filter { it.trashed == _showTrash.value }
-            .filter { !_favoritesOnly.value || _showTrash.value || it.favorite }
-            .sortedByDescending { epochOf(it.taken_at ?: it.created) }
-        _state.value = GalleryUi(false, false, photos, groupByDay(photos))
+        val showTrash = _showTrash.value
+        val favOnly = _favoritesOnly.value
+        viewModelScope.launch {
+            val ui = withContext(Dispatchers.Default) {
+                // Normal grid = untrashed; trash view = only trashed. Both newest-first.
+                // The favorites filter only applies to the normal (non-trash) grid.
+                val photos = all
+                    .filter { it.trashed == showTrash }
+                    .filter { !favOnly || showTrash || it.favorite }
+                    .sortedByDescending { epochOf(it.taken_at ?: it.created) }
+                GalleryUi(false, false, photos, groupByDay(photos))
+            }
+            _state.value = ui
+        }
     }
 
     /** Best-effort epoch millis from an ISO-8601 or EXIF (`yyyy:MM:dd HH:mm:ss`)
@@ -567,7 +579,7 @@ class GalleryViewModel @Inject constructor(
         runCatching { return java.time.Instant.parse(ts).toEpochMilli() }
         // EXIF "yyyy:MM:dd HH:mm:ss" → normalise the date part to ISO and retry as local.
         runCatching {
-            val norm = ts.trim().replaceFirst(Regex("^(\\d{4}):(\\d{2}):(\\d{2})"), "$1-$2-$3").replace(' ', 'T')
+            val norm = ts.trim().replaceFirst(EXIF_DATE_PREFIX, "$1-$2-$3").replace(' ', 'T')
             return java.time.LocalDateTime.parse(norm)
                 .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
         }
@@ -580,6 +592,14 @@ class GalleryViewModel @Inject constructor(
          * this, matching the web `_doSearch` (`resources/js/app.js`): `s > 0.2`.
          */
         const val SEARCH_THRESHOLD = 0.2
+
+        /**
+         * EXIF date prefix (`yyyy:MM:dd`) → ISO (`yyyy-MM-dd`). Compiled ONCE: it is
+         * applied per photo in [epochOf] + [dayKeyOf], and compiling a fresh [Regex]
+         * for every photo on the main thread ANR'd the app on large libraries (each
+         * `Pattern.compile` registers a native allocation — thousands per recompute).
+         */
+        private val EXIF_DATE_PREFIX = Regex("^(\\d{4}):(\\d{2}):(\\d{2})")
 
         /**
          * Group an already-sorted, already-filtered photo list by capture DAY
@@ -603,7 +623,7 @@ class GalleryViewModel @Inject constructor(
         private fun dayKeyOf(ts: String?): String {
             if (ts.isNullOrBlank()) return "unknown"
             // Normalise EXIF `yyyy:MM:dd` to `yyyy-MM-dd`, then take the date part.
-            val norm = ts.trim().replaceFirst(Regex("^(\\d{4}):(\\d{2}):(\\d{2})"), "$1-$2-$3")
+            val norm = ts.trim().replaceFirst(EXIF_DATE_PREFIX, "$1-$2-$3")
             val date = norm.take(10)
             return if (date.length == 10) date else "unknown"
         }

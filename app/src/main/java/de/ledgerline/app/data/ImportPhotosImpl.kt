@@ -185,8 +185,10 @@ class ImportPhotosImpl @Inject constructor(
     private fun nowIso(): String = OffsetDateTime.now(ZoneOffset.UTC).toString()
 
     private companion object {
-        /** Photos encrypting+uploading in parallel. Small — kind to mobile data and server throttles. */
-        const val LANES = 4
+        /** Photos encrypting+uploading in parallel. Small — kind to mobile data, server throttles, and
+         *  peak memory: each lane buffers a photo's `/gallery/process` base64 renditions in RAM, so 4
+         *  lanes on a large-photo batch saturated the heap and ANR-killed the app (verified on-device). */
+        const val LANES = 2
         /** Index entries per sealed-store PUT (vs. one PUT per photo before). */
         const val COMMIT_BATCH = 8
     }
