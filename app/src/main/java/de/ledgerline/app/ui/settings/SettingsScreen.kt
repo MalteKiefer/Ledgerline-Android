@@ -47,6 +47,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.outlined.ContentCopy
@@ -126,7 +127,7 @@ import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
 /** Internal Settings destinations — a categorized landing (ROOT) plus one sub-screen per category. */
-private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, MAPS, OFFLINE_MAPS, OFFLINE, BACKGROUND, BACKUP, ACCOUNT, NOTIFICATIONS, SHARED_LINK, SHARED_VAULTS, ABOUT, LICENSES }
+private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, MAPS, OFFLINE_MAPS, OFFLINE, BACKGROUND, BACKUP, CALENDAR, ACCOUNT, NOTIFICATIONS, SHARED_LINK, SHARED_VAULTS, ABOUT, LICENSES }
 
 /**
  * Settings screen — a categorized landing list plus per-category sub-screens, in the
@@ -253,6 +254,7 @@ fun SettingsContent(
         SettingsRoute.OFFLINE -> stringResource(R.string.settings_cat_offline)
         SettingsRoute.BACKGROUND -> stringResource(R.string.settings_cat_background)
         SettingsRoute.BACKUP -> stringResource(R.string.settings_cat_backup)
+        SettingsRoute.CALENDAR -> stringResource(R.string.settings_cat_calendar)
         SettingsRoute.ACCOUNT -> stringResource(R.string.settings_cat_account)
         SettingsRoute.NOTIFICATIONS -> stringResource(R.string.settings_cat_notifications)
         SettingsRoute.SHARED_LINK -> stringResource(R.string.share_open_title)
@@ -404,6 +406,7 @@ fun SettingsContent(
                     vm = vm,
                 )
 
+                SettingsRoute.CALENDAR -> de.ledgerline.app.ui.calendar.CalendarSettingsContent(innerPadding)
                 SettingsRoute.NOTIFICATIONS -> NotificationsSettings(innerPadding)
                 SettingsRoute.SHARED_LINK -> de.ledgerline.app.ui.share.SharedLinkContent(innerPadding)
                 SettingsRoute.SHARED_VAULTS -> de.ledgerline.app.ui.share.SharedVaultsContent(innerPadding)
@@ -492,6 +495,7 @@ private fun SettingsRoot(padding: PaddingValues, vm: SettingsViewModel, onNaviga
         Item(1, stringResource(R.string.settings_cat_background), stringResource(R.string.settings_cat_background_sub), Icons.Outlined.Sync, Brand.tintTeal) { onNavigate(SettingsRoute.BACKGROUND) },
         Item(1, stringResource(R.string.settings_cat_backup), stringResource(R.string.settings_cat_backup_sub), Icons.Outlined.PhotoLibrary, Brand.tintOrange) { onNavigate(SettingsRoute.BACKUP) },
         Item(1, stringResource(R.string.settings_cat_maps), stringResource(R.string.settings_cat_maps_sub), Icons.Outlined.Map, Brand.tintTeal) { onNavigate(SettingsRoute.MAPS) },
+        Item(1, stringResource(R.string.settings_cat_calendar), stringResource(R.string.settings_cat_calendar_sub), Icons.Outlined.CalendarMonth, Brand.tintOrange) { onNavigate(SettingsRoute.CALENDAR) },
         Item(2, stringResource(R.string.share_open_title), stringResource(R.string.share_open_hint), Icons.Outlined.Link, Brand.tintBlue) { onNavigate(SettingsRoute.SHARED_LINK) },
         Item(2, stringResource(R.string.vaults_title), stringResource(R.string.settings_cat_vaults_sub), Icons.Outlined.Share, Brand.tintViolet) { onNavigate(SettingsRoute.SHARED_VAULTS) },
         Item(3, stringResource(R.string.settings_theme), themeValue, Icons.Outlined.Contrast, Brand.tintViolet) { onNavigate(SettingsRoute.APPEARANCE) },

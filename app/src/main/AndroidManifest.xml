@@ -25,6 +25,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Calendar reminders fire at an exact minute; USE_EXACT_ALARM is the calendar/alarm use case. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <!-- See installed browsers (Android 11+ package visibility) so the "ask which
@@ -89,6 +91,10 @@
                 <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".core.calendar.CalendarReminderReceiver"
+            android:exported="false" />
 
         <service
             android:name=".core.ops.BackgroundOpService"

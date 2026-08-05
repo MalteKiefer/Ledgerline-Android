@@ -868,6 +868,12 @@
     <string name="calendar_manage">Manage calendars</string>
     <string name="calendar_add_calendar">Add calendar</string>
     <string name="calendar_set_default">Set as default</string>
+    <string name="calendar_navigate">Navigate</string>
+    <string name="settings_cat_calendar">Calendar</string>
+    <string name="settings_cat_calendar_sub">Feeds, calendars, notifications</string>
+    <string name="calendar_notifications">Reminder notifications</string>
+    <string name="calendar_notifications_sub">Show a notification on this device when a reminder is due</string>
+    <string name="calendar_exact_alarm">Allow exact alarms</string>
     <string name="calendar_reminders">Reminders</string>
     <string name="reminder_at_time">At time</string>
     <string name="reminder_10m">10 min</string>

@@ -25,23 +25,20 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Directions
 import androidx.compose.material.icons.outlined.Event
-import androidx.compose.material.icons.outlined.Star
-import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Today
-import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.Switch
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -53,15 +50,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.CalendarEvent
+import de.ledgerline.app.domain.model.EventLocation
 import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.theme.Brand
@@ -92,8 +90,6 @@ fun CalendarScreen(
     var detail by remember { mutableStateOf<CalendarEvent?>(null) }
     var editorFor by remember { mutableStateOf<CalendarEvent?>(null) }
     var creating by remember { mutableStateOf(false) }
-    var showSettings by remember { mutableStateOf(false) }
-    var showCalendars by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -128,9 +124,6 @@ fun CalendarScreen(
                 title = stringResourceSafe(R.string.dest_calendar),
                 onMenu = onMenu,
                 actions = {
-                    IconButton(onClick = { showSettings = true }) {
-                        Icon(Icons.Outlined.Tune, stringResourceSafe(R.string.calendar_feeds_title))
-                    }
                     IconButton(onClick = { vm.goToday() }) {
                         Icon(Icons.Outlined.Today, stringResourceSafe(R.string.calendar_today))
                     }
@@ -148,10 +141,6 @@ fun CalendarScreen(
                         DropdownMenuItem(
                             text = { Text(stringResourceSafe(R.string.calendar_export)) },
                             onClick = { menuOpen = false; exportLauncher.launch("ledgerline.ics") },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResourceSafe(R.string.calendar_manage)) },
-                            onClick = { menuOpen = false; showCalendars = true },
                         )
                     }
                 },
@@ -290,35 +279,13 @@ fun CalendarScreen(
     }
 
     detail?.let { e ->
-        EventDetailDialog(
-            e, vm.colorFor(e.calendarId), vm.calendarName(e.calendarId),
+        EventDetailSheet(
+            e = e,
+            colorHex = vm.colorFor(e.calendarId),
+            calendarName = vm.calendarName(e.calendarId),
             canEdit = !vm.isFeed(e.calendarId),
             onEdit = { detail = null; editorFor = e },
             onDismiss = { detail = null },
-        )
-    }
-
-    if (showSettings) {
-        CalendarFeedsDialog(
-            birthdaysOn = ui.birthdaysOn,
-            countries = ui.holidayCountries,
-            subscriptions = ui.subscriptions,
-            onSave = { b, c -> vm.saveSettings(b, c); showSettings = false },
-            onAddSub = { name, url -> vm.addSubscription(name, url) },
-            onRemoveSub = { id -> vm.removeSubscription(id) },
-            onDismiss = { showSettings = false },
-        )
-    }
-
-    if (showCalendars) {
-        CalendarsManageDialog(
-            calendars = ui.calendars,
-            onAdd = { name, color -> vm.addCalendar(name, color) },
-            onRename = { id, name -> vm.renameCalendar(id, name) },
-            onColor = { id, color -> vm.setCalendarColor(id, color) },
-            onDefault = { id -> vm.setDefaultCalendar(id) },
-            onDelete = { id -> vm.deleteCalendar(id) },
-            onDismiss = { showCalendars = false },
         )
     }
 }
@@ -390,171 +357,96 @@ private fun EventRow(e: CalendarEvent, color: Color, onClick: () -> Unit) {
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun EventDetailDialog(e: CalendarEvent, colorHex: String, calendarName: String, canEdit: Boolean, onEdit: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(),
-        confirmButton = {
-            if (canEdit) TextButton(onClick = onEdit) { Text(stringResourceSafe(R.string.action_edit)) }
-            else TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) }
-        },
-        dismissButton = { if (canEdit) TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) } },
-        icon = { Icon(Icons.Outlined.Event, null, tint = parseHex(colorHex)) },
-        title = { Text(e.title.ifBlank { "—" }) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val time = eventTimeLabel(e)
-                if (time.isNotBlank()) Text(time)
-                if (calendarName.isNotBlank()) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Box(Modifier.size(10.dp).background(parseHex(colorHex), CircleShape))
-                        Text(calendarName, style = MaterialTheme.typography.labelLarge)
-                    }
-                }
-                e.location?.takeIf { it.label.isNotBlank() }?.let {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Icon(Icons.Outlined.LocationOn, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(it.label)
-                    }
-                }
-                if (e.description.isNotBlank()) Text(e.description, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        },
-    )
-}
-
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun CalendarFeedsDialog(
-    birthdaysOn: Boolean,
-    countries: List<String>,
-    subscriptions: List<de.ledgerline.app.ui.calendar.Subscription>,
-    onSave: (Boolean, List<String>) -> Unit,
-    onAddSub: (String, String) -> Unit,
-    onRemoveSub: (String) -> Unit,
+private fun EventDetailSheet(
+    e: CalendarEvent,
+    colorHex: String,
+    calendarName: String,
+    canEdit: Boolean,
+    onEdit: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var birthdays by remember { mutableStateOf(birthdaysOn) }
-    val selected = remember { androidx.compose.runtime.mutableStateListOf<String>().apply { addAll(countries) } }
-    var subName by remember { mutableStateOf("") }
-    var subUrl by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = { onSave(birthdays, selected.toList()) }) { Text(stringResourceSafe(R.string.action_save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) } },
-        title = { Text(stringResourceSafe(R.string.calendar_feeds_title)) },
-        text = {
-            Column(
-                Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResourceSafe(R.string.calendar_feed_birthdays), Modifier.weight(1f))
-                    Switch(checked = birthdays, onCheckedChange = { birthdays = it })
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val color = parseHex(colorHex)
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(Modifier.size(44.dp).background(color.copy(alpha = 0.18f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Event, null, tint = color)
                 }
-                Text(stringResourceSafe(R.string.calendar_feed_holidays), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    de.ledgerline.app.core.calendar.Holidays.COUNTRIES.forEach { c ->
-                        FilterChip(
-                            selected = selected.contains(c),
-                            onClick = { if (selected.contains(c)) selected.remove(c) else selected.add(c) },
-                            label = { Text(c) },
-                        )
+                Column(Modifier.weight(1f)) {
+                    Text(e.title.ifBlank { "—" }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    if (calendarName.isNotBlank()) {
+                        Text(calendarName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Text(stringResourceSafe(R.string.calendar_subscriptions), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                subscriptions.forEach { s ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(s.name.ifBlank { s.url }, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-                        IconButton(onClick = { onRemoveSub(s.id) }) { Icon(Icons.Outlined.Close, stringResourceSafe(R.string.action_delete)) }
-                    }
-                }
-                androidx.compose.material3.OutlinedTextField(subName, { subName = it }, label = { Text(stringResourceSafe(R.string.calendar_field_title)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                androidx.compose.material3.OutlinedTextField(subUrl, { subUrl = it }, label = { Text("https:// / webcal://") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                TextButton(
-                    onClick = { if (subUrl.isNotBlank()) { onAddSub(subName.trim(), subUrl.trim()); subName = ""; subUrl = "" } },
-                    enabled = subUrl.isNotBlank(),
-                ) { Text(stringResourceSafe(R.string.calendar_add_subscription)) }
             }
-        },
-    )
-}
-
-private val CAL_PALETTE = listOf("#7066f5", "#9e70fa", "#3b9fd6", "#59ad6b", "#e2915a", "#3fae9f", "#d1607e", "#6b7280")
-
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun CalendarsManageDialog(
-    calendars: List<de.ledgerline.app.domain.model.CalendarModel>,
-    onAdd: (String, String) -> Unit,
-    onRename: (String, String) -> Unit,
-    onColor: (String, String) -> Unit,
-    onDefault: (String) -> Unit,
-    onDelete: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var newName by remember { mutableStateOf("") }
-    var newColor by remember { mutableStateOf(CAL_PALETTE.first()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResourceSafe(R.string.action_close)) } },
-        title = { Text(stringResourceSafe(R.string.calendar_manage)) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                calendars.forEach { c ->
-                    androidx.compose.runtime.key(c.id) {
-                        var name by remember { mutableStateOf(c.name) }
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                androidx.compose.material3.OutlinedTextField(
-                                    value = name, onValueChange = { name = it },
-                                    singleLine = true, modifier = Modifier.weight(1f),
-                                    trailingIcon = {
-                                        if (name.isNotBlank() && name != c.name) {
-                                            IconButton(onClick = { onRename(c.id, name.trim()) }) { Icon(Icons.Outlined.Check, stringResourceSafe(R.string.action_save)) }
-                                        }
-                                    },
-                                )
-                                IconButton(onClick = { onDefault(c.id) }) {
-                                    Icon(if (c.isDefault) Icons.Outlined.Star else Icons.Outlined.StarBorder, stringResourceSafe(R.string.calendar_set_default))
-                                }
-                                IconButton(onClick = { onDelete(c.id) }, enabled = calendars.size > 1) {
-                                    Icon(Icons.Outlined.Close, stringResourceSafe(R.string.action_delete))
-                                }
-                            }
-                            ColorPalette(selected = c.color) { onColor(c.id, it) }
-                        }
-                    }
-                }
-                androidx.compose.material3.HorizontalDivider()
-                Text(stringResourceSafe(R.string.calendar_add_calendar), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                androidx.compose.material3.OutlinedTextField(newName, { newName = it }, label = { Text(stringResourceSafe(R.string.calendar_field_title)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                ColorPalette(selected = newColor) { newColor = it }
-                TextButton(
-                    onClick = { if (newName.isNotBlank()) { onAdd(newName.trim(), newColor); newName = "" } },
-                    enabled = newName.isNotBlank(),
-                ) { Text(stringResourceSafe(R.string.calendar_add_calendar)) }
+            eventWhenLabel(e).takeIf { it.isNotBlank() }?.let {
+                DetailLine(Icons.Outlined.Schedule, it)
             }
-        },
-    )
-}
-
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun ColorPalette(selected: String, onPick: (String) -> Unit) {
-    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        CAL_PALETTE.forEach { hex ->
-            val sel = hex.equals(selected, ignoreCase = true)
-            Box(
-                Modifier
-                    .size(26.dp)
-                    .background(parseHex(hex), CircleShape)
-                    .then(if (sel) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
-                    .clickable { onPick(hex) },
-            )
+            e.location?.takeIf { it.label.isNotBlank() }?.let { loc ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { launchNavigation(context, loc) }
+                        .padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Icon(Icons.Outlined.LocationOn, null, tint = color)
+                    Text(loc.label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    Icon(Icons.Outlined.Directions, stringResourceSafe(R.string.calendar_navigate), tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+            if (e.description.isNotBlank()) {
+                DetailLine(Icons.Outlined.Notes, e.description)
+            }
+            if (canEdit) {
+                de.ledgerline.app.ui.theme.PrimaryGradientButton(
+                    text = stringResourceSafe(R.string.action_edit),
+                    onClick = onEdit,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun DetailLine(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Icon(icon, null, modifier = Modifier.size(20.dp).padding(top = 2.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+/** Open the device's map/navigation app for an event location (coords if known, else a name search). */
+private fun launchNavigation(context: android.content.Context, loc: EventLocation) {
+    val q = if (loc.lat != null && loc.lng != null) "${loc.lat},${loc.lng}(${android.net.Uri.encode(loc.label)})"
+    else android.net.Uri.encode(loc.label)
+    val geo = android.net.Uri.parse("geo:0,0?q=$q")
+    runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, geo)) }
+        .onFailure {
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://www.openstreetmap.org/search?query=${android.net.Uri.encode(loc.label)}")),
+                )
+            }
+        }
+}
+
+/** Full "when" label: date for all-day, else date + time range. */
+private fun eventWhenLabel(e: CalendarEvent): String {
+    val d = CalendarViewModel.dateOf(e.start) ?: return ""
+    val dateStr = d.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))
+    if (e.allDay || !e.start.contains('T')) return dateStr
+    val t = eventTimeLabel(e)
+    return if (t.isBlank()) dateStr else "$dateStr · $t"
 }
 
 // ---- helpers ----

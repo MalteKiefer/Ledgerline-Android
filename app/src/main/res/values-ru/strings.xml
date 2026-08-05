@@ -869,6 +869,12 @@
     <string name="calendar_manage">Управление календарями</string>
     <string name="calendar_add_calendar">Добавить календарь</string>
     <string name="calendar_set_default">По умолчанию</string>
+    <string name="calendar_navigate">Навигация</string>
+    <string name="settings_cat_calendar">Календарь</string>
+    <string name="settings_cat_calendar_sub">Ленты, календари, уведомления</string>
+    <string name="calendar_notifications">Уведомления-напоминания</string>
+    <string name="calendar_notifications_sub">Показывать уведомление на устройстве, когда наступает напоминание</string>
+    <string name="calendar_exact_alarm">Разрешить точные будильники</string>
     <string name="calendar_reminders">Напоминания</string>
     <string name="reminder_at_time">В момент</string>
     <string name="reminder_10m">10 мин</string>

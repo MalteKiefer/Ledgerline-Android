@@ -866,6 +866,12 @@
     <string name="calendar_manage">Kalender verwalten</string>
     <string name="calendar_add_calendar">Kalender hinzufügen</string>
     <string name="calendar_set_default">Als Standard</string>
+    <string name="calendar_navigate">Navigieren</string>
+    <string name="settings_cat_calendar">Kalender</string>
+    <string name="settings_cat_calendar_sub">Feeds, Kalender, Benachrichtigungen</string>
+    <string name="calendar_notifications">Erinnerungs-Benachrichtigungen</string>
+    <string name="calendar_notifications_sub">Auf diesem Gerät benachrichtigen, wenn eine Erinnerung fällig ist</string>
+    <string name="calendar_exact_alarm">Exakte Alarme erlauben</string>
     <string name="calendar_reminders">Erinnerungen</string>
     <string name="reminder_at_time">Zur Zeit</string>
     <string name="reminder_10m">10 Min</string>

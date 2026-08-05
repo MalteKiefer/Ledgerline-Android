@@ -11,6 +11,7 @@ import de.ledgerline.app.domain.model.CalendarModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -51,6 +52,8 @@ class CalendarViewModel @Inject constructor(
     private val repo: CalendarRepository,
     cache: CalendarCache,
     private val workspaceCache: de.ledgerline.app.core.WorkspaceCache,
+    private val settingsStore: de.ledgerline.app.data.SettingsStore,
+    private val notifier: de.ledgerline.app.core.calendar.CalendarNotifier,
 ) : ViewModel() {
 
     val ui: StateFlow<CalendarUi> = cache.value
@@ -87,6 +90,15 @@ class CalendarViewModel @Inject constructor(
     private val _selectedDay = MutableStateFlow(LocalDate.now())
     val selectedDay: StateFlow<LocalDate> = _selectedDay
 
+    /** On-device reminder notifications opt-in (from settings). */
+    val notificationsEnabled: StateFlow<Boolean> =
+        settingsStore.calendarNotificationsEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    fun setNotificationsEnabled(enabled: Boolean) = viewModelScope.launch {
+        settingsStore.setCalendarNotificationsEnabled(enabled)
+        registerAllReminders()
+    }
+
     private val _subEvents = MutableStateFlow<List<CalendarEvent>>(emptyList())
     /** Read-only events fetched from public .ics subscriptions; the screen observes this to recompose. */
     val subEvents: StateFlow<List<CalendarEvent>> = _subEvents
@@ -109,6 +121,7 @@ class CalendarViewModel @Inject constructor(
         val today = LocalDate.now()
         val horizon = today.plusDays(90)
         val rows = ArrayList<de.ledgerline.app.data.remote.dto.ReminderRow>()
+        val local = ArrayList<de.ledgerline.app.core.calendar.LocalReminder>()
         outer@ for (e in ui.value.events) {
             if (e.reminders.isEmpty() || e.status == "cancelled") continue
             val days = if (e.rrule.isBlank()) listOfNotNull(dateOf(e.start))
@@ -128,11 +141,14 @@ class CalendarViewModel @Inject constructor(
                             remind_at = DateTimeFormatter.ISO_INSTANT.format(instant),
                         ),
                     )
+                    local.add(de.ledgerline.app.core.calendar.LocalReminder(instant.toEpochMilli(), e.title.ifBlank { "—" }))
                     if (rows.size >= 2000) break@outer
                 }
             }
         }
         repo.registerReminders(rows)
+        // Local on-device notifications (opt-in) — schedule the soonest reminders via AlarmManager.
+        if (settingsStore.calendarNotificationsEnabled.first()) notifier.schedule(local) else notifier.cancelAll()
     }
 
     /** Fetch every subscribed .ics via the server proxy and overlay it read-only. */

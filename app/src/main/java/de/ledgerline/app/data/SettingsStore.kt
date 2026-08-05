@@ -42,6 +42,7 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val backupAlbumsKey = stringSetPreferencesKey("backup_album_ids")
     private val backupDeleteAfterKey = booleanPreferencesKey("backup_delete_after")
     private val keepScreenOnKey = booleanPreferencesKey("keep_screen_on")
+    private val calendarNotifyKey = booleanPreferencesKey("calendar_notifications_enabled")
     private val keepScreenOnMinutesKey = intPreferencesKey("keep_screen_on_minutes")
     private val rememberVaultKey = booleanPreferencesKey("remember_vault")
     private val rememberVaultDaysKey = intPreferencesKey("remember_vault_days")
@@ -342,6 +343,14 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
 
     suspend fun setKeepScreenOn(enabled: Boolean) {
         context.settingsDataStore.edit { it[keepScreenOnKey] = enabled }
+    }
+
+    /** Show a local on-device notification when a calendar reminder is due (default off). */
+    val calendarNotificationsEnabled: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[calendarNotifyKey] ?: false }
+
+    suspend fun setCalendarNotificationsEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { it[calendarNotifyKey] = enabled }
     }
 
     /**
