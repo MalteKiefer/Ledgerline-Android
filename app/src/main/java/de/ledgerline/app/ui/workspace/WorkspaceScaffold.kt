@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.MonitorHeart
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Description
@@ -210,6 +211,7 @@ fun WorkspaceScaffold(
                         WorkspaceDest.Explore -> de.ledgerline.app.ui.explore.ExploreScreen(onMenu = { scope.launch { drawerState.open() } })
 
                         WorkspaceDest.Health -> de.ledgerline.app.ui.health.HealthScreen(onMenu = { scope.launch { drawerState.open() } })
+                        WorkspaceDest.Calendar -> de.ledgerline.app.ui.calendar.CalendarScreen(onMenu = { scope.launch { drawerState.open() } })
 
                         WorkspaceDest.Finance -> de.ledgerline.app.ui.finance.FinanceScreen(onMenu = { scope.launch { drawerState.open() } })
 
@@ -362,6 +364,7 @@ private fun DrawerSheet(current: WorkspaceDest, visible: (WorkspaceDest) -> Bool
                     Triple(WorkspaceDest.Contacts, Icons.Outlined.Contacts, de.ledgerline.app.ui.theme.Brand.tintTeal),
                     Triple(WorkspaceDest.Explore, Icons.Outlined.Map, de.ledgerline.app.ui.theme.Brand.tintTeal),
                     Triple(WorkspaceDest.Health, Icons.Outlined.MonitorHeart, de.ledgerline.app.ui.theme.Brand.tintGreen),
+                    Triple(WorkspaceDest.Calendar, Icons.Outlined.CalendarMonth, de.ledgerline.app.ui.theme.Brand.tintOrange),
                     Triple(WorkspaceDest.Finance, Icons.Outlined.ReceiptLong, de.ledgerline.app.ui.theme.Brand.tintGreen),
                 ).filter { visible(it.first) }.forEach { (d, ic, t) -> DrawerRow(d, ic, t, current, onSelect) }
             }

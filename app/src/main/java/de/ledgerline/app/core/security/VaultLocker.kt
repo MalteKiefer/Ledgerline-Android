@@ -26,6 +26,7 @@ class VaultLocker @Inject constructor(
     private val exploreCache: de.ledgerline.app.core.ExploreCache,
     private val healthCache: de.ledgerline.app.core.HealthCache,
     private val financeCache: de.ledgerline.app.core.FinanceCache,
+    private val calendarCache: de.ledgerline.app.core.CalendarCache,
 ) {
     /**
      * Lock the vault: wipe the Vault Key + all in-memory decrypted state (incl. the
@@ -41,5 +42,6 @@ class VaultLocker @Inject constructor(
         exploreCache.clear()
         healthCache.clear()
         financeCache.clear()
+        calendarCache.clear()
     }
 }

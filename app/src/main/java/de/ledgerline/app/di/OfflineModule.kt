@@ -52,6 +52,10 @@ abstract class OfflineModule {
 
     @Binds
     @IntoSet
+    abstract fun calendarSyncable(impl: de.ledgerline.app.data.CalendarRepository): SyncableStore
+
+    @Binds
+    @IntoSet
     abstract fun exploreSyncable(impl: ExploreRepository): SyncableStore
 
     @Binds

@@ -18,6 +18,7 @@ enum class WorkspaceDest(val labelRes: Int, val moduleKey: String? = null) {
     Contacts(R.string.menu_contacts, "contacts"),
     Explore(R.string.dest_explore, "explore"),
     Health(R.string.dest_health, "health"),
+    Calendar(R.string.dest_calendar, "calendar"),
     Finance(R.string.dest_finance, "finance"),
     Settings(R.string.settings_title);                    // system — always shown
 

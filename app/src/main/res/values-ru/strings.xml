@@ -828,6 +828,12 @@
 
     <!-- Модуль здоровья -->
     <string name="dest_health">Здоровье</string>
+    <string name="dest_calendar">Календарь</string>
+    <string name="calendar_today">Сегодня</string>
+    <string name="calendar_prev">Предыдущий месяц</string>
+    <string name="calendar_next">Следующий месяц</string>
+    <string name="calendar_loading">Загрузка…</string>
+    <string name="calendar_no_events">Нет событий</string>
     <string name="health_add">Добавить измерение</string>
     <string name="health_edit">Изменить измерение</string>
     <string name="health_master">Личные данные</string>
