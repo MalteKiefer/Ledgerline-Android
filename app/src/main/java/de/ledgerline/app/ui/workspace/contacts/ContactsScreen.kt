@@ -181,7 +181,10 @@ fun ContactsScreen(
     // Detail/editor takes over the whole screen.
     val current = openId
     if (current != null) {
-        val contact = vm.contactById(current) ?: pendingNew?.takeIf { it.id == current }
+        // Re-read from the full cache whenever the observed state changes (keyed on `ui`), so a
+        // save reflects in the open detail immediately — without this, the detail held the contact
+        // snapshot from when it opened and only refreshed after navigating list→detail again.
+        val contact = remember(current, ui) { vm.contactById(current) } ?: pendingNew?.takeIf { it.id == current }
         if (contact != null) {
             ContactDetailScreen(
                 contact = contact,
