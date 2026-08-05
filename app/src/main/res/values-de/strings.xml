@@ -828,6 +828,9 @@
     <string name="dest_health">Gesundheit</string>
     <string name="dest_calendar">Kalender</string>
     <string name="calendar_today">Heute</string>
+    <string name="view_month">Monat</string>
+    <string name="view_week">Woche</string>
+    <string name="view_day">Tag</string>
     <string name="calendar_prev">Voriger Monat</string>
     <string name="calendar_next">Nächster Monat</string>
     <string name="calendar_loading">Lädt…</string>

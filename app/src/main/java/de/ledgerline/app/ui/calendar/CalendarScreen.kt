@@ -74,12 +74,16 @@ import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.util.Locale
 
+private enum class CalView { MONTH, WEEK, DAY }
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CalendarScreen(
     modifier: Modifier = Modifier,
     onMenu: (() -> Unit)? = null,
     vm: CalendarViewModel = hiltViewModel(),
 ) {
+    var viewMode by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(CalView.MONTH) }
     val ui by vm.ui.collectAsStateWithLifecycle()
     val month by vm.month.collectAsStateWithLifecycle()
     val selectedDay by vm.selectedDay.collectAsStateWithLifecycle()
@@ -162,83 +166,117 @@ fun CalendarScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp),
         ) {
-            // Month header with prev/next.
-            Row(
-                Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = { vm.prevMonth() }) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResourceSafe(R.string.calendar_prev))
-                }
-                Text(
-                    month.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + month.year,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = { vm.nextMonth() }) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowForward, stringResourceSafe(R.string.calendar_next))
-                }
-            }
-
-            // Weekday header (Mon-first).
-            val weekStart = DayOfWeek.MONDAY
-            Row(Modifier.fillMaxWidth()) {
-                for (i in 0..6) {
-                    val dow = weekStart.plus(i.toLong())
-                    Text(
-                        dow.getDisplayName(TextStyle.SHORT, Locale.getDefault()),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-
-            // 6-week grid.
-            val first = month.atDay(1)
-            val lead = ((first.dayOfWeek.value - weekStart.value) + 7) % 7
-            val gridStart = first.minusDays(lead.toLong())
             val today = LocalDate.now()
-            Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                for (w in 0 until 6) {
+            val dm = remember { DateTimeFormatter.ofPattern("d. MMM", Locale.getDefault()) }
+            val dayHeaderFmt = remember { DateTimeFormatter.ofPattern("EEE, d. MMM", Locale.getDefault()) }
+            val weekStart = DayOfWeek.MONDAY
+
+            // Adaptive header + prev/next (steps by month / week / day).
+            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = {
+                    when (viewMode) {
+                        CalView.MONTH -> vm.prevMonth()
+                        CalView.WEEK -> vm.selectDay(selectedDay.minusWeeks(1))
+                        CalView.DAY -> vm.selectDay(selectedDay.minusDays(1))
+                    }
+                }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, stringResourceSafe(R.string.calendar_prev)) }
+                Text(
+                    when (viewMode) {
+                        CalView.MONTH -> month.month.getDisplayName(TextStyle.FULL, Locale.getDefault()) + " " + month.year
+                        CalView.WEEK -> { val ws = selectedDay.with(weekStart); "${ws.format(dm)} – ${ws.plusDays(6).format(dm)}" }
+                        CalView.DAY -> selectedDay.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL))
+                    },
+                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center, modifier = Modifier.weight(1f),
+                )
+                IconButton(onClick = {
+                    when (viewMode) {
+                        CalView.MONTH -> vm.nextMonth()
+                        CalView.WEEK -> vm.selectDay(selectedDay.plusWeeks(1))
+                        CalView.DAY -> vm.selectDay(selectedDay.plusDays(1))
+                    }
+                }) { Icon(Icons.AutoMirrored.Outlined.ArrowForward, stringResourceSafe(R.string.calendar_next)) }
+            }
+
+            // View switcher.
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(bottom = 4.dp)) {
+                listOf(CalView.MONTH to R.string.view_month, CalView.WEEK to R.string.view_week, CalView.DAY to R.string.view_day).forEach { (mode, res) ->
+                    FilterChip(selected = viewMode == mode, onClick = { viewMode = mode }, label = { Text(stringResourceSafe(res)) })
+                }
+            }
+
+            @Composable
+            fun DayEventList(day: LocalDate) {
+                val evs = vm.eventsForDay(day)
+                if (evs.isEmpty()) {
+                    Text(stringResourceSafe(R.string.calendar_no_events), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(4.dp))
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        evs.forEach { e -> EventRow(e, parseHex(vm.colorFor(e.calendarId))) { detail = e } }
+                    }
+                }
+            }
+
+            when (viewMode) {
+                CalView.MONTH -> {
                     Row(Modifier.fillMaxWidth()) {
-                        for (d in 0 until 7) {
-                            val date = gridStart.plusDays((w * 7 + d).toLong())
-                            DayCell(
-                                date = date,
-                                inMonth = date.month == month.month,
-                                isToday = date == today,
-                                isSelected = date == selectedDay,
-                                dotColors = vm.eventsForDay(date).take(3).map { parseHex(vm.colorFor(it.calendarId)) },
-                                onClick = { vm.selectDay(date) },
-                                modifier = Modifier.weight(1f),
+                        for (i in 0..6) {
+                            Text(
+                                weekStart.plus(i.toLong()).getDisplayName(TextStyle.SHORT, Locale.getDefault()),
+                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center, modifier = Modifier.weight(1f),
                             )
                         }
                     }
-                }
-            }
-
-            Spacer(Modifier.size(12.dp))
-            Text(
-                selectedDay.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
-            )
-
-            val dayEvents = vm.eventsForDay(selectedDay)
-            if (ui.loading && ui.events.isEmpty()) {
-                Text(stringResourceSafe(R.string.calendar_loading), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(4.dp))
-            } else if (dayEvents.isEmpty()) {
-                Text(stringResourceSafe(R.string.calendar_no_events), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(4.dp))
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    dayEvents.forEach { e ->
-                        EventRow(e, parseHex(vm.colorFor(e.calendarId))) { detail = e }
+                    val first = month.atDay(1)
+                    val lead = ((first.dayOfWeek.value - weekStart.value) + 7) % 7
+                    val gridStart = first.minusDays(lead.toLong())
+                    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                        for (w in 0 until 6) {
+                            Row(Modifier.fillMaxWidth()) {
+                                for (d in 0 until 7) {
+                                    val date = gridStart.plusDays((w * 7 + d).toLong())
+                                    DayCell(
+                                        date = date, inMonth = date.month == month.month, isToday = date == today,
+                                        isSelected = date == selectedDay,
+                                        dotColors = vm.eventsForDay(date).take(3).map { parseHex(vm.colorFor(it.calendarId)) },
+                                        onClick = { vm.selectDay(date) }, modifier = Modifier.weight(1f),
+                                    )
+                                }
+                            }
+                        }
                     }
+                    Spacer(Modifier.size(12.dp))
+                    Text(
+                        selectedDay.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.FULL)),
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 6.dp),
+                    )
+                    if (ui.loading && ui.events.isEmpty()) {
+                        Text(stringResourceSafe(R.string.calendar_loading), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(4.dp))
+                    } else DayEventList(selectedDay)
+                }
+                CalView.WEEK -> {
+                    val ws = selectedDay.with(weekStart)
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 8.dp)) {
+                        for (i in 0..6) {
+                            val d = ws.plusDays(i.toLong())
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    d.format(dayHeaderFmt),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = if (d == today) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = if (d == today) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.clickable { vm.selectDay(d); viewMode = CalView.DAY },
+                                )
+                                DayEventList(d)
+                            }
+                        }
+                    }
+                }
+                CalView.DAY -> {
+                    Spacer(Modifier.size(8.dp))
+                    DayEventList(selectedDay)
                 }
             }
             Spacer(Modifier.size(24.dp))

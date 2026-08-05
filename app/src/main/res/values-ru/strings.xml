@@ -831,6 +831,9 @@
     <string name="dest_health">Здоровье</string>
     <string name="dest_calendar">Календарь</string>
     <string name="calendar_today">Сегодня</string>
+    <string name="view_month">Месяц</string>
+    <string name="view_week">Неделя</string>
+    <string name="view_day">День</string>
     <string name="calendar_prev">Предыдущий месяц</string>
     <string name="calendar_next">Следующий месяц</string>
     <string name="calendar_loading">Загрузка…</string>
