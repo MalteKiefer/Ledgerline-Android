@@ -321,13 +321,27 @@ fun MapsforgeMap(
         }
     }
 
-    // A single tile cache tied to this MapView's display model.
+    // Tile cache for the offline vector renderer.
     val tileCache: TileCache = remember(mapView) {
         AndroidUtil.createTileCache(
             context,
             "ll-mapsforge",
             mapView.model.displayModel.tileSize,
             // Larger cache = smoother pan/zoom (fewer re-renders of vector tiles).
+            2.5f,
+            mapView.model.frameBufferModel.overdrawFactor,
+        )
+    }
+
+    // SEPARATE tile cache for the online OSM download layer. mapsforge keys cache entries by
+    // tile position only, so sharing one cache between the vector renderer and the raster
+    // download layer makes them clobber each other's tiles — the map then renders as a shifted,
+    // partial patchwork (the on-device bug). A distinct cache (own label/dir) keeps them apart.
+    val onlineTileCache: TileCache = remember(mapView) {
+        AndroidUtil.createTileCache(
+            context,
+            "ll-mapsforge-osm",
+            mapView.model.displayModel.tileSize,
             2.5f,
             mapView.model.frameBufferModel.overdrawFactor,
         )
@@ -403,7 +417,7 @@ fun MapsforgeMap(
             val source = OpenStreetMapMapnik.INSTANCE
             source.userAgent = "de.ledgerline.app"
             val dl = TileDownloadLayer(
-                tileCache,
+                onlineTileCache,
                 mapView.model.mapViewPosition,
                 source,
                 AndroidGraphicFactory.INSTANCE,

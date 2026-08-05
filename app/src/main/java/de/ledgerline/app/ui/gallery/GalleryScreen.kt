@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -631,7 +632,12 @@ private fun PhotosTab(
         if (!selectionMode) {
             @OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
             FloatingActionButtonMenu(
-                modifier = Modifier.align(Alignment.BottomEnd),
+                // Lift above the floating Photos/Albums/People tab pill (and the gesture nav bar)
+                // so the FAB and its expanded upload items aren't covered by it.
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(bottom = 80.dp),
                 expanded = fabExpanded,
                 button = {
                     ToggleFloatingActionButton(
@@ -688,7 +694,8 @@ private fun PhotosTab(
                 },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(16.dp),
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 80.dp),
             )
         }
 
