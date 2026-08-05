@@ -53,12 +53,12 @@ import java.time.format.FormatStyle
  * (`yyyy-MM-ddTHH:mm`) with a tz hint; all-day uses date-only (`yyyy-MM-dd`) — matching the
  * web `CalendarEvent` contract. Recurrence / reminders ride along untouched via the record's raw.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun CalendarEventEditor(
     initial: CalendarEvent?,
     defaultDay: LocalDate,
-    onSave: (id: String?, title: String, description: String, allDay: Boolean, start: String, end: String, tz: String, location: EventLocation?) -> Unit,
+    onSave: (id: String?, title: String, description: String, allDay: Boolean, start: String, end: String, tz: String, location: EventLocation?, rrule: String) -> Unit,
     onDelete: (() -> Unit)?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
@@ -74,6 +74,16 @@ fun CalendarEventEditor(
     var endDate by remember { mutableStateOf(initEndDate) }
     var startTime by remember { mutableStateOf(parseTime(initial?.start) ?: LocalTime.of(9, 0)) }
     var endTime by remember { mutableStateOf(parseTime(initial?.end) ?: LocalTime.of(10, 0)) }
+
+    // Recurrence editor state (parsed from the event's RRULE).
+    val initRule = remember { de.ledgerline.app.core.calendar.CalendarRecurrence.parse(initial?.rrule ?: "") }
+    var freq by remember { mutableStateOf(initRule?.freq ?: "none") }
+    var interval by remember { mutableStateOf((initRule?.interval ?: 1).coerceAtLeast(1)) }
+    val byday = remember { androidx.compose.runtime.mutableStateListOf<String>().apply { initRule?.byday?.let { addAll(it) } } }
+    var ends by remember { mutableStateOf(when { initRule?.count != null -> "count"; initRule?.until != null -> "until"; else -> "never" }) }
+    var count by remember { mutableStateOf(initRule?.count ?: 10) }
+    var until by remember { mutableStateOf(initRule?.until ?: startDate.plusMonths(3)) }
+    var pickUntil by remember { mutableStateOf(false) }
 
     // date/time picker targets: null = closed; else which field is being edited.
     var pickDate by remember { mutableStateOf<String?>(null) }   // "start" | "end"
@@ -136,6 +146,65 @@ fun CalendarEventEditor(
                 minLines = 3, modifier = Modifier.fillMaxWidth(),
             )
 
+            // ---- Recurrence ----
+            Text(stringResource(R.string.calendar_repeat), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            val freqLabels = listOf(
+                "none" to stringResource(R.string.repeat_none),
+                "DAILY" to stringResource(R.string.repeat_daily),
+                "WEEKLY" to stringResource(R.string.repeat_weekly),
+                "MONTHLY" to stringResource(R.string.repeat_monthly),
+                "YEARLY" to stringResource(R.string.repeat_yearly),
+            )
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                freqLabels.forEach { (key, label) ->
+                    androidx.compose.material3.FilterChip(selected = freq == key, onClick = { freq = key }, label = { Text(label) })
+                }
+            }
+            if (freq != "none") {
+                OutlinedTextField(
+                    value = interval.toString(),
+                    onValueChange = { interval = it.filter { c -> c.isDigit() }.toIntOrNull()?.coerceIn(1, 999) ?: 1 },
+                    label = { Text(stringResource(R.string.calendar_interval)) },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (freq == "WEEKLY") {
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        de.ledgerline.app.core.calendar.CalendarRecurrence.WEEKDAYS.forEach { wd ->
+                            androidx.compose.material3.FilterChip(
+                                selected = byday.contains(wd),
+                                onClick = { if (byday.contains(wd)) byday.remove(wd) else byday.add(wd) },
+                                label = { Text(wd) },
+                            )
+                        }
+                    }
+                }
+                Text(stringResource(R.string.calendar_ends), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(
+                        "never" to stringResource(R.string.ends_never),
+                        "count" to stringResource(R.string.ends_count),
+                        "until" to stringResource(R.string.ends_until),
+                    ).forEach { (key, label) ->
+                        androidx.compose.material3.FilterChip(selected = ends == key, onClick = { ends = key }, label = { Text(label) })
+                    }
+                }
+                if (ends == "count") {
+                    OutlinedTextField(
+                        value = count.toString(),
+                        onValueChange = { count = it.filter { c -> c.isDigit() }.toIntOrNull()?.coerceIn(1, 999) ?: 1 },
+                        label = { Text(stringResource(R.string.calendar_count)) },
+                        singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                if (ends == "until") {
+                    FieldChip(until.format(dateFmt), Modifier.fillMaxWidth()) { pickUntil = true }
+                }
+            }
+
             PrimaryGradientButton(
                 text = stringResource(R.string.action_save),
                 onClick = {
@@ -149,8 +218,11 @@ fun CalendarEventEditor(
                         start = startDate.toString() + "T" + startTime.format(timeFmt)
                         end = endDate.toString() + "T" + endTime.format(timeFmt)
                     }
+                    val rrule = de.ledgerline.app.core.calendar.CalendarRecurrence.build(
+                        freq, interval, byday.toList(), ends, count, until.toString(),
+                    )
                     onSave(initial?.id, title.trim(), description.trim(), allDay, start, end, tz,
-                        locationLabel.trim().takeIf { it.isNotBlank() }?.let { EventLocation(label = it) })
+                        locationLabel.trim().takeIf { it.isNotBlank() }?.let { EventLocation(label = it) }, rrule)
                     onBack()
                 },
                 enabled = title.isNotBlank(),
@@ -193,6 +265,20 @@ fun CalendarEventEditor(
             },
             dismissButton = { TextButton(onClick = { pickTime = null }) { Text(stringResource(R.string.action_cancel)) } },
         ) { Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) { TimePicker(state = ts) } }
+    }
+
+    if (pickUntil) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = until.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = { pickUntil = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { until = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
+                    pickUntil = false
+                }) { Text(stringResource(R.string.action_ok)) }
+            },
+            dismissButton = { TextButton(onClick = { pickUntil = false }) { Text(stringResource(R.string.action_cancel)) } },
+        ) { DatePicker(state = state) }
     }
 }
 

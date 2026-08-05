@@ -42,6 +42,11 @@ data class CalendarEvent(
     val location: EventLocation? = null,
     /** RFC-5545 RRULE (no DTSTART); blank = single event. */
     val rrule: String = "",
+    /** Excluded occurrence days (yyyy-MM-dd) of a recurring series. */
+    val exdates: List<String> = emptyList(),
+    /** This record overrides one occurrence (day) of [overrideOf]. */
+    val recurrenceId: String = "",
+    val overrideOf: String = "",
     val status: String = "confirmed",
     val raw: JsonObject = JsonObject(emptyMap()),
 )
@@ -110,6 +115,9 @@ object CalendarRecordCodec {
             tz = str(o, "tz"),
             location = loc,
             rrule = str(o, "rrule"),
+            exdates = (o["exdates"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.map { it.take(10) },
+            recurrenceId = str(o, "recurrenceId"),
+            overrideOf = str(o, "overrideOf"),
             status = str(o, "status").ifBlank { "confirmed" },
             raw = o,
         )
@@ -150,6 +158,9 @@ object CalendarRecordCodec {
         if (e.tz.isNotBlank()) out["tz"] = JsonPrimitive(e.tz)
         out["status"] = JsonPrimitive(e.status)
         if (e.rrule.isNotBlank()) out["rrule"] = JsonPrimitive(e.rrule) else out["rrule"] = JsonNull
+        if (e.exdates.isNotEmpty()) out["exdates"] = JsonArray(e.exdates.map { JsonPrimitive(it) }) else out.remove("exdates")
+        if (e.recurrenceId.isNotBlank()) out["recurrenceId"] = JsonPrimitive(e.recurrenceId) else out.remove("recurrenceId")
+        if (e.overrideOf.isNotBlank()) out["overrideOf"] = JsonPrimitive(e.overrideOf) else out.remove("overrideOf")
         if (e.location != null) {
             val locOut = (e.raw["location"] as? JsonObject)?.toMutableMap() ?: LinkedHashMap()
             locOut["label"] = JsonPrimitive(e.location.label)

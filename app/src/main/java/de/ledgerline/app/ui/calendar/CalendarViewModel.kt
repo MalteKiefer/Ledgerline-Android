@@ -69,6 +69,7 @@ class CalendarViewModel @Inject constructor(
         end: String,
         tz: String,
         location: de.ledgerline.app.domain.model.EventLocation?,
+        rrule: String = "",
     ) = viewModelScope.launch {
         repo.save { m ->
             var cals = m.calendars
@@ -86,7 +87,7 @@ class CalendarViewModel @Inject constructor(
             val existing = m.events.firstOrNull { it.id == id }
             val ev = (existing ?: de.ledgerline.app.domain.model.CalendarEvent(id = de.ledgerline.app.core.Ids.newId(), calendarId = cid, title = title, start = start)).copy(
                 calendarId = cid, title = title, description = description, allDay = allDay,
-                start = start, end = end, tz = tz, location = location, status = "confirmed",
+                start = start, end = end, tz = tz, location = location, rrule = rrule, status = "confirmed",
             )
             val events = if (existing != null) m.events.map { if (it.id == ev.id) ev else it } else m.events + ev
             m.copy(calendars = cals, events = events)
@@ -113,28 +114,78 @@ class CalendarViewModel @Inject constructor(
     fun calendarName(calendarId: String): String =
         ui.value.calendars.firstOrNull { it.id == calendarId }?.name ?: ""
 
-    /** Events touching [date], sorted all-day first then by start time. */
-    fun eventsForDay(date: LocalDate): List<CalendarEvent> =
-        ui.value.events
-            .filter { it.status != "cancelled" && covers(it, date) }
-            .sortedWith(compareByDescending<CalendarEvent> { it.allDay }.thenBy { it.start })
+    /** Days (yyyy-MM-dd) of every per-occurrence override, keyed base|day, so masters skip them. */
+    private fun overrideKeys(events: List<CalendarEvent>): Set<String> =
+        events.filter { it.recurrenceId.isNotBlank() && it.overrideOf.isNotBlank() }
+            .mapTo(HashSet()) { "${it.overrideOf}|${it.recurrenceId.take(10)}" }
 
-    /** Days in [month] that have at least one (non-cancelled) event — drives the grid dots. */
+    private fun spanDays(e: CalendarEvent): Long {
+        val s = dateOf(e.start) ?: return 0
+        val end = dateOf(e.end) ?: s
+        return maxOf(0, de.ledgerline.app.core.calendar.CalendarRecurrence.daysBetween(s, end))
+    }
+
+    /** Shift a recurring master to a concrete occurrence starting on [day] (keeps wall-clock time). */
+    private fun occurrenceOf(e: CalendarEvent, day: LocalDate): CalendarEvent {
+        val startTime = if (!e.allDay && e.start.contains('T')) e.start.substringAfter('T').take(5) else ""
+        val endTime = if (!e.allDay && e.end.contains('T')) e.end.substringAfter('T').take(5) else startTime
+        val endDay = day.plusDays(spanDays(e))
+        val start = if (e.allDay || startTime.isEmpty()) day.toString() else "${day}T$startTime"
+        val end = if (e.allDay || endTime.isEmpty()) endDay.toString() else "${endDay}T$endTime"
+        return e.copy(start = start, end = end, rrule = "", recurrenceId = day.toString())
+    }
+
+    /** Events touching [date] (recurrences expanded, overrides applied), all-day first then by time. */
+    fun eventsForDay(date: LocalDate): List<CalendarEvent> {
+        val events = ui.value.events
+        val overrides = overrideKeys(events)
+        val out = ArrayList<CalendarEvent>()
+        for (e in events) {
+            if (e.status == "cancelled") continue
+            if (e.rrule.isBlank()) {
+                if (covers(e, date)) out.add(e)
+            } else {
+                val span = spanDays(e)
+                val occ = de.ledgerline.app.core.calendar.CalendarRecurrence.occurrences(
+                    e.start, e.rrule, e.exdates, date.minusDays(span), date,
+                )
+                for (day in occ) {
+                    if (overrides.contains("${e.id}|$day")) continue
+                    val syn = occurrenceOf(e, day)
+                    if (covers(syn, date)) out.add(syn)
+                }
+            }
+        }
+        return out.sortedWith(compareByDescending<CalendarEvent> { it.allDay }.thenBy { it.start })
+    }
+
+    /** Days in [month] that have at least one event — drives the grid dots. */
     fun daysWithEvents(month: YearMonth): Set<LocalDate> {
-        val out = HashSet<LocalDate>()
         val first = month.atDay(1)
         val last = month.atEndOfMonth()
-        for (e in ui.value.events) {
+        val events = ui.value.events
+        val overrides = overrideKeys(events)
+        val out = HashSet<LocalDate>()
+        for (e in events) {
             if (e.status == "cancelled") continue
-            val s = dateOf(e.start) ?: continue
-            val end = dateOf(e.end) ?: s
-            // Clamp the event's span to the visible month and mark each covered day.
-            var d = if (s.isBefore(first)) first else s
-            val stop = if (end.isAfter(last)) last else end
-            while (!d.isAfter(stop)) { out.add(d); d = d.plusDays(1) }
-            // A recurring event whose first occurrence is before this month still shows via its
-            // start day only (no expansion yet) — mark the start if it lands in-month.
-            if (e.rrule.isNotBlank() && s in first..last) out.add(s)
+            val span = spanDays(e)
+            if (e.rrule.isBlank()) {
+                val s = dateOf(e.start) ?: continue
+                val end = dateOf(e.end) ?: s
+                var d = if (s.isBefore(first)) first else s
+                val stop = if (end.isAfter(last)) last else end
+                while (!d.isAfter(stop)) { out.add(d); d = d.plusDays(1) }
+            } else {
+                val occ = de.ledgerline.app.core.calendar.CalendarRecurrence.occurrences(
+                    e.start, e.rrule, e.exdates, first.minusDays(span), last,
+                )
+                for (day in occ) {
+                    if (overrides.contains("${e.id}|$day")) continue
+                    var d = if (day.isBefore(first)) first else day
+                    val stop = minOf(day.plusDays(span), last)
+                    while (!d.isAfter(stop)) { out.add(d); d = d.plusDays(1) }
+                }
+            }
         }
         return out
     }
