@@ -740,6 +740,7 @@
     <string name="home_vault_unlocked">Хранилище разблокировано</string>
     <string name="home_e2e">Сквозное шифрование на этом устройстве</string>
     <string name="home_quick_actions">Быстрые действия</string>
+    <string name="home_overdue_todos">%1$d просроченных задач</string>
     <string name="home_qa_note">Заметка</string>
     <string name="home_qa_upload">Загрузить</string>
     <string name="home_qa_backup">Фото</string>

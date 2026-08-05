@@ -737,6 +737,7 @@
     <string name="home_vault_unlocked">Tresor entsperrt</string>
     <string name="home_e2e">Ende-zu-Ende verschlüsselt auf diesem Gerät</string>
     <string name="home_quick_actions">Schnellaktionen</string>
+    <string name="home_overdue_todos">%1$d überfällige Todos</string>
     <string name="home_qa_note">Neue Notiz</string>
     <string name="home_qa_upload">Hochladen</string>
     <string name="home_qa_backup">Fotos</string>

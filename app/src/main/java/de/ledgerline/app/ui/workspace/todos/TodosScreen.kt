@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.RestoreFromTrash
@@ -60,6 +61,7 @@ import de.ledgerline.app.ui.workspace.common.TagChips
 import de.ledgerline.app.ui.workspace.common.TagFilterRow
 import de.ledgerline.app.ui.workspace.common.TrashBar
 import de.ledgerline.app.ui.workspace.common.formatDue
+import de.ledgerline.app.ui.workspace.common.isOverdue
 import de.ledgerline.app.ui.common.ConfirmDialog
 import de.ledgerline.app.ui.common.TextInputDialog
 
@@ -361,6 +363,8 @@ private fun TodoRow(
     onOpen: () -> Unit,
 ) {
     val dueText = formatDue(todo.due)
+    // An open todo past its due date is highlighted in the error colour so it stands out.
+    val overdue = !todo.done && isOverdue(todo.due)
     val showPriority = todo.priority.isNotBlank() && todo.priority != "normal"
     ListItem(
         headlineContent = {
@@ -391,16 +395,18 @@ private fun TodoRow(
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
+                                    val dueTint = if (overdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                     Icon(
-                                        Icons.Outlined.Event,
+                                        if (overdue) Icons.Outlined.EventBusy else Icons.Outlined.Event,
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        tint = dueTint,
                                     )
                                     Text(
                                         dueText,
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = dueTint,
+                                        fontWeight = if (overdue) androidx.compose.ui.text.font.FontWeight.SemiBold else null,
                                     )
                                 }
                             }

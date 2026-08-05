@@ -1,6 +1,9 @@
 package de.ledgerline.app.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -97,6 +100,28 @@ fun HomeScreen(
                     Text(stringResource(R.string.home_vault_unlocked), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 }
                 Text(stringResource(R.string.home_e2e), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        // --- overdue todos alert ---
+        if (counts.todosOverdue > 0) {
+            Spacer(Modifier.size(12.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.errorContainer, RoundedCornerShape(14.dp))
+                    .clickable { onOpen(WorkspaceDest.Todos) }
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Icon(Icons.Outlined.EventBusy, null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                Text(
+                    stringResource(R.string.home_overdue_todos, counts.todosOverdue),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
             }
         }
 

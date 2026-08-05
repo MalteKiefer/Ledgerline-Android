@@ -34,6 +34,7 @@ class HomeViewModel @Inject constructor(
     data class Counts(
         val notes: Int = 0,
         val todosOpen: Int = 0,
+        val todosOverdue: Int = 0,
         val bookmarks: Int = 0,
         val contacts: Int = 0,
         val files: Int = 0,
@@ -50,6 +51,7 @@ class HomeViewModel @Inject constructor(
         Counts(
             notes = m?.notes?.count { !it.trashed } ?: 0,
             todosOpen = m?.todos?.count { !it.trashed && !it.done } ?: 0,
+            todosOverdue = m?.todos?.count { !it.trashed && !it.done && de.ledgerline.app.ui.workspace.common.isOverdue(it.due) } ?: 0,
             bookmarks = m?.bookmarks?.count { !it.trashed } ?: 0,
             contacts = m?.contacts?.count { !it.trashed } ?: 0,
             files = m?.files?.count { !it.trashed } ?: 0,

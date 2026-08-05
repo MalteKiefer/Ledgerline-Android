@@ -739,6 +739,7 @@
     <string name="home_vault_unlocked">Vault unlocked</string>
     <string name="home_e2e">Encrypted end-to-end on this device</string>
     <string name="home_quick_actions">Quick actions</string>
+    <string name="home_overdue_todos">%1$d overdue todos</string>
     <string name="home_qa_note">New note</string>
     <string name="home_qa_upload">Upload</string>
     <string name="home_qa_backup">Photos</string>

@@ -34,17 +34,23 @@ fun formatDue(due: String): String {
     }
 }
 
-/** True when the todo `due` value (ISO date or date-time) is strictly before today. */
+/**
+ * True when a todo `due` value is in the past. A date-time due is overdue once that exact
+ * moment has passed (so "today 09:00" is overdue by the afternoon); a date-only due is
+ * overdue only from the following day (it still has the whole day to be done). Caller must
+ * also check `!done` — a completed todo is never overdue.
+ */
 fun isOverdue(due: String): Boolean {
     if (due.isBlank()) return false
     return try {
-        val date = when {
+        when {
             due.contains('T') && (due.endsWith("Z") || due.contains('+')) ->
-                OffsetDateTime.parse(due).toLocalDate()
-            due.contains('T') -> LocalDateTime.parse(due).toLocalDate()
-            else -> LocalDate.parse(due)
+                OffsetDateTime.parse(due).toInstant().isBefore(java.time.Instant.now())
+            due.contains('T') ->
+                LocalDateTime.parse(due).isBefore(LocalDateTime.now())
+            else ->
+                LocalDate.parse(due).isBefore(LocalDate.now())
         }
-        date.isBefore(LocalDate.now())
     } catch (_: Exception) {
         false
     }
