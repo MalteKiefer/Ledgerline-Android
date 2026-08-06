@@ -2,14 +2,13 @@ package de.ledgerline.app.data
 
 import de.ledgerline.app.core.offline.OfflineFlags
 import de.ledgerline.app.data.offline.FileBlobPolicy
-import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
  * Pure JVM coverage for the §C1 policy decode/migration and the `maxBytes` computation.
- * The DataStore flows delegate to [SettingsStore.decodeFilesPolicy]/[decodePhotosPolicy],
- * so testing those functions exercises the same migration logic without a DataStore.
+ * The DataStore flow delegates to [SettingsStore.decodeFilesPolicy], so testing that
+ * function exercises the same migration logic without a DataStore.
  */
 class OfflinePolicyDecodeTest {
 
@@ -27,14 +26,6 @@ class OfflinePolicyDecodeTest {
         assertEquals(FileBlobPolicy.ON_DEMAND, SettingsStore.decodeFilesPolicy(null, true))
         assertEquals(FileBlobPolicy.OFF, SettingsStore.decodeFilesPolicy(null, false))
         assertEquals(FileBlobPolicy.ON_DEMAND, SettingsStore.decodeFilesPolicy(null, null))
-    }
-
-    @Test fun photos_stored_enum_and_migration() {
-        assertEquals(PhotoBlobPolicy.THUMBS, SettingsStore.decodePhotosPolicy("THUMBS", null))
-        assertEquals(PhotoBlobPolicy.ON_DEMAND, SettingsStore.decodePhotosPolicy("nope", null))
-        assertEquals(PhotoBlobPolicy.ON_DEMAND, SettingsStore.decodePhotosPolicy(null, true))
-        assertEquals(PhotoBlobPolicy.OFF, SettingsStore.decodePhotosPolicy(null, false))
-        assertEquals(PhotoBlobPolicy.ON_DEMAND, SettingsStore.decodePhotosPolicy(null, null))
     }
 
     @Test fun maxBytes_is_mb_times_one_mebibyte_and_zero_stays_zero() {

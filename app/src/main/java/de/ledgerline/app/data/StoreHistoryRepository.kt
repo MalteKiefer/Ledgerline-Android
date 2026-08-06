@@ -27,7 +27,7 @@ class StoreHistoryRepository(
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
-    enum class Store { FILES, GALLERY, NOTES, PASSWORDS, INVOICES, CONTACTS, TODOS, BOOKMARKS }
+    enum class Store { FILES, NOTES, PASSWORDS, INVOICES, CONTACTS, TODOS, BOOKMARKS }
 
     /** Retained versions of [store], newest first. Empty on failure. */
     suspend fun list(store: Store): List<StoreHistoryEntry> = withContext(Dispatchers.IO) {
@@ -35,7 +35,6 @@ class StoreHistoryRepository(
         val res: Response<*> = runCatching {
             when (store) {
                 Store.FILES -> api.filesStoreHistory()
-                Store.GALLERY -> api.galleryStoreHistory()
                 Store.NOTES -> api.notesStoreHistory()
                 Store.PASSWORDS -> api.passwordsStoreHistory()
                 Store.INVOICES -> api.invoicesStoreHistory()
@@ -54,7 +53,6 @@ class StoreHistoryRepository(
         runCatching {
             when (store) {
                 Store.FILES -> api.filesStoreHistoryVersion(version)
-                Store.GALLERY -> api.galleryStoreHistoryVersion(version)
                 Store.NOTES -> api.notesStoreHistoryVersion(version)
                 Store.PASSWORDS -> api.passwordsStoreHistoryVersion(version)
                 Store.INVOICES -> api.invoicesStoreHistoryVersion(version)

@@ -10,12 +10,6 @@ package de.ledgerline.app.data.offline
 enum class FileBlobPolicy { OFF, ON_DEMAND, ALL }
 
 /**
- * Per-module offline blob-caching policy for the gallery. [THUMBS] adds thumbnail-only
- * prefetch; on-access caching still stores whatever is viewed (only [OFF] disables it).
- */
-enum class PhotoBlobPolicy { OFF, THUMBS, ON_DEMAND, ALL }
-
-/**
  * Per-module offline policy for contact avatar blobs. [ALL] prefetches every avatar;
  * [ON_DEMAND] caches only avatars actually viewed; [OFF] disables avatar caching.
  * (Notes/todos/bookmarks/contacts records themselves live in the sealed `/store`

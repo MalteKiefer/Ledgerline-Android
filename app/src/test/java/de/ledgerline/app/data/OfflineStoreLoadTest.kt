@@ -1,6 +1,5 @@
 package de.ledgerline.app.data
 
-import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.WorkspaceCache
@@ -17,8 +16,8 @@ import retrofit2.Response
 
 /**
  * A2 — network-first, cache-fallback for the sealed store manifests.
- * An online [WorkspaceRepository.load]/[GalleryRepository.load] writes the envelope
- * through to the [StoreDiskCache]; a subsequent offline load serves it from disk.
+ * An online [WorkspaceRepository.load] writes the envelope through to the
+ * [StoreDiskCache]; a subsequent offline load serves it from disk.
  */
 class OfflineStoreLoadTest {
 
@@ -154,130 +153,5 @@ class OfflineStoreLoadTest {
         val m = (res as Outcome.Ok).value.manifest
         assertEquals(listOf("root.txt"), m.files.map { it.name })
         assertEquals(listOf("Docs"), m.fileFolders.map { it.name })
-    }
-
-    // ---- Gallery --------------------------------------------------------------
-
-    private class GalleryApi(val body: StoreResponse?, val code: Int?) : NotImplementedApi() {
-        override suspend fun galleryStore(): Response<StoreResponse> = when {
-            code != null -> Response.error(code, ResponseBody.create(null, ""))
-            else -> Response.success(body!!)
-        }
-    }
-
-    @Test fun gallery_online_writes_cache_then_offline_503_reads_it() = runBlocking {
-        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
-        val vh = VaultKeyHolder().apply { set(vk) }
-        val storeCache = tmpStoreCache()
-
-        val manifestJson = """{"v":1,"photos":[{"id":"p1"}],"albums":[],"people":[]}"""
-        val online = GalleryRepository(
-            sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
-            galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
-            blobCache = tmpBlobCache(),
-            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
-            apiProvider = { GalleryApi(StoreResponse("SEALED:$manifestJson", 4), code = null) },
-        )
-        assertTrue(online.load() is Outcome.Ok)
-        assertEquals(4, storeCache.get("gallery")!!.version)
-
-        // Non-2xx (503, not 401) → cache fallback.
-        val offline = GalleryRepository(
-            sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
-            galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
-            blobCache = tmpBlobCache(),
-            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
-            apiProvider = { GalleryApi(null, code = 503) },
-        )
-        val res = offline.load()
-        assertTrue(res is Outcome.Ok)
-        assertEquals(listOf("p1"), (res as Outcome.Ok).value.manifest.photos.map { it.id })
-        assertEquals(4, res.value.version)
-    }
-
-    // A v3 sharded root: one photo shard blob + a people collection blob. `galleryRaw`
-    // serves the framed-echo ciphertext online; offline (fail=true) it throws so assembly
-    // must come from the shared blob cache the online load populated.
-    private class ShardedGalleryApi(
-        val store: StoreResponse?,
-        val storeCode: Int?,
-        val blobs: Map<String, ByteArray>,
-        val fail: Boolean,
-    ) : NotImplementedApi() {
-        override suspend fun galleryStore(): Response<StoreResponse> = when {
-            storeCode != null -> Response.error(storeCode, ResponseBody.create(null, ""))
-            else -> Response.success(store!!)
-        }
-        override suspend fun galleryRaw(blob: String): Response<ResponseBody> {
-            if (fail) throw java.io.IOException("offline")
-            val b = blobs[blob] ?: return Response.error(404, ResponseBody.create(null, ""))
-            return Response.success(ResponseBody.create(null, b))
-        }
-    }
-
-    @Test fun gallery_v3_online_caches_shard_blobs_then_offline_assembles_them() = runBlocking {
-        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
-        val vh = VaultKeyHolder().apply { set(vk) }
-        val storeCache = tmpStoreCache()
-        val blobCache = tmpBlobCache()   // SHARED across online + offline repos
-
-        // Blob payloads: a photo-shard record array and a people-collection record array,
-        // framed so SealTagCrypto's echo decryptor returns them verbatim.
-        val shardArray = """[{"id":"p1"},{"id":"p2"}]"""
-        val peopleArray = """[{"id":"per1","name":"Alice"}]"""
-        val blobs = mapOf(
-            "shard-a" to frameForEchoDecrypt(shardArray.toByteArray(), crypto),
-            "coll-p" to frameForEchoDecrypt(peopleArray.toByteArray(), crypto),
-        )
-        val rootJson = """{"v":3,"shardBits":0,"shards":[{"ref":"shard-a","key":"k","bucket":0}],""" +
-            """"peopleRef":"coll-p","peopleKey":"k"}"""
-
-        val online = GalleryRepository(
-            sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
-            galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
-            blobCache = blobCache,
-            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
-            apiProvider = { ShardedGalleryApi(StoreResponse("SEALED:$rootJson", 8), storeCode = null, blobs = blobs, fail = false) },
-        )
-        val first = online.load()
-        assertTrue(first is Outcome.Ok)
-        assertEquals(setOf("p1", "p2"), (first as Outcome.Ok).value.manifest.photos.map { it.id }.toSet())
-        // The shard + collection ciphertext were written through to the shared blob cache.
-        assertTrue(blobCache.has("shard-a"))
-        assertTrue(blobCache.has("coll-p"))
-
-        // Offline: the store GET 503s AND galleryRaw throws — assembly must be served entirely
-        // from the cached root + cached shard/collection blobs.
-        val offline = GalleryRepository(
-            sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
-            galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
-            blobCache = blobCache,
-            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
-            apiProvider = { ShardedGalleryApi(null, storeCode = 503, blobs = blobs, fail = true) },
-        )
-        val res = offline.load()
-        assertTrue(res is Outcome.Ok)
-        val m = (res as Outcome.Ok).value.manifest
-        assertEquals(setOf("p1", "p2"), m.photos.map { it.id }.toSet())
-        assertEquals(listOf("Alice"), m.people.map { it.name })
-        assertEquals(8, res.value.version)
-    }
-
-    @Test fun gallery_401_never_falls_back_to_cache() = runBlocking {
-        val sh = SessionHolder().apply { set(Session("https://h", "tok", "sha256/x", null)) }
-        val vh = VaultKeyHolder().apply { set(vk) }
-        val storeCache = tmpStoreCache()
-        storeCache.put("gallery", de.ledgerline.app.core.offline.StoreEnvelope("SEALED:{}", 9))
-        val repo = GalleryRepository(
-            sh, vh, crypto, GalleryCache(), storeCache, FakeOfflineFlags(),
-            galleryUpload = NoGalleryUpload, degradedState = de.ledgerline.app.core.offline.DegradedState(),
-            blobCache = tmpBlobCache(),
-            syncOutbox = tmpOutbox(), connectivity = FakeConnectivity(),
-            apiProvider = { GalleryApi(null, code = 401) },
-        )
-        // 401 → HTTP error (forced-logout path), NOT the cached manifest.
-        val res = repo.load()
-        assertTrue(res is Outcome.Err)
-        assertEquals(de.ledgerline.app.core.ErrorKind.HTTP, (res as Outcome.Err).kind)
     }
 }

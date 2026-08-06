@@ -14,14 +14,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Durable, VK-sealed queue of photo/file imports whose blob upload couldn't complete (offline or a
+ * Durable, VK-sealed queue of file imports whose blob upload couldn't complete (offline or a
  * recoverable server error). The source plaintext is stream-encrypted to a per-item sealed file
- * ([SealedImportBlob]); the index (names/mime/geo/folder + each item's sealed content key) is itself
+ * ([SealedImportBlob]); the index (names/mime/folder + each item's sealed content key) is itself
  * VK-sealed. Nothing is stored in the clear. [PendingImportRepository] replays the queue on reconnect,
  * running the full upload+append pipeline from the sealed source and removing each item on success.
  *
- * Dedupe is by content [sig] (the same windowed hash the importer uses), so a retry — or the camera-
- * roll backup re-scanning the same photo — never queues or uploads it twice.
+ * Dedupe is by content [sig] (the same windowed hash the importer uses), so a retry never queues
+ * or uploads the same file twice.
  */
 @Singleton
 class ImportQueue(
@@ -34,7 +34,7 @@ class ImportQueue(
     private val json = Json { ignoreUnknownKeys = true }
     private val mutex = Mutex()
 
-    enum class Kind { PHOTO, FILE }
+    enum class Kind { FILE }
 
     @Serializable
     data class Item(
@@ -45,8 +45,6 @@ class ImportQueue(
         val size: Long,
         val encFileKey: String,
         val sig: String,
-        val lat: Double? = null,
-        val lng: Double? = null,
         val folder: String? = null,
     )
 
@@ -59,19 +57,14 @@ class ImportQueue(
     /** Cheap, VK-free check (used to decide whether a sync pass needs to drain the queue). */
     fun hasPending(): Boolean = (root.listFiles { f -> f.extension == "blob" }?.isNotEmpty()) == true
 
-    suspend fun enqueuePhoto(
-        vk: ByteArray, name: String, mime: String, size: Long, sig: String,
-        openInput: () -> InputStream, lat: Double?, lng: Double?,
-    ): Boolean = enqueue(vk, Kind.PHOTO, name, mime, size, sig, openInput, lat, lng, folder = null)
-
     suspend fun enqueueFile(
         vk: ByteArray, name: String, mime: String, size: Long, sig: String,
         openInput: () -> InputStream, folder: String?,
-    ): Boolean = enqueue(vk, Kind.FILE, name, mime, size, sig, openInput, lat = null, lng = null, folder = folder)
+    ): Boolean = enqueue(vk, Kind.FILE, name, mime, size, sig, openInput, folder = folder)
 
     private suspend fun enqueue(
         vk: ByteArray, kind: Kind, name: String, mime: String, size: Long, sig: String,
-        openInput: () -> InputStream, lat: Double?, lng: Double?, folder: String?,
+        openInput: () -> InputStream, folder: String?,
     ): Boolean = mutex.withLock {
         try {
             val idx = readIndex(vk)
@@ -80,7 +73,7 @@ class ImportQueue(
             val id = Ids.newId()
             val blob = File(root, "$id.blob")
             val key = SealedImportBlob.sealToFile(crypto, vk, size, openInput, blob)
-            writeIndex(vk, Index(idx.items + Item(id, kind.name, name, mime, size, key, sig, lat, lng, folder)))
+            writeIndex(vk, Index(idx.items + Item(id, kind.name, name, mime, size, key, sig, folder)))
             true
         } catch (_: Exception) {
             false

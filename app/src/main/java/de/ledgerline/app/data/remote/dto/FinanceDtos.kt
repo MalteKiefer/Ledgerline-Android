@@ -34,9 +34,10 @@ data class CompanyDto(
 data class CompanyResponse(val company: CompanyDto? = null)
 
 /**
- * `POST /api/v1/invoices/ocr` response — server-side OCR of a receipt (transient cleartext, ZK-parity
- * with `/gallery/process`). `text` is line-structured; recognition runs client-side (`ReceiptOcr`).
- * See docs spec `ledgerline-server-ocr-spec.md`. Optional endpoint: absent → manual entry.
+ * `POST /api/v1/invoices/ocr` response — server-side OCR of a receipt (transient cleartext,
+ * never persisted server-side). `text` is line-structured; recognition runs client-side
+ * (`ReceiptOcr`). See docs spec `ledgerline-server-ocr-spec.md`. Optional endpoint: absent →
+ * manual entry.
  */
 @Serializable
 data class OcrResponse(

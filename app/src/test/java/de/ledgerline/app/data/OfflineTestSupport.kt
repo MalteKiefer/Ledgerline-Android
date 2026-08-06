@@ -8,14 +8,12 @@ import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
-import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.cleartextApi
 import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
-import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
 import de.ledgerline.app.data.remote.dto.UploadResponse
@@ -35,7 +33,6 @@ import java.io.File
 class FakeOfflineFlags(
     private val enabled: Boolean = true,
     private val filesPolicy: FileBlobPolicy = FileBlobPolicy.ON_DEMAND,
-    private val photosPolicy: PhotoBlobPolicy = PhotoBlobPolicy.ON_DEMAND,
     private val contactsPolicy: ContactBlobPolicy = ContactBlobPolicy.ON_DEMAND,
     private val maxBytes: Long = 0L,
     private val wifiOnly: Boolean = false,
@@ -43,7 +40,6 @@ class FakeOfflineFlags(
 ) : OfflineFlags {
     override fun enabled() = enabled
     override fun filesPolicy() = filesPolicy
-    override fun photosPolicy() = photosPolicy
     override fun contactsPolicy() = contactsPolicy
     override fun maxBytes() = maxBytes
     override fun wifiOnly() = wifiOnly
@@ -81,17 +77,6 @@ fun fileBlobRepoForTest(baseUrl: String): FileBlobRepository = FileBlobRepositor
     apiProvider = { s -> cleartextApi(s.baseUrl, tokenProvider = { s.token }) },
 )
 
-/** A [GalleryBlobRepository] bound to a fixed fake [api] (the api-provider seam). */
-fun galleryBlobRepoForTest(
-    sessionHolder: SessionHolder,
-    vaultKeyHolder: VaultKeyHolder,
-    crypto: Crypto,
-    blobCache: BlobDiskCache,
-    offlineFlags: OfflineFlags,
-    api: LedgerlineApi,
-): GalleryBlobRepository =
-    GalleryBlobRepository(sessionHolder, vaultKeyHolder, crypto, blobCache, offlineFlags) { api }
-
 /** A [ContactBlobRepository] bound to a fixed fake [api] (the api-provider seam). */
 fun contactBlobRepoForTest(
     sessionHolder: SessionHolder,
@@ -111,14 +96,6 @@ fun tmpBlobCache(): BlobDiskCache =
  * A [LedgerlineApi] whose every method throws by default; override just the endpoints
  * a given test exercises. Any accidental call to an un-overridden endpoint is loud.
  */
-/** A [de.ledgerline.app.domain.usecase.GalleryUploadApi] whose methods throw — for
- *  gallery tests that never upload (load-path tests). */
-object NoGalleryUpload : de.ledgerline.app.domain.usecase.GalleryUploadApi {
-    override suspend fun uploadBytes(bytes: ByteArray, name: String) = throw NotImplementedError()
-    override suspend fun uploadStream(name: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
-    override suspend fun process(name: String, mime: String, size: Long, openInput: () -> java.io.InputStream) = throw NotImplementedError()
-}
-
 open class NotImplementedApi : LedgerlineApi {
     override suspend fun claimPair(body: PairClaimRequest): Response<PairClaimResponse> = throw NotImplementedError()
     override suspend fun pollPair(body: de.ledgerline.app.data.remote.dto.PairCollectRequest): Response<PairPollResponse> = throw NotImplementedError()
@@ -145,14 +122,8 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun filesUploadPart(token: okhttp3.RequestBody, part: okhttp3.RequestBody, chunk: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadPartResponse> = throw NotImplementedError()
     override suspend fun filesUploadComplete(body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse> = throw NotImplementedError()
     override suspend fun filesUploadAbort(body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
-    override suspend fun galleryUploadInit(body: de.ledgerline.app.data.remote.dto.UploadInitRequest): Response<de.ledgerline.app.data.remote.dto.UploadInitResponse> = throw NotImplementedError()
-    override suspend fun galleryUploadPart(token: okhttp3.RequestBody, part: okhttp3.RequestBody, chunk: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.UploadPartResponse> = throw NotImplementedError()
-    override suspend fun galleryUploadComplete(body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse> = throw NotImplementedError()
-    override suspend fun galleryUploadAbort(body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit> = throw NotImplementedError()
     override suspend fun deleteBlob(blob: String): Response<Unit> = throw NotImplementedError()
     override suspend fun filesReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
-    // Default to a benign success so a gallery load's best-effort reconcile-on-load is a no-op in fakes.
-    override suspend fun galleryReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = Response.success(de.ledgerline.app.data.remote.dto.ReconcileResponse(0, 0))
     // Default to an empty sharded files store so WorkspaceRepository.load()'s files slice
     // resolves to an empty list in fakes that don't exercise files. Override where needed.
     override suspend fun filesStore(): Response<StoreResponse> = Response.success(StoreResponse(null, 0))
@@ -160,19 +131,10 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun createFileShare(body: de.ledgerline.app.data.remote.dto.ShareCreateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse> = throw NotImplementedError()
     override suspend fun updateFileShare(token: String, body: de.ledgerline.app.data.remote.dto.ShareUpdateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse> = throw NotImplementedError()
     override suspend fun deleteFileShare(token: String): Response<Unit> = throw NotImplementedError()
-    override suspend fun createGalleryShare(body: de.ledgerline.app.data.remote.dto.ShareCreateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse> = throw NotImplementedError()
-    override suspend fun updateGalleryShare(token: String, body: de.ledgerline.app.data.remote.dto.ShareUpdateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse> = throw NotImplementedError()
-    override suspend fun deleteGalleryShare(token: String): Response<Unit> = throw NotImplementedError()
     override suspend fun putStore(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
     override suspend fun filesUsage(): Response<UsageResponse> = throw NotImplementedError()
-    override suspend fun galleryStore(): Response<StoreResponse> = throw NotImplementedError()
-    override suspend fun galleryRaw(blob: String): Response<ResponseBody> = throw NotImplementedError()
-    override suspend fun galleryRawBatch(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<ResponseBody> = throw NotImplementedError()
-    override suspend fun galleryUsage(): Response<UsageResponse> = throw NotImplementedError()
-    override suspend fun galleryUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
-    override suspend fun galleryProcess(file: MultipartBody.Part): Response<ProcessResponse> = throw NotImplementedError()
-    override suspend fun galleryAnalyze(file: okhttp3.MultipartBody.Part): retrofit2.Response<de.ledgerline.app.data.remote.dto.AnalyzeResponse> = throw NotImplementedError()
     override suspend fun galleryGeocode(q: String): retrofit2.Response<de.ledgerline.app.data.remote.dto.GeocodeResponse> = throw NotImplementedError()
+    override suspend fun galleryReverse(lat: Double, lng: Double): Response<de.ledgerline.app.data.remote.dto.ReverseResponse> = throw NotImplementedError()
 
         override suspend fun notifications(etag: String?): retrofit2.Response<de.ledgerline.app.data.remote.dto.NotificationsResponse> = throw NotImplementedError()
         override suspend fun markNotificationRead(id: Long): retrofit2.Response<Unit> = throw NotImplementedError()
@@ -215,9 +177,6 @@ open class NotImplementedApi : LedgerlineApi {
         override suspend fun exploreUpload(file: okhttp3.MultipartBody.Part): retrofit2.Response<de.ledgerline.app.data.remote.dto.UploadResponse> = throw NotImplementedError()
         override suspend fun exploreRaw(blob: String): retrofit2.Response<okhttp3.ResponseBody> = throw NotImplementedError()
         override suspend fun exploreReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): retrofit2.Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
-    override suspend fun galleryStorePut(body: StorePutRequest): Response<StoreResponse> = throw NotImplementedError()
-    override suspend fun deleteGalleryBlob(blob: String): Response<Unit> = throw NotImplementedError()
-    override suspend fun embedText(body: de.ledgerline.app.data.remote.dto.EmbedTextRequest): Response<de.ledgerline.app.data.remote.dto.EmbedTextResponse> = throw NotImplementedError()
     override suspend fun contactsUsage(): Response<UsageResponse> = throw NotImplementedError()
     override suspend fun contactsReconcile(body: de.ledgerline.app.data.remote.dto.ReconcileRequest): Response<de.ledgerline.app.data.remote.dto.ReconcileResponse> = throw NotImplementedError()
     override suspend fun contactsUpload(file: MultipartBody.Part): Response<UploadResponse> = throw NotImplementedError()
@@ -229,7 +188,6 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun contactsStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
     override suspend fun contactsStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
     override suspend fun deleteContactBlob(blob: String): Response<Unit> = throw NotImplementedError()
-    override suspend fun galleryReverse(lat: Double, lng: Double): Response<de.ledgerline.app.data.remote.dto.ReverseResponse> = throw NotImplementedError()
     override suspend fun mapsRoute(points: String): Response<de.ledgerline.app.data.remote.dto.MapsRouteResponse> = throw NotImplementedError()
     // Default to an empty sharded notes store so WorkspaceRepository.load()'s notes slice
     // resolves to an empty list in fakes that don't exercise notes. Override where needed.
@@ -266,8 +224,6 @@ open class NotImplementedApi : LedgerlineApi {
     override suspend fun moduleStoreHistoryVersion(module: String, version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
     override suspend fun filesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
     override suspend fun filesStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
-    override suspend fun galleryStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
-    override suspend fun galleryStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
     override suspend fun notesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()
     override suspend fun notesStoreHistoryVersion(version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion> = throw NotImplementedError()
     override suspend fun passwordsStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse> = throw NotImplementedError()

@@ -33,10 +33,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
- * Android share target. Receives ACTION_SEND / ACTION_SEND_MULTIPLE, parses and
- * classifies the shared items (image/video -> Gallery, else Files), and hosts a
- * small unlock-gated Compose flow. Like MainActivity it wipes the Vault Key on
- * background (respecting in-flight background ops) and is FLAG_SECURE.
+ * Android share target. Receives ACTION_SEND / ACTION_SEND_MULTIPLE, parses the shared
+ * items and imports them into Files, and hosts a small unlock-gated Compose flow. Like
+ * MainActivity it wipes the Vault Key on background (respecting in-flight background
+ * ops) and is FLAG_SECURE.
  *
  * S1: intent parse + unlock gate + lock lifecycle + a placeholder confirm.
  * The real confirm sheet and upload land in S2.
@@ -151,7 +151,7 @@ class ShareActivity : FragmentActivity() {
         return uris.filter { it.scheme == "content" }.mapNotNull { uri ->
             runCatching {
                 val mime = contentResolver.getType(uri) ?: intent.type ?: "application/octet-stream"
-                SharedItem(uri = uri, mime = mime, name = displayName(uri), target = classify(mime))
+                SharedItem(uri = uri, mime = mime, name = displayName(uri))
             }.getOrNull()
         }
     }

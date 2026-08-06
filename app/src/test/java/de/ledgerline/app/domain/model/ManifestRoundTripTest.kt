@@ -86,23 +86,4 @@ class ManifestRoundTripTest {
         assertEquals("#fff", result.color)
         assertEquals("star", result.icon)
     }
-
-    @Test
-    fun galleryPhoto_preserves_rotation_flip_favorite_and_failure_fields() {
-        val input = """
-            {
-              "id": "p1", "media_type": "image",
-              "rotation": 90, "flipH": true, "flipV": false,
-              "favorite": true, "failed": true, "procError": "x"
-            }
-        """.trimIndent()
-
-        val result = roundTrip<GalleryPhoto>(input)
-
-        assertEquals(90, result.rotation)
-        assertTrue("flipH must survive round-trip", result.flipH)
-        assertTrue("favorite must survive round-trip", result.favorite)
-        assertTrue("failed must survive round-trip", result.failed)
-        assertEquals("x", result.procError)
-    }
 }

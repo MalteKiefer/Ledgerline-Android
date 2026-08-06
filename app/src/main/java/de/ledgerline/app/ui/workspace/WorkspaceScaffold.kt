@@ -37,7 +37,6 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -69,7 +68,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
-import de.ledgerline.app.ui.gallery.GalleryScreen
 import de.ledgerline.app.ui.home.HomeScreen
 import de.ledgerline.app.ui.search.SearchScreen
 import de.ledgerline.app.ui.settings.SettingsContent
@@ -83,7 +81,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The redesigned shell (Material 3 Expressive, hub-and-spoke). A [HomeScreen] hub plus three
- * heavy surfaces (Files/Photos/Vault) live in a floating pill bar with a detached search key;
+ * heavy surfaces (Files/Vault/Notes) live in a floating pill bar with a detached search key;
  * the long tail (Notes/Todos/Bookmarks/Contacts/Settings) opens from the navigation drawer and
  * the Home tiles. A nested full-screen view collapses the pill.
  */
@@ -189,7 +187,6 @@ fun WorkspaceScaffold(
                         ) { p -> HomeScreen(Modifier.padding(p), onOpen = navigate) }
 
                         WorkspaceDest.Files -> FilesScreen(onMenu = { scope.launch { drawerState.open() } })
-                        WorkspaceDest.Photos -> GalleryScreen(onMenu = { scope.launch { drawerState.open() } })
                         WorkspaceDest.Vault -> de.ledgerline.app.ui.passwords.PasswordsScreen(onMenu = { scope.launch { drawerState.open() } })
 
                         WorkspaceDest.Notes -> AppScaffold(
@@ -290,8 +287,8 @@ private data class PrimaryTab(val dest: WorkspaceDest, val icon: ImageVector)
 private val PRIMARY_TABS = listOf(
     PrimaryTab(WorkspaceDest.Home, Icons.Outlined.Home),
     PrimaryTab(WorkspaceDest.Files, Icons.Outlined.Folder),
-    PrimaryTab(WorkspaceDest.Photos, Icons.Outlined.PhotoLibrary),
     PrimaryTab(WorkspaceDest.Vault, Icons.Outlined.Lock),
+    PrimaryTab(WorkspaceDest.Notes, Icons.Outlined.Description),
 )
 
 @Composable
@@ -352,7 +349,6 @@ private fun DrawerSheet(current: WorkspaceDest, visible: (WorkspaceDest) -> Bool
                 listOf(
                     Triple(WorkspaceDest.Home, Icons.Outlined.Home, de.ledgerline.app.ui.theme.Brand.accent),
                     Triple(WorkspaceDest.Files, Icons.Outlined.Folder, de.ledgerline.app.ui.theme.Brand.tintBlue),
-                    Triple(WorkspaceDest.Photos, Icons.Outlined.PhotoLibrary, de.ledgerline.app.ui.theme.Brand.tintOrange),
                     Triple(WorkspaceDest.Vault, Icons.Outlined.Lock, de.ledgerline.app.ui.theme.Brand.tintViolet),
                 ).filter { visible(it.first) }.forEach { (d, ic, t) -> DrawerRow(d, ic, t, current, onSelect) }
 

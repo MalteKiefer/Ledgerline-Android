@@ -7,11 +7,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
-import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -27,7 +25,6 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val bgOpsKey = booleanPreferencesKey("background_ops_enabled")
     private val offlineKey = booleanPreferencesKey("offline_cache_enabled")
     private val filesPolicyKey = stringPreferencesKey("offline_files_policy")
-    private val photosPolicyKey = stringPreferencesKey("offline_photos_policy")
     private val contactsPolicyKey = stringPreferencesKey("offline_contacts_policy")
     private val cacheMaxMbKey = intPreferencesKey("offline_cache_max_mb")
     private val prefetchWifiOnlyKey = booleanPreferencesKey("prefetch_wifi_only")
@@ -38,9 +35,6 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val dateFormatKey = stringPreferencesKey("date_format")
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val dynamicColorKey = booleanPreferencesKey("dynamic_color")
-    private val backupEnabledKey = booleanPreferencesKey("backup_enabled")
-    private val backupAlbumsKey = stringSetPreferencesKey("backup_album_ids")
-    private val backupDeleteAfterKey = booleanPreferencesKey("backup_delete_after")
     private val keepScreenOnKey = booleanPreferencesKey("keep_screen_on")
     private val calendarNotifyKey = booleanPreferencesKey("calendar_notifications_enabled")
     private val keepScreenOnMinutesKey = intPreferencesKey("keep_screen_on_minutes")
@@ -60,10 +54,9 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val prefGlucoseKey = stringPreferencesKey("pref_glucose")
     private val prefTimeFormatKey = stringPreferencesKey("pref_time_format")
 
-    // Legacy 5a boolean keys, retained only so a stored value migrates into the new
-    // enum policies when the new key is absent (§C1).
+    // Legacy 5a boolean key, retained only so a stored value migrates into the new
+    // enum policy when the new key is absent (§C1).
     private val legacyFilesBlobsKey = booleanPreferencesKey("offline_files_blobs")
-    private val legacyPhotosBlobsKey = booleanPreferencesKey("offline_photos_blobs")
 
     /** Idle auto-lock timeout in minutes; defaults to [DEFAULT_TIMEOUT_MINUTES]. */
     val timeoutMinutes: Flow<Int> =
@@ -119,17 +112,6 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
 
     suspend fun setFilesPolicy(p: FileBlobPolicy) {
         context.settingsDataStore.edit { it[filesPolicyKey] = p.name }
-    }
-
-    /**
-     * Photo blob caching policy. Defaults to [PhotoBlobPolicy.ON_DEMAND].
-     * Migration mirrors [filesPolicy] from the legacy `offline_photos_blobs` boolean.
-     */
-    val photosPolicy: Flow<PhotoBlobPolicy> =
-        context.settingsDataStore.data.map { decodePhotosPolicy(it[photosPolicyKey], it[legacyPhotosBlobsKey]) }
-
-    suspend fun setPhotosPolicy(p: PhotoBlobPolicy) {
-        context.settingsDataStore.edit { it[photosPolicyKey] = p.name }
     }
 
     /** Contact-avatar blob caching policy. Defaults to [ContactBlobPolicy.ON_DEMAND]. */
@@ -305,35 +287,6 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
         context.settingsDataStore.edit { it[dynamicColorKey] = on }
     }
 
-    /** Master camera-backup switch. Defaults to OFF (opt-in). */
-    val backupEnabled: Flow<Boolean> =
-        context.settingsDataStore.data.map { it[backupEnabledKey] ?: false }
-
-    suspend fun setBackupEnabled(enabled: Boolean) {
-        context.settingsDataStore.edit { it[backupEnabledKey] = enabled }
-    }
-
-    /** MediaStore bucket ids selected for backup. */
-    val backupAlbumIds: Flow<Set<String>> =
-        context.settingsDataStore.data.map { it[backupAlbumsKey].orEmpty() }
-
-    suspend fun setBackupAlbumIds(ids: Set<String>) {
-        context.settingsDataStore.edit { it[backupAlbumsKey] = ids }
-    }
-
-    /**
-     * Whether device originals are removed after a successful backup. OFF by default.
-     * Deletion is never silent: the removed items go to the Android trash (30-day
-     * recoverable) and the OS shows its own per-batch consent dialog (scoped storage —
-     * the app doesn't own the camera roll). See [BackupStateStore] pending-delete queue.
-     */
-    val backupDeleteAfter: Flow<Boolean> =
-        context.settingsDataStore.data.map { it[backupDeleteAfterKey] ?: false }
-
-    suspend fun setBackupDeleteAfter(enabled: Boolean) {
-        context.settingsDataStore.edit { it[backupDeleteAfterKey] = enabled }
-    }
-
     /**
      * Whether the screen is kept awake while the app is in the foreground (display-only;
      * does NOT affect the idle auto-lock, which still wipes the VK). Defaults to OFF.
@@ -430,13 +383,5 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
                     null -> FileBlobPolicy.ON_DEMAND
                 }
 
-        /** Decode the stored photos policy; mirrors [decodeFilesPolicy]. */
-        fun decodePhotosPolicy(stored: String?, legacyBool: Boolean?): PhotoBlobPolicy =
-            stored?.let { runCatching { PhotoBlobPolicy.valueOf(it) }.getOrDefault(PhotoBlobPolicy.ON_DEMAND) }
-                ?: when (legacyBool) {
-                    true -> PhotoBlobPolicy.ON_DEMAND
-                    false -> PhotoBlobPolicy.OFF
-                    null -> PhotoBlobPolicy.ON_DEMAND
-                }
     }
 }

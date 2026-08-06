@@ -1,7 +1,5 @@
 package de.ledgerline.app.core.security
 
-import de.ledgerline.app.core.GalleryCache
-import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.WorkspaceCache
@@ -17,9 +15,7 @@ class VaultLocker @Inject constructor(
     private val vaultKeyHolder: VaultKeyHolder,
     private val sessionHolder: SessionHolder,
     private val workspaceCache: WorkspaceCache,
-    private val galleryCache: GalleryCache,
     private val thumbCache: ThumbCache,
-    private val metaCache: MetaCache,
     private val identityRepository: de.ledgerline.app.data.IdentityRepository,
     private val sharedVaultRepository: de.ledgerline.app.data.SharedVaultRepository,
     private val passwordsCache: de.ledgerline.app.core.PasswordsCache,
@@ -35,7 +31,7 @@ class VaultLocker @Inject constructor(
      */
     fun lock() {
         vaultKeyHolder.wipe(); sessionHolder.clear(); workspaceCache.clear()
-        galleryCache.clear(); thumbCache.clear(); metaCache.clear()
+        thumbCache.clear()
         identityRepository.clear()
         sharedVaultRepository.clear()
         passwordsCache.clear()

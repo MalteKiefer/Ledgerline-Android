@@ -1,7 +1,5 @@
 package de.ledgerline.app.core.security
 
-import de.ledgerline.app.core.GalleryCache
-import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.WorkspaceCache
@@ -25,8 +23,6 @@ class VaultLockerTest {
         val workspaceCache = WorkspaceCache().apply {
             set(Workspace(WorkspaceManifest(), version = 1))
         }
-        val galleryCache = GalleryCache()
-        val metaCache = MetaCache().apply { put("p1", null) }
         // ThumbCache references android.graphics.Bitmap, so mock it and assert
         // clear() is invoked rather than exercising its map on the JVM.
         val thumbCache = mockk<ThumbCache>(relaxed = true)
@@ -35,9 +31,7 @@ class VaultLockerTest {
             vaultKeyHolder = vaultKeyHolder,
             sessionHolder = sessionHolder,
             workspaceCache = workspaceCache,
-            galleryCache = galleryCache,
             thumbCache = thumbCache,
-            metaCache = metaCache,
             identityRepository = io.mockk.mockk(relaxed = true),
             sharedVaultRepository = io.mockk.mockk(relaxed = true),
             passwordsCache = de.ledgerline.app.core.PasswordsCache(),
@@ -53,8 +47,6 @@ class VaultLockerTest {
         assertFalse(vaultKeyHolder.unlocked.value)
         assertNull(sessionHolder.get())
         assertNull(workspaceCache.value.value)
-        assertNull(galleryCache.value.value)
-        assertFalse(metaCache.has("p1"))
         verify(exactly = 1) { thumbCache.clear() }
     }
 }

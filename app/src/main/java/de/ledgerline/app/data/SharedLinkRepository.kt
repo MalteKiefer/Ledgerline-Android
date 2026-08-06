@@ -13,7 +13,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -24,29 +23,15 @@ import javax.inject.Singleton
 /** A parsed `{baseUrl}/s/{token}#s:{sk}` share link. */
 data class ParsedShareLink(val token: String, val shareKey: String, val host: String)
 
-/** A decrypted (SK-opened) share manifest — either a file/folder bundle or a gallery album. */
+/** A decrypted (SK-opened) share manifest — a file/folder bundle. */
 data class SharedManifest(
-    val kind: String,                 // file | folder | gallery
+    val kind: String,                 // file | folder
     val name: String,
     val allowDownload: Boolean,
     val files: List<SharedFile> = emptyList(),
-    val photos: List<SharedPhoto> = emptyList(),
 )
 
 data class SharedFile(val name: String, val mime: String, val size: Long, val path: String, val ref: String, val key: String)
-
-data class SharedPhoto(
-    val id: String,
-    val type: String,
-    val caption: String,
-    val thumbRef: String? = null, val thumbKey: String? = null,
-    val mediumRef: String? = null, val mediumKey: String? = null,
-    val originalRef: String? = null, val originalKey: String? = null,
-) {
-    /** Best display rendition ref/key (medium → thumb). */
-    val displayRef get() = mediumRef ?: thumbRef
-    val displayKey get() = mediumKey ?: thumbKey
-}
 
 /**
  * Recipient side of the public share links this app already CREATES: opens `{baseUrl}/s/{token}#s:{sk}`
@@ -113,23 +98,7 @@ class SharedLinkRepository(
 
     private fun parseManifest(obj: JsonObject, allowDownload: Boolean): SharedManifest {
         val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: ""
-        val kind = obj["kind"]?.jsonPrimitive?.contentOrNull
-            ?: if (obj.containsKey("photos")) "gallery" else "file"
-        if (kind == "gallery") {
-            val photos = (obj["photos"]?.jsonArray ?: emptyList()).mapNotNull { el ->
-                val p = el as? JsonObject ?: return@mapNotNull null
-                fun s(k: String) = p[k]?.jsonPrimitive?.contentOrNull
-                SharedPhoto(
-                    id = s("id") ?: return@mapNotNull null,
-                    type = s("t") ?: "image",
-                    caption = s("cap") ?: "",
-                    thumbRef = s("tR"), thumbKey = s("tK"),
-                    mediumRef = s("mR"), mediumKey = s("mK"),
-                    originalRef = s("oR"), originalKey = s("oK"),
-                )
-            }
-            return SharedManifest("gallery", name, obj["allowDownload"]?.jsonPrimitive?.contentOrNull?.toBoolean() ?: allowDownload, photos = photos)
-        }
+        val kind = obj["kind"]?.jsonPrimitive?.contentOrNull ?: "file"
         val files = (obj["files"]?.jsonArray ?: emptyList()).mapNotNull { el ->
             val f = el as? JsonObject ?: return@mapNotNull null
             fun s(k: String) = f[k]?.jsonPrimitive?.contentOrNull

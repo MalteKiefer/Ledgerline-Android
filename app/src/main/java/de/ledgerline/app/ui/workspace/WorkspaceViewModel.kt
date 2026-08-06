@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.core.WorkspaceCache
-import de.ledgerline.app.core.backup.GalleryBackupManager
 import de.ledgerline.app.core.offline.Prefetcher
 import de.ledgerline.app.domain.usecase.LoadWorkspace
 import kotlinx.coroutines.launch
@@ -18,7 +17,6 @@ class WorkspaceViewModel @Inject constructor(
     private val load: LoadWorkspace,
     private val cache: WorkspaceCache,
     private val prefetcher: Prefetcher,
-    private val backupManager: GalleryBackupManager,
     moduleAccess: de.ledgerline.app.core.ModuleAccess,
     private val reachability: de.ledgerline.app.core.ServerReachability,
 ) : ViewModel() {
@@ -49,7 +47,6 @@ class WorkspaceViewModel @Inject constructor(
             reachability.checkNow()   // probe /up immediately on open (post-unlock), not up to 60s later
             if (cache.value.value == null) load.invoke()
             prefetcher.maybePrefetchOnUnlock()
-            backupManager.maybeRun()
         }
     }
 }

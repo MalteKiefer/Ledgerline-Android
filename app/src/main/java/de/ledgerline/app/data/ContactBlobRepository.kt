@@ -25,7 +25,7 @@ data class ContactUsage(val used: Long, val quota: Long)
 /**
  * Streams contact avatar blobs to/from the pinned, authenticated session. Records
  * themselves live in the sealed `/store` manifest; only avatars are separate encrypted
- * blobs. Mirrors [GalleryBlobRepository]: encrypt (secretstream + Padmé) on upload,
+ * blobs. Same pattern as [FileBlobRepository]: encrypt (secretstream + Padmé) on upload,
  * frame-decrypt on download, 429-aware bulk delete.
  */
 @Singleton

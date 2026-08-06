@@ -3,7 +3,6 @@ package de.ledgerline.app.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.PasswordsCache
 import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.data.AccountRepository
@@ -26,7 +25,6 @@ import javax.inject.Inject
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     workspaceCache: WorkspaceCache,
-    galleryCache: GalleryCache,
     passwordsCache: PasswordsCache,
     private val account: AccountRepository,
 ) : ViewModel() {
@@ -38,15 +36,13 @@ class HomeViewModel @Inject constructor(
         val bookmarks: Int = 0,
         val contacts: Int = 0,
         val files: Int = 0,
-        val photos: Int = 0,
         val vault: Int = 0,
     )
 
     val counts: StateFlow<Counts> = combine(
         workspaceCache.value,
-        galleryCache.value,
         passwordsCache.value,
-    ) { ws, gal, pw ->
+    ) { ws, pw ->
         val m = ws?.manifest
         Counts(
             notes = m?.notes?.count { !it.trashed } ?: 0,
@@ -55,7 +51,6 @@ class HomeViewModel @Inject constructor(
             bookmarks = m?.bookmarks?.count { !it.trashed } ?: 0,
             contacts = m?.contacts?.count { !it.trashed } ?: 0,
             files = m?.files?.count { !it.trashed } ?: 0,
-            photos = gal?.manifest?.photos?.count { !it.trashed } ?: 0,
             vault = pw?.manifest?.secrets?.count { !it.isTrashed } ?: 0,
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, Counts())

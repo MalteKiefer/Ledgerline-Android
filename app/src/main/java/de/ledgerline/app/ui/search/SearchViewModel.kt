@@ -2,7 +2,6 @@ package de.ledgerline.app.ui.search
 
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.PasswordsCache
 import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.ui.workspace.WorkspaceDest
@@ -15,14 +14,13 @@ import javax.inject.Inject
 data class SearchHit(val dest: WorkspaceDest, val title: String, val subtitle: String)
 
 /**
- * Global search across the already-decrypted in-memory caches (files, photos, passwords, notes,
+ * Global search across the already-decrypted in-memory caches (files, passwords, notes,
  * bookmarks, contacts). Plain case-insensitive substring match on the fields a person recognises —
  * zero-knowledge safe (nothing leaves the device; the server never sees the query).
  */
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val workspaceCache: WorkspaceCache,
-    private val galleryCache: GalleryCache,
     private val passwordsCache: PasswordsCache,
 ) : ViewModel() {
 
@@ -51,9 +49,6 @@ class SearchViewModel @Inject constructor(
         passwordsCache.value.value?.manifest?.secrets?.asSequence()
             ?.filter { !it.isTrashed && it.title.lowercase().contains(q) }?.take(6)
             ?.forEach { out.add(SearchHit(WorkspaceDest.Vault, it.title, it.type)) }
-        galleryCache.value.value?.manifest?.photos?.asSequence()
-            ?.filter { !it.trashed && (it.name?.lowercase()?.contains(q) == true) }?.take(6)
-            ?.forEach { out.add(SearchHit(WorkspaceDest.Photos, it.name ?: "Photo", "Photo")) }
         return out
     }
 

@@ -2,8 +2,6 @@ package de.ledgerline.app.domain.share
 
 import de.ledgerline.app.domain.model.NamedFolder
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -48,46 +46,6 @@ object ShareManifests {
                 "kind" to JsonPrimitive(kind),
                 "name" to JsonPrimitive(name),
                 "files" to JsonArray(entries),
-            ),
-        ).toString()
-    }
-
-    /** One photo entry: `{id,t,at,w,h,cap}` plus present re-wrapped blob pairs (tR/tK, …). */
-    data class PhotoEntryIn(
-        val id: String,
-        val type: String,
-        val at: String?,
-        val width: Int?,
-        val height: Int?,
-        val caption: String,
-        /** Ordered (outRefKey, outKeyKey, refValue, wrappedKey) for present renditions. */
-        val blobs: List<BlobPair>,
-    )
-
-    data class BlobPair(val outRef: String, val outKey: String, val ref: String, val key: String)
-
-    /** `{ name, allowDownload, photos:[{id,t,at,w,h,cap, tR,tK, …}] }`. */
-    fun galleryManifest(name: String, allowDownload: Boolean, photos: List<PhotoEntryIn>): String {
-        val entries = photos.map { p ->
-            val m = linkedMapOf<String, JsonElement>(
-                "id" to JsonPrimitive(p.id),
-                "t" to JsonPrimitive(p.type),
-                "at" to (p.at?.let { JsonPrimitive(it) } ?: JsonNull),
-                "w" to (p.width?.let { JsonPrimitive(it) } ?: JsonNull),
-                "h" to (p.height?.let { JsonPrimitive(it) } ?: JsonNull),
-                "cap" to JsonPrimitive(p.caption),
-            )
-            for (b in p.blobs) {
-                m[b.outRef] = JsonPrimitive(b.ref)
-                m[b.outKey] = JsonPrimitive(b.key)
-            }
-            JsonObject(m)
-        }
-        return JsonObject(
-            linkedMapOf(
-                "name" to JsonPrimitive(name),
-                "allowDownload" to JsonPrimitive(allowDownload),
-                "photos" to JsonArray(entries),
             ),
         ).toString()
     }

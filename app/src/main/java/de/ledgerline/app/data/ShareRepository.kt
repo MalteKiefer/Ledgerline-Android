@@ -1,7 +1,6 @@
 package de.ledgerline.app.data
 
 import de.ledgerline.app.core.ErrorKind
-import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.Outcome
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.WorkspaceCache
@@ -11,7 +10,6 @@ import de.ledgerline.app.core.security.VaultKeyHolder
 import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.data.remote.dto.ShareCreateRequest
-import de.ledgerline.app.domain.model.GalleryManifest
 import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.model.ShareInfo
 import de.ledgerline.app.domain.model.WorkspaceManifest
@@ -21,7 +19,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Owner-side options for a public share. Files always allow download; gallery is a choice. */
+/** Owner-side options for a public share. Files always allow download. */
 data class ShareOptions(
     val allowDownload: Boolean = true,
     val expiresAtIso: String? = null,
@@ -39,21 +37,11 @@ interface FileSharing {
     suspend fun revokeFileShare(id: String, isFolder: Boolean): Outcome<Unit>
 }
 
-/** Gallery-album public-share surface consumed by the gallery UI. */
-interface AlbumSharing {
-    fun existingLink(share: ShareInfo?): String?
-    suspend fun createAlbumShare(albumId: String, opts: ShareOptions): Outcome<ShareResult>
-    suspend fun updateAlbumShare(albumId: String, opts: ShareOptions): Outcome<ShareResult>
-    /** Best-effort re-push of a shared album's manifest, PRESERVING its options; no-op if unshared. */
-    suspend fun refreshAlbumShare(albumId: String): Outcome<Unit>
-    suspend fun revokeAlbumShare(albumId: String): Outcome<Unit>
-}
-
 /**
- * Creates/revokes public share links for files, folders and gallery albums (rebuild-spec
- * §4.4/§4.5). The share key (SK) is generated on-device and lives ONLY in the link fragment
- * (`#s:<sk>`); the server stores just the sealed manifest + blob refs. The SK + token are
- * persisted on the owner's record (via the sealed store) so the link can be re-copied/revoked.
+ * Creates/revokes public share links for files and folders (rebuild-spec §4.4). The share key
+ * (SK) is generated on-device and lives ONLY in the link fragment (`#s:<sk>`); the server stores
+ * just the sealed manifest + blob refs. The SK + token are persisted on the owner's record (via
+ * the sealed store) so the link can be re-copied/revoked.
  *
  * All crypto is byte-compatible with the web `ShareCrypto` (see [ShareManifests]).
  */
@@ -64,23 +52,19 @@ class ShareRepository(
     private val crypto: Crypto,
     private val shareCrypto: ShareCrypto,
     private val workspaceCache: WorkspaceCache,
-    private val galleryCache: GalleryCache,
     private val workspaceRepo: WorkspaceRepository,
-    private val galleryRepo: GalleryRepository,
     private val apiProvider: (Session) -> LedgerlineApi,
-) : FileSharing, AlbumSharing {
+) : FileSharing {
     @Inject constructor(
         sessionHolder: SessionHolder,
         vaultKeyHolder: VaultKeyHolder,
         crypto: Crypto,
         shareCrypto: ShareCrypto,
         workspaceCache: WorkspaceCache,
-        galleryCache: GalleryCache,
         workspaceRepo: WorkspaceRepository,
-        galleryRepo: GalleryRepository,
     ) : this(
-        sessionHolder, vaultKeyHolder, crypto, shareCrypto, workspaceCache, galleryCache,
-        workspaceRepo, galleryRepo,
+        sessionHolder, vaultKeyHolder, crypto, shareCrypto, workspaceCache,
+        workspaceRepo,
         apiProvider = { s -> NetworkFactory.create(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin) },
     )
 
@@ -232,146 +216,11 @@ class ShareRepository(
         refs.add(f.blob)
     }
 
-    // ---- Gallery albums --------------------------------------------------------
-
-    /** Build + seal an album manifest under [sk]; null if the album is gone or has no blobs. */
-    private fun buildAlbumShare(manifest: GalleryManifest, albumId: String, sk: String, vk: ByteArray, allowDownload: Boolean): Pair<String, List<String>>? {
-        val album = manifest.albums.find { it.id == albumId } ?: return null
-        val refs = ArrayList<String>()
-        val byId = manifest.photos.associateBy { it.id }
-        val entries = album.photoIds.mapNotNull { pid ->
-            val p = byId[pid] ?: return@mapNotNull null
-            if (p.trashed) return@mapNotNull null
-            val blobs = ArrayList<ShareManifests.BlobPair>()
-            fun add(ref: String?, key: String?, outRef: String, outKey: String) {
-                if (ref.isNullOrEmpty() || key.isNullOrEmpty()) return
-                val rawFk = crypto.openValue(key, vk) ?: return
-                blobs.add(ShareManifests.BlobPair(outRef, outKey, ref, shareCrypto.wrapFileKey(rawFk, sk)))
-                refs.add(ref)
-            }
-            add(p.thumbRef, p.thumbKey, "tR", "tK")
-            add(p.mediumRef, p.mediumKey, "mR", "mK")
-            add(p.motionRef, p.motionKey, "moR", "moK")
-            if (allowDownload) add(p.originalRef, p.originalKey, "oR", "oK")
-            ShareManifests.PhotoEntryIn(
-                id = p.id, type = p.media_type.ifEmpty { "image" },
-                at = p.taken_at ?: p.created, width = p.width, height = p.height,
-                caption = "", blobs = blobs,
-            )
-        }
-        if (refs.isEmpty()) return null
-        return shareCrypto.sealManifest(ShareManifests.galleryManifest(album.name, allowDownload, entries), sk) to refs.distinct()
-    }
-
-    override suspend fun createAlbumShare(albumId: String, opts: ShareOptions): Outcome<ShareResult> =
-        withContext(Dispatchers.IO) {
-            val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
-            val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
-            val manifest = currentGallery() ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
-
-            val sk = shareCrypto.newShareKey()
-            val (sealed, refs) = buildAlbumShare(manifest, albumId, sk, vk, opts.allowDownload)
-                ?: return@withContext Outcome.Err(ErrorKind.HTTP)
-            val body = try {
-                val res = apiProvider(session).createGalleryShare(
-                    ShareCreateRequest(kind = null, sealed, refs, allowDownload = opts.allowDownload, expiresAt = opts.expiresAtIso, password = opts.password?.trim()?.ifBlank { null }),
-                )
-                if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.HTTP)
-                res.body() ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
-            } catch (e: Exception) {
-                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
-            }
-            val token = body.token
-
-            val info = ShareInfo(
-                token = token, sk = sk, allowDownload = opts.allowDownload,
-                hasPassword = !opts.password.isNullOrBlank(),
-                expiresAt = opts.expiresAtIso, created = nowIso(),
-                version = body.version,
-            )
-            val saved = galleryRepo.save { m -> applyAlbumShare(m, albumId, info) }
-            if (saved is Outcome.Err) return@withContext saved
-            Outcome.Ok(ShareResult(token, sk, linkFor(session.baseUrl, token, sk)))
-        }
-
-    /** Re-push an existing album share (same token + key) after content/option changes. */
-    override suspend fun updateAlbumShare(albumId: String, opts: ShareOptions): Outcome<ShareResult> =
-        withContext(Dispatchers.IO) {
-            val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
-            val vk = vaultKeyHolder.get() ?: return@withContext Outcome.Err(ErrorKind.DECRYPT)
-            val manifest = currentGallery() ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
-            val existing = manifest.albums.find { it.id == albumId }?.share
-                ?: return@withContext Outcome.Err(ErrorKind.HTTP)
-
-            val sk = existing.sk
-            val (sealed, refs) = buildAlbumShare(manifest, albumId, sk, vk, opts.allowDownload)
-                ?: return@withContext Outcome.Err(ErrorKind.HTTP)
-            val newPassword = opts.password?.trim()?.ifBlank { null }
-            val clearPassword = if (newPassword == null && !existing.hasPassword) true else null
-            val newVersion = try {
-                val res = apiProvider(session).updateGalleryShare(
-                    existing.token,
-                    de.ledgerline.app.data.remote.dto.ShareUpdateRequest(sealed, refs, allowDownload = opts.allowDownload, expiresAt = opts.expiresAtIso, password = newPassword, clearPassword = clearPassword, expectedVersion = existing.version),
-                )
-                if (!res.isSuccessful) return@withContext Outcome.Err(ErrorKind.HTTP)
-                res.body()?.version ?: existing.version
-            } catch (e: Exception) {
-                return@withContext Outcome.Err(ErrorKind.NETWORK, e)
-            }
-
-            val info = existing.copy(
-                allowDownload = opts.allowDownload, expiresAt = opts.expiresAtIso,
-                hasPassword = when { newPassword != null -> true; clearPassword == true -> false; else -> existing.hasPassword },
-                version = newVersion,
-            )
-            val saved = galleryRepo.save { m -> applyAlbumShare(m, albumId, info) }
-            if (saved is Outcome.Err) return@withContext saved
-            Outcome.Ok(ShareResult(existing.token, sk, linkFor(session.baseUrl, existing.token, sk)))
-        }
-
-    /**
-     * Re-push a shared album's manifest after its contents/name changed, keeping the existing
-     * options (allow-download, expiry, password). No-op (Ok) when the album isn't shared. The
-     * server's update replaces sealed_manifest+blob_refs and would RESET allow_download/expires_at
-     * if omitted, so both are re-sent from the stored descriptor; a blank password keeps the
-     * existing one.
-     */
-    override suspend fun refreshAlbumShare(albumId: String): Outcome<Unit> {
-        val existing = currentGallery()?.albums?.find { it.id == albumId }?.share
-            ?: return Outcome.Ok(Unit)
-        val opts = ShareOptions(
-            allowDownload = existing.allowDownload ?: true,
-            expiresAtIso = existing.expiresAt,
-            password = null,
-        )
-        return when (val r = updateAlbumShare(albumId, opts)) {
-            is Outcome.Ok -> Outcome.Ok(Unit)
-            is Outcome.Err -> r
-        }
-    }
-
-    override suspend fun revokeAlbumShare(albumId: String): Outcome<Unit> = withContext(Dispatchers.IO) {
-        val session = sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
-        val manifest = currentGallery() ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
-        val token = manifest.albums.find { it.id == albumId }?.share?.token
-            ?: return@withContext Outcome.Ok(Unit)
-        try { apiProvider(session).deleteGalleryShare(token) } catch (_: Exception) { /* best effort */ }
-        val saved = galleryRepo.save { m -> applyAlbumShare(m, albumId, null) }
-        if (saved is Outcome.Err) saved else Outcome.Ok(Unit)
-    }
-
-    private fun applyAlbumShare(m: GalleryManifest, albumId: String, info: ShareInfo?): GalleryManifest =
-        m.copy(albums = m.albums.map { if (it.id == albumId) it.copy(share = info) else it })
-
     // ---- helpers ---------------------------------------------------------------
 
     private suspend fun currentWorkspace(): WorkspaceManifest? =
         workspaceCache.value.value?.manifest
             ?: (workspaceRepo.load() as? Outcome.Ok)?.value?.manifest
-
-    private suspend fun currentGallery(): GalleryManifest? =
-        galleryCache.value.value?.manifest
-            ?: (galleryRepo.load() as? Outcome.Ok)?.value?.manifest
 
     private fun nowIso(): String = java.time.Instant.now().toString()
 

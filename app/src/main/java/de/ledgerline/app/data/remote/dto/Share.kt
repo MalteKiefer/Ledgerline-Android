@@ -4,10 +4,10 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * Create a public share (files or gallery). Byte-shape matches the web `_shareBody`
- * (`resources/js/components/{files,gallery}.js`). [kind] is files-only (`"file"|"folder"`)
- * and omitted for gallery; [expiresAt]/[password] are omitted when null (kotlinx drops
- * null-default properties). `allow_download` is always sent (no default).
+ * Create a public share (file or folder). Byte-shape matches the web `_shareBody`
+ * (`resources/js/components/files.js`). [kind] is `"file"|"folder"`; [expiresAt]/[password]
+ * are omitted when null (kotlinx drops null-default properties). `allow_download` is
+ * always sent (no default).
  */
 @Serializable
 data class ShareCreateRequest(

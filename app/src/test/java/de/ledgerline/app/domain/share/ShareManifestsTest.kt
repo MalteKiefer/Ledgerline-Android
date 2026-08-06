@@ -31,37 +31,6 @@ class ShareManifestsTest {
         assertEquals(true, json.contains(""""mime":"application/octet-stream""""))
     }
 
-    @Test fun gallery_manifest_matches_web_shape() {
-        val json = ShareManifests.galleryManifest(
-            name = "Trip", allowDownload = true,
-            photos = listOf(
-                ShareManifests.PhotoEntryIn(
-                    id = "p1", type = "image", at = "2024-01-01T00:00:00Z", width = 100, height = 200,
-                    caption = "",
-                    blobs = listOf(
-                        ShareManifests.BlobPair("tR", "tK", "tblob", "tkey"),
-                        ShareManifests.BlobPair("oR", "oK", "oblob", "okey"),
-                    ),
-                ),
-            ),
-        )
-        assertEquals(
-            """{"name":"Trip","allowDownload":true,"photos":[{"id":"p1","t":"image","at":"2024-01-01T00:00:00Z","w":100,"h":200,"cap":"","tR":"tblob","tK":"tkey","oR":"oblob","oK":"okey"}]}""",
-            json,
-        )
-    }
-
-    @Test fun gallery_entry_emits_null_at_w_h_when_absent() {
-        val json = ShareManifests.galleryManifest(
-            "A", false,
-            listOf(ShareManifests.PhotoEntryIn("p", "image", null, null, null, "", emptyList())),
-        )
-        assertEquals(
-            """{"name":"A","allowDownload":false,"photos":[{"id":"p","t":"image","at":null,"w":null,"h":null,"cap":""}]}""",
-            json,
-        )
-    }
-
     @Test fun subtree_collects_descendants_inclusive() {
         val folders = listOf(
             NamedFolder(id = "root"),

@@ -123,7 +123,7 @@ fun ContactDetailScreen(
     // Take an avatar photo in-app (in-memory JPEG, no disk).
     if (showCamera) {
         BackHandler { showCamera = false }
-        de.ledgerline.app.ui.gallery.CameraCaptureScreen(
+        de.ledgerline.app.ui.common.CameraCaptureScreen(
             onCaptured = { bytes, _, _ -> onPickAvatar(bytes); showCamera = false },
             onBack = { showCamera = false },
         )

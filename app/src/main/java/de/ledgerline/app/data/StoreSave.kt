@@ -9,14 +9,11 @@ import de.ledgerline.app.data.remote.dto.StoreResponse
 import retrofit2.Response
 
 /**
- * Shared optimistic-write + cache-fallback helpers for the sealed `/store` and
- * `/gallery/store` endpoints. Both stores share the exact same envelope
- * (`{ciphertext, version}`), the same 409 optimistic-concurrency loop, and the
- * same network-first on-disk fallback — only the manifest type, cache, API
- * methods, and domain wrapper differ, so those are passed in as lambdas.
- *
- * NOTE: gallery *load* has extra v2-shard assembly which is NOT shared and lives
- * in GalleryRepository; only [optimisticSave] and [cachedOrStore] are common.
+ * Shared optimistic-write + cache-fallback helpers for the sealed `/store` and per-module
+ * `/{module}/store` endpoints (e.g. Explore, Health, Finance). Every such store shares the
+ * exact same envelope (`{ciphertext, version}`), the same 409 optimistic-concurrency loop,
+ * and the same network-first on-disk fallback — only the manifest type, cache, API methods,
+ * and domain wrapper differ, so those are passed in as lambdas.
  */
 
 /**

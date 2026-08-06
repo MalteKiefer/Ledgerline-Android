@@ -1,28 +1,18 @@
 package de.ledgerline.app.ui.share
 
-import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -31,15 +21,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -49,13 +35,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.data.SharedFile
 import de.ledgerline.app.data.SharedManifest
-import de.ledgerline.app.data.SharedPhoto
 import de.ledgerline.app.ui.common.secretKeyboardOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Paste-a-link recipient viewer for public shares (files/folders/gallery). */
+/** Paste-a-link recipient viewer for public shares (files/folders). */
 @Composable
 fun SharedLinkContent(padding: PaddingValues) {
     val vm: SharedLinkViewModel = hiltViewModel()
@@ -120,21 +105,12 @@ private fun PasswordPrompt(s: SharedLinkViewModel.State.NeedsPassword, onSubmit:
 private fun ManifestView(s: SharedLinkViewModel.State.Ready, vm: SharedLinkViewModel, onClose: () -> Unit) {
     val m = s.manifest
     Row2(title = m.name.ifBlank { stringResource(R.string.share_untitled) }, onClose = onClose)
-    if (m.kind == "gallery") {
-        Text(
-            stringResource(R.string.share_photo_count, m.photos.size),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        GalleryGrid(m.photos, vm)
-    } else {
-        Text(
-            stringResource(R.string.share_file_count, m.files.size),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FileList(m, vm)
-    }
+    Text(
+        stringResource(R.string.share_file_count, m.files.size),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    FileList(m, vm)
 }
 
 @Composable
@@ -166,28 +142,6 @@ private fun FileList(m: SharedManifest, vm: SharedLinkViewModel) {
                 },
             )
             HorizontalDivider()
-        }
-    }
-}
-
-@Composable
-private fun GalleryGrid(photos: List<SharedPhoto>, vm: SharedLinkViewModel) {
-    LazyVerticalGrid(columns = GridCells.Adaptive(110.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        items(photos, key = { it.id }) { p ->
-            val bmp by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, p.id) {
-                val bytes = vm.photoBytes(p)
-                value = bytes?.let {
-                    withContext(Dispatchers.Default) { runCatching { BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() }
-                }
-            }
-            Box(
-                Modifier.aspectRatio(1f).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) {
-                val b = bmp
-                if (b == null) CircularProgressIndicator(Modifier.padding(30.dp))
-                else Image(bitmap = b, contentDescription = p.caption.ifBlank { null }, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
         }
     }
 }

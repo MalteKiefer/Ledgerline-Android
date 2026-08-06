@@ -20,7 +20,7 @@ annotation class ApplicationScope
 object CoroutineModule {
     /**
      * One app-lifetime scope for singletons that run background work for the whole
-     * process (background sync, prefetch settings mirror, gallery backup). Injecting it
+     * process (background sync, prefetch settings mirror). Injecting it
      * (instead of each singleton newing its own `CoroutineScope`) makes the lifetime
      * explicit and lets tests substitute a controlled scope.
      */

@@ -34,7 +34,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import kotlinx.coroutines.launch
 import de.ledgerline.app.ui.common.AppTopBar
-import de.ledgerline.app.ui.gallery.MapTilesViewModel
+import de.ledgerline.app.ui.map.MapTilesViewModel
 import de.ledgerline.app.ui.map.MapsforgeMap
 import de.ledgerline.app.ui.workspace.common.FloatingTabBar
 
