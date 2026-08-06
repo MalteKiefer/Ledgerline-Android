@@ -1,4 +1,4 @@
-package de.ledgerline.app.ui.gallery
+package de.ledgerline.app.ui.common
 
 import android.Manifest
 import android.annotation.SuppressLint

@@ -7,7 +7,8 @@ import kotlinx.serialization.Serializable
 data class ShareMetaResponse(
     val found: Boolean = false,
     val expired: Boolean = false,
-    val kind: String = "",              // file | folder | gallery
+    val kind: String = "",              // file | folder (server may also send "gallery" for a
+                                         // share created by web/iOS; unsupported here — no photo viewer)
     val needs_password: Boolean = false,
     val allow_download: Boolean = false,
     val name: String? = null,

@@ -24,8 +24,8 @@ import de.ledgerline.app.core.ops.OpKind
  * Shared progress overlay driven by [OperationManager.active][de.ledgerline.app.core.ops.OperationManager.active].
  * While any operation is running it dims the screen and shows a spinner plus one
  * `"<kind> current/total"` line per active op (the count is omitted when the total is
- * unknown). Reused across Gallery/People/Duplicates so backgrounded ops keep showing
- * progress when the app returns to the foreground. Renders nothing when idle.
+ * unknown). Reused across Files/Share so backgrounded ops keep showing progress when
+ * the app returns to the foreground. Renders nothing when idle.
  */
 @Composable
 fun OpProgressOverlay(modifier: Modifier = Modifier) {

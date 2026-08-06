@@ -12,7 +12,6 @@ import de.ledgerline.app.core.security.BiometricAvailability
 import de.ledgerline.app.core.security.IdleLocker
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
-import de.ledgerline.app.core.backup.GalleryBackupManager
 import androidx.compose.ui.graphics.asImageBitmap
 import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.ContactSort
@@ -20,12 +19,8 @@ import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.data.RememberedVaultStore
 import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.data.SettingsStore
-import de.ledgerline.app.data.backup.BackupStateStore
-import de.ledgerline.app.data.backup.DeviceAlbum
-import de.ledgerline.app.data.backup.DeviceAlbums
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
-import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.data.remote.dto.MeUser
 import kotlinx.coroutines.Dispatchers
@@ -53,9 +48,6 @@ class SettingsViewModel @Inject constructor(
     private val prefetcher: Prefetcher,
     private val accountRepository: AccountRepository,
     private val avatarCache: de.ledgerline.app.core.AvatarCache,
-    private val backupManager: GalleryBackupManager,
-    private val deviceAlbums: DeviceAlbums,
-    private val backupStateStore: BackupStateStore,
     private val rememberedVault: RememberedVaultStore,
     private val biometric: BiometricAvailability,
     private val securityLog: de.ledgerline.app.core.security.SecurityLog,
@@ -226,48 +218,6 @@ class SettingsViewModel @Inject constructor(
         applySettings(cur.copy(fileMaxVersions = clamped), de.ledgerline.app.data.remote.dto.UserSettingsDto(fileMaxVersions = clamped))
     }
 
-    val backupEnabled: StateFlow<Boolean> = settingsStore.backupEnabled
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-    val backupAlbumIds: StateFlow<Set<String>> = settingsStore.backupAlbumIds
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
-
-    private val _albums = MutableStateFlow<List<DeviceAlbum>>(emptyList())
-    val albums: StateFlow<List<DeviceAlbum>> = _albums.asStateFlow()
-
-    private val _backedUpCount = MutableStateFlow(0)
-    val backedUpCount: StateFlow<Int> = _backedUpCount.asStateFlow()
-
-    fun loadAlbums() = viewModelScope.launch {
-        _albums.value = withContext(Dispatchers.IO) { deviceAlbums.list() }
-        _backedUpCount.value = backupStateStore.backedUpIds().size
-    }
-
-    fun setBackupEnabled(on: Boolean) = viewModelScope.launch {
-        settingsStore.setBackupEnabled(on)
-        if (on) backupManager.maybeRun()
-    }
-
-    fun toggleAlbum(bucketId: String) = viewModelScope.launch {
-        val cur = settingsStore.backupAlbumIds.first().toMutableSet()
-        if (!cur.add(bucketId)) cur.remove(bucketId)
-        settingsStore.setBackupAlbumIds(cur)
-    }
-
-    fun backupNow() = backupManager.maybeRun()
-
-    /** "Delete device originals after backup" opt-in. */
-    val backupDeleteAfter: StateFlow<Boolean> = settingsStore.backupDeleteAfter
-        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
-
-    fun setBackupDeleteAfter(on: Boolean) = viewModelScope.launch { settingsStore.setBackupDeleteAfter(on) }
-
-    /** Content-URIs of backed-up originals queued for device removal (consent-gated in the UI). */
-    val pendingDeleteUris: StateFlow<Set<String>> = backupStateStore.pendingDelete
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
-
-    /** Called after the OS confirms the trash request, to drop those URIs from the queue. */
-    fun onOriginalsDeleted(uris: Collection<String>) = viewModelScope.launch { backupStateStore.clearPendingDelete(uris) }
-
     /** Current idle-lock timeout in minutes, backed by the plaintext settings store. */
     val timeoutMinutes: StateFlow<Int> = settingsStore.timeoutMinutes
         .stateIn(viewModelScope, SharingStarted.Eagerly, SettingsStore.DEFAULT_TIMEOUT_MINUTES)
@@ -416,14 +366,6 @@ class SettingsViewModel @Inject constructor(
 
     fun setFilesPolicy(p: FileBlobPolicy) {
         viewModelScope.launch { settingsStore.setFilesPolicy(p) }
-    }
-
-    /** Photo blob caching policy (Off / Thumbnails / On demand / All). */
-    val photosPolicy: StateFlow<PhotoBlobPolicy> = settingsStore.photosPolicy
-        .stateIn(viewModelScope, SharingStarted.Eagerly, PhotoBlobPolicy.ON_DEMAND)
-
-    fun setPhotosPolicy(p: PhotoBlobPolicy) {
-        viewModelScope.launch { settingsStore.setPhotosPolicy(p) }
     }
 
     /** Contact-avatar blob caching policy (Off / On demand / All). */

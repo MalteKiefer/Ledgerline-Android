@@ -1,7 +1,5 @@
 package de.ledgerline.app.data
 
-import de.ledgerline.app.core.GalleryCache
-import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.WorkspaceCache
@@ -9,7 +7,6 @@ import de.ledgerline.app.core.offline.BlobDiskCache
 import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
-import de.ledgerline.app.data.backup.BackupStateStore
 import de.ledgerline.app.domain.usecase.ForceLogout
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -27,15 +24,12 @@ class ForceLogoutImpl @Inject constructor(
     private val vaultKeyHolder: VaultKeyHolder,
     private val sessionHolder: SessionHolder,
     private val workspaceCache: WorkspaceCache,
-    private val galleryCache: GalleryCache,
     private val thumbCache: ThumbCache,
-    private val metaCache: MetaCache,
     private val storeCache: StoreDiskCache,
     private val blobCache: BlobDiskCache,
     private val vaultParamsCache: de.ledgerline.app.core.offline.VaultParamsCache,
     private val syncOutbox: de.ledgerline.app.core.offline.SyncOutbox,
     private val importQueue: ImportQueue,
-    private val backupStateStore: BackupStateStore,
     private val rememberedVault: RememberedVaultStore,
     private val placeRepository: PlaceRepository,
     private val securityLog: de.ledgerline.app.core.security.SecurityLog,
@@ -65,18 +59,15 @@ class ForceLogoutImpl @Inject constructor(
         financeCache.clear()
         moduleAccess.clear()
         workspaceCache.clear()
-        galleryCache.clear()
         thumbCache.clear()
-        metaCache.clear()
-        // Persisted last: drop the sealed session, the offline ciphertext caches, the
-        // backup bookkeeping, and delete the keystore key so a re-pair is required. (A
-        // normal lock keeps the disk cache — only this forced-logout path wipes it, §11.)
+        // Persisted last: drop the sealed session, the offline ciphertext caches, and
+        // delete the keystore key so a re-pair is required. (A normal lock keeps the disk
+        // cache — only this forced-logout path wipes it, §11.)
         storeCache.clear()
         blobCache.clear()
         vaultParamsCache.clear()
         syncOutbox.clearAll()
         importQueue.clearAll() // sealed plaintext source copies of queued imports
-        backupStateStore.clear()
         rememberedVault.clear()
         placeRepository.clear()
         // Security state: reset the duress counter and erase the audit log so a wiped

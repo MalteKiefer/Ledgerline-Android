@@ -1,7 +1,5 @@
 package de.ledgerline.app.data
 
-import de.ledgerline.app.core.GalleryCache
-import de.ledgerline.app.core.MetaCache
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.ThumbCache
 import de.ledgerline.app.core.WorkspaceCache
@@ -10,7 +8,6 @@ import de.ledgerline.app.core.offline.StoreDiskCache
 import de.ledgerline.app.core.offline.StoreEnvelope
 import de.ledgerline.app.core.security.KeystoreSealer
 import de.ledgerline.app.core.security.VaultKeyHolder
-import de.ledgerline.app.data.backup.BackupStateStore
 import de.ledgerline.app.domain.model.Session
 import de.ledgerline.app.domain.model.Workspace
 import de.ledgerline.app.domain.model.WorkspaceManifest
@@ -41,20 +38,16 @@ class ForceLogoutImplTest {
         val workspaceCache = WorkspaceCache().apply {
             set(Workspace(WorkspaceManifest(), version = 1))
         }
-        val galleryCache = GalleryCache()
         val thumbCache = ThumbCache()
-        val metaCache = MetaCache().apply { put("p1", null) }
 
         // The two Android-touching deps (DataStore / AndroidKeystore) are mocked; we
         // assert their clear() is invoked as part of the wipe.
         val sessionStore = mockk<SessionStore>(relaxed = true)
         val keystoreSealer = mockk<KeystoreSealer>(relaxed = true)
-        val backupStateStore = mockk<BackupStateStore>(relaxed = true)
         val rememberedVault = mockk<RememberedVaultStore>(relaxed = true)
         val placeRepository = mockk<PlaceRepository>(relaxed = true)
         coEvery { sessionStore.clear() } returns Unit
         every { keystoreSealer.clear() } returns Unit
-        coEvery { backupStateStore.clear() } returns Unit
         coEvery { rememberedVault.clear() } returns Unit
         coEvery { placeRepository.clear() } returns Unit
 
@@ -72,15 +65,12 @@ class ForceLogoutImplTest {
             vaultKeyHolder = vaultKeyHolder,
             sessionHolder = sessionHolder,
             workspaceCache = workspaceCache,
-            galleryCache = galleryCache,
             thumbCache = thumbCache,
-            metaCache = metaCache,
             storeCache = storeCache,
             blobCache = blobCache,
             vaultParamsCache = de.ledgerline.app.core.offline.VaultParamsCache(tmp.newFile("vault_params.json")),
             syncOutbox = de.ledgerline.app.core.offline.SyncOutbox(tmp.newFolder("outbox"), io.mockk.mockk(relaxed = true)),
             importQueue = ImportQueue(tmp.newFolder("import_queue"), io.mockk.mockk(relaxed = true)),
-            backupStateStore = backupStateStore,
             rememberedVault = rememberedVault,
             placeRepository = placeRepository,
             securityLog = io.mockk.mockk(relaxed = true),
@@ -104,8 +94,6 @@ class ForceLogoutImplTest {
         assertFalse(vaultKeyHolder.unlocked.value)
         assertNull(sessionHolder.get())
         assertNull(workspaceCache.value.value)
-        assertNull(galleryCache.value.value)
-        assertFalse(metaCache.has("p1"))
 
         // Persisted session + auth-gated keystore key deleted (re-pair required).
         coVerify(exactly = 1) { sessionStore.clear() }

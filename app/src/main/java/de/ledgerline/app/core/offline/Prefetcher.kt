@@ -1,15 +1,12 @@
 package de.ledgerline.app.core.offline
 
-import de.ledgerline.app.core.GalleryCache
 import de.ledgerline.app.core.WorkspaceCache
 import de.ledgerline.app.core.ops.OpKind
 import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.data.ContactBlobRepository
 import de.ledgerline.app.data.FileBlobRepository
-import de.ledgerline.app.data.GalleryBlobRepository
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
-import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,9 +24,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class Prefetcher @Inject constructor(
-    private val galleryCache: GalleryCache,
     private val workspaceCache: WorkspaceCache,
-    private val galleryRepo: GalleryBlobRepository,
     private val fileRepo: FileBlobRepository,
     private val contactRepo: ContactBlobRepository,
     private val blobCache: BlobDiskCache,
@@ -37,7 +32,7 @@ class Prefetcher @Inject constructor(
     private val constraints: Constraints,
     private val operationManager: OperationManager,
 ) {
-    private enum class Kind { FILE, GALLERY, CONTACT }
+    private enum class Kind { FILE, CONTACT }
 
     /** A blob ref plus which store it belongs to (routes to the right repo). */
     private data class Ref(val id: String, val kind: Kind)
@@ -52,22 +47,20 @@ class Prefetcher @Inject constructor(
     /** Manual "Prefetch now": runs whenever any policy caches something; honours constraints. */
     fun prefetchNow() = run(auto = false)
 
-    /** Auto on unlock: only runs when a prefetch policy (ALL / THUMBS) is active. */
+    /** Auto on unlock: only runs when a prefetch policy (ALL) is active. */
     fun maybePrefetchOnUnlock() = run(auto = true)
 
     private fun run(auto: Boolean) {
         if (!offlineFlags.enabled()) return
 
-        val photosPolicy = offlineFlags.photosPolicy()
         val filesPolicy = offlineFlags.filesPolicy()
         val contactsPolicy = offlineFlags.contactsPolicy()
 
-        val photosIsPrefetch = photosPolicy == PhotoBlobPolicy.THUMBS || photosPolicy == PhotoBlobPolicy.ALL
         val filesIsPrefetch = filesPolicy == FileBlobPolicy.ALL
         val contactsIsPrefetch = contactsPolicy == ContactBlobPolicy.ALL
 
         // Nothing caches anything → no-op on both paths (auto and manual).
-        if (!photosIsPrefetch && !filesIsPrefetch && !contactsIsPrefetch) return
+        if (!filesIsPrefetch && !contactsIsPrefetch) return
 
         // Don't stack: a PREFETCH op is already running.
         if (operationManager.active.value.any { it.kind == OpKind.PREFETCH }) return
@@ -81,19 +74,6 @@ class Prefetcher @Inject constructor(
         }
 
         val refs = ArrayList<Ref>()
-
-        if (photosIsPrefetch) {
-            val photos = galleryCache.value.value?.manifest?.photos.orEmpty().filter { !it.trashed }
-            for (p in photos) {
-                when (photosPolicy) {
-                    PhotoBlobPolicy.THUMBS -> listOfNotNull(p.thumbRef)
-                    PhotoBlobPolicy.ALL -> listOfNotNull(
-                        p.thumbRef, p.mediumRef, p.originalRef, p.motionRef, p.metaRef,
-                    ) + p.faceCropRefs
-                    else -> emptyList()
-                }.forEach { refs.add(Ref(it, Kind.GALLERY)) }
-            }
-        }
 
         if (filesIsPrefetch) {
             val files = workspaceCache.value.value?.manifest?.files.orEmpty().filter { !it.trashed }
@@ -113,19 +93,13 @@ class Prefetcher @Inject constructor(
         val pending = refs.distinctBy { it.id }.filterNot { blobCache.has(it.id) }
         if (pending.isEmpty()) return
 
-        // Gallery + files are fetched in batches (one raw-batch round-trip per ≤512 ids); contacts
-        // stay per-blob (their store has no batch endpoint).
-        val galleryRefs = pending.filter { it.kind == Kind.GALLERY }.map { it.id }
+        // Files are fetched in batches (one raw-batch round-trip per ≤512 ids); contacts stay
+        // per-blob (their store has no batch endpoint).
         val fileRefs = pending.filter { it.kind == Kind.FILE }.map { it.id }
         val others = pending.filter { it.kind == Kind.CONTACT }
 
         operationManager.run(OpKind.PREFETCH, total = pending.size) { report ->
             var done = 0
-            for (chunk in galleryRefs.chunked(512)) {
-                galleryRepo.prefetchBatch(chunk)
-                done += chunk.size
-                report(done, pending.size)
-            }
             for (chunk in fileRefs.chunked(512)) {
                 fileRepo.prefetchBatch(chunk)
                 done += chunk.size
@@ -134,7 +108,7 @@ class Prefetcher @Inject constructor(
             for (ref in others) {
                 when (ref.kind) {
                     Kind.CONTACT -> contactRepo.prefetch(ref.id)
-                    else -> Unit // gallery/files handled in the batches above
+                    else -> Unit // files handled in the batch above
                 }
                 report(++done, pending.size)
             }

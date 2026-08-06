@@ -56,8 +56,7 @@ fun ShareScreen(
     val activeOps by opsVm.active.collectAsStateWithLifecycle()
     val folders by vm.fileFolders.collectAsStateWithLifecycle()
 
-    val photos = items.count { it.target == ShareTarget.GALLERY }
-    val files = items.count { it.target == ShareTarget.FILES }
+    val files = items.size
 
     var started by remember { mutableStateOf(false) }
     var selectedFolder by remember { mutableStateOf<String?>(null) }
@@ -90,15 +89,7 @@ fun ShareScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             ) {
                 Column(Modifier.fillMaxWidth().padding(20.dp)) {
-                    if (photos > 0) {
-                        Text(
-                            stringResource(R.string.share_summary_photos, photos),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
                     if (files > 0) {
-                        if (photos > 0) Spacer(Modifier.height(8.dp))
                         Text(
                             stringResource(R.string.share_summary_files, files),
                             style = MaterialTheme.typography.bodyLarge,

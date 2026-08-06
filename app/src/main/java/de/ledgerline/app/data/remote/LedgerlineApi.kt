@@ -1,15 +1,11 @@
 package de.ledgerline.app.data.remote
 
-import de.ledgerline.app.data.remote.dto.EmbedTextRequest
-import de.ledgerline.app.data.remote.dto.EmbedTextResponse
 import de.ledgerline.app.data.remote.dto.MeResponse
 import de.ledgerline.app.data.remote.dto.PairClaimRequest
 import de.ledgerline.app.data.remote.dto.PairClaimResponse
 import de.ledgerline.app.data.remote.dto.PairPollResponse
-import de.ledgerline.app.data.remote.dto.ProcessResponse
 import de.ledgerline.app.data.remote.dto.ReconcileRequest
 import de.ledgerline.app.data.remote.dto.ReconcileResponse
-import de.ledgerline.app.data.remote.dto.ReverseResponse
 import de.ledgerline.app.data.remote.dto.StorePutRequest
 import de.ledgerline.app.data.remote.dto.StoreResponse
 import de.ledgerline.app.data.remote.dto.UploadResponse
@@ -141,10 +137,6 @@ interface LedgerlineApi {
     @POST("api/v1/files/blobs/reconcile")
     suspend fun filesReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
 
-    // Living-set reconcile for gallery blobs (reclaims orphaned photo/shard blobs, 24h grace).
-    @POST("api/v1/gallery/blobs/reconcile")
-    suspend fun galleryReconcile(@Body body: ReconcileRequest): Response<ReconcileResponse>
-
     // Store v3 sharded files index (root pointer table + external shard/collection blobs).
     // --- Notes sharded store + blobs (web migrated notes off the monolith, §P0) ---
     @GET("api/v1/notes/store")
@@ -252,88 +244,25 @@ interface LedgerlineApi {
     @DELETE("api/v1/files/shares/{token}")
     suspend fun deleteFileShare(@Path("token") token: String): Response<Unit>
 
-    @POST("api/v1/gallery/shares")
-    suspend fun createGalleryShare(@Body body: de.ledgerline.app.data.remote.dto.ShareCreateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse>
-
-    @PUT("api/v1/gallery/shares/{token}")
-    suspend fun updateGalleryShare(@Path("token") token: String, @Body body: de.ledgerline.app.data.remote.dto.ShareUpdateRequest): Response<de.ledgerline.app.data.remote.dto.ShareTokenResponse>
-
-    @DELETE("api/v1/gallery/shares/{token}")
-    suspend fun deleteGalleryShare(@Path("token") token: String): Response<Unit>
-
     @PUT("api/v1/store")
     suspend fun putStore(@Body body: StorePutRequest): Response<StoreResponse>
 
     @GET("api/v1/files/usage")
     suspend fun filesUsage(): Response<UsageResponse>
 
-    @GET("api/v1/gallery/store")
-    suspend fun galleryStore(): Response<StoreResponse>
-
-    @GET("api/v1/gallery/raw/{blob}")
-    @Streaming
-    suspend fun galleryRaw(@Path("blob") blob: String): Response<ResponseBody>
-
-    // Batched blob fetch: framed concat of up to 512 blobs' ciphertext (fewer round-trips
-    // for thumbnail prefetch). Frame = u32le(idLen) + id + u32le(size) + ciphertext.
-    @POST("api/v1/gallery/raw-batch")
-    @Streaming
-    suspend fun galleryRawBatch(@Body body: ReconcileRequest): Response<ResponseBody>
-
-    @GET("api/v1/gallery/usage")
-    suspend fun galleryUsage(): Response<UsageResponse>
-
-    @Multipart
-    @POST("api/v1/gallery/upload")
-    suspend fun galleryUpload(@Part file: MultipartBody.Part): Response<UploadResponse>
-
-    @POST("api/v1/gallery/upload/init")
-    suspend fun galleryUploadInit(@Body body: de.ledgerline.app.data.remote.dto.UploadInitRequest): Response<de.ledgerline.app.data.remote.dto.UploadInitResponse>
-
-    @Multipart
-    @POST("api/v1/gallery/upload/part")
-    suspend fun galleryUploadPart(
-        @Part("token") token: okhttp3.RequestBody,
-        @Part("part") part: okhttp3.RequestBody,
-        @Part chunk: MultipartBody.Part,
-    ): Response<de.ledgerline.app.data.remote.dto.UploadPartResponse>
-
-    @POST("api/v1/gallery/upload/complete")
-    suspend fun galleryUploadComplete(@Body body: de.ledgerline.app.data.remote.dto.UploadCompleteRequest): Response<UploadResponse>
-
-    @POST("api/v1/gallery/upload/abort")
-    suspend fun galleryUploadAbort(@Body body: de.ledgerline.app.data.remote.dto.UploadAbortRequest): Response<Unit>
-
-    @Multipart
-    @POST("api/v1/gallery/process")
-    suspend fun galleryProcess(@Part file: MultipartBody.Part): Response<ProcessResponse>
-
-    /** Deferred ML pass on a medium rendition (plaintext, discarded): CLIP embedding + faces
-     *  + model tag only, for re-embedding photos whose stored embModel is stale/missing. */
-    @Multipart
-    @POST("api/v1/gallery/analyze")
-    suspend fun galleryAnalyze(@Part file: MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.AnalyzeResponse>
-
-    @PUT("api/v1/gallery/store")
-    suspend fun galleryStorePut(@Body body: StorePutRequest): Response<StoreResponse>
-
-    @DELETE("api/v1/gallery/blob/{blob}")
-    suspend fun deleteGalleryBlob(@Path("blob") blob: String): Response<Unit>
-
-    @POST("api/v1/gallery/embed-text")
-    suspend fun embedText(@Body body: EmbedTextRequest): Response<EmbedTextResponse>
-
-    @GET("api/v1/gallery/reverse")
-    suspend fun galleryReverse(
-        @Query("lat") lat: Double,
-        @Query("lng") lng: Double,
-    ): Response<ReverseResponse>
-
     /** Forward-geocode a free-text place query — server-proxied (never third-party-direct), so the
      *  query + client IP stay inside the ZK perimeter (mirrors the web, which routes all place search
      *  through this endpoint). */
     @GET("api/v1/gallery/geocode")
     suspend fun galleryGeocode(@Query("q") q: String): Response<de.ledgerline.app.data.remote.dto.GeocodeResponse>
+
+    /** Reverse-geocode a coordinate to a place name (used by Explore's map, coarse grid, never
+     *  server-cached). Despite the path, this is shared place-search infra, not gallery-only. */
+    @GET("api/v1/gallery/reverse")
+    suspend fun galleryReverse(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+    ): Response<de.ledgerline.app.data.remote.dto.ReverseResponse>
 
     /** Snap a `lat,lng;lat,lng;…` waypoint string to a routed path (Explore tour planning). */
     @GET("api/v1/maps/route")
@@ -547,12 +476,6 @@ interface LedgerlineApi {
 
     @GET("api/v1/files/store/history/{version}")
     suspend fun filesStoreHistoryVersion(@Path("version") version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion>
-
-    @GET("api/v1/gallery/store/history")
-    suspend fun galleryStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse>
-
-    @GET("api/v1/gallery/store/history/{version}")
-    suspend fun galleryStoreHistoryVersion(@Path("version") version: Int): Response<de.ledgerline.app.data.remote.dto.StoreHistoryVersion>
 
     @GET("api/v1/notes/store/history")
     suspend fun notesStoreHistory(): Response<de.ledgerline.app.data.remote.dto.StoreHistoryResponse>

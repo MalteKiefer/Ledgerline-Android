@@ -10,17 +10,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * The raw sealed-store envelope exactly as the server returns it from `/store` and
- * `/gallery/store`: `{ ciphertext, version }`. The [ciphertext] is already sealed
- * with the Vault Key, so persisting it to disk leaks nothing (§9/§11) — decryption
- * always happens in-memory and needs the VK.
+ * The raw sealed-store envelope exactly as the server returns it from `/store` and the
+ * per-module `/{module}/store` endpoints: `{ ciphertext, version }`. The [ciphertext] is
+ * already sealed with the Vault Key, so persisting it to disk leaks nothing (§9/§11) —
+ * decryption always happens in-memory and needs the VK.
  */
 @Serializable
 data class StoreEnvelope(val ciphertext: String? = null, val version: Int = 0)
 
 /**
  * Persists `{ciphertext, version}` envelopes per store key under
- * `filesDir/storecache/`, one `<key>.json` file per key (key ∈ {`workspace`,`gallery`}).
+ * `filesDir/storecache/`, one `<key>.json` file per key (key ∈ {`workspace`,`files_root`,…}).
  *
  * Writes are atomic (write to `<key>.json.tmp`, then rename) so a crash never leaves
  * a half-written file. Reads return null on any error (absent OR corrupt), so a

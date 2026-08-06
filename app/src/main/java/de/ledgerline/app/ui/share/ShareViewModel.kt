@@ -12,8 +12,6 @@ import de.ledgerline.app.core.ops.OpKind
 import de.ledgerline.app.core.ops.OperationManager
 import de.ledgerline.app.domain.model.NamedFolder
 import de.ledgerline.app.domain.usecase.ImportFile
-import de.ledgerline.app.domain.usecase.ImportPhotos
-import de.ledgerline.app.domain.usecase.PhotoSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,14 +21,13 @@ import javax.inject.Inject
 
 /**
  * Drives the share-target confirm sheet: exposes the workspace folder list for the
- * files picker and runs the actual import through the shared [ImportPhotos]/[ImportFile]
- * use-cases via [OperationManager] (so the work survives backgrounding and feeds the
- * shared progress overlay + service notification).
+ * files picker and runs the actual import through the shared [ImportFile] use-case via
+ * [OperationManager] (so the work survives backgrounding and feeds the shared progress
+ * overlay + service notification).
  */
 @HiltViewModel
 class ShareViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val importPhotos: ImportPhotos,
     private val importFile: ImportFile,
     workspaceCache: WorkspaceCache,
     private val operationManager: OperationManager,
@@ -48,71 +45,34 @@ class ShareViewModel @Inject constructor(
     fun clearMessage() { _message.value = null }
 
     /**
-     * Import the shared [items]: gallery items run through [ImportPhotos] (dedup +
-     * upload + gallery-index append), file items through [ImportFile] into
-     * [targetFolder] (null = root). Both run as independent [OperationManager] ops so
-     * their progress feeds the shared overlay; failures are summed and surfaced as
-     * `"import_done:<ok>:<failed>"` in [message].
+     * Import the shared [items] via [ImportFile] into [targetFolder] (null = root), as an
+     * [OperationManager] op so its progress feeds the shared overlay; failures are summed and
+     * surfaced as `"import_done:<ok>:<failed>"` in [message].
      */
     fun import(items: List<SharedItem>, targetFolder: String?) {
-        val gallery = items.filter { it.target == ShareTarget.GALLERY }
-        val files = items.filter { it.target == ShareTarget.FILES }
-        val total = gallery.size + files.size
-        if (total == 0) return
+        if (items.isEmpty()) return
 
         val failed = java.util.concurrent.atomic.AtomicInteger(0)
-        val remainingOps = java.util.concurrent.atomic.AtomicInteger(
-            (if (gallery.isNotEmpty()) 1 else 0) + (if (files.isNotEmpty()) 1 else 0),
-        )
 
-        fun finishOp() {
-            if (remainingOps.decrementAndGet() == 0) {
-                val f = failed.get()
-                _message.value = "import_done:${total - f}:$f"
-            }
-        }
-
-        if (gallery.isNotEmpty()) {
-            val sources = gallery.map { it.toPhotoSource() }
-            operationManager.run(OpKind.UPLOAD, total = sources.size) { report ->
-                try {
-                    val result = importPhotos.invoke(sources, report)
-                    failed.addAndGet(result.failed)
-                } finally {
-                    finishOp()
-                }
-            }
-        }
-
-        if (files.isNotEmpty()) {
-            operationManager.run(OpKind.UPLOAD, total = files.size) { report ->
-                try {
-                    var done = 0
-                    report(0, files.size)
-                    for (item in files) {
-                        val size = sizeOf(item.uri)
-                        val res = importFile.invoke(item.name, item.mime, size, targetFolder) {
-                            context.contentResolver.openInputStream(item.uri)
-                                ?: error("cannot open ${item.uri}")
-                        }
-                        if (res is de.ledgerline.app.core.Outcome.Err) failed.incrementAndGet()
-                        report(++done, files.size)
+        operationManager.run(OpKind.UPLOAD, total = items.size) { report ->
+            try {
+                var done = 0
+                report(0, items.size)
+                for (item in items) {
+                    val size = sizeOf(item.uri)
+                    val res = importFile.invoke(item.name, item.mime, size, targetFolder) {
+                        context.contentResolver.openInputStream(item.uri)
+                            ?: error("cannot open ${item.uri}")
                     }
-                } finally {
-                    finishOp()
+                    if (res is de.ledgerline.app.core.Outcome.Err) failed.incrementAndGet()
+                    report(++done, items.size)
                 }
+            } finally {
+                val f = failed.get()
+                _message.value = "import_done:${items.size - f}:$f"
             }
         }
     }
-
-    private fun SharedItem.toPhotoSource() = PhotoSource(
-        name = name,
-        mime = mime,
-        size = de.ledgerline.app.core.util.blobSize(context.contentResolver, uri),
-        openInput = { context.contentResolver.openInputStream(uri) ?: error("cannot open $uri") },
-        lat = null,
-        lng = null,
-    )
 
     /** Best-effort content size via OpenableColumns.SIZE. Falls back to reading the
      *  stream length (the encrypt/upload path also needs a length up front). */

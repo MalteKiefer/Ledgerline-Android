@@ -1,4 +1,4 @@
-package de.ledgerline.app.ui.gallery
+package de.ledgerline.app.ui.map
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

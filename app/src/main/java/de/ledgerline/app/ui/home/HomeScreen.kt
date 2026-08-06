@@ -22,7 +22,6 @@ import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -130,7 +129,6 @@ fun HomeScreen(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             QuickAction(Icons.AutoMirrored.Outlined.NoteAdd, stringResource(R.string.home_qa_note), Modifier.weight(1f)) { onOpen(WorkspaceDest.Notes) }
             QuickAction(Icons.Outlined.CloudUpload, stringResource(R.string.home_qa_upload), Modifier.weight(1f)) { onOpen(WorkspaceDest.Files) }
-            QuickAction(Icons.Outlined.PhotoCamera, stringResource(R.string.home_qa_backup), Modifier.weight(1f)) { onOpen(WorkspaceDest.Photos) }
             QuickAction(Icons.Outlined.Lock, stringResource(R.string.home_qa_password), Modifier.weight(1f)) { onOpen(WorkspaceDest.Vault) }
         }
 

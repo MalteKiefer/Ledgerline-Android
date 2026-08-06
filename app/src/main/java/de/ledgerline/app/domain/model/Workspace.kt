@@ -90,7 +90,8 @@ data class FileEntry(
  * Owner-side public-share record persisted in the sealed store (byte-compatible with the
  * web client's `src.share` / `al.share`): the share [token] and the 32-byte share key [sk]
  * (base64) so the link can be re-copied/revoked. `sk` NEVER leaves the device except in the
- * link fragment. [kind] is files-only (`"file"|"folder"`); [allowDownload] is gallery-only.
+ * link fragment. [kind] is `"file"|"folder"`; [allowDownload] is unused for files (kept for
+ * wire-compat with older/foreign-client share records).
  */
 @Serializable
 data class ShareInfo(

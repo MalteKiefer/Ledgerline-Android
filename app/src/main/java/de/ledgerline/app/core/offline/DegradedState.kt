@@ -15,9 +15,6 @@ import javax.inject.Singleton
 class DegradedState @Inject constructor() {
     private val _files = MutableStateFlow(false)
     val files: StateFlow<Boolean> = _files
-    private val _gallery = MutableStateFlow(false)
-    val gallery: StateFlow<Boolean> = _gallery
 
     fun setFiles(degraded: Boolean) { _files.value = degraded }
-    fun setGallery(degraded: Boolean) { _gallery.value = degraded }
 }

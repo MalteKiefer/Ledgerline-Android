@@ -3,7 +3,6 @@ package de.ledgerline.app.core.offline
 import de.ledgerline.app.data.SettingsStore
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
-import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.SettingsStore.Companion.DEFAULT_CACHE_MAX_MB
 import de.ledgerline.app.di.ApplicationScope
 import kotlinx.coroutines.CoroutineScope
@@ -22,9 +21,6 @@ interface OfflineFlags {
 
     /** Latest file-content blob caching policy. */
     fun filesPolicy(): FileBlobPolicy
-
-    /** Latest photo blob caching policy. */
-    fun photosPolicy(): PhotoBlobPolicy
 
     /** Latest contact-avatar blob caching policy. */
     fun contactsPolicy(): ContactBlobPolicy
@@ -60,9 +56,6 @@ class OfflinePrefs @Inject constructor(
     private var filesPolicy: FileBlobPolicy = FileBlobPolicy.ON_DEMAND
 
     @Volatile
-    private var photosPolicy: PhotoBlobPolicy = PhotoBlobPolicy.ON_DEMAND
-
-    @Volatile
     private var contactsPolicy: ContactBlobPolicy = ContactBlobPolicy.ON_DEMAND
 
     @Volatile
@@ -77,7 +70,6 @@ class OfflinePrefs @Inject constructor(
     init {
         scope.launch { settings.offlineEnabled.collect { enabled = it } }
         scope.launch { settings.filesPolicy.collect { filesPolicy = it } }
-        scope.launch { settings.photosPolicy.collect { photosPolicy = it } }
         scope.launch { settings.contactsPolicy.collect { contactsPolicy = it } }
         scope.launch { settings.cacheMaxMb.collect { cacheMaxMb = it } }
         scope.launch { settings.prefetchWifiOnly.collect { wifiOnly = it } }
@@ -87,8 +79,6 @@ class OfflinePrefs @Inject constructor(
     override fun enabled(): Boolean = enabled
 
     override fun filesPolicy(): FileBlobPolicy = filesPolicy
-
-    override fun photosPolicy(): PhotoBlobPolicy = photosPolicy
 
     override fun contactsPolicy(): ContactBlobPolicy = contactsPolicy
 

@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Contacts
-import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -58,7 +57,7 @@ import kotlinx.coroutines.launch
 
 /**
  * First-run onboarding as a swipeable multi-step pager: an intro page plus one page
- * per optional permission (location / contacts / media). The permissions no longer
+ * per optional permission (location / contacts). The permissions no longer
  * have to fit on a single screen. "Skip" or the final "Get started" hands off to
  * pairing via [onGetStarted]; every permission is optional.
  */
@@ -70,13 +69,11 @@ fun WelcomeScreen(onGetStarted: () -> Unit) {
 
     var locationGranted by remember { mutableStateOf(granted(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) }
     var contactsGranted by remember { mutableStateOf(granted(Manifest.permission.READ_CONTACTS)) }
-    var mediaGranted by remember { mutableStateOf(granted(Manifest.permission.READ_MEDIA_IMAGES)) }
 
     val locationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r -> locationGranted = r.values.any { it } }
     val contactsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r -> contactsGranted = r.values.any { it } }
-    val mediaLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r -> mediaGranted = r.values.any { it } }
 
-    val pageCount = 4
+    val pageCount = 3
     val pager = rememberPagerState { pageCount }
     val scope = rememberCoroutineScope()
     val isLast = pager.currentPage >= pageCount - 1
@@ -95,7 +92,7 @@ fun WelcomeScreen(onGetStarted: () -> Unit) {
                     grantedLabel = stringResource(R.string.welcome_location_granted),
                     onAllow = { locationLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)) },
                 )
-                2 -> PermissionPage(
+                else -> PermissionPage(
                     icon = Icons.Outlined.Contacts, tint = Brand.tintBlue,
                     title = stringResource(R.string.welcome_contacts_title),
                     body = stringResource(R.string.welcome_contacts_body),
@@ -103,15 +100,6 @@ fun WelcomeScreen(onGetStarted: () -> Unit) {
                     allowLabel = stringResource(R.string.welcome_contacts_allow),
                     grantedLabel = stringResource(R.string.welcome_contacts_granted),
                     onAllow = { contactsLauncher.launch(arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS)) },
-                )
-                else -> PermissionPage(
-                    icon = Icons.Outlined.PhotoLibrary, tint = Brand.tintOrange,
-                    title = stringResource(R.string.welcome_media_title),
-                    body = stringResource(R.string.welcome_media_body),
-                    granted = mediaGranted,
-                    allowLabel = stringResource(R.string.welcome_media_allow),
-                    grantedLabel = stringResource(R.string.welcome_media_granted),
-                    onAllow = { mediaLauncher.launch(arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)) },
                 )
             }
         }

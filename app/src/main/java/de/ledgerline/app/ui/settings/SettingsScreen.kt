@@ -66,12 +66,10 @@ import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.GppMaybe
 import androidx.compose.material.icons.outlined.VerifiedUser
 import androidx.compose.material.icons.outlined.Password
-import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -113,10 +111,8 @@ import de.ledgerline.app.R
 import de.ledgerline.app.data.ContactSort
 import de.ledgerline.app.data.DateFormatPref
 import de.ledgerline.app.data.SettingsStore
-import de.ledgerline.app.data.backup.DeviceAlbum
 import de.ledgerline.app.data.offline.ContactBlobPolicy
 import de.ledgerline.app.data.offline.FileBlobPolicy
-import de.ledgerline.app.data.offline.PhotoBlobPolicy
 import de.ledgerline.app.data.remote.dto.MeUser
 import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
@@ -127,7 +123,7 @@ import de.ledgerline.app.ui.workspace.common.humanSize
 import kotlinx.coroutines.launch
 
 /** Internal Settings destinations — a categorized landing (ROOT) plus one sub-screen per category. */
-private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, MAPS, OFFLINE_MAPS, OFFLINE, BACKGROUND, BACKUP, CALENDAR, ACCOUNT, NOTIFICATIONS, SHARED_LINK, SHARED_VAULTS, ABOUT, LICENSES }
+private enum class SettingsRoute { ROOT, APPEARANCE, SECURITY, MAPS, OFFLINE_MAPS, OFFLINE, BACKGROUND, CALENDAR, ACCOUNT, NOTIFICATIONS, SHARED_LINK, SHARED_VAULTS, ABOUT, LICENSES }
 
 /**
  * Settings screen — a categorized landing list plus per-category sub-screens, in the
@@ -167,7 +163,6 @@ fun SettingsContent(
     val refreshSeconds by vm.backgroundRefreshSeconds.collectAsStateWithLifecycle()
     val offlineEnabled by vm.offlineEnabled.collectAsStateWithLifecycle()
     val filesPolicy by vm.filesPolicy.collectAsStateWithLifecycle()
-    val photosPolicy by vm.photosPolicy.collectAsStateWithLifecycle()
     val contactsPolicy by vm.contactsPolicy.collectAsStateWithLifecycle()
     val cacheMaxMb by vm.cacheMaxMb.collectAsStateWithLifecycle()
     val prefetchWifiOnly by vm.prefetchWifiOnly.collectAsStateWithLifecycle()
@@ -184,12 +179,6 @@ fun SettingsContent(
     val coordinateFormat by vm.coordinateFormat.collectAsStateWithLifecycle()
     val devices by vm.devices.collectAsStateWithLifecycle()
     val userSettings by vm.userSettings.collectAsStateWithLifecycle()
-    val backupEnabled by vm.backupEnabled.collectAsStateWithLifecycle()
-    val backupAlbumIds by vm.backupAlbumIds.collectAsStateWithLifecycle()
-    val albums by vm.albums.collectAsStateWithLifecycle()
-    val backedUpCount by vm.backedUpCount.collectAsStateWithLifecycle()
-    val backupDeleteAfter by vm.backupDeleteAfter.collectAsStateWithLifecycle()
-    val pendingDeleteUris by vm.pendingDeleteUris.collectAsStateWithLifecycle()
 
     var route by rememberSaveable { mutableStateOf(SettingsRoute.ROOT) }
     var currentLang by remember { mutableStateOf(currentLanguageTag(context)) }
@@ -214,26 +203,6 @@ fun SettingsContent(
     val notificationsLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-    // Result is ignored: backup runs regardless; the permission grant allows reading media.
-    val mediaLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
-
-    // "Delete originals after backup": the scoped-storage trash request needs OS consent (the
-    // app doesn't own the camera roll). On approval, drop those URIs from the pending queue.
-    var trashRequested by remember { mutableStateOf<List<String>>(emptyList()) }
-    val trashLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
-            if (res.resultCode == android.app.Activity.RESULT_OK) vm.onOriginalsDeleted(trashRequested)
-            trashRequested = emptyList()
-        }
-    val requestTrash: () -> Unit = req@{
-        val uris = pendingDeleteUris.mapNotNull { runCatching { android.net.Uri.parse(it) }.getOrNull() }
-        if (uris.isEmpty()) return@req
-        trashRequested = pendingDeleteUris.toList()
-        val pi = android.provider.MediaStore.createTrashRequest(context.contentResolver, uris, true)
-        trashLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build())
-    }
-
     // The offline-map manager owns its own full-screen scaffold; render it directly.
     if (route == SettingsRoute.OFFLINE_MAPS) {
         de.ledgerline.app.ui.explore.OfflineMapsScreen(onBack = { route = SettingsRoute.MAPS })
@@ -253,7 +222,6 @@ fun SettingsContent(
         SettingsRoute.OFFLINE_MAPS -> stringResource(R.string.offline_maps_title)
         SettingsRoute.OFFLINE -> stringResource(R.string.settings_cat_offline)
         SettingsRoute.BACKGROUND -> stringResource(R.string.settings_cat_background)
-        SettingsRoute.BACKUP -> stringResource(R.string.settings_cat_backup)
         SettingsRoute.CALENDAR -> stringResource(R.string.settings_cat_calendar)
         SettingsRoute.ACCOUNT -> stringResource(R.string.settings_cat_account)
         SettingsRoute.NOTIFICATIONS -> stringResource(R.string.settings_cat_notifications)
@@ -330,7 +298,6 @@ fun SettingsContent(
                     padding = innerPadding,
                     offlineEnabled = offlineEnabled,
                     filesPolicy = filesPolicy,
-                    photosPolicy = photosPolicy,
                     contactsPolicy = contactsPolicy,
                     cacheMaxMb = cacheMaxMb,
                     prefetchWifiOnly = prefetchWifiOnly,
@@ -338,7 +305,6 @@ fun SettingsContent(
                     cacheSize = cacheSize,
                     onSetOffline = vm::setOfflineEnabled,
                     onSetFilesPolicy = vm::setFilesPolicy,
-                    onSetPhotosPolicy = vm::setPhotosPolicy,
                     onSetContactsPolicy = vm::setContactsPolicy,
                     onSetCacheMaxMb = vm::setCacheMaxMb,
                     onSetWifiOnly = vm::setPrefetchWifiOnly,
@@ -366,27 +332,6 @@ fun SettingsContent(
                         }
                     },
                     onSetLinkChooser = vm::setLinkChooserEnabled,
-                )
-
-                SettingsRoute.BACKUP -> BackupSettings(
-                    padding = innerPadding,
-                    enabled = backupEnabled,
-                    albums = albums,
-                    selected = backupAlbumIds,
-                    backedUpCount = backedUpCount,
-                    onSetEnabled = { on ->
-                        vm.setBackupEnabled(on)
-                        if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            mediaLauncher.launch(arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO))
-                        }
-                    },
-                    onToggleAlbum = vm::toggleAlbum,
-                    onBackupNow = vm::backupNow,
-                    onLoadAlbums = vm::loadAlbums,
-                    deleteAfter = backupDeleteAfter,
-                    onSetDeleteAfter = vm::setBackupDeleteAfter,
-                    pendingDeleteCount = pendingDeleteUris.size,
-                    onDeletePending = requestTrash,
                 )
 
                 SettingsRoute.ACCOUNT -> AccountSettings(
@@ -493,7 +438,6 @@ private fun SettingsRoot(padding: PaddingValues, vm: SettingsViewModel, onNaviga
         Item(0, stringResource(R.string.settings_cat_passkeys), stringResource(R.string.settings_cat_passkeys_sub), Icons.Outlined.Fingerprint, Brand.tintBlue) { launchCredentialProviderSettings(context) },
         Item(1, stringResource(R.string.settings_cat_offline), stringResource(R.string.settings_cat_offline_sub), Icons.Outlined.CloudOff, Brand.tintGreen) { onNavigate(SettingsRoute.OFFLINE) },
         Item(1, stringResource(R.string.settings_cat_background), stringResource(R.string.settings_cat_background_sub), Icons.Outlined.Sync, Brand.tintTeal) { onNavigate(SettingsRoute.BACKGROUND) },
-        Item(1, stringResource(R.string.settings_cat_backup), stringResource(R.string.settings_cat_backup_sub), Icons.Outlined.PhotoLibrary, Brand.tintOrange) { onNavigate(SettingsRoute.BACKUP) },
         Item(1, stringResource(R.string.settings_cat_maps), stringResource(R.string.settings_cat_maps_sub), Icons.Outlined.Map, Brand.tintTeal) { onNavigate(SettingsRoute.MAPS) },
         Item(1, stringResource(R.string.settings_cat_calendar), stringResource(R.string.settings_cat_calendar_sub), Icons.Outlined.CalendarMonth, Brand.tintOrange) { onNavigate(SettingsRoute.CALENDAR) },
         Item(2, stringResource(R.string.share_open_title), stringResource(R.string.share_open_hint), Icons.Outlined.Link, Brand.tintBlue) { onNavigate(SettingsRoute.SHARED_LINK) },
@@ -1001,7 +945,6 @@ private fun OfflineSettings(
     padding: PaddingValues,
     offlineEnabled: Boolean,
     filesPolicy: FileBlobPolicy,
-    photosPolicy: PhotoBlobPolicy,
     contactsPolicy: ContactBlobPolicy,
     cacheMaxMb: Int,
     prefetchWifiOnly: Boolean,
@@ -1009,7 +952,6 @@ private fun OfflineSettings(
     cacheSize: Long,
     onSetOffline: (Boolean) -> Unit,
     onSetFilesPolicy: (FileBlobPolicy) -> Unit,
-    onSetPhotosPolicy: (PhotoBlobPolicy) -> Unit,
     onSetContactsPolicy: (ContactBlobPolicy) -> Unit,
     onSetCacheMaxMb: (Int) -> Unit,
     onSetWifiOnly: (Boolean) -> Unit,
@@ -1027,15 +969,6 @@ private fun OfflineSettings(
             RadioRow(stringResource(R.string.policy_on_demand), filesPolicy == FileBlobPolicy.ON_DEMAND, offlineEnabled) { onSetFilesPolicy(FileBlobPolicy.ON_DEMAND) }
             SettingsRowDivider()
             RadioRow(stringResource(R.string.policy_all), filesPolicy == FileBlobPolicy.ALL, offlineEnabled) { onSetFilesPolicy(FileBlobPolicy.ALL) }
-        }
-        SettingsSection(stringResource(R.string.settings_photos_policy)) {
-            RadioRow(stringResource(R.string.policy_off), photosPolicy == PhotoBlobPolicy.OFF, offlineEnabled) { onSetPhotosPolicy(PhotoBlobPolicy.OFF) }
-            SettingsRowDivider()
-            RadioRow(stringResource(R.string.policy_thumbs), photosPolicy == PhotoBlobPolicy.THUMBS, offlineEnabled) { onSetPhotosPolicy(PhotoBlobPolicy.THUMBS) }
-            SettingsRowDivider()
-            RadioRow(stringResource(R.string.policy_on_demand), photosPolicy == PhotoBlobPolicy.ON_DEMAND, offlineEnabled) { onSetPhotosPolicy(PhotoBlobPolicy.ON_DEMAND) }
-            SettingsRowDivider()
-            RadioRow(stringResource(R.string.policy_all), photosPolicy == PhotoBlobPolicy.ALL, offlineEnabled) { onSetPhotosPolicy(PhotoBlobPolicy.ALL) }
         }
         SettingsSection(stringResource(R.string.settings_contacts_policy), hint = stringResource(R.string.settings_offline_manifest_note)) {
             RadioRow(stringResource(R.string.policy_off), contactsPolicy == ContactBlobPolicy.OFF, offlineEnabled) { onSetContactsPolicy(ContactBlobPolicy.OFF) }
@@ -1095,76 +1028,6 @@ private fun BackgroundSettings(
             SwitchRow(stringResource(R.string.settings_background_ops_title), stringResource(R.string.settings_background_ops_subtitle), backgroundOps, onSetBackgroundOps)
             SettingsRowDivider()
             SwitchRow(stringResource(R.string.settings_link_chooser), "", linkChooser, onSetLinkChooser)
-        }
-        Spacer(Modifier.height(20.dp))
-    }
-}
-
-@Composable
-private fun BackupSettings(
-    padding: PaddingValues,
-    enabled: Boolean,
-    albums: List<DeviceAlbum>,
-    selected: Set<String>,
-    backedUpCount: Int,
-    onSetEnabled: (Boolean) -> Unit,
-    onToggleAlbum: (String) -> Unit,
-    onBackupNow: () -> Unit,
-    onLoadAlbums: () -> Unit,
-    deleteAfter: Boolean,
-    onSetDeleteAfter: (Boolean) -> Unit,
-    pendingDeleteCount: Int,
-    onDeletePending: () -> Unit,
-) {
-    LaunchedEffect(enabled) { if (enabled) onLoadAlbums() }
-    SubScreen(padding) {
-        SettingsSection(stringResource(R.string.settings_backup_section)) {
-            SwitchRow(stringResource(R.string.settings_backup_title), stringResource(R.string.settings_backup_subtitle), enabled, onSetEnabled)
-        }
-        if (enabled) {
-            SettingsSection(stringResource(R.string.settings_backup_cleanup)) {
-                SwitchRow(
-                    stringResource(R.string.settings_backup_delete_title),
-                    stringResource(R.string.settings_backup_delete_subtitle),
-                    deleteAfter,
-                    onSetDeleteAfter,
-                )
-                if (pendingDeleteCount > 0) {
-                    SettingsRowDivider()
-                    Row(
-                        Modifier.fillMaxWidth().clickable { onDeletePending() }.padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconChip(Icons.Outlined.DeleteSweep, tint = Brand.tintOrange, size = 32.dp)
-                        Spacer(Modifier.width(14.dp))
-                        Text(
-                            stringResource(R.string.settings_backup_delete_pending, pendingDeleteCount),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-            }
-            SettingsSection(stringResource(R.string.settings_backup_albums), hint = stringResource(R.string.settings_backup_status, backedUpCount)) {
-                albums.forEachIndexed { i, a ->
-                    if (i > 0) SettingsRowDivider()
-                    Row(
-                        Modifier.fillMaxWidth().clickable { onToggleAlbum(a.bucketId) }.padding(horizontal = 14.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        IconChip(Icons.Outlined.PhotoLibrary, tint = Brand.tintOrange, size = 32.dp)
-                        Spacer(Modifier.width(14.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(a.name, style = MaterialTheme.typography.bodyLarge)
-                            Text(stringResource(R.string.settings_backup_album_count, a.count), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Checkbox(checked = a.bucketId in selected, onCheckedChange = { onToggleAlbum(a.bucketId) })
-                    }
-                }
-            }
-            OutlinedButton(onClick = onBackupNow, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 14.dp)) {
-                Text(stringResource(R.string.settings_backup_now))
-            }
         }
         Spacer(Modifier.height(20.dp))
     }

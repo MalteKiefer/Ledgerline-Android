@@ -14,7 +14,6 @@ import de.ledgerline.app.core.offline.OfflinePrefs
 import de.ledgerline.app.core.offline.SyncableStore
 import de.ledgerline.app.data.ExploreRepository
 import de.ledgerline.app.data.FinanceRepository
-import de.ledgerline.app.data.GalleryRepository
 import de.ledgerline.app.data.HealthRepository
 import de.ledgerline.app.data.PasswordsRepository
 import de.ledgerline.app.data.PendingImportRepository
@@ -61,10 +60,6 @@ abstract class OfflineModule {
     @Binds
     @IntoSet
     abstract fun workspaceSyncable(impl: WorkspaceRepository): SyncableStore
-
-    @Binds
-    @IntoSet
-    abstract fun gallerySyncable(impl: GalleryRepository): SyncableStore
 
     @Binds
     @IntoSet

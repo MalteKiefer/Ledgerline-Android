@@ -16,7 +16,6 @@ import androidx.compose.material.icons.outlined.Contacts
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -94,7 +93,6 @@ fun SearchScreen(
 
 private fun iconOf(d: WorkspaceDest): ImageVector = when (d) {
     WorkspaceDest.Files -> Icons.Outlined.Folder
-    WorkspaceDest.Photos -> Icons.Outlined.PhotoLibrary
     WorkspaceDest.Vault -> Icons.Outlined.Lock
     WorkspaceDest.Notes -> Icons.Outlined.Description
     WorkspaceDest.Bookmarks -> Icons.Outlined.Bookmarks
@@ -104,7 +102,6 @@ private fun iconOf(d: WorkspaceDest): ImageVector = when (d) {
 
 private fun tintOf(d: WorkspaceDest): Color = when (d) {
     WorkspaceDest.Files -> Brand.tintBlue
-    WorkspaceDest.Photos -> Brand.tintViolet
     WorkspaceDest.Vault -> Brand.tintViolet
     WorkspaceDest.Notes -> Brand.tintTeal
     WorkspaceDest.Bookmarks -> Brand.tintOrange

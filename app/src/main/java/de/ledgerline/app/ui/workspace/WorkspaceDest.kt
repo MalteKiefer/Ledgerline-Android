@@ -10,7 +10,6 @@ import de.ledgerline.app.R
 enum class WorkspaceDest(val labelRes: Int, val moduleKey: String? = null) {
     Home(R.string.dest_home),                              // hub — always shown
     Files(R.string.tab_files, "files"),
-    Photos(R.string.tab_gallery, "gallery"),
     Vault(R.string.tab_passwords, "passwords"),
     Notes(R.string.tab_notes, "notes"),
     Todos(R.string.tab_todos, "todos"),
@@ -28,6 +27,6 @@ enum class WorkspaceDest(val labelRes: Int, val moduleKey: String? = null) {
 
     companion object {
         /** The four surfaces that appear in the pill bar / rail. */
-        val primary = listOf(Home, Files, Photos, Vault)
+        val primary = listOf(Home, Files, Vault, Notes)
     }
 }

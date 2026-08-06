@@ -56,15 +56,15 @@ class ImportQueueTest {
         val bytes = ByteArray(20) { it.toByte() } // spans multiple 8-byte chunks
         val sig = ContentSig.of({ ByteArrayInputStream(bytes) }, bytes.size.toLong())
 
-        assertTrue(q.enqueuePhoto(vk, "IMG.jpg", "image/jpeg", bytes.size.toLong(), sig, { ByteArrayInputStream(bytes) }, 1.0, 2.0))
+        assertTrue(q.enqueueFile(vk, "doc.pdf", "application/pdf", bytes.size.toLong(), sig, { ByteArrayInputStream(bytes) }, folder = "f1"))
         assertTrue(q.hasPending())
 
         val items = q.pending(vk)
         assertEquals(1, items.size)
         val h = items.first()
-        assertEquals("IMG.jpg", h.item.name)
-        assertEquals(ImportQueue.Kind.PHOTO.name, h.item.kind)
-        assertEquals(1.0, h.item.lat!!, 0.0)
+        assertEquals("doc.pdf", h.item.name)
+        assertEquals(ImportQueue.Kind.FILE.name, h.item.kind)
+        assertEquals("f1", h.item.folder)
         assertArrayEquals(bytes, h.open().use { it.readBytes() })   // decrypting stream yields the source
     }
 
@@ -72,8 +72,8 @@ class ImportQueueTest {
         val q = queue()
         val bytes = ByteArray(10) { 7 }
         val sig = ContentSig.of({ ByteArrayInputStream(bytes) }, bytes.size.toLong())
-        q.enqueuePhoto(vk, "a.jpg", "image/jpeg", 10, sig, { ByteArrayInputStream(bytes) }, null, null)
-        q.enqueuePhoto(vk, "a-again.jpg", "image/jpeg", 10, sig, { ByteArrayInputStream(bytes) }, null, null)
+        q.enqueueFile(vk, "a.pdf", "application/pdf", 10, sig, { ByteArrayInputStream(bytes) }, folder = null)
+        q.enqueueFile(vk, "a-again.pdf", "application/pdf", 10, sig, { ByteArrayInputStream(bytes) }, folder = null)
         assertEquals(1, q.pending(vk).size)
     }
 

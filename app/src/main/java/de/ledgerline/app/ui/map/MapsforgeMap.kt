@@ -34,7 +34,7 @@ import java.io.File
  * Shared mapsforge map surface. mapsforge renders offline vector `.map` files with its own
  * engine (LGPL, no Google); when no offline map covers the area and the user has opted into
  * online tiles, it falls back to OSM raster tiles via [TileDownloadLayer]. This is the single
- * map surface for the whole app (Explore/Karte/Tracker and, per the migration, the gallery).
+ * map surface for the whole app (Explore/Karte/Tracker).
  *
  * Online tiles are OSM-policy compliant (descriptive User-Agent, set globally in [LedgerlineApp]).
  * Callers that can hit online tiles must gate the composable behind the opt-in `MapTilesGate`.
@@ -46,7 +46,6 @@ class MapsforgeController {
     private var track: Polyline? = null
     private val markers = mutableListOf<Marker>()
     private val arrowMarkers = mutableListOf<Marker>()
-    private var clusterLayer: Layer? = null
     private var searchPin: Marker? = null
 
     /** Recenter (and optionally set zoom, mapsforge zoom bytes ~0..20). */
@@ -112,16 +111,6 @@ class MapsforgeController {
     }
 
     fun resetNorth() = setRotation(0f)
-
-    /** Attach a photo-clustering overlay (see [PhotoClusterLayer]). Safe no-op if not ready. */
-    fun setPhotoClusters(photos: List<PhotoPoint>, pin: org.mapsforge.core.graphics.Bitmap?, bubbleColorArgb: Int, onOpenPhoto: (String) -> Unit) {
-        val mv = mapView ?: return
-        clusterLayer?.let { mv.layerManager.layers.remove(it) }
-        val layer = PhotoClusterLayer(mv, photos, pin, bubbleColorArgb, onOpenPhoto)
-        clusterLayer = layer
-        mv.layerManager.layers.add(layer)
-        mv.invalidate()
-    }
 
     /** A single independent search-result pin (separate from waypoint/cluster markers). */
     fun setSearchPin(lat: Double, lng: Double, bitmap: org.mapsforge.core.graphics.Bitmap?) {
@@ -251,7 +240,7 @@ fun GatedMapsforgeMap(
     initialLng: Double? = null,
     initialZoom: Byte = 12,
     onMapTap: ((Double, Double) -> Unit)? = null,
-    tilesVm: de.ledgerline.app.ui.gallery.MapTilesViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
+    tilesVm: MapTilesViewModel = androidx.hilt.navigation.compose.hiltViewModel(),
 ) {
     val offline = rememberInstalledOfflineMaps()
     val online by tilesVm.enabled.collectAsStateWithLifecycle()
@@ -267,7 +256,7 @@ fun GatedMapsforgeMap(
             onMapTap = onMapTap,
         )
     } else {
-        de.ledgerline.app.ui.gallery.MapTilesGate(modifier) { /* enabling flips [online]→true */ }
+        MapTilesGate(modifier) { /* enabling flips [online]→true */ }
     }
 }
 

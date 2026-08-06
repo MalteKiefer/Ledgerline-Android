@@ -7,7 +7,6 @@ import de.ledgerline.app.data.ParsedShareLink
 import de.ledgerline.app.data.SharedFile
 import de.ledgerline.app.data.SharedLinkRepository
 import de.ledgerline.app.data.SharedManifest
-import de.ledgerline.app.data.SharedPhoto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,14 +66,6 @@ class SharedLinkViewModel @Inject constructor(
     }
 
     private val ready get() = _state.value as? State.Ready
-
-    /** Decrypt a photo's display rendition (medium→thumb) for the in-app grid. */
-    suspend fun photoBytes(p: SharedPhoto): ByteArray? {
-        val r = ready ?: return null
-        val ref = p.displayRef ?: return null
-        val key = p.displayKey ?: return null
-        return repo.downloadBlob(r.link.token, ref, key, r.link.shareKey, r.grant)
-    }
 
     /** Decrypt a file's full bytes for saving via the Storage Access Framework. */
     suspend fun fileBytes(f: SharedFile): ByteArray? {
