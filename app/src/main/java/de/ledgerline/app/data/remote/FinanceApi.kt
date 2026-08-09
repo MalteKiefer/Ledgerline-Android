@@ -72,7 +72,7 @@ interface FinanceApi {
     suspend fun categorySuggestions(): Response<CategorySuggestionsResponse>
 
     @GET("api/v1/finance/trash")
-    suspend fun financeTrash(): Response<JsonObject>
+    suspend fun financeTrash(): Response<de.ledgerline.app.domain.model.finance.FinanceTrash>
 
     // ---- Invoices ----
     @POST("api/v1/finance/invoices")

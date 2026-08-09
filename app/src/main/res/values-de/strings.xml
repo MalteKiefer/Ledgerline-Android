@@ -1326,4 +1326,26 @@
     <string name="login_error_network">Server nicht erreichbar.</string>
     <string name="login_error_https">Die URL muss mit https:// beginnen.</string>
     <string name="login_error_auth">Authentifizierung abgebrochen.</string>
+    <!-- Files sharing -->
+    <string name="share_public_link">Öffentlicher Link</string>
+    <string name="share_create_link">Link erstellen</string>
+    <string name="share_link_created">Link erstellt</string>
+    <string name="share_copy_link">Link kopieren</string>
+    <string name="share_with_user">Mit Nutzer teilen</string>
+    <string name="share_user_email">Nutzer-E-Mail</string>
+    <string name="share_role_viewer">Leser</string>
+    <string name="share_role_editor">Bearbeiter</string>
+    <string name="share_add_member">Hinzufügen</string>
+    <string name="share_member_not_found">Kein Nutzer mit dieser E-Mail</string>
+    <string name="share_manage_folder">Ordnerfreigabe</string>
+    <string name="shared_with_me">Für mich freigegeben</string>
+    <string name="shared_by">Freigegeben von %1$s</string>
+    <string name="shared_empty">Noch nichts für dich freigegeben</string>
+    <string name="files_download_zip">Als ZIP herunterladen</string>
+    <string name="files_replace_content">Datei ersetzen…</string>
+    <string name="files_new_version_added">Neue Version hinzugefügt</string>
+    <!-- Finance trash + company logo -->
+    <string name="more_trash">Papierkorb</string>
+    <string name="company_logo">Firmenlogo</string>
+    <string name="action_remove">Entfernen</string>
 </resources>

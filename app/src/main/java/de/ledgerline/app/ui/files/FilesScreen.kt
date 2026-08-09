@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderZip
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.MoreVert
@@ -88,6 +89,9 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
     var showSearch by remember { mutableStateOf(false) }
     var showStats by remember { mutableStateOf(false) }
     var showLabels by remember { mutableStateOf(false) }
+    var showShared by remember { mutableStateOf(false) }
+    // (kind, id, folderId) for the public-link share dialog.
+    var shareTarget by remember { mutableStateOf<Triple<String, Int, Int?>?>(null) }
 
     // Sub-screens own their top bar; give them only the bottom-nav clearance.
     val bottomOnly = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
@@ -97,6 +101,7 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
         showSearch -> { Box(bottomOnly) { FilesSearchScreen(vm, onOpenDetail = { showSearch = false; detailId = it }) { showSearch = false } }; return }
         showStats -> { Box(bottomOnly) { FilesStatsScreen(vm) { showStats = false } }; return }
         showLabels -> { Box(bottomOnly) { FilesLabelsScreen(vm) { showLabels = false } }; return }
+        showShared -> { Box(bottomOnly) { SharedWithMeScreen(vm) { showShared = false } }; return }
     }
 
     val ctx = LocalContext.current
@@ -134,7 +139,22 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
 
     Box(Modifier.fillMaxSize().padding(contentPadding)) {
         Column(Modifier.fillMaxSize()) {
-            FilesTopBar(onSearch = { showSearch = true }, onTrash = { showTrash = true }, onStats = { showStats = true }, onLabels = { showLabels = true })
+            FilesTopBar(
+                onSearch = { showSearch = true }, onTrash = { showTrash = true }, onStats = { showStats = true },
+                onLabels = { showLabels = true }, onShared = { showShared = true },
+                onDownloadFolder = vm.currentFolderId?.let { fid ->
+                    {
+                        scope.launch {
+                            busy = ctx.getString(R.string.files_downloading)
+                            val dir = java.io.File(ctx.cacheDir, "docs").apply { mkdirs() }
+                            val dest = java.io.File(dir, "folder_$fid.zip")
+                            val ok = vm.zipFolder(fid, dest)
+                            busy = null
+                            if (ok) DocOpener.openFile(ctx, dest, "application/zip") else busy = ctx.getString(R.string.files_open_failed)
+                        }
+                    }
+                },
+            )
             Breadcrumb(stack, onRoot = { vm.goToRoot() }, onCrumb = { vm.goTo(it) })
 
             when {
@@ -153,6 +173,7 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
                             FolderRow(
                                 folder = folder,
                                 onOpen = { vm.openFolder(folder) },
+                                onShare = { shareTarget = Triple("folder", folder.id, folder.id) },
                                 onRename = { renameFolder = folder },
                                 onMove = { moveFolder = folder },
                                 onDelete = { deleteFolder = folder },
@@ -175,6 +196,7 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
                                         }
                                     }
                                 },
+                                onShare = { shareTarget = Triple("file", file.id, null) },
                                 onRename = { renameFile = file },
                                 onMove = { moveFile = file },
                                 onToggleFavorite = { vm.toggleFavorite(file.id, !file.favorite) {} },
@@ -204,6 +226,9 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
     }
 
     // ---- dialogs ----
+    shareTarget?.let { (kind, id, fid) ->
+        ShareDialog(vm, kind = kind, id = id, folderId = fid, onDismiss = { shareTarget = null })
+    }
     if (newFolder) TextInputDialog(
         title = stringResource(R.string.files_new_folder), label = stringResource(R.string.files_folder_name),
         confirmLabel = stringResource(R.string.action_create), initial = "",
@@ -256,11 +281,17 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
 @Composable
 private fun Breadcrumb(stack: List<FileFolder>, onRoot: () -> Unit, onCrumb: (FileFolder) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Crumb(stringResource(R.string.files_root), onClick = onRoot, active = stack.isEmpty())
+        // Root is a home icon (the "Files" title already sits in the top bar — no duplicate label).
+        Icon(
+            Icons.Outlined.Home,
+            contentDescription = stringResource(R.string.files_root),
+            tint = if (stack.isEmpty()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.clickable(onClick = onRoot).padding(4.dp).height(20.dp),
+        )
         stack.forEachIndexed { i, folder ->
             Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Crumb(folder.name, onClick = { onCrumb(folder) }, active = i == stack.lastIndex)
@@ -280,7 +311,7 @@ private fun Crumb(text: String, onClick: () -> Unit, active: Boolean) {
 }
 
 @Composable
-private fun FolderRow(folder: FileFolder, onOpen: () -> Unit, onRename: () -> Unit, onMove: () -> Unit, onDelete: () -> Unit) {
+private fun FolderRow(folder: FileFolder, onOpen: () -> Unit, onShare: () -> Unit, onRename: () -> Unit, onMove: () -> Unit, onDelete: () -> Unit) {
     LedgerRow(
         title = folder.name,
         leading = { SoftIconChip(Icons.Outlined.Folder, tint = Brand.tintBlue) },
@@ -289,6 +320,7 @@ private fun FolderRow(folder: FileFolder, onOpen: () -> Unit, onRename: () -> Un
                 RowChevron()
                 RowMenu(
                     items = listOf(
+                        MenuItem(stringResource(R.string.action_share), onShare),
                         MenuItem(stringResource(R.string.action_rename), onRename),
                         MenuItem(stringResource(R.string.action_move), onMove),
                         MenuItem(stringResource(R.string.action_delete), onDelete, destructive = true),
@@ -305,6 +337,7 @@ private fun FileRow(
     file: FileEntry,
     onDetail: () -> Unit,
     onOpenExternal: () -> Unit,
+    onShare: () -> Unit,
     onRename: () -> Unit,
     onMove: () -> Unit,
     onToggleFavorite: () -> Unit,
@@ -321,6 +354,7 @@ private fun FileRow(
                 RowMenu(
                     items = listOf(
                         MenuItem(stringResource(R.string.action_open), onOpenExternal),
+                        MenuItem(stringResource(R.string.action_share), onShare),
                         MenuItem(stringResource(R.string.action_rename), onRename),
                         MenuItem(stringResource(R.string.action_move), onMove),
                         MenuItem(stringResource(if (file.favorite) R.string.action_unfavorite else R.string.action_favorite), onToggleFavorite),
@@ -334,7 +368,14 @@ private fun FileRow(
 }
 
 @Composable
-private fun FilesTopBar(onSearch: () -> Unit, onTrash: () -> Unit, onStats: () -> Unit, onLabels: () -> Unit) {
+private fun FilesTopBar(
+    onSearch: () -> Unit,
+    onTrash: () -> Unit,
+    onStats: () -> Unit,
+    onLabels: () -> Unit,
+    onShared: () -> Unit,
+    onDownloadFolder: (() -> Unit)?,
+) {
     var overflow by remember { mutableStateOf(false) }
     de.ledgerline.app.ui.common.AppTopBar(
         title = stringResource(R.string.files_root),
@@ -344,6 +385,10 @@ private fun FilesTopBar(onSearch: () -> Unit, onTrash: () -> Unit, onStats: () -
             Box {
                 androidx.compose.material3.IconButton(onClick = { overflow = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
                 DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.shared_with_me)) }, onClick = { overflow = false; onShared() })
+                    onDownloadFolder?.let { dl ->
+                        DropdownMenuItem(text = { Text(stringResource(R.string.files_download_zip)) }, onClick = { overflow = false; dl() })
+                    }
                     DropdownMenuItem(text = { Text(stringResource(R.string.files_stats)) }, onClick = { overflow = false; onStats() })
                     DropdownMenuItem(text = { Text(stringResource(R.string.files_manage_labels)) }, onClick = { overflow = false; onLabels() })
                 }

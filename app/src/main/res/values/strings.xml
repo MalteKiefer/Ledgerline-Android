@@ -1328,4 +1328,26 @@
     <string name="login_error_network">Couldn\'t reach the server.</string>
     <string name="login_error_https">The URL must start with https://</string>
     <string name="login_error_auth">Authentication was cancelled.</string>
+    <!-- Files sharing -->
+    <string name="share_public_link">Public link</string>
+    <string name="share_create_link">Create link</string>
+    <string name="share_link_created">Link created</string>
+    <string name="share_copy_link">Copy link</string>
+    <string name="share_with_user">Share with user</string>
+    <string name="share_user_email">User email</string>
+    <string name="share_role_viewer">Viewer</string>
+    <string name="share_role_editor">Editor</string>
+    <string name="share_add_member">Add</string>
+    <string name="share_member_not_found">No user with that email</string>
+    <string name="share_manage_folder">Folder sharing</string>
+    <string name="shared_with_me">Shared with me</string>
+    <string name="shared_by">Shared by %1$s</string>
+    <string name="shared_empty">Nothing shared with you yet</string>
+    <string name="files_download_zip">Download as ZIP</string>
+    <string name="files_replace_content">Replace file…</string>
+    <string name="files_new_version_added">New version added</string>
+    <!-- Finance trash + company logo -->
+    <string name="more_trash">Trash</string>
+    <string name="company_logo">Company logo</string>
+    <string name="action_remove">Remove</string>
 </resources>

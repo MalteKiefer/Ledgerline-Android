@@ -265,17 +265,47 @@ class FinanceRepository @Inject constructor(
         }
     }
 
+    suspend fun updateReceipt(id: Int, body: JsonObject) = record({ api().updateReceipt(id, body) }, { it.receipt }, ::upsertReceipt)
     suspend fun deleteStandaloneReceipt(id: Int): Outcome<Unit> = delete({ api().deleteStandaloneReceipt(id) }) {
         publish(cur().let { d -> d.copy(standaloneReceipts = d.standaloneReceipts.filterNot { it.id == id }) })
     }
+    suspend fun restoreStandaloneReceipt(id: Int) = record({ api().restoreStandaloneReceipt(id) }, { it.receipt }, ::upsertReceipt)
+    suspend fun forceStandaloneReceipt(id: Int) = delete({ api().forceStandaloneReceipt(id) }) {}
 
     suspend fun standaloneReceiptBytes(id: Int): ByteArray? = withContext(Dispatchers.IO) {
         runCatching { api().standaloneReceiptRaw(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
     }
 
+    // ---- Trash (soft-deleted rows) + restore + permanent delete ----
+    suspend fun trash(): de.ledgerline.app.domain.model.finance.FinanceTrash? = get { api().financeTrash() }
+    suspend fun restoreTransaction(id: Int) = record({ api().restoreTransaction(id) }, { it.transaction }, ::upsertTransaction)
+    suspend fun restorePartner(id: Int) = record({ api().restorePartner(id) }, { it.partner }, ::upsertPartner)
+    suspend fun restorePaymentMethod(id: Int) = record({ api().restorePaymentMethod(id) }, { it.paymentMethod }, ::upsertPayment)
+    suspend fun restoreProject(id: Int) = record({ api().restoreProject(id) }, { it.project }, ::upsertProject)
+    suspend fun forceInvoice(id: Int) = delete({ api().forceInvoice(id) }) {}
+    suspend fun forceTransaction(id: Int) = delete({ api().forceTransaction(id) }) {}
+    suspend fun forcePartner(id: Int) = delete({ api().forcePartner(id) }) {}
+    suspend fun forcePaymentMethod(id: Int) = delete({ api().forcePaymentMethod(id) }) {}
+    suspend fun forceProject(id: Int) = delete({ api().forceProject(id) }) {}
+
     // ---- Company profile ----
     suspend fun company(): CompanyProfile? = get { api().company() }?.company
     suspend fun updateCompany(profile: CompanyProfile): CompanyProfile? = get { api().updateCompany(profile) }?.company
+
+    /** Update the company logo (multipart). Passing null [bytes] with removeLogo=true clears it. */
+    suspend fun updateCompanyLogo(bytes: ByteArray?, fileName: String, removeLogo: Boolean): CompanyProfile? = withContext(Dispatchers.IO) {
+        if (!connectivity.isOnline()) return@withContext null
+        val parts = buildList {
+            if (bytes != null) add(okhttp3.MultipartBody.Part.createFormData("logo", fileName, bytes.toRequestBody("image/*".toMediaTypeOrNull())))
+            if (removeLogo) add(okhttp3.MultipartBody.Part.createFormData("remove_logo", "1"))
+        }
+        runCatching { api().updateCompanyMultipart(parts).takeIf { it.isSuccessful }?.body()?.company }.getOrNull()
+    }
+
+    /** Company logo image bytes (`GET /company/logo`), or null. */
+    suspend fun companyLogo(): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { api().companyLogo().takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
 
     // ---- generic helpers ----
     /** A record create/update: extract the record from the `{record}` wrapper + patch the cache. */

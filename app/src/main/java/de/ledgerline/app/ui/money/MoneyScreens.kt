@@ -1,6 +1,8 @@
 package de.ledgerline.app.ui.money
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -840,6 +842,18 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: () -> Unit) {
     var footer by remember(p) { mutableStateOf(p.invoiceFooterText ?: "") }
     var smallBusiness by remember(p) { mutableStateOf(p.smallBusiness ?: false) }
     var busy by remember { mutableStateOf(false) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var logo by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    androidx.compose.runtime.LaunchedEffect(p.hasLogo) {
+        logo = if (p.hasLogo) vm.companyLogo()?.let { b -> runCatching { android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size)?.let { it.asImageBitmap() } }.getOrNull() } else null
+    }
+    val logoPicker = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch {
+            val bytes = runCatching { ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } }.getOrNull() ?: return@launch
+            vm.uploadCompanyLogo(bytes, "logo.png") { ok -> if (ok) logo = runCatching { android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.let { it.asImageBitmap() } }.getOrNull() }
+        }
+    }
     AppScaffold(topBar = {
         AppTopBar(title = stringResource(R.string.more_company), onBack = onBack, actions = {
             TextButton(enabled = !busy, onClick = {
@@ -856,6 +870,15 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: () -> Unit) {
         })
     }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            FormSection(stringResource(R.string.company_logo)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    logo?.let { androidx.compose.foundation.Image(it, contentDescription = null, modifier = Modifier.size(64.dp)) }
+                    TextButton(onClick = { logoPicker.launch("image/*") }) { Text(stringResource(R.string.action_upload)) }
+                    if (logo != null) TextButton(onClick = { vm.removeCompanyLogo { ok -> if (ok) logo = null } }) {
+                        Text(stringResource(R.string.action_remove), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
             FormSection(stringResource(R.string.company_identity)) {
                 Field(name, { name = it }, R.string.company_name)
                 Field(address, { address = it }, R.string.company_address)

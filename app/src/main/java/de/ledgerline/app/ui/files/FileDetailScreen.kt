@@ -77,7 +77,26 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
     var rename by remember { mutableStateOf(false) }
     var move by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var share by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
+
+    val replaceLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        if (uri != null) scope.launch {
+            val tmp = withContext(Dispatchers.IO) {
+                val name = file.name
+                val dir = java.io.File(ctx.cacheDir, "uploads").apply { mkdirs() }
+                val dest = java.io.File(dir, "replace_${file.id}")
+                ctx.contentResolver.openInputStream(uri)?.use { input -> dest.outputStream().use { input.copyTo(it) } }
+                Triple(dest, name, ctx.contentResolver.getType(uri))
+            }
+            vm.replaceContent(file.id, tmp.first, tmp.second, tmp.third) { ok ->
+                runCatching { tmp.first.delete() }
+                msg = ctx.getString(if (ok) R.string.files_new_version_added else R.string.files_save_failed)
+            }
+        }
+    }
 
     LaunchedEffect(fileId, file.version) {
         versions = vm.versions(fileId)
@@ -121,6 +140,8 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AssistChip(onClick = { scope.launch { openExternal(vm, ctx, file) { msg = it } } }, label = { Text(stringResource(R.string.action_open)) })
                 AssistChip(onClick = { saveLauncher.launch(file.name) }, label = { Text(stringResource(R.string.files_save_device)) })
+                AssistChip(onClick = { share = true }, label = { Text(stringResource(R.string.action_share)) })
+                AssistChip(onClick = { replaceLauncher.launch("*/*") }, label = { Text(stringResource(R.string.files_replace_content)) })
                 AssistChip(onClick = { rename = true }, label = { Text(stringResource(R.string.action_rename)) })
                 AssistChip(onClick = { move = true }, label = { Text(stringResource(R.string.action_move)) })
                 AssistChip(onClick = { confirmDelete = true }, label = { Text(stringResource(R.string.action_delete)) })
@@ -186,6 +207,7 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
         message = stringResource(R.string.files_delete_confirm), confirmLabel = stringResource(R.string.action_delete),
         onConfirm = { confirmDelete = false; vm.deleteFile(file.id) { onBack() } }, onDismiss = { confirmDelete = false },
     )
+    if (share) ShareDialog(vm, kind = "file", id = file.id, folderId = null, onDismiss = { share = false })
 }
 
 @Composable

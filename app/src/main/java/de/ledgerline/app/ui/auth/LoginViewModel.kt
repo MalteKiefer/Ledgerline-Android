@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import de.ledgerline.app.R
+import de.ledgerline.app.core.AppLockState
+import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.data.LoginOutcome
 import de.ledgerline.app.data.LoginRepository
 import de.ledgerline.app.data.SessionStore
@@ -23,6 +25,8 @@ import javax.inject.Inject
 class LoginViewModel @Inject constructor(
     private val loginRepository: LoginRepository,
     private val sessionStore: SessionStore,
+    private val sessionHolder: SessionHolder,
+    private val appLockState: AppLockState,
 ) : ViewModel() {
 
     data class UiState(
@@ -47,8 +51,15 @@ class LoginViewModel @Inject constructor(
             when (val r = loginRepository.login(baseUrl, email, password, code.ifBlank { null })) {
                 is LoginOutcome.Success -> {
                     // Seal the token behind one biometric prompt; false = auth cancelled.
-                    if (sessionStore.save(r.session, authorize)) onSuccess()
-                    else _state.value = _state.value.copy(submitting = false, errorRes = R.string.login_error_auth)
+                    if (sessionStore.save(r.session, authorize)) {
+                        // We already authenticated (the seal prompt) and hold the session in memory —
+                        // enter directly, without an immediate second biometric on the lock screen.
+                        sessionHolder.set(r.session)
+                        appLockState.unlock()
+                        onSuccess()
+                    } else {
+                        _state.value = _state.value.copy(submitting = false, errorRes = R.string.login_error_auth)
+                    }
                 }
                 LoginOutcome.TwoFactorRequired -> {
                     // The server returns two_factor:true both for the first prompt and for a wrong code;

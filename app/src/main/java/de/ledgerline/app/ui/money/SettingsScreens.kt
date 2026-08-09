@@ -1,22 +1,37 @@
 package de.ledgerline.app.ui.money
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -26,6 +41,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import de.ledgerline.app.ui.common.LedgerRow
+import de.ledgerline.app.ui.common.ListSectionCard
+import de.ledgerline.app.ui.common.RowChevron
+import de.ledgerline.app.ui.common.RowDivider
+import de.ledgerline.app.ui.common.RowMeta
+import de.ledgerline.app.ui.common.SoftIconChip
+import de.ledgerline.app.ui.theme.Brand
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -72,47 +97,96 @@ fun MoneySettingsScreen(onBack: (() -> Unit)? = null, onLoggedOut: () -> Unit, v
 @Composable
 private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut: () -> Unit, open: (SettingsSub) -> Unit) {
     val me by vm.me.collectAsStateWithLifecycle()
+    val avatar by vm.avatar.collectAsStateWithLifecycle()
     val theme by vm.themeMode.collectAsStateWithLifecycle()
+    val maxVersions by vm.fileMaxVersions.collectAsStateWithLifecycle()
+    var langOpen by remember { mutableStateOf(false) }
+    var themeOpen by remember { mutableStateOf(false) }
+    var maxOpen by remember { mutableStateOf(false) }
+    val curLang = remember { vm.currentLanguageTag() }
+
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.more_settings), onBack = onBack) }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            me?.let { u ->
-                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(u.name ?: "—", style = MaterialTheme.typography.titleMedium)
-                    u.email?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                }
-            }
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState())) {
+            ProfileHeader(me?.name, me?.email, avatar)
 
             SectionLabel(stringResource(R.string.settings_appearance))
-            Column(Modifier.fillMaxWidth().cardSurface(padded = false)) {
-                ThemeRow(stringResource(R.string.theme_system), theme == ThemeMode.SYSTEM) { vm.setTheme(ThemeMode.SYSTEM) }
-                ThemeRow(stringResource(R.string.theme_light), theme == ThemeMode.LIGHT) { vm.setTheme(ThemeMode.LIGHT) }
-                ThemeRow(stringResource(R.string.theme_dark), theme == ThemeMode.DARK) { vm.setTheme(ThemeMode.DARK) }
+            ListSectionCard {
+                SettingRow(stringResource(R.string.settings_theme), themeLabel(theme), Icons.Outlined.DarkMode, Brand.tintViolet) { themeOpen = true }
+                RowDivider()
+                SettingRow(stringResource(R.string.settings_language), languageLabel(curLang), Icons.Outlined.Translate, Brand.tintBlue) { langOpen = true }
             }
-
-            var langOpen by remember { mutableStateOf(false) }
-            val curLang = remember { vm.currentLanguageTag() }
-            HubRow(stringResource(R.string.settings_language) + " · " + languageLabel(curLang)) { langOpen = true }
-            if (langOpen) LanguageDialog(current = curLang, onPick = { vm.setLanguage(it); langOpen = false }, onDismiss = { langOpen = false })
 
             SectionLabel(stringResource(R.string.settings_files))
-            val maxVersions by vm.fileMaxVersions.collectAsStateWithLifecycle()
-            MaxVersionsRow(current = maxVersions, onPick = { vm.setFileMaxVersions(it) })
+            ListSectionCard {
+                SettingRow(stringResource(R.string.settings_max_versions), maxVersions.toString(), Icons.Outlined.Folder, Brand.tintTeal) { maxOpen = true }
+            }
 
             SectionLabel(stringResource(R.string.settings_account))
-            HubRow(stringResource(R.string.settings_devices)) { open(SettingsSub.Devices) }
-            HubRow(stringResource(R.string.settings_notifications)) { open(SettingsSub.Notifications) }
-            HubRow(stringResource(R.string.settings_about)) { open(SettingsSub.About) }
+            ListSectionCard {
+                SettingRow(stringResource(R.string.settings_devices), null, Icons.Outlined.Devices, Brand.tintBlue) { open(SettingsSub.Devices) }
+                RowDivider()
+                SettingRow(stringResource(R.string.settings_notifications), null, Icons.Outlined.Notifications, Brand.tintOrange) { open(SettingsSub.Notifications) }
+                RowDivider()
+                SettingRow(stringResource(R.string.security_title), null, Icons.Outlined.Shield, Brand.tintGreen) { open(SettingsSub.Security) }
+                RowDivider()
+                SettingRow(stringResource(R.string.settings_about), null, Icons.Outlined.Info, Brand.tintGray) { open(SettingsSub.About) }
+            }
 
             SectionLabel(stringResource(R.string.settings_security))
-            HubRow(stringResource(R.string.settings_lock_now)) { vm.lockNow() }
-            HubRow(stringResource(R.string.security_title)) { open(SettingsSub.Security) }
-
-            SectionLabel(stringResource(R.string.settings_account), danger = true)
-            TextButton(onClick = { vm.logout(onLoggedOut) }) {
-                Text(stringResource(R.string.settings_logout), color = MaterialTheme.colorScheme.error)
+            ListSectionCard {
+                SettingRow(stringResource(R.string.settings_lock_now), null, Icons.Outlined.Lock, Brand.tintViolet) { vm.lockNow() }
+                RowDivider()
+                LedgerRow(
+                    title = stringResource(R.string.settings_logout),
+                    leading = { SoftIconChip(Icons.AutoMirrored.Outlined.Logout, tint = MaterialTheme.colorScheme.error) },
+                    onClick = { vm.logout(onLoggedOut) },
+                )
             }
+            Spacer(Modifier.height(24.dp))
         }
     }
+
+    if (themeOpen) ThemeDialog(current = theme, onPick = { vm.setTheme(it); themeOpen = false }, onDismiss = { themeOpen = false })
+    if (langOpen) LanguageDialog(current = curLang, onPick = { vm.setLanguage(it); langOpen = false }, onDismiss = { langOpen = false })
+    if (maxOpen) MaxVersionsDialog(current = maxVersions, onPick = { vm.setFileMaxVersions(it); maxOpen = false }, onDismiss = { maxOpen = false })
+}
+
+/** Account header: circular avatar (or gradient initial) + name + email. */
+@Composable
+private fun ProfileHeader(name: String?, email: String?, avatar: ImageBitmap?) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Box(Modifier.size(56.dp).clip(CircleShape).background(Brand.accentGradient), contentAlignment = Alignment.Center) {
+            if (avatar != null) {
+                Image(avatar, contentDescription = null, modifier = Modifier.size(56.dp).clip(CircleShape), contentScale = ContentScale.Crop)
+            } else {
+                Text((name?.trim()?.firstOrNull()?.uppercase() ?: "?"), style = MaterialTheme.typography.headlineSmall, color = androidx.compose.ui.graphics.Color.White)
+            }
+        }
+        Column(Modifier.weight(1f)) {
+            Text(name ?: "—", style = MaterialTheme.typography.titleMedium)
+            email?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+}
+
+/** A grouped-list settings row: tinted icon chip, label, optional current-value, chevron. */
+@Composable
+private fun SettingRow(label: String, value: String?, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    LedgerRow(
+        title = label,
+        leading = { SoftIconChip(icon, tint = tint) },
+        trailing = {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                value?.let { RowMeta(it) }
+                RowChevron()
+            }
+        },
+        onClick = onClick,
+    )
 }
 
 @Composable
@@ -128,14 +202,48 @@ private fun ThemeRow(label: String, selected: Boolean, onSelect: () -> Unit) {
 }
 
 @Composable
-private fun HubRow(label: String, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).cardSurface(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+private fun themeLabel(mode: ThemeMode): String = stringResource(
+    when (mode) { ThemeMode.SYSTEM -> R.string.theme_system; ThemeMode.LIGHT -> R.string.theme_light; ThemeMode.DARK -> R.string.theme_dark },
+)
+
+@Composable
+private fun ThemeDialog(current: ThemeMode, onPick: (ThemeMode) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_theme)) },
+        text = {
+            Column {
+                ThemeRow(stringResource(R.string.theme_system), current == ThemeMode.SYSTEM) { onPick(ThemeMode.SYSTEM) }
+                ThemeRow(stringResource(R.string.theme_light), current == ThemeMode.LIGHT) { onPick(ThemeMode.LIGHT) }
+                ThemeRow(stringResource(R.string.theme_dark), current == ThemeMode.DARK) { onPick(ThemeMode.DARK) }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun MaxVersionsDialog(current: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_max_versions)) },
+        text = {
+            Column {
+                listOf(5, 10, 20, 50, 100).forEach { n ->
+                    Row(
+                        Modifier.fillMaxWidth().selectable(current == n, onClick = { onPick(n) }).padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        RadioButton(selected = current == n, onClick = { onPick(n) })
+                        Text(n.toString(), style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 @Composable
@@ -169,22 +277,6 @@ private fun LanguageDialog(current: String, onPick: (String) -> Unit, onDismiss:
         confirmButton = {},
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
-}
-
-@Composable
-private fun MaxVersionsRow(current: Int, onPick: (Int) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        Row(Modifier.fillMaxWidth().clickable { open = true }.cardSurface(), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.settings_max_versions), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            Text(current.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            listOf(5, 10, 20, 50, 100).forEach { n ->
-                DropdownMenuItem(text = { Text(n.toString()) }, onClick = { open = false; onPick(n) })
-            }
-        }
-    }
 }
 
 @Composable

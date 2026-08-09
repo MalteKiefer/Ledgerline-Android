@@ -1329,4 +1329,26 @@
     <string name="login_error_network">Не удалось связаться с сервером.</string>
     <string name="login_error_https">URL должен начинаться с https://</string>
     <string name="login_error_auth">Аутентификация отменена.</string>
+    <!-- Files sharing -->
+    <string name="share_public_link">Публичная ссылка</string>
+    <string name="share_create_link">Создать ссылку</string>
+    <string name="share_link_created">Ссылка создана</string>
+    <string name="share_copy_link">Копировать ссылку</string>
+    <string name="share_with_user">Поделиться с пользователем</string>
+    <string name="share_user_email">Эл. почта пользователя</string>
+    <string name="share_role_viewer">Читатель</string>
+    <string name="share_role_editor">Редактор</string>
+    <string name="share_add_member">Добавить</string>
+    <string name="share_member_not_found">Нет пользователя с такой почтой</string>
+    <string name="share_manage_folder">Доступ к папке</string>
+    <string name="shared_with_me">Доступно мне</string>
+    <string name="shared_by">Поделился %1$s</string>
+    <string name="shared_empty">Вам пока ничего не открыли</string>
+    <string name="files_download_zip">Скачать как ZIP</string>
+    <string name="files_replace_content">Заменить файл…</string>
+    <string name="files_new_version_added">Добавлена новая версия</string>
+    <!-- Finance trash + company logo -->
+    <string name="more_trash">Корзина</string>
+    <string name="company_logo">Логотип компании</string>
+    <string name="action_remove">Удалить</string>
 </resources>

@@ -195,6 +195,11 @@ class FilesRepository @Inject constructor(
         record({ api().updateLabel(id, buildJsonObject { put("name", name); put("color", color) }) }, { it.label }, ::upsertLabel)
     suspend fun deleteLabel(id: Int): Outcome<Unit> = delete({ api().deleteLabel(id) }) { removeLabel(id) }
 
+    /** Standalone folder list (`GET /files/folders`) — same rows as in [load]'s snapshot. */
+    suspend fun folders(): List<FileFolder> = get { api().folders() }?.folders.orEmpty()
+    /** Standalone label list (`GET /files/labels`) — same rows as in [load]'s snapshot. */
+    suspend fun labels(): List<FileLabel> = get { api().labels() }?.labels.orEmpty()
+
     // ---- Trash / stats / search ----
     suspend fun trash(): FilesTrash? = get { api().trash() }
     suspend fun emptyTrash(): Int? = get { api().emptyTrash() }?.deleted

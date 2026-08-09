@@ -3,6 +3,7 @@ package de.ledgerline.app.ui.money
 import android.app.LocaleManager
 import android.content.Context
 import android.os.LocaleList
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -48,8 +49,20 @@ class AccountViewModel @Inject constructor(
     private val _fileMaxVersions = MutableStateFlow(10)
     val fileMaxVersions: StateFlow<Int> = _fileMaxVersions.asStateFlow()
 
+    private val _avatar = MutableStateFlow<androidx.compose.ui.graphics.ImageBitmap?>(null)
+    val avatar: StateFlow<androidx.compose.ui.graphics.ImageBitmap?> = _avatar.asStateFlow()
+
     init {
-        viewModelScope.launch { _me.value = account.me() }
+        viewModelScope.launch {
+            val u = account.me()
+            _me.value = u
+            if (u?.hasAvatar == true) {
+                val bytes = account.avatar()
+                _avatar.value = bytes?.let {
+                    runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull()
+                }
+            }
+        }
         viewModelScope.launch { account.getSettings()?.fileMaxVersions?.let { _fileMaxVersions.value = it } }
     }
 

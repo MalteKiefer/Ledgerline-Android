@@ -31,7 +31,11 @@ import javax.inject.Inject
 class FilesViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repo: FilesRepository,
+    private val sessionHolder: de.ledgerline.app.core.SessionHolder,
 ) : ViewModel() {
+
+    /** Base URL of the paired server (for building public share links). */
+    fun baseUrl(): String? = sessionHolder.get()?.baseUrl
     val data: StateFlow<FilesData?> = repo.data
 
     /** Folder navigation stack (root = empty). The last id is the folder currently shown. */
@@ -121,6 +125,13 @@ class FilesViewModel @Inject constructor(
     suspend fun search(q: String): List<FileEntry> = repo.search(q)
     suspend fun thumb(id: Int): ByteArray? = repo.thumbBytes(id)
 
+    /** Zip a whole folder subtree server-side into [dest]. */
+    suspend fun zipFolder(folderId: Int, dest: File): Boolean = repo.zipToFile(dest, folderId = folderId)
+
+    /** Replace a file's content with new bytes (adds a version). */
+    fun replaceContent(id: Int, file: File, name: String, mime: String?, done: (Boolean) -> Unit) =
+        run({ repo.replaceContent(id, file, name, mime) }, done)
+
     fun setFavorite(id: Int, value: Boolean, done: (Boolean) -> Unit) = run({ repo.toggleFavorite(id, value) }, done)
 
     // ---- Versions ----
@@ -152,6 +163,48 @@ class FilesViewModel @Inject constructor(
         val tmp = downloadToCache(entry) ?: return@withContext false
         runCatching { tmp.inputStream().use { it.copyTo(out) }; true }.getOrDefault(false)
     }
+
+    // ---- Sharing: public links ----
+    /** Public link URL for a share token: {baseUrl}/file-share/{token}. */
+    fun shareUrl(token: String): String = (baseUrl()?.trimEnd('/') ?: "") + "/file-share/" + token
+
+    suspend fun createFileShare(fileId: Int, password: String?, allowDownload: Boolean, expiresAt: String?) =
+        repo.createShare(kotlinx.serialization.json.buildJsonObject {
+            put("kind", "file"); put("file_id", fileId); put("allow_download", allowDownload)
+            if (!password.isNullOrBlank()) put("password", password)
+            if (!expiresAt.isNullOrBlank()) put("expires_at", expiresAt)
+        })
+    suspend fun createFolderShare(folderId: Int, password: String?, allowDownload: Boolean, expiresAt: String?) =
+        repo.createShare(kotlinx.serialization.json.buildJsonObject {
+            put("kind", "folder"); put("file_folder_id", folderId); put("allow_download", allowDownload)
+            if (!password.isNullOrBlank()) put("password", password)
+            if (!expiresAt.isNullOrBlank()) put("expires_at", expiresAt)
+        })
+    fun deleteShare(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteShare(id)) }
+
+    // ---- Sharing: cross-user folder shares ----
+    suspend fun folderShares() = repo.folderShares()
+    suspend fun createUserFolderShare(folderId: Int, email: String, role: String) = repo.createFolderShare(folderId, email, role)
+    fun updateFolderShareMember(shareId: Int, userId: Int, role: String, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.updateFolderShareMember(shareId, userId, role) != null) }
+    fun removeFolderShareMember(shareId: Int, userId: Int, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.removeFolderShareMember(shareId, userId)) }
+    fun deleteFolderShare(shareId: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteFolderShare(shareId)) }
+
+    // ---- Sharing: shared-with-me ----
+    suspend fun sharedWithMe() = repo.sharedWithMe()
+    suspend fun browseShared(shareId: Int) = repo.browseShared(shareId)
+    suspend fun downloadSharedToCache(shareId: Int, file: de.ledgerline.app.domain.model.files.SharedFile): File? {
+        val dir = File(context.cacheDir, "docs").apply { mkdirs() }
+        val dest = File(dir, "s${shareId}_${file.id}_${file.name.replace(Regex("[^A-Za-z0-9._-]"), "_")}")
+        return if (repo.downloadSharedToFile(shareId, file.id, dest)) dest else null
+    }
+    fun renameShared(shareId: Int, fileId: Int, name: String, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.renameShared(shareId, fileId, name)) }
+    fun deleteShared(shareId: Int, fileId: Int, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.deleteShared(shareId, fileId)) }
+    fun uploadShared(shareId: Int, file: File, name: String, mime: String?, folderId: Int?, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.uploadShared(shareId, file, name, mime, folderId) is Outcome.Ok) }
 
     fun clear() = repo.clear()
 }

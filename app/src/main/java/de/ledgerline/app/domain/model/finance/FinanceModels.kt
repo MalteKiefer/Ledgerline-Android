@@ -174,6 +174,16 @@ data class FinanceReceipt(
     @SerialName("deleted_at") val deletedAt: String? = null,
 )
 
+/** Soft-deleted finance rows (`GET /finance/trash`) — no receipts/categories key. */
+@Serializable
+data class FinanceTrash(
+    val invoices: List<Invoice> = emptyList(),
+    val partners: List<FinancePartner> = emptyList(),
+    val paymentMethods: List<PaymentMethod> = emptyList(),
+    val projects: List<FinanceProject> = emptyList(),
+    val transactions: List<BankTransaction> = emptyList(),
+)
+
 /** The full owner-scoped finance snapshot (`GET /finance/data`). */
 @Serializable
 data class FinanceData(

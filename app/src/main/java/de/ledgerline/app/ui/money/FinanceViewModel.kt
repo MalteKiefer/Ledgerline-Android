@@ -134,14 +134,37 @@ class FinanceViewModel @Inject constructor(
     // ---- Standalone receipts (Fremdbelege) ----
     fun storeReceipt(bytes: ByteArray, name: String, mime: String, done: (Boolean) -> Unit) =
         viewModelScope.launch { done(repo.storeReceipt(bytes, name, mime) is Outcome.Ok) }
+    fun updateReceipt(id: Int, body: kotlinx.serialization.json.JsonObject, done: (Boolean) -> Unit) =
+        run({ repo.updateReceipt(id, body) }, done)
     fun deleteStandaloneReceipt(id: Int, done: (Boolean) -> Unit) =
         viewModelScope.launch { done(repo.deleteStandaloneReceipt(id) is Outcome.Ok) }
+    fun restoreStandaloneReceipt(id: Int, done: (Boolean) -> Unit) = run({ repo.restoreStandaloneReceipt(id) }, done)
+    fun forceStandaloneReceipt(id: Int, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.forceStandaloneReceipt(id) is Outcome.Ok) }
     suspend fun standaloneReceiptBytes(id: Int): ByteArray? = repo.standaloneReceiptBytes(id)
 
     suspend fun loadCompany(): CompanyProfile? = repo.company()
     fun saveCompany(profile: CompanyProfile, done: (Boolean) -> Unit) {
         viewModelScope.launch { done(repo.updateCompany(profile) != null) }
     }
+    suspend fun companyLogo(): ByteArray? = repo.companyLogo()
+    fun uploadCompanyLogo(bytes: ByteArray, name: String, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.updateCompanyLogo(bytes, name, removeLogo = false) != null) }
+    fun removeCompanyLogo(done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.updateCompanyLogo(null, "", removeLogo = true) != null) }
+
+    // ---- Trash ----
+    suspend fun loadTrash() = repo.trash()
+    fun restoreInvoice(id: Int, done: (Boolean) -> Unit) = run({ repo.restoreInvoice(id) }, done)
+    fun restoreTransaction(id: Int, done: (Boolean) -> Unit) = run({ repo.restoreTransaction(id) }, done)
+    fun restorePartner(id: Int, done: (Boolean) -> Unit) = run({ repo.restorePartner(id) }, done)
+    fun restorePaymentMethod(id: Int, done: (Boolean) -> Unit) = run({ repo.restorePaymentMethod(id) }, done)
+    fun restoreProject(id: Int, done: (Boolean) -> Unit) = run({ repo.restoreProject(id) }, done)
+    fun forceInvoice(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.forceInvoice(id) is Outcome.Ok) }
+    fun forceTransaction(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.forceTransaction(id) is Outcome.Ok) }
+    fun forcePartner(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.forcePartner(id) is Outcome.Ok) }
+    fun forcePaymentMethod(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.forcePaymentMethod(id) is Outcome.Ok) }
+    fun forceProject(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.forceProject(id) is Outcome.Ok) }
 
     companion object {
         private val euro: NumberFormat = NumberFormat.getCurrencyInstance(Locale.GERMANY)

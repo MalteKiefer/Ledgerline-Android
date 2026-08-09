@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.ArrowDropDown
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.Icon
@@ -64,6 +65,7 @@ sealed interface MoneyRoute {
     data object Company : MoneyRoute
     data object Insights : MoneyRoute
     data object Receipts : MoneyRoute
+    data object Trash : MoneyRoute
 }
 
 /**
@@ -101,6 +103,7 @@ fun FinanceSection(
                     onCompany = { onPush(MoneyRoute.Company) },
                     onInsights = { onPush(MoneyRoute.Insights) },
                     onReceipts = { onPush(MoneyRoute.Receipts) },
+                    onTrash = { onPush(MoneyRoute.Trash) },
                 )
             }
         }
@@ -120,6 +123,7 @@ fun MoneyRouteHost(route: MoneyRoute, vm: FinanceViewModel, onBack: () -> Unit) 
         MoneyRoute.Company -> CompanyScreen(vm, onBack)
         MoneyRoute.Insights -> InsightsScreen(vm, onBack)
         MoneyRoute.Receipts -> ReceiptsScreen(vm, onBack)
+        MoneyRoute.Trash -> FinanceTrashScreen(vm, onBack)
     }
 }
 
@@ -205,6 +209,7 @@ private fun MoreTab(
     onCompany: () -> Unit,
     onInsights: () -> Unit,
     onReceipts: () -> Unit,
+    onTrash: () -> Unit,
 ) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -216,6 +221,7 @@ private fun MoreTab(
         MoreRow(stringResource(R.string.more_receipts), Icons.AutoMirrored.Outlined.ReceiptLong, Brand.tintOrange, onReceipts)
         MoreRow(stringResource(R.string.more_insights), Icons.Outlined.Dashboard, Brand.tintViolet, onInsights)
         MoreRow(stringResource(R.string.more_company), Icons.Outlined.AccountBalance, Brand.tintTeal, onCompany)
+        MoreRow(stringResource(R.string.more_trash), Icons.Outlined.Delete, Brand.tintGray, onTrash)
     }
 }
 

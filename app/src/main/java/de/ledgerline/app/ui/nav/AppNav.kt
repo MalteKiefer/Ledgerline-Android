@@ -106,7 +106,7 @@ fun AppNav(
     when (dest) {
         Destination.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         Destination.WELCOME -> WelcomeScreen(onGetStarted = { vm.toLogin() })
-        Destination.LOGIN -> LoginScreen(authorize = authorize, onLoggedIn = { vm.toLock() })
+        Destination.LOGIN -> LoginScreen(authorize = authorize, onLoggedIn = { vm.toHome() })
         Destination.LOCK -> AppLockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
         Destination.HOME -> {
             val unlocked by vm.unlocked.collectAsStateWithLifecycle()
