@@ -1446,4 +1446,23 @@
     <string name="admin_backup_jobs">Задания</string>
     <string name="admin_backup_runs">Запуски</string>
     <string name="admin_no_data">Нет данных</string>
+    <string name="sec_webdav">Подключение WebDAV</string>
+    <string name="sec_webdav_pw">Пароль WebDAV (мин. 12)</string>
+    <string name="sec_webdav_set">Задать пароль</string>
+    <string name="sec_webdav_clear">Отключить WebDAV</string>
+    <string name="sec_sessions">Сессии браузера</string>
+    <string name="settings_paperless">Paperless</string>
+    <string name="paperless_enabled">Включено</string>
+    <string name="paperless_url">URL Paperless</string>
+    <string name="paperless_token">API-токен (пусто = сохранить)</string>
+    <string name="paperless_test">Проверить соединение</string>
+    <string name="paperless_sync">Синхронизировать</string>
+    <string name="admin_security_portal">Портал безопасности</string>
+    <string name="admin_blocked_ips">Заблокированные IP</string>
+    <string name="admin_cidr">IP или CIDR</string>
+    <string name="admin_reason">Причина (необяз.)</string>
+    <string name="admin_block_ip">Заблокировать IP</string>
+    <string name="admin_request_log">Журнал запросов</string>
+    <string name="admin_block_user">Заблокировать</string>
+    <string name="admin_unblock_user">Разблокировать</string>
 </resources>

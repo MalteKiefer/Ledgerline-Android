@@ -74,4 +74,13 @@ class AdminViewModel @Inject constructor(
     fun testBackupDestination(body: JsonObject, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.testBackupDestination(body)) }
     suspend fun downloadBackupRun(id: Int, source: String) = repo.downloadBackupRun(id, source)
     suspend fun restoreBackupRun(id: Int, source: String) = repo.restoreBackupRun(id, source)?.ok == true
+
+    // ---- Security portal ----
+    suspend fun requestLog(page: Int) = repo.requestLog(page)
+    suspend fun requestLogExport() = repo.requestLogExport()
+    suspend fun blockedIps() = repo.blockedIps()
+    fun blockIp(cidr: String, reason: String?, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.blockIp(cidr, reason)) }
+    fun unblockIp(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.unblockIp(id)) }
+    fun blockUser(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.blockUser(id)) }
+    fun unblockUser(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.unblockUser(id)) }
 }

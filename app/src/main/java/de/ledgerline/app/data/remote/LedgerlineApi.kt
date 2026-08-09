@@ -104,4 +104,66 @@ interface LedgerlineApi {
 
     @HTTP(method = "DELETE", path = "api/v1/user/two-factor", hasBody = false)
     suspend fun twoFactorDisable(): Response<de.ledgerline.app.data.remote.dto.TwoFactorEnabledResponse>
+
+    // ---- Account sessions ----
+    @GET("api/v1/account/sessions")
+    suspend fun accountSessions(): Response<de.ledgerline.app.data.remote.dto.SessionsResponse>
+
+    @DELETE("api/v1/account/sessions/{id}")
+    suspend fun revokeAccountSession(@Path("id") id: String): Response<Unit>
+
+    // ---- App-specific WebDAV mount password ----
+    @GET("api/v1/account/webdav")
+    suspend fun webdav(): Response<de.ledgerline.app.data.remote.dto.WebDavStatus>
+
+    @PUT("api/v1/account/webdav")
+    suspend fun updateWebdav(@Body body: de.ledgerline.app.data.remote.dto.WebDavRequest): Response<de.ledgerline.app.data.remote.dto.WebDavStatus>
+
+    @DELETE("api/v1/account/webdav")
+    suspend fun clearWebdav(): Response<de.ledgerline.app.data.remote.dto.WebDavStatus>
+
+    // ---- Owner-side device pairing (approve a new device) ----
+    @POST("api/v1/device-pairings")
+    suspend fun createDevicePairing(): Response<de.ledgerline.app.data.remote.dto.DevicePairingCreated>
+
+    @GET("api/v1/device-pairings/{id}")
+    suspend fun devicePairingStatus(@Path("id") id: Long): Response<de.ledgerline.app.data.remote.dto.DevicePairingStatus>
+
+    @POST("api/v1/device-pairings/{id}/approve")
+    suspend fun approveDevicePairing(@Path("id") id: Long): Response<Unit>
+
+    @POST("api/v1/device-pairings/{id}/reject")
+    suspend fun rejectDevicePairing(@Path("id") id: Long): Response<Unit>
+
+    // ---- Paperless-ngx integration ----
+    @GET("api/v1/paperless/config")
+    suspend fun paperlessConfig(): Response<de.ledgerline.app.data.remote.dto.PaperlessConfig>
+
+    @PUT("api/v1/paperless/config")
+    suspend fun updatePaperlessConfig(@Body body: de.ledgerline.app.data.remote.dto.PaperlessConfigRequest): Response<de.ledgerline.app.data.remote.dto.PaperlessConfig>
+
+    @POST("api/v1/paperless/config/test")
+    suspend fun testPaperlessConfig(): Response<de.ledgerline.app.data.remote.dto.PaperlessOk>
+
+    @GET("api/v1/paperless/terms")
+    suspend fun paperlessTerms(): Response<de.ledgerline.app.data.remote.dto.PaperlessTermsResponse>
+
+    @POST("api/v1/paperless/sync")
+    suspend fun paperlessSync(): Response<de.ledgerline.app.data.remote.dto.PaperlessOk>
+
+    // ---- Site-icon proxy (finance bank logos / partner favicons) ----
+    @GET("api/v1/passwords/icon")
+    @Streaming
+    suspend fun siteIcon(@retrofit2.http.Query("url") url: String): Response<ResponseBody>
+
+    // ---- Misc account/integration endpoints (completeness) ----
+    @POST("api/v1/user/email/verify/resend")
+    suspend fun resendEmailVerification(): Response<Unit>
+
+    @retrofit2.http.Multipart
+    @POST("api/v1/paperless/documents")
+    suspend fun paperlessSubmit(@retrofit2.http.Part file: okhttp3.MultipartBody.Part): Response<de.ledgerline.app.data.remote.dto.PaperlessOk>
+
+    @POST("api/v1/device-pairings/cli")
+    suspend fun createDevicePairingCli(): Response<de.ledgerline.app.data.remote.dto.DevicePairingCreated>
 }

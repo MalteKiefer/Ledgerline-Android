@@ -1446,4 +1446,23 @@
     <string name="admin_backup_jobs">Jobs</string>
     <string name="admin_backup_runs">Runs</string>
     <string name="admin_no_data">No data</string>
+    <string name="sec_webdav">WebDAV mount</string>
+    <string name="sec_webdav_pw">WebDAV password (min 12)</string>
+    <string name="sec_webdav_set">Set password</string>
+    <string name="sec_webdav_clear">Disable WebDAV</string>
+    <string name="sec_sessions">Browser sessions</string>
+    <string name="settings_paperless">Paperless</string>
+    <string name="paperless_enabled">Enabled</string>
+    <string name="paperless_url">Paperless URL</string>
+    <string name="paperless_token">API token (blank keeps)</string>
+    <string name="paperless_test">Test connection</string>
+    <string name="paperless_sync">Sync terms</string>
+    <string name="admin_security_portal">Security portal</string>
+    <string name="admin_blocked_ips">Blocked IPs</string>
+    <string name="admin_cidr">IP or CIDR</string>
+    <string name="admin_reason">Reason (optional)</string>
+    <string name="admin_block_ip">Block IP</string>
+    <string name="admin_request_log">Request log</string>
+    <string name="admin_block_user">Block user</string>
+    <string name="admin_unblock_user">Unblock user</string>
 </resources>

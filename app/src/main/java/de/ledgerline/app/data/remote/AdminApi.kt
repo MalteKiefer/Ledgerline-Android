@@ -173,4 +173,27 @@ interface AdminApi {
 
     @POST("api/v1/backup/runs/{id}/restore")
     suspend fun restoreBackupRun(@Path("id") id: Int, @Body body: JsonObject): Response<AdminOk>
+
+    // ---- Security portal (request log + blocked IPs + user block) ----
+    @GET("api/v1/request-log")
+    suspend fun requestLog(@Query("page") page: Int?, @Query("per_page") perPage: Int?): Response<de.ledgerline.app.domain.model.admin.RequestLogPage>
+
+    @GET("api/v1/request-log/export")
+    @Streaming
+    suspend fun requestLogExport(@Query("format") format: String): Response<ResponseBody>
+
+    @GET("api/v1/blocked-ips")
+    suspend fun blockedIps(): Response<de.ledgerline.app.domain.model.admin.BlockedIpsResponse>
+
+    @POST("api/v1/blocked-ips")
+    suspend fun blockIp(@Body body: JsonObject): Response<JsonObject>
+
+    @DELETE("api/v1/blocked-ips/{id}")
+    suspend fun unblockIp(@Path("id") id: Int): Response<Unit>
+
+    @POST("api/v1/users/{id}/block")
+    suspend fun blockUser(@Path("id") id: Int): Response<AdminOk>
+
+    @POST("api/v1/users/{id}/unblock")
+    suspend fun unblockUser(@Path("id") id: Int): Response<AdminOk>
 }

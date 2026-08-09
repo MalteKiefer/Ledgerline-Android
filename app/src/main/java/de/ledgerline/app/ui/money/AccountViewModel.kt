@@ -127,4 +127,17 @@ class AccountViewModel @Inject constructor(
         val ok = account.deleteAccount(email)
         if (ok) { forceLogout.invoke(); done(true) } else done(false)
     }
+
+    // ---- WebDAV / sessions / paperless ----
+    suspend fun webdav() = account.webdav()
+    fun setWebdav(pw: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(account.setWebdav(pw) != null) }
+    fun clearWebdav(done: (Boolean) -> Unit) = viewModelScope.launch { done(account.clearWebdav() != null) }
+    suspend fun sessions() = account.sessions()
+    fun revokeSession(id: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(account.revokeSession(id)) }
+
+    suspend fun paperlessConfig() = account.paperlessConfig()
+    fun savePaperless(enabled: Boolean, url: String, token: String?, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(account.updatePaperlessConfig(enabled, url, token) != null) }
+    fun testPaperless(done: (Boolean) -> Unit) = viewModelScope.launch { done(account.testPaperless()) }
+    fun paperlessSync(done: (Boolean) -> Unit) = viewModelScope.launch { done(account.paperlessSync()) }
 }

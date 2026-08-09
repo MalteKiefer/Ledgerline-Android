@@ -164,6 +164,24 @@ data class BackupRun(
 )
 @Serializable data class BackupRunsResponse(val runs: List<BackupRun> = emptyList())
 
+// ---- Security portal (request log, blocked IPs, user block) ----
+@Serializable data class BlockedIp(val id: Int = 0, val cidr: String = "", val reason: String? = null, @SerialName("created_at") val createdAt: String? = null)
+@Serializable data class BlockedIpsResponse(val blocks: List<BlockedIp> = emptyList())
+@Serializable data class RequestLogUser(val id: Int = 0, val name: String = "")
+@Serializable
+data class RequestLogRow(
+    val id: Int = 0,
+    val time: String? = null,
+    val ip: String? = null,
+    val method: String = "",
+    val path: String = "",
+    val status: Int = 0,
+    val user: RequestLogUser? = null,
+    @SerialName("user_agent") val userAgent: String? = null,
+    @SerialName("duration_ms") val durationMs: Int? = null,
+)
+@Serializable data class RequestLogPage(val data: List<RequestLogRow> = emptyList(), val meta: AuditMeta = AuditMeta())
+
 val BACKUP_DRIVERS = listOf("s3", "b2", "sftp", "webdav")
 val BACKUP_SOURCES = listOf("database", "invoices", "files")
 val BACKUP_MODES = listOf("full", "incremental")

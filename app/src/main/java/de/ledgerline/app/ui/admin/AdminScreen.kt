@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Monitor
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -65,7 +66,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal enum class AdminSub { HUB, USERS, ACCESS, NOTIFICATIONS, SYSTEM, GROUPS, SECURITY_LOG, BACKUP }
+internal enum class AdminSub { HUB, USERS, ACCESS, NOTIFICATIONS, SYSTEM, GROUPS, SECURITY_LOG, SECURITY_PORTAL, BACKUP }
 
 /** Admin section, shown only to admins (`/me.user.groups` contains "admin"). Internal sub-nav. */
 @Composable
@@ -79,6 +80,7 @@ fun AdminScreen(onBack: () -> Unit, vm: AdminViewModel = hiltViewModel()) {
         AdminSub.SYSTEM -> SystemScreen(vm, back)
         AdminSub.GROUPS -> GroupsScreen(vm, back)
         AdminSub.SECURITY_LOG -> SecurityLogScreen(vm, back)
+        AdminSub.SECURITY_PORTAL -> SecurityPortalScreen(vm, back)
         AdminSub.BACKUP -> BackupScreen(vm, back)
         AdminSub.HUB -> AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.admin_title), onBack = onBack) }) { pad ->
             Column(Modifier.fillMaxSize().padding(pad)) {
@@ -94,6 +96,8 @@ fun AdminScreen(onBack: () -> Unit, vm: AdminViewModel = hiltViewModel()) {
                     HubRow(stringResource(R.string.admin_system), Icons.Outlined.Monitor, Brand.tintViolet) { sub = AdminSub.SYSTEM }
                     de.ledgerline.app.ui.common.RowDivider()
                     HubRow(stringResource(R.string.admin_security_log), Icons.Outlined.Lock, Brand.tintGray) { sub = AdminSub.SECURITY_LOG }
+                    de.ledgerline.app.ui.common.RowDivider()
+                    HubRow(stringResource(R.string.admin_security_portal), Icons.Outlined.Shield, Brand.tintOrange) { sub = AdminSub.SECURITY_PORTAL }
                     de.ledgerline.app.ui.common.RowDivider()
                     HubRow(stringResource(R.string.admin_backup), Icons.Outlined.Backup, Brand.tintBlue) { sub = AdminSub.BACKUP }
                 }
@@ -149,6 +153,8 @@ private fun UsersScreen(vm: AdminViewModel, onBack: () -> Unit) {
             onResetPw = { vm.resetPassword(u.id) {} },
             onReset2fa = { vm.resetTwoFactor(u.id) {} },
             onInvite = { vm.inviteLink(u.id, 168, false) { r -> invite = r?.url } },
+            onBlock = { vm.blockUser(u.id) {} },
+            onUnblock = { vm.unblockUser(u.id) {} },
             onDismiss = { editing = null },
         )
     }
@@ -171,6 +177,8 @@ private fun UserEditDialog(
     onResetPw: (() -> Unit)? = null,
     onReset2fa: (() -> Unit)? = null,
     onInvite: (() -> Unit)? = null,
+    onBlock: (() -> Unit)? = null,
+    onUnblock: (() -> Unit)? = null,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
@@ -204,7 +212,11 @@ private fun UserEditDialog(
                         onResetPw?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_reset_password)) }) }
                         onReset2fa?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_reset_2fa)) }) }
                     }
-                    onInvite?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_invite_link)) }) }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        onInvite?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_invite_link)) }) }
+                        onBlock?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_block_user)) }) }
+                        onUnblock?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_unblock_user)) }) }
+                    }
                     onDelete?.let { TextButton(onClick = it) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) } }
                 }
             }

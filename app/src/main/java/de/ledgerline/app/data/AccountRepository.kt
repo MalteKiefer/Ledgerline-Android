@@ -6,6 +6,8 @@ import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.data.remote.dto.MeUser
 import de.ledgerline.app.domain.model.Session
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -260,5 +262,73 @@ class AccountRepository(
         } catch (_: Exception) {
             false
         }
+    }
+
+    // ---- Browser sessions ----
+    suspend fun sessions(): List<de.ledgerline.app.data.remote.dto.SessionRow> {
+        val s = sessionHolder.get() ?: return emptyList()
+        return try { apiProvider(s).accountSessions().takeIf { it.isSuccessful }?.body()?.sessions.orEmpty() } catch (_: Exception) { emptyList() }
+    }
+    suspend fun revokeSession(id: String): Boolean = call { it.revokeAccountSession(id) }
+
+    // ---- App-specific WebDAV mount password ----
+    suspend fun webdav(): de.ledgerline.app.data.remote.dto.WebDavStatus? {
+        val s = sessionHolder.get() ?: return null
+        return try { apiProvider(s).webdav().takeIf { it.isSuccessful }?.body() } catch (_: Exception) { null }
+    }
+    suspend fun setWebdav(password: String): de.ledgerline.app.data.remote.dto.WebDavStatus? {
+        val s = sessionHolder.get() ?: return null
+        return try { apiProvider(s).updateWebdav(de.ledgerline.app.data.remote.dto.WebDavRequest(password)).takeIf { it.isSuccessful }?.body() } catch (_: Exception) { null }
+    }
+    suspend fun clearWebdav(): de.ledgerline.app.data.remote.dto.WebDavStatus? {
+        val s = sessionHolder.get() ?: return null
+        return try { apiProvider(s).clearWebdav().takeIf { it.isSuccessful }?.body() } catch (_: Exception) { null }
+    }
+
+    // ---- Owner-side device pairing (approve a new device) ----
+    suspend fun createDevicePairing(): de.ledgerline.app.data.remote.dto.DevicePairingCreated? {
+        val s = sessionHolder.get() ?: return null
+        return try { apiProvider(s).createDevicePairing().takeIf { it.isSuccessful }?.body() } catch (_: Exception) { null }
+    }
+    suspend fun devicePairingStatus(id: Long): de.ledgerline.app.data.remote.dto.DevicePairingStatus? {
+        val s = sessionHolder.get() ?: return null
+        return try { apiProvider(s).devicePairingStatus(id).takeIf { it.isSuccessful }?.body() } catch (_: Exception) { null }
+    }
+    suspend fun approveDevicePairing(id: Long): Boolean = call { it.approveDevicePairing(id) }
+    suspend fun rejectDevicePairing(id: Long): Boolean = call { it.rejectDevicePairing(id) }
+
+    // ---- Paperless-ngx integration ----
+    suspend fun paperlessConfig(): de.ledgerline.app.data.remote.dto.PaperlessConfig? {
+        val s = sessionHolder.get() ?: return null
+        return try { apiProvider(s).paperlessConfig().takeIf { it.isSuccessful }?.body() } catch (_: Exception) { null }
+    }
+    suspend fun updatePaperlessConfig(enabled: Boolean, url: String, token: String?): de.ledgerline.app.data.remote.dto.PaperlessConfig? {
+        val s = sessionHolder.get() ?: return null
+        val body = de.ledgerline.app.data.remote.dto.PaperlessConfigRequest(enabled = enabled, url = url.ifBlank { null }, token = token?.ifBlank { null })
+        return try { apiProvider(s).updatePaperlessConfig(body).takeIf { it.isSuccessful }?.body() } catch (_: Exception) { null }
+    }
+    suspend fun testPaperless(): Boolean {
+        val s = sessionHolder.get() ?: return false
+        return try { apiProvider(s).testPaperlessConfig().takeIf { it.isSuccessful }?.body()?.ok == true } catch (_: Exception) { false }
+    }
+    suspend fun paperlessSync(): Boolean {
+        val s = sessionHolder.get() ?: return false
+        return try { apiProvider(s).paperlessSync().takeIf { it.isSuccessful }?.body()?.ok == true } catch (_: Exception) { false }
+    }
+    /** Forward a document's bytes to the user's Paperless-ngx (transient; server stores nothing). */
+    suspend fun paperlessSubmit(bytes: ByteArray, fileName: String, mime: String): Boolean {
+        val s = sessionHolder.get() ?: return false
+        return try {
+            val part = okhttp3.MultipartBody.Part.createFormData("file", fileName, bytes.toRequestBody(mime.toMediaTypeOrNull()))
+            apiProvider(s).paperlessSubmit(part).takeIf { it.isSuccessful }?.body()?.ok == true
+        } catch (_: Exception) { false }
+    }
+
+    suspend fun resendEmailVerification(): Boolean = call { it.resendEmailVerification() }
+
+    /** CLI-style device pairing code (owner approves another device). */
+    suspend fun createDevicePairingCli(): de.ledgerline.app.data.remote.dto.DevicePairingCreated? {
+        val s = sessionHolder.get() ?: return null
+        return try { apiProvider(s).createDevicePairingCli().takeIf { it.isSuccessful }?.body() } catch (_: Exception) { null }
     }
 }

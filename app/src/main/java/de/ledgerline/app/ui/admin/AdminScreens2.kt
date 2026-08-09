@@ -310,3 +310,41 @@ private fun fmtBytes(b: Long): String {
     if (b < 1024) return "$b B"; val u = listOf("KB","MB","GB","TB"); var v = b.toDouble()/1024; var i = 0
     while (v >= 1024 && i < u.size-1) { v /= 1024; i++ }; return String.format(java.util.Locale.US, "%.1f %s", v, u[i])
 }
+
+// ---------------------------------------------------------------------------
+//  Security portal — blocked IPs + request log
+// ---------------------------------------------------------------------------
+@Composable
+internal fun SecurityPortalScreen(vm: AdminViewModel, onBack: () -> Unit) {
+    var blocks by remember { mutableStateOf<List<de.ledgerline.app.domain.model.admin.BlockedIp>>(emptyList()) }
+    var reqLog by remember { mutableStateOf<List<de.ledgerline.app.domain.model.admin.RequestLogRow>>(emptyList()) }
+    var reload by remember { mutableIntStateOf(0) }
+    var cidr by remember { mutableStateOf("") }
+    var reason by remember { mutableStateOf("") }
+    LaunchedEffect(reload) {
+        blocks = vm.blockedIps()
+        reqLog = vm.requestLog(1)?.data.orEmpty()
+    }
+    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.admin_security_portal), onBack = onBack) }) { pad ->
+        LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = ListBottomPadding) {
+            item { SectionLabel(stringResource(R.string.admin_blocked_ips)) }
+            item {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(cidr, { cidr = it }, label = { Text(stringResource(R.string.admin_cidr)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(reason, { reason = it }, label = { Text(stringResource(R.string.admin_reason)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    TextButton(enabled = cidr.isNotBlank(), onClick = { vm.blockIp(cidr.trim(), reason.trim().ifBlank { null }) { if (it) { cidr = ""; reason = ""; reload++ } } }) { Text(stringResource(R.string.admin_block_ip)) }
+                }
+            }
+            listSection(blocks, key = { "b${it.id}" }) { b ->
+                LedgerRow(title = b.cidr, subtitle = b.reason, trailing = { IconButton(onClick = { vm.unblockIp(b.id) { reload++ } }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete)) } })
+            }
+            item { SectionLabel(stringResource(R.string.admin_request_log)) }
+            listSection(reqLog, key = { "r${it.id}" }) { r ->
+                LedgerRow(
+                    title = "${r.method} ${r.path}",
+                    subtitle = listOfNotNull(r.status.toString(), r.ip, r.time?.take(19)?.replace('T', ' ')).joinToString(" · "),
+                )
+            }
+        }
+    }
+}

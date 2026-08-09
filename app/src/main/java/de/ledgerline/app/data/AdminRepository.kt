@@ -118,4 +118,16 @@ class AdminRepository @Inject constructor(
     }
     suspend fun restoreBackupRun(id: Int, source: String) =
         get { it.restoreBackupRun(id, buildJsonObject { put("source", source) }) }
+
+    // ---- Security portal ----
+    suspend fun requestLog(page: Int) = get { it.requestLog(page, 100) }
+    suspend fun requestLogExport(): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { api().requestLogExport("csv").takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
+    suspend fun blockedIps() = get { it.blockedIps() }?.blocks.orEmpty()
+    suspend fun blockIp(cidr: String, reason: String?) =
+        ok { it.blockIp(buildJsonObject { put("cidr", cidr); if (!reason.isNullOrBlank()) put("reason", reason) }) }
+    suspend fun unblockIp(id: Int) = ok { it.unblockIp(id) }
+    suspend fun blockUser(id: Int) = ok { it.blockUser(id) }
+    suspend fun unblockUser(id: Int) = ok { it.unblockUser(id) }
 }

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Folder
@@ -82,6 +83,7 @@ private sealed interface SettingsSub {
     data object Security : SettingsSub
     data object About : SettingsSub
     data object Admin : SettingsSub
+    data object Paperless : SettingsSub
 }
 
 /** Settings hub with internal sub-navigation (devices / notifications / about). [onBack] is null when
@@ -95,6 +97,7 @@ fun MoneySettingsScreen(onBack: (() -> Unit)? = null, onLoggedOut: () -> Unit, v
         SettingsSub.Security -> SecurityScreen(vm, onLoggedOut) { sub = SettingsSub.Hub }
         SettingsSub.About -> AboutScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Admin -> de.ledgerline.app.ui.admin.AdminScreen(onBack = { sub = SettingsSub.Hub })
+        SettingsSub.Paperless -> PaperlessScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Hub -> SettingsHub(vm, onBack, onLoggedOut, open = { sub = it })
     }
 }
@@ -133,6 +136,8 @@ private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut
                 SettingRow(stringResource(R.string.settings_notifications), null, Icons.Outlined.Notifications, Brand.tintOrange) { open(SettingsSub.Notifications) }
                 RowDivider()
                 SettingRow(stringResource(R.string.security_title), null, Icons.Outlined.Shield, Brand.tintGreen) { open(SettingsSub.Security) }
+                RowDivider()
+                SettingRow(stringResource(R.string.settings_paperless), null, Icons.Outlined.Description, Brand.tintTeal) { open(SettingsSub.Paperless) }
                 RowDivider()
                 SettingRow(stringResource(R.string.settings_about), null, Icons.Outlined.Info, Brand.tintGray) { open(SettingsSub.About) }
             }
@@ -400,6 +405,34 @@ private fun SecurityScreen(vm: AccountViewModel, onLoggedOut: () -> Unit, onBack
                 TextButton(onClick = { scope.launch { recoveryCodes = vm.regenerateRecoveryCodes() } }) { Text(stringResource(R.string.security_recovery_regenerate)) }
             }
 
+            // WebDAV mount password
+            SectionLabel(stringResource(R.string.sec_webdav))
+            var webdavPw by remember { mutableStateOf("") }
+            var webdavEnabled by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { webdavEnabled = vm.webdav()?.enabled == true }
+            Field(webdavPw, { webdavPw = it }, R.string.sec_webdav_pw)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(enabled = webdavPw.length >= 12, onClick = { vm.setWebdav(webdavPw) { ok -> if (ok) { webdavEnabled = true; webdavPw = "" } } }) { Text(stringResource(R.string.sec_webdav_set)) }
+                if (webdavEnabled) TextButton(onClick = { vm.clearWebdav { ok -> if (ok) webdavEnabled = false } }) { Text(stringResource(R.string.sec_webdav_clear), color = MaterialTheme.colorScheme.error) }
+            }
+
+            // Browser sessions
+            var sessions by remember { mutableStateOf<List<de.ledgerline.app.data.remote.dto.SessionRow>>(emptyList()) }
+            var sessReload by remember { mutableStateOf(0) }
+            LaunchedEffect(sessReload) { sessions = vm.sessions() }
+            if (sessions.isNotEmpty()) {
+                SectionLabel(stringResource(R.string.sec_sessions))
+                sessions.forEach { srow ->
+                    Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(srow.ip ?: "—", style = MaterialTheme.typography.bodyMedium)
+                            srow.userAgent?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1) }
+                        }
+                        if (!srow.current) TextButton(onClick = { vm.revokeSession(srow.id) { sessReload++ } }) { Text(stringResource(R.string.device_revoke)) }
+                    }
+                }
+            }
+
             SectionLabel(stringResource(R.string.security_data))
             TextButton(onClick = { exportLauncher.launch("ledgerline-export.zip") }) { Text(stringResource(R.string.security_export)) }
 
@@ -475,5 +508,34 @@ private fun AboutInfoRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
         Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun PaperlessScreen(vm: AccountViewModel, onBack: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var enabled by remember { mutableStateOf(false) }
+    var url by remember { mutableStateOf("") }
+    var token by remember { mutableStateOf("") }
+    var hasToken by remember { mutableStateOf(false) }
+    var msg by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        vm.paperlessConfig()?.let { enabled = it.enabled; url = it.url ?: ""; hasToken = it.hasToken }
+    }
+    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.settings_paperless), onBack = onBack) }) { pad ->
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            msg?.let { Text(it, color = MaterialTheme.colorScheme.primary) }
+            Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.paperless_enabled), Modifier.weight(1f))
+                androidx.compose.material3.Switch(checked = enabled, onCheckedChange = { enabled = it })
+            }
+            Field(url, { url = it }, R.string.paperless_url)
+            Field(token, { token = it }, if (hasToken) R.string.admin_secret_keep else R.string.paperless_token)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { vm.savePaperless(enabled, url, token.ifBlank { null }) { ok -> msg = if (ok) "OK" else ctx.getString(R.string.admin_failed); if (ok) { token = ""; hasToken = hasToken || token.isNotBlank() } } }) { Text(stringResource(R.string.action_save)) }
+                TextButton(onClick = { vm.testPaperless { ok -> msg = if (ok) "OK" else ctx.getString(R.string.admin_failed) } }) { Text(stringResource(R.string.paperless_test)) }
+                TextButton(onClick = { vm.paperlessSync { ok -> msg = if (ok) "OK" else ctx.getString(R.string.admin_failed) } }) { Text(stringResource(R.string.paperless_sync)) }
+            }
+        }
     }
 }
