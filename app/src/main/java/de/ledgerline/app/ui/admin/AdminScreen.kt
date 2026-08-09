@@ -13,9 +13,12 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Monitor
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
@@ -62,21 +65,37 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-private enum class AdminSub { HUB, USERS, ACCESS }
+internal enum class AdminSub { HUB, USERS, ACCESS, NOTIFICATIONS, SYSTEM, GROUPS, SECURITY_LOG, BACKUP }
 
 /** Admin section, shown only to admins (`/me.user.groups` contains "admin"). Internal sub-nav. */
 @Composable
 fun AdminScreen(onBack: () -> Unit, vm: AdminViewModel = hiltViewModel()) {
     var sub by remember { mutableStateOf(AdminSub.HUB) }
+    val back = { sub = AdminSub.HUB }
     when (sub) {
-        AdminSub.USERS -> UsersScreen(vm) { sub = AdminSub.HUB }
-        AdminSub.ACCESS -> AccessScreen(vm) { sub = AdminSub.HUB }
+        AdminSub.USERS -> UsersScreen(vm, back)
+        AdminSub.ACCESS -> AccessScreen(vm, back)
+        AdminSub.NOTIFICATIONS -> NotificationsAdminScreen(vm, back)
+        AdminSub.SYSTEM -> SystemScreen(vm, back)
+        AdminSub.GROUPS -> GroupsScreen(vm, back)
+        AdminSub.SECURITY_LOG -> SecurityLogScreen(vm, back)
+        AdminSub.BACKUP -> BackupScreen(vm, back)
         AdminSub.HUB -> AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.admin_title), onBack = onBack) }) { pad ->
             Column(Modifier.fillMaxSize().padding(pad)) {
                 de.ledgerline.app.ui.common.ListSectionCard {
                     HubRow(stringResource(R.string.admin_users), Icons.Outlined.Group, Brand.tintBlue) { sub = AdminSub.USERS }
                     de.ledgerline.app.ui.common.RowDivider()
+                    HubRow(stringResource(R.string.admin_groups), Icons.Outlined.Group, Brand.tintTeal) { sub = AdminSub.GROUPS }
+                    de.ledgerline.app.ui.common.RowDivider()
                     HubRow(stringResource(R.string.admin_access), Icons.Outlined.Tune, Brand.tintGreen) { sub = AdminSub.ACCESS }
+                    de.ledgerline.app.ui.common.RowDivider()
+                    HubRow(stringResource(R.string.admin_notifications), Icons.Outlined.Notifications, Brand.tintOrange) { sub = AdminSub.NOTIFICATIONS }
+                    de.ledgerline.app.ui.common.RowDivider()
+                    HubRow(stringResource(R.string.admin_system), Icons.Outlined.Monitor, Brand.tintViolet) { sub = AdminSub.SYSTEM }
+                    de.ledgerline.app.ui.common.RowDivider()
+                    HubRow(stringResource(R.string.admin_security_log), Icons.Outlined.Lock, Brand.tintGray) { sub = AdminSub.SECURITY_LOG }
+                    de.ledgerline.app.ui.common.RowDivider()
+                    HubRow(stringResource(R.string.admin_backup), Icons.Outlined.Backup, Brand.tintBlue) { sub = AdminSub.BACKUP }
                 }
             }
         }

@@ -73,12 +73,49 @@ class AdminRepository @Inject constructor(
         }) }
 
     // ---- Notifications ----
-    suspend fun notifications(): JsonObject? = get { it.notifications() }
-    suspend fun updateNotifications(body: JsonObject): JsonObject? = get { it.updateNotifications(body) }
+    suspend fun notifications(): de.ledgerline.app.domain.model.admin.NotificationsSettings? = get { it.notifications() }
+    suspend fun updateNotifications(body: JsonObject): de.ledgerline.app.domain.model.admin.NotificationsSettings? = get { it.updateNotifications(body) }
     suspend fun testNotification(channel: String): Boolean =
         ok { it.testNotification(buildJsonObject { put("channel", channel) }) }
 
     // ---- System ----
-    suspend fun system(): JsonObject? = get { it.system() }
+    suspend fun system(): de.ledgerline.app.domain.model.admin.SystemOverview? = get { it.system() }
     suspend fun resolveError(id: Int): Boolean = ok { it.resolveError(id) }
+
+    // ---- Security log ----
+    suspend fun securityLog(action: String?, user: Int?, since: String?, page: Int, perPage: Int) =
+        get { it.securityLog(action?.ifBlank { null }, user, since?.ifBlank { null }, page, perPage) }
+    suspend fun securityLogExport(format: String): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { api().securityLogExport(format, 10000).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
+
+    // ---- Backup ----
+    suspend fun backupDestinations() = get { it.backupDestinations() }?.destinations.orEmpty()
+    suspend fun createBackupDestination(body: JsonObject) = ok { it.createBackupDestination(body) }
+    suspend fun updateBackupDestination(id: Int, body: JsonObject) = ok { it.updateBackupDestination(id, body) }
+    suspend fun deleteBackupDestination(id: Int) = ok { it.deleteBackupDestination(id) }
+    suspend fun testBackupDestination(body: JsonObject): Boolean =
+        get { it.testBackupDestination(body) }?.ok == true
+
+    suspend fun backupJobs() = get { it.backupJobs() }?.jobs.orEmpty()
+    suspend fun createBackupJob(body: JsonObject) = get { it.createBackupJob(body) }?.job
+    suspend fun updateBackupJob(id: Int, body: JsonObject) = get { it.updateBackupJob(id, body) }?.job
+    suspend fun deleteBackupJob(id: Int) = ok { it.deleteBackupJob(id) }
+    suspend fun runBackupJob(id: Int) = ok { it.runBackupJob(id) }
+
+    suspend fun backupRuns() = get { it.backupRuns() }?.runs.orEmpty()
+    suspend fun downloadBackupRun(id: Int, source: String): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { api().downloadBackupRun(id, source).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
+    suspend fun verifyBackupRun(id: Int, source: String, passphrase: String?) =
+        get { it.verifyBackupRun(id, buildJsonObject { put("source", source); if (!passphrase.isNullOrBlank()) put("passphrase", passphrase) }) }
+    suspend fun cancelBackupRun(id: Int) = ok { it.cancelBackupRun(id) }
+    suspend fun decryptBackupRun(id: Int, source: String, passphrase: String): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching {
+            api().decryptBackupRun(id, buildJsonObject { put("source", source); put("passphrase", passphrase) })
+                .takeIf { it.isSuccessful }?.body()?.bytes()
+        }.getOrNull()
+    }
+    suspend fun restoreBackupRun(id: Int, source: String) =
+        get { it.restoreBackupRun(id, buildJsonObject { put("source", source) }) }
 }

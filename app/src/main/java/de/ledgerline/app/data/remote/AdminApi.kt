@@ -8,8 +8,16 @@ import de.ledgerline.app.domain.model.admin.AdminUserResponse
 import de.ledgerline.app.domain.model.admin.AdminUsersResponse
 import de.ledgerline.app.domain.model.admin.DevicePolicy
 import de.ledgerline.app.domain.model.admin.FilesLimits
+import de.ledgerline.app.domain.model.admin.BackupDestinationsResponse
+import de.ledgerline.app.domain.model.admin.BackupJobResponse
+import de.ledgerline.app.domain.model.admin.BackupJobsResponse
+import de.ledgerline.app.domain.model.admin.BackupRunsResponse
 import de.ledgerline.app.domain.model.admin.InviteLinkResponse
+import de.ledgerline.app.domain.model.admin.NotificationsSettings
 import de.ledgerline.app.domain.model.admin.RegistrationSetting
+import de.ledgerline.app.domain.model.admin.SecurityLogPage
+import de.ledgerline.app.domain.model.admin.SystemOverview
+import okhttp3.ResponseBody
 import kotlinx.serialization.json.JsonObject
 import retrofit2.Response
 import retrofit2.http.Body
@@ -18,6 +26,8 @@ import retrofit2.http.GET
 import retrofit2.http.PUT
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 /**
  * Admin REST surface (`can:manage-global-settings`). Free-form [JsonObject] request bodies so the
@@ -82,18 +92,85 @@ interface AdminApi {
 
     // ---- Notifications (SMTP/NTFY/webhook) ----
     @GET("api/v1/admin/notifications")
-    suspend fun notifications(): Response<JsonObject>
+    suspend fun notifications(): Response<NotificationsSettings>
 
     @PUT("api/v1/admin/notifications")
-    suspend fun updateNotifications(@Body body: JsonObject): Response<JsonObject>
+    suspend fun updateNotifications(@Body body: JsonObject): Response<NotificationsSettings>
 
     @POST("api/v1/admin/notifications/test")
     suspend fun testNotification(@Body body: JsonObject): Response<AdminOk>
 
     // ---- System (read-only ops) ----
     @GET("api/v1/admin/system")
-    suspend fun system(): Response<JsonObject>
+    suspend fun system(): Response<SystemOverview>
 
     @POST("api/v1/admin/system/errors/{id}/resolve")
     suspend fun resolveError(@Path("id") id: Int): Response<AdminOk>
+
+    // ---- Security log ----
+    @GET("api/v1/security-log")
+    suspend fun securityLog(
+        @Query("action") action: String?,
+        @Query("user") user: Int?,
+        @Query("since") since: String?,
+        @Query("page") page: Int?,
+        @Query("per_page") perPage: Int?,
+    ): Response<SecurityLogPage>
+
+    @GET("api/v1/security-log/export")
+    @Streaming
+    suspend fun securityLogExport(@Query("format") format: String, @Query("limit") limit: Int?): Response<ResponseBody>
+
+    // ---- Backup: destinations ----
+    @GET("api/v1/backup/destinations")
+    suspend fun backupDestinations(): Response<BackupDestinationsResponse>
+
+    @POST("api/v1/backup/destinations")
+    suspend fun createBackupDestination(@Body body: JsonObject): Response<JsonObject>
+
+    @PUT("api/v1/backup/destinations/{id}")
+    suspend fun updateBackupDestination(@Path("id") id: Int, @Body body: JsonObject): Response<JsonObject>
+
+    @DELETE("api/v1/backup/destinations/{id}")
+    suspend fun deleteBackupDestination(@Path("id") id: Int): Response<Unit>
+
+    @POST("api/v1/backup/destinations/test")
+    suspend fun testBackupDestination(@Body body: JsonObject): Response<AdminOk>
+
+    // ---- Backup: jobs ----
+    @GET("api/v1/backup/jobs")
+    suspend fun backupJobs(): Response<BackupJobsResponse>
+
+    @POST("api/v1/backup/jobs")
+    suspend fun createBackupJob(@Body body: JsonObject): Response<BackupJobResponse>
+
+    @PUT("api/v1/backup/jobs/{id}")
+    suspend fun updateBackupJob(@Path("id") id: Int, @Body body: JsonObject): Response<BackupJobResponse>
+
+    @DELETE("api/v1/backup/jobs/{id}")
+    suspend fun deleteBackupJob(@Path("id") id: Int): Response<Unit>
+
+    @POST("api/v1/backup/jobs/{id}/run")
+    suspend fun runBackupJob(@Path("id") id: Int): Response<AdminOk>
+
+    // ---- Backup: runs ----
+    @GET("api/v1/backup/runs")
+    suspend fun backupRuns(): Response<BackupRunsResponse>
+
+    @GET("api/v1/backup/runs/{id}/download")
+    @Streaming
+    suspend fun downloadBackupRun(@Path("id") id: Int, @Query("source") source: String): Response<ResponseBody>
+
+    @POST("api/v1/backup/runs/{id}/verify")
+    suspend fun verifyBackupRun(@Path("id") id: Int, @Body body: JsonObject): Response<AdminOk>
+
+    @POST("api/v1/backup/runs/{id}/cancel")
+    suspend fun cancelBackupRun(@Path("id") id: Int): Response<AdminOk>
+
+    @POST("api/v1/backup/runs/{id}/decrypt")
+    @Streaming
+    suspend fun decryptBackupRun(@Path("id") id: Int, @Body body: JsonObject): Response<ResponseBody>
+
+    @POST("api/v1/backup/runs/{id}/restore")
+    suspend fun restoreBackupRun(@Path("id") id: Int, @Body body: JsonObject): Response<AdminOk>
 }

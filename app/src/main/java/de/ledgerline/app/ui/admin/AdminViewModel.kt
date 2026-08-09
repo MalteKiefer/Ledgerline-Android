@@ -38,11 +38,40 @@ class AdminViewModel @Inject constructor(
         viewModelScope.launch { done(repo.setFilesLimits(maxMb, graceHours)) }
 
     // ---- Notifications ----
-    suspend fun notifications(): JsonObject? = repo.notifications()
-    fun updateNotifications(body: JsonObject, done: (JsonObject?) -> Unit) = viewModelScope.launch { done(repo.updateNotifications(body)) }
+    suspend fun notifications() = repo.notifications()
+    fun updateNotifications(body: JsonObject, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.updateNotifications(body) != null) }
     fun testNotification(channel: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.testNotification(channel)) }
 
     // ---- System ----
-    suspend fun system(): JsonObject? = repo.system()
+    suspend fun system() = repo.system()
     fun resolveError(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.resolveError(id)) }
+
+    // ---- Groups ----
+    suspend fun groups() = repo.groups()
+    fun saveGroup(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done((if (id == null) repo.createGroup(body) else repo.updateGroup(id, body)) != null) }
+    fun deleteGroup(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteGroup(id)) }
+
+    // ---- Security log ----
+    suspend fun securityLog(action: String?, user: Int?, since: String?, page: Int, perPage: Int) =
+        repo.securityLog(action, user, since, page, perPage)
+    suspend fun securityLogExport(format: String) = repo.securityLogExport(format)
+
+    // ---- Backup ----
+    suspend fun backupDestinations() = repo.backupDestinations()
+    suspend fun backupJobs() = repo.backupJobs()
+    suspend fun backupRuns() = repo.backupRuns()
+    fun runBackupJob(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.runBackupJob(id)) }
+    fun deleteBackupJob(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteBackupJob(id)) }
+    fun saveBackupJob(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done((if (id == null) repo.createBackupJob(body) else repo.updateBackupJob(id, body)) != null) }
+    fun cancelBackupRun(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.cancelBackupRun(id)) }
+    fun verifyBackupRun(id: Int, source: String, passphrase: String?, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.verifyBackupRun(id, source, passphrase)?.ok == true) }
+    fun deleteBackupDestination(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteBackupDestination(id)) }
+    fun saveBackupDestination(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(if (id == null) repo.createBackupDestination(body) else repo.updateBackupDestination(id, body)) }
+    fun testBackupDestination(body: JsonObject, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.testBackupDestination(body)) }
+    suspend fun downloadBackupRun(id: Int, source: String) = repo.downloadBackupRun(id, source)
+    suspend fun restoreBackupRun(id: Int, source: String) = repo.restoreBackupRun(id, source)?.ok == true
 }
