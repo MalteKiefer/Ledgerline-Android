@@ -79,7 +79,16 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
     var move by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var share by remember { mutableStateOf(false) }
+    var pdfFile by remember { mutableStateOf<java.io.File?>(null) }
     var msg by remember { mutableStateOf<String?>(null) }
+
+    val isPdf = (file.mime?.lowercase() == "application/pdf") || file.name.substringAfterLast('.', "").equals("pdf", true)
+
+    // In-app PDF viewer overlay.
+    pdfFile?.let { f ->
+        de.ledgerline.app.ui.common.PdfViewerScreen(f, title = file.name, onBack = { pdfFile = null })
+        return
+    }
 
     val replaceLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.GetContent(),
@@ -139,6 +148,14 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
 
             // Actions
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (isPdf) AssistChip(onClick = {
+                    scope.launch {
+                        msg = ctx.getString(R.string.files_downloading)
+                        val f = vm.downloadToCache(file)
+                        msg = if (f != null) null else ctx.getString(R.string.files_open_failed)
+                        if (f != null) pdfFile = f
+                    }
+                }, label = { Text(stringResource(R.string.action_view)) })
                 AssistChip(onClick = { scope.launch { openExternal(vm, ctx, file) { msg = it } } }, label = { Text(stringResource(R.string.action_open)) })
                 AssistChip(onClick = { saveLauncher.launch(file.name) }, label = { Text(stringResource(R.string.files_save_device)) })
                 AssistChip(onClick = { share = true }, label = { Text(stringResource(R.string.action_share)) })

@@ -1072,6 +1072,7 @@
     <string name="more_company">Профиль компании</string>
     <string name="more_settings">Настройки</string>
     <string name="action_open">Открыть</string>
+    <string name="action_view">Просмотр</string>
     <string name="action_add">Добавить</string>
     <string name="invoices_empty">Пока нет счетов.</string>
     <string name="invoice_draft">Черновик</string>
