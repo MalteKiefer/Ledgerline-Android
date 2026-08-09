@@ -69,8 +69,6 @@ class MainActivity : FragmentActivity() {
         if (keepScreenOn && keepScreenOnMinutes > 0) armKeepScreen()
     }
 
-    private val pairLink = MutableStateFlow<String?>(null)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!de.ledgerline.app.BuildConfig.DEBUG) {
@@ -98,8 +96,6 @@ class MainActivity : FragmentActivity() {
                 }
         }
 
-        pairLink.value = extractPairLink(intent)
-
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) {
                 // Backgrounding locks: drop the session from memory; re-biometric to return.
@@ -126,30 +122,14 @@ class MainActivity : FragmentActivity() {
                     .isAppearanceLightStatusBars = !dark
             }
             LedgerlineTheme(darkTheme = dark) {
-                val link by pairLink.collectAsState()
                 val auth = VaultAuthorizers(
                     activity = this@MainActivity,
                     lockTitle = stringResource(R.string.lock_title),
                     lockSubtitle = stringResource(R.string.lock_subtitle),
                     cancelText = stringResource(R.string.action_cancel),
                 )
-                AppNav(
-                    authorize = auth.authorize,
-                    strongAuthorize = auth.strongAuthorize,
-                    initialPairLink = link,
-                )
+                AppNav(authorize = auth.authorize)
             }
         }
     }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        extractPairLink(intent)?.let { pairLink.value = it }
-    }
-
-    private fun extractPairLink(intent: Intent?): String? =
-        intent?.data
-            ?.takeIf { it.scheme == "ledgerline" && it.host == "pair" }
-            ?.toString()
 }

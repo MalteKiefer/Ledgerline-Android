@@ -21,21 +21,22 @@ import de.ledgerline.app.data.SessionStore
 import de.ledgerline.app.data.files.FilesRepository
 import de.ledgerline.app.data.finance.FinanceRepository
 import de.ledgerline.app.domain.usecase.ForceLogout
+import de.ledgerline.app.ui.auth.LoginScreen
 import de.ledgerline.app.ui.lock.AppLockScreen
 import de.ledgerline.app.ui.shell.AppShell
 import de.ledgerline.app.ui.onboarding.WelcomeScreen
-import de.ledgerline.app.ui.pairing.PairingScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class Destination { LOADING, WELCOME, PAIRING, LOCK, HOME }
+enum class Destination { LOADING, WELCOME, LOGIN, LOCK, HOME }
 
 /**
- * Root flow for the finance pivot: WELCOME → PAIRING → LOCK (biometric session read) → HOME. There
- * is no zero-knowledge vault/passphrase step anymore — the Sanctum token (unsealed by one biometric)
- * grants data access directly. [AppLockState] is the in-memory gate; backgrounding/idle/logout locks.
+ * Root flow: WELCOME → LOGIN (URL + email + password + optional 2FA) → LOCK (biometric session read)
+ * → HOME. There is no QR pairing and no zero-knowledge vault/passphrase — the device-scoped Sanctum
+ * token (unsealed by one biometric) grants data access directly. [AppLockState] is the in-memory gate;
+ * backgrounding/idle/logout locks.
  */
 @HiltViewModel
 class RootViewModel @Inject constructor(
@@ -53,13 +54,9 @@ class RootViewModel @Inject constructor(
 
     val unlocked: StateFlow<Boolean> = appLockState.unlocked
 
-    fun start(hasPairLink: Boolean) {
+    fun start() {
         viewModelScope.launch {
-            _dest.value = when {
-                sessionStore.exists() -> Destination.LOCK
-                hasPairLink -> Destination.PAIRING
-                else -> Destination.WELCOME
-            }
+            _dest.value = if (sessionStore.exists()) Destination.LOCK else Destination.WELCOME
         }
     }
 
@@ -84,7 +81,7 @@ class RootViewModel @Inject constructor(
         _dest.value = Destination.WELCOME
     }
 
-    fun toPairing() { _dest.value = Destination.PAIRING }
+    fun toLogin() { _dest.value = Destination.LOGIN }
     fun toLock() { appLockState.lock(); _dest.value = Destination.LOCK }
     fun toHome() {
         _dest.value = Destination.HOME
@@ -100,21 +97,16 @@ class RootViewModel @Inject constructor(
 @Composable
 fun AppNav(
     authorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
-    strongAuthorize: suspend (javax.crypto.Cipher) -> javax.crypto.Cipher?,
-    initialPairLink: String? = null,
     vm: RootViewModel = hiltViewModel(),
 ) {
     val dest by vm.dest.collectAsStateWithLifecycle()
 
-    LaunchedEffect(Unit) { vm.start(hasPairLink = initialPairLink != null) }
-    LaunchedEffect(initialPairLink) {
-        if (initialPairLink != null && dest == Destination.WELCOME) vm.toPairing()
-    }
+    LaunchedEffect(Unit) { vm.start() }
 
     when (dest) {
         Destination.LOADING -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        Destination.WELCOME -> WelcomeScreen(onGetStarted = { vm.toPairing() })
-        Destination.PAIRING -> PairingScreen(authorize = authorize, initialPairLink = initialPairLink, onPaired = { vm.toLock() })
+        Destination.WELCOME -> WelcomeScreen(onGetStarted = { vm.toLogin() })
+        Destination.LOGIN -> LoginScreen(authorize = authorize, onLoggedIn = { vm.toLock() })
         Destination.LOCK -> AppLockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
         Destination.HOME -> {
             val unlocked by vm.unlocked.collectAsStateWithLifecycle()

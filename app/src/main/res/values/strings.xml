@@ -1316,4 +1316,16 @@
     <string name="security_recovery_codes">Recovery codes</string>
     <string name="security_recovery_show">Show recovery codes</string>
     <string name="security_recovery_regenerate">Regenerate codes</string>
+    <!-- Login (replaces QR pairing) -->
+    <string name="login_title">Sign in</string>
+    <string name="login_url">Server URL</string>
+    <string name="login_email">Email</string>
+    <string name="login_password">Password</string>
+    <string name="login_2fa_code">Two-factor code</string>
+    <string name="login_2fa_hint">Enter the code from your authenticator app.</string>
+    <string name="login_submit">Sign in</string>
+    <string name="login_error_invalid">Wrong email or password.</string>
+    <string name="login_error_network">Couldn\'t reach the server.</string>
+    <string name="login_error_https">The URL must start with https://</string>
+    <string name="login_error_auth">Authentication was cancelled.</string>
 </resources>

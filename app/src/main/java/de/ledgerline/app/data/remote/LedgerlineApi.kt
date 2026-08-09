@@ -1,9 +1,8 @@
 package de.ledgerline.app.data.remote
 
+import de.ledgerline.app.data.remote.dto.LoginRequest
+import de.ledgerline.app.data.remote.dto.LoginResponse
 import de.ledgerline.app.data.remote.dto.MeResponse
-import de.ledgerline.app.data.remote.dto.PairClaimRequest
-import de.ledgerline.app.data.remote.dto.PairClaimResponse
-import de.ledgerline.app.data.remote.dto.PairPollResponse
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
@@ -23,12 +22,9 @@ import retrofit2.http.Streaming
  * was deleted with the ZK modules.)
  */
 interface LedgerlineApi {
-    // ---- Pairing (public) ----
-    @POST("api/v1/auth/pair")
-    suspend fun claimPair(@Body body: PairClaimRequest): Response<PairClaimResponse>
-
-    @POST("api/v1/auth/pair/collect")
-    suspend fun pollPair(@Body body: de.ledgerline.app.data.remote.dto.PairCollectRequest): Response<PairPollResponse>
+    // ---- Login (public) — email + password (+ 2FA) → device-scoped bearer ----
+    @POST("api/v1/auth/login")
+    suspend fun login(@Body body: LoginRequest): Response<LoginResponse>
 
     // ---- Account / device ----
     @GET("api/v1/me")

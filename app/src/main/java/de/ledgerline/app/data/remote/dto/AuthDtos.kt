@@ -3,21 +3,28 @@ package de.ledgerline.app.data.remote.dto
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-@Serializable data class PairClaimRequest(val code: String, val device_name: String)
-@Serializable data class PairClaimResponse(val status: String)
-
-/** `POST /api/v1/auth/pair/collect` — poll for approval with the same one-time code. */
-@Serializable data class PairCollectRequest(
-    val code: String,
+/**
+ * `POST /api/v1/auth/login` — email + password (+ optional 2FA) → a device-scoped bearer token.
+ * Replaces QR device pairing: the user types the server URL + credentials directly. The device
+ * metadata (name/install/app/os) lets the server register the token so it shows under connected
+ * devices — see the web spec `ledgerline-mobile-login-spec.md`.
+ */
+@Serializable data class LoginRequest(
+    val email: String,
+    val password: String,
+    val code: String? = null,
+    val recovery_code: String? = null,
+    val device_name: String? = null,
     val install_id: String? = null,
     val app_version: String? = null,
     val os_version: String? = null,
 )
 
-@Serializable data class PairPollResponse(
-    val status: String,
+/** Success → `{token, user}`; 2FA needed → HTTP 422 `{two_factor:true}`; bad creds → 422 validation. */
+@Serializable data class LoginResponse(
     val token: String? = null,
     val user: PairedUser? = null,
+    @SerialName("two_factor") val twoFactor: Boolean = false,
 )
 
 @Serializable data class PairedUser(

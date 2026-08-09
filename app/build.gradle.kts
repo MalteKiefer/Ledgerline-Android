@@ -151,11 +151,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.coroutines.android)
 
-    // CameraX + ZXing power the QR device-pairing scanner (the only camera use post-pivot).
-    implementation(libs.camera.camera2)
-    implementation(libs.camera.lifecycle)
-    implementation(libs.camera.view)
-    implementation(libs.zxing.core)
+    // (Camera/QR removed — the app now signs in with URL + email + password instead of QR pairing.)
     implementation(libs.biometric)
     implementation(libs.androidx.lifecycle.runtime.compose)
 

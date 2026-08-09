@@ -1314,4 +1314,16 @@
     <string name="security_recovery_codes">Wiederherstellungscodes</string>
     <string name="security_recovery_show">Codes anzeigen</string>
     <string name="security_recovery_regenerate">Codes neu erzeugen</string>
+    <!-- Login (replaces QR pairing) -->
+    <string name="login_title">Anmelden</string>
+    <string name="login_url">Server-URL</string>
+    <string name="login_email">E-Mail</string>
+    <string name="login_password">Passwort</string>
+    <string name="login_2fa_code">Zwei-Faktor-Code</string>
+    <string name="login_2fa_hint">Gib den Code aus deiner Authenticator-App ein.</string>
+    <string name="login_submit">Anmelden</string>
+    <string name="login_error_invalid">E-Mail oder Passwort falsch.</string>
+    <string name="login_error_network">Server nicht erreichbar.</string>
+    <string name="login_error_https">Die URL muss mit https:// beginnen.</string>
+    <string name="login_error_auth">Authentifizierung abgebrochen.</string>
 </resources>
