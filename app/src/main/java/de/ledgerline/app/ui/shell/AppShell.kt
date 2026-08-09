@@ -99,7 +99,7 @@ fun AppShell(
             Section.FILES -> FilesSection(contentPadding = pad)
             Section.FINANCE ->
                 if (route != null) Box(bottomOnly) { MoneyRouteHost(route!!, financeVm, onBack = { route = null }) }
-                else FinanceSection(onPush = { route = it }, modifier = Modifier.padding(pad), vm = financeVm)
+                else FinanceSection(onPush = { route = it }, modifier = bottomOnly, vm = financeVm)
             Section.ACCOUNT -> Box(bottomOnly) {
                 MoneySettingsScreen(onBack = null, onLoggedOut = onDisconnected)
             }

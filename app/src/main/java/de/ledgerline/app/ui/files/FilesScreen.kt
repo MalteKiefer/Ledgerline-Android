@@ -162,7 +162,9 @@ fun FilesSection(
         }.sortedByDescending { it.updatedAt ?: "" }
     } else vm.filesIn(data, vm.currentFolderId)
 
-    Box(Modifier.fillMaxSize().padding(contentPadding)) {
+    // Only bottom-nav clearance here; FilesTopBar (a TopAppBar) applies the top status-bar inset itself,
+    // so applying the full contentPadding too would double the top gap above the title.
+    Box(Modifier.fillMaxSize().padding(bottom = contentPadding.calculateBottomPadding())) {
         Column(Modifier.fillMaxSize()) {
             if (selecting) {
                 SelectionBar(

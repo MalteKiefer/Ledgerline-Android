@@ -111,6 +111,7 @@ fun FinanceSection(
         else -> null
     }
     Column(modifier.fillMaxSize()) {
+        AppTopBar(title = stringResource(R.string.tab_finance))
         androidx.compose.material3.PrimaryScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 8.dp) {
             Tab.entries.forEach { t ->
                 androidx.compose.material3.Tab(
