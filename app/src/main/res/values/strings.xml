@@ -1377,4 +1377,15 @@
     <string name="receipt_category">Category</string>
     <string name="receipt_vat">VAT</string>
     <string name="receipt_note">Note</string>
+    <string name="company_branding">Invoice branding</string>
+    <string name="company_website">Website</string>
+    <string name="company_template">Template</string>
+    <string name="company_accent_color">Accent colour</string>
+    <string name="company_heading_color">Heading colour</string>
+    <string name="company_font">Font</string>
+    <string name="company_payment_methods">Payment methods (text)</string>
+    <string name="company_payment_terms_text">Payment terms (text)</string>
+    <string name="company_next_number">Next invoice number</string>
+    <string name="company_vat_ist">Cash-basis VAT (Ist)</string>
+    <string name="project_parent">Parent project</string>
 </resources>

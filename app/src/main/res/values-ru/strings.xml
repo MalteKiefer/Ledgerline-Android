@@ -1377,4 +1377,15 @@
     <string name="receipt_category">Категория</string>
     <string name="receipt_vat">НДС</string>
     <string name="receipt_note">Заметка</string>
+    <string name="company_branding">Оформление счёта</string>
+    <string name="company_website">Веб-сайт</string>
+    <string name="company_template">Шаблон</string>
+    <string name="company_accent_color">Акцентный цвет</string>
+    <string name="company_heading_color">Цвет заголовков</string>
+    <string name="company_font">Шрифт</string>
+    <string name="company_payment_methods">Способы оплаты (текст)</string>
+    <string name="company_payment_terms_text">Условия оплаты (текст)</string>
+    <string name="company_next_number">Следующий номер счёта</string>
+    <string name="company_vat_ist">НДС по оплате (Ist)</string>
+    <string name="project_parent">Родительский проект</string>
 </resources>

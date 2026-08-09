@@ -1374,4 +1374,15 @@
     <string name="receipt_category">Kategorie</string>
     <string name="receipt_vat">USt</string>
     <string name="receipt_note">Notiz</string>
+    <string name="company_branding">Rechnungs-Branding</string>
+    <string name="company_website">Webseite</string>
+    <string name="company_template">Vorlage</string>
+    <string name="company_accent_color">Akzentfarbe</string>
+    <string name="company_heading_color">Überschriftsfarbe</string>
+    <string name="company_font">Schriftart</string>
+    <string name="company_payment_methods">Zahlungsmittel (Text)</string>
+    <string name="company_payment_terms_text">Zahlungsbedingungen (Text)</string>
+    <string name="company_next_number">Nächste Rechnungsnummer</string>
+    <string name="company_vat_ist">Ist-Versteuerung</string>
+    <string name="project_parent">Übergeordnetes Projekt</string>
 </resources>

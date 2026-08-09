@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -39,15 +40,23 @@ fun InsightsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     var vatAdvance by remember { mutableStateOf<de.ledgerline.app.domain.model.finance.VatAdvanceReturn?>(null) }
     var euer by remember { mutableStateOf<de.ledgerline.app.domain.model.finance.EuerReport?>(null) }
     val year by vm.year.collectAsStateWithLifecycle()
+    var quarter by remember { mutableStateOf<Int?>(null) } // null = full year
     var refresh by remember { mutableStateOf(0) }
-    LaunchedEffect(refresh, year) {
-        vatAdvance = vm.loadVatAdvance(year, null)
+    LaunchedEffect(refresh, year, quarter) {
+        vatAdvance = vm.loadVatAdvance(year, quarter)
         euer = vm.loadEuer(year)
         dups = vm.loadDuplicates()
         suggestions = vm.loadSuggestions()
     }
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.more_insights), onBack = onBack) }) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            // Full year / quarter selector for the USt-Voranmeldung.
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.FilterChip(selected = quarter == null, onClick = { quarter = null }, label = { Text(year.toString()) })
+                (1..4).forEach { q ->
+                    androidx.compose.material3.FilterChip(selected = quarter == q, onClick = { quarter = q }, label = { Text("Q$q") })
+                }
+            }
             vatAdvance?.let { v ->
                 SectionLabel(stringResource(R.string.insights_vat_advance))
                 Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {

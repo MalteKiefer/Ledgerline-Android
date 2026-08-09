@@ -1,6 +1,9 @@
 package de.ledgerline.app.ui.money
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.horizontalScroll
@@ -52,8 +55,17 @@ import kotlinx.serialization.json.put
 fun InvoicesTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit) {
     val data by vm.data.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    var query by remember { mutableStateOf("") }
     Box(Modifier.fillMaxSize()) {
-        val invoices = data?.invoices?.filter { it.deletedAt == null }?.sortedByDescending { it.issueDate ?: "" }.orEmpty()
+      Column(Modifier.fillMaxSize()) {
+        OutlinedTextField(
+            value = query, onValueChange = { query = it },
+            label = { Text(stringResource(R.string.files_search)) }, singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        val invoices = data?.invoices?.filter { it.deletedAt == null }
+            ?.filter { query.isBlank() || (it.number ?: "").contains(query, true) || (customerName(it) ?: "").contains(query, true) }
+            ?.sortedByDescending { it.issueDate ?: "" }.orEmpty()
         de.ledgerline.app.ui.common.RefreshBox(refreshing = refreshing, onRefresh = { vm.pullRefresh() }) {
         if (invoices.isEmpty()) {
             ScrollableEmptyState(stringResource(R.string.invoices_empty))
@@ -80,6 +92,7 @@ fun InvoicesTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit) {
             }
         }
         }
+      }
         ExtendedFloatingActionButton(
             onClick = { onEdit(null) },
             icon = { Icon(Icons.Outlined.Add, null) },
@@ -855,10 +868,14 @@ fun ProjectsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
         var name by remember { mutableStateOf(p?.name ?: "") }
         var kind by remember { mutableStateOf(p?.kind ?: "business") }
         var note by remember { mutableStateOf(p?.note ?: "") }
+        var parentId by remember { mutableStateOf(p?.parentId) }
         var busy by remember { mutableStateOf(false) }
+        // Eligible parents: any other live project (can't be its own parent).
+        val parents = list.filter { it.id != editing }
         fun body() = buildJsonObject {
             p?.let { put("version", it.version) }
             put("name", name.trim()); put("kind", kind); put("note", note.trim())
+            put("parent_id", parentId?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
         }
         AppScaffold(topBar = {
             AppTopBar(title = stringResource(R.string.more_projects), onBack = { editing = null; creating = false }, actions = {
@@ -872,6 +889,15 @@ fun ProjectsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
                     Field(name, { name = it }, R.string.project_name)
                     SectionLabel(stringResource(R.string.project_kind))
                     ChipRow(listOf("business", "private"), kind, { if (it == "business") stringResource(R.string.project_kind_business) else stringResource(R.string.project_kind_private) }) { kind = it }
+                    if (parents.isNotEmpty()) {
+                        SectionLabel(stringResource(R.string.project_parent))
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            androidx.compose.material3.FilterChip(selected = parentId == null, onClick = { parentId = null }, label = { Text(stringResource(R.string.invoice_partner_none)) })
+                            parents.forEach { pr ->
+                                androidx.compose.material3.FilterChip(selected = parentId == pr.id, onClick = { parentId = pr.id }, label = { Text(pr.name) })
+                            }
+                        }
+                    }
                     Field(note, { note = it }, R.string.project_note)
                 }
             }
@@ -913,6 +939,16 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     var termsDays by remember(p) { mutableStateOf(p.invoicePaymentTermsDays?.toString() ?: "") }
     var footer by remember(p) { mutableStateOf(p.invoiceFooterText ?: "") }
     var smallBusiness by remember(p) { mutableStateOf(p.smallBusiness ?: false) }
+    // Invoice branding (feeds the web PDF generator).
+    var website by remember(p) { mutableStateOf(p.companyWebsite ?: "") }
+    var nextNumber by remember(p) { mutableStateOf(p.invoiceNextNumber?.toString() ?: "") }
+    var template by remember(p) { mutableStateOf(p.invoiceTemplate ?: "modern") }
+    var accentColor by remember(p) { mutableStateOf(p.invoiceAccentColor ?: "#7066F5") }
+    var headingColor by remember(p) { mutableStateOf(p.invoiceHeadingColor ?: "#111827") }
+    var font by remember(p) { mutableStateOf(p.invoiceFont ?: "") }
+    var vatIst by remember(p) { mutableStateOf(p.invoiceVatIst ?: false) }
+    var payMethodsText by remember(p) { mutableStateOf(p.invoicePaymentMethods ?: "") }
+    var payTermsText by remember(p) { mutableStateOf(p.invoicePaymentTermsText ?: "") }
     var busy by remember { mutableStateOf(false) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -937,6 +973,15 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
                     invoiceDefaultVatRate = defaultVat.replace(',', '.').toDoubleOrNull(),
                     invoicePaymentTermsDays = termsDays.toIntOrNull(),
                     invoiceFooterText = footer.ifBlank { null }, smallBusiness = smallBusiness,
+                    companyWebsite = website.ifBlank { null },
+                    invoiceNextNumber = nextNumber.toIntOrNull(),
+                    invoiceTemplate = template,
+                    invoiceAccentColor = accentColor,
+                    invoiceHeadingColor = headingColor,
+                    invoiceFont = font.ifBlank { null },
+                    invoiceVatIst = vatIst,
+                    invoicePaymentMethods = payMethodsText.ifBlank { null },
+                    invoicePaymentTermsText = payTermsText.ifBlank { null },
                 )) { ok -> busy = false; if (ok) onBack?.invoke() }
             }) { Text(stringResource(R.string.action_save)) }
         })
@@ -969,9 +1014,40 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
             }
             FormSection(stringResource(R.string.company_invoice_defaults)) {
                 Field(numberFormat, { numberFormat = it }, R.string.company_number_format)
+                NumField(nextNumber, { nextNumber = it }, R.string.company_next_number, Modifier.fillMaxWidth())
                 Field(defaultVat, { defaultVat = it }, R.string.company_default_vat)
                 Field(termsDays, { termsDays = it }, R.string.company_terms_days)
                 Field(footer, { footer = it }, R.string.company_footer)
+                ToggleRow(stringResource(R.string.company_vat_ist), vatIst) { vatIst = it }
+            }
+            FormSection(stringResource(R.string.company_branding)) {
+                Field(website, { website = it }, R.string.company_website)
+                SectionLabel(stringResource(R.string.company_template))
+                ChipRow(listOf("modern", "elegant", "editorial", "klassisch", "schlicht"), template, { it.replaceFirstChar { c -> c.uppercase() } }) { template = it }
+                ColorPickRow(stringResource(R.string.company_accent_color), accentColor) { accentColor = it }
+                ColorPickRow(stringResource(R.string.company_heading_color), headingColor) { headingColor = it }
+                Field(font, { font = it }, R.string.company_font)
+                Field(payMethodsText, { payMethodsText = it }, R.string.company_payment_methods)
+                Field(payTermsText, { payTermsText = it }, R.string.company_payment_terms_text)
+            }
+        }
+    }
+}
+
+private val BRANDING_COLORS = listOf("#7066F5", "#111827", "#3B9FD6", "#59AD6B", "#E2915A", "#3FAE9F", "#9E70FA", "#6B7280", "#D6455D")
+
+@Composable
+private fun ColorPickRow(label: String, current: String, onPick: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        SectionLabel(label)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            BRANDING_COLORS.forEach { hex ->
+                Box(
+                    Modifier.size(28.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(de.ledgerline.app.ui.files.parseHex(hex))
+                        .clickable { onPick(hex) },
+                    contentAlignment = Alignment.Center,
+                ) { if (current.equals(hex, ignoreCase = true)) Box(Modifier.size(10.dp).clip(androidx.compose.foundation.shape.CircleShape).background(androidx.compose.ui.graphics.Color.White)) }
             }
         }
     }

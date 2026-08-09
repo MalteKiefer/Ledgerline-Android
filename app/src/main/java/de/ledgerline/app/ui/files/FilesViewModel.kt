@@ -133,6 +133,21 @@ class FilesViewModel @Inject constructor(
     suspend fun search(q: String): List<FileEntry> = repo.search(q)
     suspend fun thumb(id: Int): ByteArray? = repo.thumbBytes(id)
 
+    // In-memory thumbnail cache (id+version → decoded bitmap or null when unavailable).
+    private val thumbCache = mutableMapOf<String, androidx.compose.ui.graphics.ImageBitmap?>()
+    /** Decoded square thumbnail for an image file, or null (non-image / failed). Cached by id+version. */
+    suspend fun thumbnail(entry: FileEntry): androidx.compose.ui.graphics.ImageBitmap? {
+        val key = "${entry.id}:${entry.version}"
+        thumbCache[key]?.let { return it }
+        if (thumbCache.containsKey(key)) return null
+        val mime = entry.mime?.lowercase().orEmpty()
+        if (!mime.startsWith("image/")) { thumbCache[key] = null; return null }
+        val bytes = repo.thumbBytes(entry.id)
+        val bmp = bytes?.let { runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.let { b -> androidx.compose.ui.graphics.asImageBitmap(b) } }.getOrNull() }
+        thumbCache[key] = bmp
+        return bmp
+    }
+
     /** Zip a whole folder subtree server-side into [dest]. */
     suspend fun zipFolder(folderId: Int, dest: File): Boolean = repo.zipToFile(dest, folderId = folderId)
 
