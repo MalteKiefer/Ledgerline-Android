@@ -111,6 +111,7 @@ class FinanceViewModel @Inject constructor(
 
     fun saveCategory(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
         run({ if (id == null) repo.createCategory(body) else repo.updateCategory(id, body) }, done)
+    fun deleteCategory(id: Int, done: (Boolean) -> Unit) = run({ repo.deleteCategory(id) }, done)
 
     suspend fun loadDuplicates() = repo.duplicates()
     suspend fun loadSuggestions() = repo.categorySuggestions()

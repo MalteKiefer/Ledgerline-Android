@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Insights
 import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.Sell
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Work
 import androidx.compose.material3.Icon
@@ -60,6 +61,7 @@ private enum class Tab(val labelRes: Int, val icon: ImageVector) {
     PAYMENT_METHODS(R.string.more_payment_methods, Icons.Outlined.CreditCard),
     PROJECTS(R.string.more_projects, Icons.Outlined.Work),
     RECEIPTS(R.string.more_receipts, Icons.Outlined.Receipt),
+    CATEGORIES(R.string.more_categories, Icons.Outlined.Sell),
     INSIGHTS(R.string.more_insights, Icons.Outlined.Insights),
     COMPANY(R.string.more_company, Icons.Outlined.Business),
     TRASH(R.string.more_trash, Icons.Outlined.Delete),
@@ -76,6 +78,7 @@ sealed interface MoneyRoute {
     data object Company : MoneyRoute
     data object Insights : MoneyRoute
     data object Receipts : MoneyRoute
+    data object Categories : MoneyRoute
     data object Trash : MoneyRoute
 }
 
@@ -98,6 +101,7 @@ fun FinanceSection(
         Tab.PAYMENT_METHODS -> MoneyRoute.PaymentMethods
         Tab.PROJECTS -> MoneyRoute.Projects
         Tab.RECEIPTS -> MoneyRoute.Receipts
+        Tab.CATEGORIES -> MoneyRoute.Categories
         Tab.INSIGHTS -> MoneyRoute.Insights
         Tab.COMPANY -> MoneyRoute.Company
         Tab.TRASH -> MoneyRoute.Trash
@@ -138,6 +142,7 @@ fun MoneyRouteHost(route: MoneyRoute, vm: FinanceViewModel, onBack: () -> Unit) 
         MoneyRoute.Company -> CompanyScreen(vm, onBack)
         MoneyRoute.Insights -> InsightsScreen(vm, onBack)
         MoneyRoute.Receipts -> ReceiptsScreen(vm, onBack)
+        MoneyRoute.Categories -> CategoriesScreen(vm, onBack)
         MoneyRoute.Trash -> FinanceTrashScreen(vm, onBack)
     }
 }
@@ -173,15 +178,31 @@ private fun DashboardTab(vm: FinanceViewModel, onOpenInvoices: () -> Unit) {
             KpiCard(stringResource(R.string.dashboard_open_invoices), FinanceViewModel.money(r?.aging?.openGross ?: 0.0), Modifier.weight(1f))
             KpiCard(stringResource(R.string.dashboard_open_count), (r?.aging?.openCount ?: 0).toString(), Modifier.weight(1f))
         }
+        r?.kpis?.growthPct?.let { g ->
+            KpiCard(stringResource(R.string.dashboard_growth), (if (g >= 0) "+" else "") + String.format(java.util.Locale.US, "%.1f%%", g), Modifier.fillMaxWidth())
+        }
+
+        // Aging breakdown of open receivables.
+        r?.aging?.buckets?.let { b ->
+            if (b.current.count + b.d1_30.count + b.d31_60.count + b.d60_plus.count > 0) {
+                SectionLabel(stringResource(R.string.dashboard_aging))
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AgingRow(stringResource(R.string.aging_current), b.current)
+                    AgingRow(stringResource(R.string.aging_1_30), b.d1_30)
+                    AgingRow(stringResource(R.string.aging_31_60), b.d31_60)
+                    AgingRow(stringResource(R.string.aging_60_plus), b.d60_plus)
+                }
+            }
+        }
 
         SectionLabel(stringResource(R.string.dashboard_top_customers))
         Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            val customers = r?.customers.orEmpty().take(5)
+            val customers = r?.customers.orEmpty()
             if (customers.isEmpty()) {
                 Text(stringResource(R.string.dashboard_no_data), color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else customers.forEach { c ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(c.name, style = MaterialTheme.typography.bodyMedium)
+                    Text(c.name, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     Text(FinanceViewModel.money(c.net), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -205,6 +226,14 @@ private fun YearPicker(current: Int, years: List<Int>, onPick: (Int) -> Unit) {
                 androidx.compose.material3.DropdownMenuItem(text = { Text(y.toString()) }, onClick = { open = false; onPick(y) })
             }
         }
+    }
+}
+
+@Composable
+private fun AgingRow(label: String, bucket: de.ledgerline.app.domain.model.finance.AgingBucket) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text("$label (${bucket.count})", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Text(FinanceViewModel.money(bucket.gross), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

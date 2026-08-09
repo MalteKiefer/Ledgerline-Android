@@ -42,7 +42,7 @@ fun FinanceTrashScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     val t = trash
 
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.trash_title), onBack = onBack) }) { pad ->
-        val empty = t == null || (t.invoices.isEmpty() && t.transactions.isEmpty() && t.partners.isEmpty() && t.paymentMethods.isEmpty() && t.projects.isEmpty())
+        val empty = t == null || (t.invoices.isEmpty() && t.transactions.isEmpty() && t.partners.isEmpty() && t.paymentMethods.isEmpty() && t.projects.isEmpty() && t.standaloneReceipts.isEmpty())
         Box(Modifier.fillMaxSize().padding(pad)) {
             if (empty) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -59,6 +59,8 @@ fun FinanceTrashScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
                     onRestore = { id -> vm.restorePaymentMethod(id) { reload++ } }, onForce = { id -> vm.forcePaymentMethod(id) { reload++ } })
                 section(R.string.more_projects, t.projects.map { it.id to it.name },
                     onRestore = { id -> vm.restoreProject(id) { reload++ } }, onForce = { id -> vm.forceProject(id) { reload++ } })
+                section(R.string.more_receipts, t.standaloneReceipts.map { it.id to it.name },
+                    onRestore = { id -> vm.restoreStandaloneReceipt(id) { reload++ } }, onForce = { id -> vm.forceStandaloneReceipt(id) { reload++ } })
             }
         }
     }

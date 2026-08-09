@@ -128,13 +128,23 @@ fun FilesSearchScreen(vm: FilesViewModel, onOpenDetail: (Int) -> Unit, onBack: (
 @Composable
 fun FilesStatsScreen(vm: FilesViewModel, onBack: () -> Unit) {
     var stats by remember { mutableStateOf<FilesStats?>(null) }
+    val data by vm.data.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { stats = vm.stats() }
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.files_stats), onBack = onBack) }) { pad ->
         val s = stats
+        val usage = data?.usage
         Column(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.fillMaxWidth().cardSurface()) {
                 Text(stringResource(R.string.files_used), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(formatBytes(s?.used ?: 0), style = MaterialTheme.typography.titleLarge)
+                val used = usage?.used ?: s?.used ?: 0
+                val quota = usage?.quota
+                Text(if (quota != null) "${formatBytes(used)} / ${formatBytes(quota)}" else formatBytes(used), style = MaterialTheme.typography.titleLarge)
+                if (quota != null && quota > 0) {
+                    androidx.compose.material3.LinearProgressIndicator(
+                        progress = { (used.toFloat() / quota.toFloat()).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
             }
             if (!s?.byType.isNullOrEmpty()) {
                 SectionLabel(stringResource(R.string.files_stats_by_type))

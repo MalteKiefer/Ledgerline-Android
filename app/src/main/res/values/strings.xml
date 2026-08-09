@@ -1358,4 +1358,14 @@
     <string name="about_source_url">https://github.com/MalteKiefer/Ledgerline-Android</string>
     <string name="about_licenses">Open-source licenses</string>
     <string name="about_made_by">Made by Malte Kiefer</string>
+    <string name="dashboard_growth">YoY growth</string>
+    <string name="dashboard_aging">Overdue by age</string>
+    <string name="aging_current">Current</string>
+    <string name="aging_1_30">1–30 days</string>
+    <string name="aging_31_60">31–60 days</string>
+    <string name="aging_60_plus">60+ days</string>
+    <string name="more_categories">Categories</string>
+    <string name="categories_title">Categories</string>
+    <string name="categories_empty">No categories yet</string>
+    <string name="category_name">Category name</string>
 </resources>

@@ -103,6 +103,14 @@ class FilesViewModel @Inject constructor(
 
     fun renameFile(id: Int, name: String, done: (Boolean) -> Unit) =
         run({ repo.updateFile(id, buildJsonObject { put("name", name) }) }, done)
+    /** Patch a file's free-text tags + note. */
+    fun updateTagsNote(id: Int, tags: List<String>, note: String, done: (Boolean) -> Unit) =
+        run({
+            repo.updateFile(id, buildJsonObject {
+                put("tags", kotlinx.serialization.json.JsonArray(tags.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+                put("note", note)
+            })
+        }, done)
     fun moveFile(id: Int, folderId: Int?, done: (Boolean) -> Unit) =
         run({ repo.updateFile(id, buildJsonObject { put("file_folder_id", folderId) }) }, done)
     fun toggleFavorite(id: Int, value: Boolean, done: (Boolean) -> Unit) = run({ repo.toggleFavorite(id, value) }, done)

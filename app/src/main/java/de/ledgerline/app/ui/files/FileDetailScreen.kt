@@ -74,6 +74,7 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
     var preview by remember(fileId, file.version) { mutableStateOf<Preview?>(null) }
     var versions by remember(fileId) { mutableStateOf<List<FileVersion>>(emptyList()) }
     var editLabels by remember { mutableStateOf(false) }
+    var editMeta by remember { mutableStateOf(false) }
     var rename by remember { mutableStateOf(false) }
     var move by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -147,14 +148,17 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
                 AssistChip(onClick = { confirmDelete = true }, label = { Text(stringResource(R.string.action_delete)) })
             }
 
-            // Metadata
-            SectionLabel(stringResource(R.string.files_type))
+            // Metadata (tags + note are editable)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                SectionLabel(stringResource(R.string.files_type), Modifier.weight(1f))
+                TextButton(onClick = { editMeta = true }) { Text(stringResource(R.string.action_edit)) }
+            }
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 MetaRow(stringResource(R.string.files_type), file.mime ?: "—")
                 MetaRow(stringResource(R.string.files_size), formatBytes(file.size))
                 file.updatedAt?.let { MetaRow(stringResource(R.string.files_modified), it.take(19).replace('T', ' ')) }
-                if (file.tags.isNotEmpty()) MetaRow(stringResource(R.string.files_tags), file.tags.joinToString(", "))
-                file.note?.takeIf { it.isNotBlank() }?.let { MetaRow(stringResource(R.string.files_note), it) }
+                MetaRow(stringResource(R.string.files_tags), file.tags.joinToString(", ").ifBlank { "—" })
+                MetaRow(stringResource(R.string.files_note), file.note?.takeIf { it.isNotBlank() } ?: "—")
             }
 
             // Labels
@@ -208,6 +212,33 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
         onConfirm = { confirmDelete = false; vm.deleteFile(file.id) { onBack() } }, onDismiss = { confirmDelete = false },
     )
     if (share) ShareDialog(vm, kind = "file", id = file.id, folderId = null, onDismiss = { share = false })
+    if (editMeta) MetaEditDialog(
+        initialTags = file.tags.joinToString(", "),
+        initialNote = file.note ?: "",
+        onConfirm = { tags, note ->
+            editMeta = false
+            vm.updateTagsNote(file.id, tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }, note) {}
+        },
+        onDismiss = { editMeta = false },
+    )
+}
+
+@Composable
+private fun MetaEditDialog(initialTags: String, initialNote: String, onConfirm: (String, String) -> Unit, onDismiss: () -> Unit) {
+    var tags by remember { mutableStateOf(initialTags) }
+    var note by remember { mutableStateOf(initialNote) }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.action_edit)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                androidx.compose.material3.OutlinedTextField(value = tags, onValueChange = { tags = it }, label = { Text(stringResource(R.string.files_tags)) }, singleLine = true)
+                androidx.compose.material3.OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text(stringResource(R.string.files_note)) }, minLines = 3)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onConfirm(tags, note) }) { Text(stringResource(R.string.action_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
 }
 
 @Composable

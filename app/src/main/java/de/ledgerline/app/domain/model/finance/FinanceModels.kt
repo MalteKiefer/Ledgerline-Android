@@ -182,6 +182,7 @@ data class FinanceTrash(
     val paymentMethods: List<PaymentMethod> = emptyList(),
     val projects: List<FinanceProject> = emptyList(),
     val transactions: List<BankTransaction> = emptyList(),
+    val standaloneReceipts: List<FinanceReceipt> = emptyList(),
 )
 
 /** The full owner-scoped finance snapshot (`GET /finance/data`). */
@@ -237,9 +238,36 @@ data class RevenueByCustomer(
 @Serializable
 data class MonthRevenue(val month: Int = 0, val net: Double = 0.0)
 
-/** Aging of OPEN invoices (status=sent, untrashed) by days past due. Detail buckets ignored here. */
+@Serializable
+data class AgingInvoice(
+    val id: Int = 0,
+    val number: String? = null,
+    val customer: String = "",
+    val gross: Double = 0.0,
+    @SerialName("due_date") val dueDate: String? = null,
+    @SerialName("days_overdue") val daysOverdue: Int = 0,
+)
+
+@Serializable
+data class AgingBucket(
+    val count: Int = 0,
+    val gross: Double = 0.0,
+    val invoices: List<AgingInvoice> = emptyList(),
+)
+
+/** The four aging buckets by days past due (server keys are numeric-with-underscore). */
+@Serializable
+data class AgingBuckets(
+    val current: AgingBucket = AgingBucket(),
+    @SerialName("1_30") val d1_30: AgingBucket = AgingBucket(),
+    @SerialName("31_60") val d31_60: AgingBucket = AgingBucket(),
+    @SerialName("60_plus") val d60_plus: AgingBucket = AgingBucket(),
+)
+
+/** Aging of OPEN invoices (status=sent, untrashed) by days past due. */
 @Serializable
 data class InvoiceAging(
+    val buckets: AgingBuckets = AgingBuckets(),
     val openCount: Int = 0,
     val openGross: Double = 0.0,
 )

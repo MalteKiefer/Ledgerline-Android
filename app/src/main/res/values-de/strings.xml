@@ -1355,4 +1355,14 @@
     <string name="about_source">Quellcode</string>
     <string name="about_licenses">Open-Source-Lizenzen</string>
     <string name="about_made_by">Erstellt von Malte Kiefer</string>
+    <string name="dashboard_growth">Wachstum ggü. Vorjahr</string>
+    <string name="dashboard_aging">Überfällig nach Alter</string>
+    <string name="aging_current">Aktuell</string>
+    <string name="aging_1_30">1–30 Tage</string>
+    <string name="aging_31_60">31–60 Tage</string>
+    <string name="aging_60_plus">60+ Tage</string>
+    <string name="more_categories">Kategorien</string>
+    <string name="categories_title">Kategorien</string>
+    <string name="categories_empty">Noch keine Kategorien</string>
+    <string name="category_name">Kategoriename</string>
 </resources>

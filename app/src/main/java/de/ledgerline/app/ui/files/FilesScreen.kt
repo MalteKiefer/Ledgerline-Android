@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material.icons.outlined.UploadFile
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -124,6 +125,9 @@ fun FilesSection(
     var moveFile by remember { mutableStateOf<FileEntry?>(null) }
     var moveFolder by remember { mutableStateOf<FileFolder?>(null) }
     var busy by remember { mutableStateOf<String?>(null) }
+    var favoritesOnly by remember { mutableStateOf(false) }
+    // Optional label filter (null = all).
+    var labelFilter by remember { mutableStateOf<Int?>(null) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -140,12 +144,22 @@ fun FilesSection(
         }
     }
 
-    val folders = vm.childFolders(data, vm.currentFolderId)
-    val files = vm.filesIn(data, vm.currentFolderId)
+    val filtering = favoritesOnly || labelFilter != null
+    // When filtering (favorites / label), search across ALL folders and hide the folder rows.
+    val folders = if (filtering) emptyList() else vm.childFolders(data, vm.currentFolderId)
+    val files = if (filtering) {
+        data?.files.orEmpty().filter { f ->
+            f.deletedAt == null &&
+                (!favoritesOnly || f.favorite) &&
+                (labelFilter == null || f.labels.any { it.id == labelFilter })
+        }.sortedByDescending { it.updatedAt ?: "" }
+    } else vm.filesIn(data, vm.currentFolderId)
 
     Box(Modifier.fillMaxSize().padding(contentPadding)) {
         Column(Modifier.fillMaxSize()) {
             FilesTopBar(
+                favoritesOnly = favoritesOnly,
+                onToggleFavorites = { favoritesOnly = !favoritesOnly; if (favoritesOnly) labelFilter = null },
                 onSearch = { showSearch = true }, onTrash = { showTrash = true }, onStats = { showStats = true },
                 onLabels = { showLabels = true }, onShared = { showShared = true },
                 onDownloadFolder = vm.currentFolderId?.let { fid ->
@@ -161,7 +175,24 @@ fun FilesSection(
                     }
                 },
             )
-            Breadcrumb(stack, onRoot = { vm.goToRoot() }, onCrumb = { vm.goTo(it) })
+            if (!favoritesOnly) Breadcrumb(stack, onRoot = { vm.goToRoot() }, onCrumb = { vm.goTo(it) })
+
+            // Label filter chips (from the account's labels).
+            val labels = data?.labels.orEmpty()
+            if (labels.isNotEmpty() && !favoritesOnly) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    labels.forEach { l ->
+                        androidx.compose.material3.FilterChip(
+                            selected = labelFilter == l.id,
+                            onClick = { labelFilter = if (labelFilter == l.id) null else l.id },
+                            label = { Text(l.name) },
+                        )
+                    }
+                }
+            }
 
             val refreshing by vm.refreshing.collectAsStateWithLifecycle()
             de.ledgerline.app.ui.common.RefreshBox(refreshing = refreshing, onRefresh = { vm.pullRefresh() }) {
@@ -378,6 +409,8 @@ private fun FileRow(
 
 @Composable
 private fun FilesTopBar(
+    favoritesOnly: Boolean,
+    onToggleFavorites: () -> Unit,
     onSearch: () -> Unit,
     onTrash: () -> Unit,
     onStats: () -> Unit,
@@ -387,8 +420,11 @@ private fun FilesTopBar(
 ) {
     var overflow by remember { mutableStateOf(false) }
     de.ledgerline.app.ui.common.AppTopBar(
-        title = stringResource(R.string.files_root),
+        title = stringResource(if (favoritesOnly) R.string.files_favorites else R.string.files_root),
         actions = {
+            androidx.compose.material3.IconButton(onClick = onToggleFavorites) {
+                Icon(if (favoritesOnly) Icons.Outlined.Star else Icons.Outlined.StarBorder, contentDescription = stringResource(R.string.files_favorites), tint = if (favoritesOnly) Brand.accent else androidx.compose.material3.LocalContentColor.current)
+            }
             androidx.compose.material3.IconButton(onClick = onSearch) { Icon(Icons.Outlined.Search, contentDescription = stringResource(R.string.files_search)) }
             androidx.compose.material3.IconButton(onClick = onTrash) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.files_trash)) }
             Box {

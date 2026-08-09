@@ -32,5 +32,7 @@ data class CompanyProfile(
     @SerialName("invoice_font") val invoiceFont: String? = null,
     @SerialName("invoice_vat_ist") val invoiceVatIst: Boolean? = null, // Ist (cash) vs Soll (accrual)
     @SerialName("small_business") val smallBusiness: Boolean? = null, // §19 Kleinunternehmer
+    // Contact persons ({name, role, email, phone}); kept as raw JSON to round-trip losslessly.
+    @SerialName("company_contacts") val companyContacts: List<kotlinx.serialization.json.JsonObject> = emptyList(),
     @SerialName("has_logo") val hasLogo: Boolean = false,
 )
