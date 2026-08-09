@@ -1385,4 +1385,6 @@
     <string name="company_next_number">Nächste Rechnungsnummer</string>
     <string name="company_vat_ist">Ist-Versteuerung</string>
     <string name="project_parent">Übergeordnetes Projekt</string>
+    <string name="share_expires">Ablauf (JJJJ-MM-TT, optional)</string>
+    <string name="dashboard_monthly">Monatsumsatz</string>
 </resources>

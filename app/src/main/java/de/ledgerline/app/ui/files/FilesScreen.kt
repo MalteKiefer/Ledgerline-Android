@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -222,8 +225,12 @@ fun FilesSection(
                     if (files.isNotEmpty()) {
                         item { SectionLabel(stringResource(R.string.files_section_files)) }
                         listSection(files, key = { "f${it.id}" }) { file ->
+                            val thumb by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, file.id, file.version) {
+                                value = vm.thumbnail(file)
+                            }
                             FileRow(
                                 file = file,
+                                thumb = thumb,
                                 onDetail = { detailId = file.id },
                                 onOpenExternal = {
                                     scope.launch {
@@ -375,6 +382,7 @@ private fun FolderRow(folder: FileFolder, onOpen: () -> Unit, onShare: () -> Uni
 @Composable
 private fun FileRow(
     file: FileEntry,
+    thumb: androidx.compose.ui.graphics.ImageBitmap? = null,
     onDetail: () -> Unit,
     onOpenExternal: () -> Unit,
     onShare: () -> Unit,
@@ -387,7 +395,15 @@ private fun FileRow(
     LedgerRow(
         title = file.name,
         subtitle = formatBytes(file.size),
-        leading = { SoftIconChip(icon, tint = tint) },
+        leading = {
+            if (thumb != null) {
+                androidx.compose.foundation.Image(
+                    thumb, contentDescription = null,
+                    modifier = Modifier.size(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(Brand.chipRadius)),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                )
+            } else SoftIconChip(icon, tint = tint)
+        },
         trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (file.favorite) Icon(Icons.Outlined.Star, contentDescription = null, tint = Brand.accent, modifier = Modifier.height(18.dp))

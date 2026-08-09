@@ -1388,4 +1388,6 @@
     <string name="company_next_number">Next invoice number</string>
     <string name="company_vat_ist">Cash-basis VAT (Ist)</string>
     <string name="project_parent">Parent project</string>
+    <string name="share_expires">Expires (YYYY-MM-DD, optional)</string>
+    <string name="dashboard_monthly">Monthly revenue</string>
 </resources>

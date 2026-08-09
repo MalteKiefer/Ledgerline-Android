@@ -55,6 +55,8 @@ import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.PrimaryGradientButton
 import de.ledgerline.app.ui.theme.cardSurface
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Public-link share dialog for a file or folder: create a link (optional password + allow-download),
@@ -67,6 +69,7 @@ fun ShareDialog(vm: FilesViewModel, kind: String, id: Int, folderId: Int?, onDis
     var share by remember { mutableStateOf<ShareView?>(null) }
     var password by remember { mutableStateOf("") }
     var allowDownload by remember { mutableStateOf(true) }
+    var expires by remember { mutableStateOf("") } // ISO yyyy-MM-dd, blank = never
     var busy by remember { mutableStateOf(false) }
 
     AlertDialog(
@@ -77,6 +80,7 @@ fun ShareDialog(vm: FilesViewModel, kind: String, id: Int, folderId: Int?, onDis
                 val s = share
                 if (s == null) {
                     OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text(stringResource(R.string.share_password_optional)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedTextField(value = expires, onValueChange = { expires = it }, label = { Text(stringResource(R.string.share_expires)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.share_allow_download), Modifier.weight(1f))
                         Switch(checked = allowDownload, onCheckedChange = { allowDownload = it })
@@ -86,6 +90,19 @@ fun ShareDialog(vm: FilesViewModel, kind: String, id: Int, folderId: Int?, onDis
                     Text(stringResource(R.string.share_link_created), color = MaterialTheme.colorScheme.primary)
                     SelectionContainer { Text(url, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.fillMaxWidth().cardSurface()) }
                     TextButton(onClick = { copyToClipboard(ctx, url) }) { Text(stringResource(R.string.share_copy_link)) }
+                    // Edit the just-created share (optimistic version guard).
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.share_allow_download), Modifier.weight(1f))
+                        Switch(checked = allowDownload, onCheckedChange = { newVal ->
+                            allowDownload = newVal
+                            scope.launch {
+                                val updated = vm.updateShare(s.id, kotlinx.serialization.json.buildJsonObject {
+                                    put("allow_download", newVal); put("version", s.version)
+                                })
+                                if (updated != null) share = updated
+                            }
+                        })
+                    }
                 }
                 if (kind == "folder" && folderId != null) FolderMembersSection(vm, folderId)
             }
@@ -96,8 +113,9 @@ fun ShareDialog(vm: FilesViewModel, kind: String, id: Int, folderId: Int?, onDis
                 TextButton(enabled = !busy, onClick = {
                     busy = true
                     scope.launch {
-                        share = if (kind == "file") vm.createFileShare(id, password, allowDownload, null)
-                        else vm.createFolderShare(id, password, allowDownload, null)
+                        val exp = expires.trim().ifBlank { null }
+                        share = if (kind == "file") vm.createFileShare(id, password, allowDownload, exp)
+                        else vm.createFolderShare(id, password, allowDownload, exp)
                         busy = false
                     }
                 }) { Text(stringResource(R.string.share_create_link)) }

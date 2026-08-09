@@ -12,6 +12,7 @@ import de.ledgerline.app.domain.model.files.FileFolder
 import de.ledgerline.app.domain.model.files.FilesData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -143,7 +144,7 @@ class FilesViewModel @Inject constructor(
         val mime = entry.mime?.lowercase().orEmpty()
         if (!mime.startsWith("image/")) { thumbCache[key] = null; return null }
         val bytes = repo.thumbBytes(entry.id)
-        val bmp = bytes?.let { runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.let { b -> androidx.compose.ui.graphics.asImageBitmap(b) } }.getOrNull() }
+        val bmp = bytes?.let { runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap() }.getOrNull() }
         thumbCache[key] = bmp
         return bmp
     }
@@ -204,6 +205,7 @@ class FilesViewModel @Inject constructor(
             if (!expiresAt.isNullOrBlank()) put("expires_at", expiresAt)
         })
     fun deleteShare(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteShare(id)) }
+    suspend fun updateShare(id: Int, body: kotlinx.serialization.json.JsonObject) = repo.updateShare(id, body)
 
     // ---- Sharing: cross-user folder shares ----
     suspend fun folderShares() = repo.folderShares()

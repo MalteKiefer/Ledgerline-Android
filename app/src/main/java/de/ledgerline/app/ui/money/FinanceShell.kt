@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -195,6 +198,12 @@ private fun DashboardTab(vm: FinanceViewModel, onOpenInvoices: () -> Unit) {
             }
         }
 
+        // Monthly revenue chart.
+        r?.months?.takeIf { it.any { m -> m.net > 0 } }?.let { months ->
+            SectionLabel(stringResource(R.string.dashboard_monthly))
+            MonthlyChart(months, Modifier.fillMaxWidth().cardSurface())
+        }
+
         SectionLabel(stringResource(R.string.dashboard_top_customers))
         Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             val customers = r?.customers.orEmpty()
@@ -224,6 +233,30 @@ private fun YearPicker(current: Int, years: List<Int>, onPick: (Int) -> Unit) {
         androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             options.forEach { y ->
                 androidx.compose.material3.DropdownMenuItem(text = { Text(y.toString()) }, onClick = { open = false; onPick(y) })
+            }
+        }
+    }
+}
+
+/** Simple 12-month revenue bar chart (net per month), scaled to the max month. */
+@Composable
+private fun MonthlyChart(months: List<de.ledgerline.app.domain.model.finance.MonthRevenue>, modifier: Modifier = Modifier) {
+    val max = (months.maxOfOrNull { it.net } ?: 0.0).coerceAtLeast(1.0)
+    val accent = Brand.accent
+    Row(
+        modifier.height(120.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = androidx.compose.ui.Alignment.Bottom,
+    ) {
+        months.sortedBy { it.month }.forEach { m ->
+            val frac = (m.net / max).coerceIn(0.0, 1.0).toFloat()
+            Column(Modifier.weight(1f), horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
+                Box(
+                    Modifier.fillMaxWidth(0.7f).fillMaxHeight(frac.coerceAtLeast(0.02f))
+                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
+                        .background(accent),
+                )
+                Text(m.month.toString(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
