@@ -33,7 +33,7 @@ import de.ledgerline.app.ui.theme.cardSurface
 
 /** Read-only insights: tax reports (VAT advance + EÜR) + duplicates + category suggestions. */
 @Composable
-fun InsightsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
+fun InsightsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     var dups by remember { mutableStateOf<FinanceDuplicates?>(null) }
     var suggestions by remember { mutableStateOf<List<CategorySuggestion>>(emptyList()) }
     var vatAdvance by remember { mutableStateOf<de.ledgerline.app.domain.model.finance.VatAdvanceReturn?>(null) }

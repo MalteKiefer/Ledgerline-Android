@@ -16,12 +16,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.ui.draw.clip
-import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Business
+import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material.icons.outlined.SwapHoriz
-import androidx.compose.material.icons.outlined.MoreHoriz
+import androidx.compose.material.icons.outlined.Work
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -47,14 +51,21 @@ import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.IconChip
 import de.ledgerline.app.ui.theme.cardSurface
 
+/** Every finance area is its own icon tab in a scrollable tab row (no "More" bucket). */
 private enum class Tab(val labelRes: Int, val icon: ImageVector) {
     DASHBOARD(R.string.tab_dashboard, Icons.Outlined.Dashboard),
     INVOICES(R.string.tab_invoices, Icons.AutoMirrored.Outlined.ReceiptLong),
     TRANSACTIONS(R.string.tab_transactions, Icons.Outlined.SwapHoriz),
-    MORE(R.string.tab_more, Icons.Outlined.MoreHoriz),
+    PARTNERS(R.string.more_partners, Icons.Outlined.Groups),
+    PAYMENT_METHODS(R.string.more_payment_methods, Icons.Outlined.CreditCard),
+    PROJECTS(R.string.more_projects, Icons.Outlined.Work),
+    RECEIPTS(R.string.more_receipts, Icons.Outlined.Receipt),
+    INSIGHTS(R.string.more_insights, Icons.Outlined.Insights),
+    COMPANY(R.string.more_company, Icons.Outlined.Business),
+    TRASH(R.string.more_trash, Icons.Outlined.Delete),
 }
 
-/** A sub-screen pushed on top of the finance section (detail/edit/list flows). */
+/** A finance screen pushed full-screen over the section (each owns its own top bar + back). */
 sealed interface MoneyRoute {
     data class InvoiceEdit(val id: Int?) : MoneyRoute
     data class TransactionEdit(val id: Int?) : MoneyRoute
@@ -69,9 +80,10 @@ sealed interface MoneyRoute {
 }
 
 /**
- * The Finance module section: a top tab row (Dashboard / Invoices / Transactions / More) over the
- * shared [FinanceViewModel]. Detail/edit/list flows are pushed as [MoneyRoute] overlays via [onPush]
- * (hosted full-screen by [de.ledgerline.app.ui.shell.AppShell]). Embedded as the Finance tab.
+ * The Finance module section: a **scrollable icon tab row** with one icon per area — no "More"
+ * bucket. Dashboard / Rechnungen / Umsätze render inline as tab content; the remaining areas
+ * (Partner, Zahlungsmittel, Projekte, Belege, Insights, Firma, Papierkorb) each open their own
+ * screen via [onPush] (they bring their own top bar + back). Edit/import flows are pushed too.
  */
 @Composable
 fun FinanceSection(
@@ -80,36 +92,40 @@ fun FinanceSection(
     vm: FinanceViewModel = hiltViewModel(),
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.DASHBOARD) }
+    // The route each non-inline tab opens (null = an inline tab that just switches content).
+    fun routeFor(t: Tab): MoneyRoute? = when (t) {
+        Tab.PARTNERS -> MoneyRoute.Partners
+        Tab.PAYMENT_METHODS -> MoneyRoute.PaymentMethods
+        Tab.PROJECTS -> MoneyRoute.Projects
+        Tab.RECEIPTS -> MoneyRoute.Receipts
+        Tab.INSIGHTS -> MoneyRoute.Insights
+        Tab.COMPANY -> MoneyRoute.Company
+        Tab.TRASH -> MoneyRoute.Trash
+        else -> null
+    }
     Column(modifier.fillMaxSize()) {
-        androidx.compose.material3.PrimaryTabRow(selectedTabIndex = tab.ordinal) {
+        androidx.compose.material3.PrimaryScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 8.dp) {
             Tab.entries.forEach { t ->
                 androidx.compose.material3.Tab(
+                    // Inline tabs stay highlighted; screen-opening tabs act as buttons (keep the
+                    // current inline tab highlighted so the row doesn't jump).
                     selected = tab == t,
-                    onClick = { tab = t },
+                    onClick = { val r = routeFor(t); if (r != null) onPush(r) else tab = t },
                     icon = { Icon(t.icon, contentDescription = stringResource(t.labelRes)) },
                 )
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
-                Tab.DASHBOARD -> DashboardTab(vm, onOpenInvoices = { tab = Tab.INVOICES })
                 Tab.INVOICES -> InvoicesTab(vm, onEdit = { onPush(MoneyRoute.InvoiceEdit(it)) })
                 Tab.TRANSACTIONS -> TransactionsTab(vm, onEdit = { onPush(MoneyRoute.TransactionEdit(it)) }, onImport = { onPush(MoneyRoute.BulkImport) })
-                Tab.MORE -> MoreTab(
-                    onPartners = { onPush(MoneyRoute.Partners) },
-                    onPaymentMethods = { onPush(MoneyRoute.PaymentMethods) },
-                    onProjects = { onPush(MoneyRoute.Projects) },
-                    onCompany = { onPush(MoneyRoute.Company) },
-                    onInsights = { onPush(MoneyRoute.Insights) },
-                    onReceipts = { onPush(MoneyRoute.Receipts) },
-                    onTrash = { onPush(MoneyRoute.Trash) },
-                )
+                else -> DashboardTab(vm, onOpenInvoices = { tab = Tab.INVOICES })
             }
         }
     }
 }
 
-/** Hosts a pushed finance [MoneyRoute] full-screen (each screen owns its own back). */
+/** Hosts a pushed finance [MoneyRoute] overlay full-screen (each screen owns its own back). */
 @Composable
 fun MoneyRouteHost(route: MoneyRoute, vm: FinanceViewModel, onBack: () -> Unit) {
     when (route) {
@@ -194,49 +210,5 @@ private fun KpiCard(label: String, value: String, modifier: Modifier = Modifier)
     Column(modifier.cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.titleLarge)
-    }
-}
-
-// ---------------------------------------------------------------------------
-//  More tab — entries into the sub-screens.
-// ---------------------------------------------------------------------------
-@Composable
-private fun MoreTab(
-    onPartners: () -> Unit,
-    onPaymentMethods: () -> Unit,
-    onProjects: () -> Unit,
-    onCompany: () -> Unit,
-    onInsights: () -> Unit,
-    onReceipts: () -> Unit,
-    onTrash: () -> Unit,
-) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        MoreRow(stringResource(R.string.more_partners), Icons.Outlined.AccountBalance, Brand.tintBlue, onPartners)
-        MoreRow(stringResource(R.string.more_payment_methods), Icons.Outlined.AccountBalance, Brand.tintGreen, onPaymentMethods)
-        MoreRow(stringResource(R.string.more_projects), Icons.Outlined.Dashboard, Brand.tintOrange, onProjects)
-        MoreRow(stringResource(R.string.more_receipts), Icons.AutoMirrored.Outlined.ReceiptLong, Brand.tintOrange, onReceipts)
-        MoreRow(stringResource(R.string.more_insights), Icons.Outlined.Dashboard, Brand.tintViolet, onInsights)
-        MoreRow(stringResource(R.string.more_company), Icons.Outlined.AccountBalance, Brand.tintTeal, onCompany)
-        MoreRow(stringResource(R.string.more_trash), Icons.Outlined.Delete, Brand.tintGray, onTrash)
-    }
-}
-
-@Composable
-private fun MoreRow(label: String, icon: ImageVector, tint: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(Brand.cardRadius))
-            .clickable(onClick = onClick)
-            .cardSurface(),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        IconChip(icon = icon, tint = tint)
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

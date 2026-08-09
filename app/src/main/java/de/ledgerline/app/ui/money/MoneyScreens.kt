@@ -635,7 +635,7 @@ private fun queryName(ctx: android.content.Context, uri: android.net.Uri): Strin
 //  Partners / Payment methods / Projects — simple name-first lists
 // ===========================================================================
 @Composable
-fun PartnersScreen(vm: FinanceViewModel, onBack: () -> Unit) {
+fun PartnersScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     val data by vm.data.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Int?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -696,7 +696,7 @@ fun PartnersScreen(vm: FinanceViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun PaymentMethodsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
+fun PaymentMethodsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     val data by vm.data.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Int?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -773,7 +773,7 @@ fun PaymentMethodsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-fun ProjectsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
+fun ProjectsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     val data by vm.data.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<Int?>(null) }
     var creating by remember { mutableStateOf(false) }
@@ -819,7 +819,7 @@ fun ProjectsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
 //  Company profile
 // ===========================================================================
 @Composable
-fun CompanyScreen(vm: FinanceViewModel, onBack: () -> Unit) {
+fun CompanyScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     var profile by remember { mutableStateOf<CompanyProfile?>(null) }
     androidx.compose.runtime.LaunchedEffect(Unit) { profile = vm.loadCompany() ?: CompanyProfile() }
     val p = profile
@@ -865,7 +865,7 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: () -> Unit) {
                     invoiceDefaultVatRate = defaultVat.replace(',', '.').toDoubleOrNull(),
                     invoicePaymentTermsDays = termsDays.toIntOrNull(),
                     invoiceFooterText = footer.ifBlank { null }, smallBusiness = smallBusiness,
-                )) { ok -> busy = false; if (ok) onBack() }
+                )) { ok -> busy = false; if (ok) onBack?.invoke() }
             }) { Text(stringResource(R.string.action_save)) }
         })
     }) { pad ->
@@ -961,7 +961,7 @@ internal fun EmptyState(text: String) {
 @Composable
 private fun NamedListScaffold(
     title: String,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onAdd: () -> Unit,
     items: List<Pair<Int, String>>,
     subtitle: (Int) -> String?,

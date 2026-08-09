@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 
 /** Standalone receipts (Fremdbelege): list, add via SAF, view externally, delete. */
 @Composable
-fun ReceiptsScreen(vm: FinanceViewModel, onBack: () -> Unit) {
+fun ReceiptsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val data by vm.data.collectAsStateWithLifecycle()

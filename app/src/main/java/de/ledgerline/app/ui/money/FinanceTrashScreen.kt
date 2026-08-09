@@ -35,7 +35,7 @@ import de.ledgerline.app.ui.common.listSection
 /** Finance trash: soft-deleted invoices/transactions/partners/payment-methods/projects with
  *  restore + permanent-delete per row. */
 @Composable
-fun FinanceTrashScreen(vm: FinanceViewModel, onBack: () -> Unit) {
+fun FinanceTrashScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     var trash by remember { mutableStateOf<FinanceTrash?>(null) }
     var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(reload) { trash = vm.loadTrash() }
