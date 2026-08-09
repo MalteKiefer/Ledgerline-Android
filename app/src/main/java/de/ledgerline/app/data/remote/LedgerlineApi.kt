@@ -96,10 +96,11 @@ interface LedgerlineApi {
     @POST("api/v1/user/two-factor/confirm")
     suspend fun twoFactorConfirm(@Body body: de.ledgerline.app.data.remote.dto.TwoFactorConfirmRequest): Response<Unit>
 
-    // The server reads current_password via Laravel input() (query OR body). OkHttp forbids a GET
-    // request body, so we pass it as a query param (transported over TLS).
-    @GET("api/v1/user/two-factor/recovery-codes")
-    suspend fun twoFactorRecoveryCodes(@retrofit2.http.Query("current_password") currentPassword: String): Response<de.ledgerline.app.data.remote.dto.RecoveryCodesResponse>
+    // POST (not GET) so the password step-up travels in the JSON body, never in the URL/query
+    // string (which would leak into access logs). Matches enable/regenerate/disable. See
+    // ledgerline-recovery-codes-post-spec.md for the required server-side route change.
+    @POST("api/v1/user/two-factor/recovery-codes")
+    suspend fun twoFactorRecoveryCodes(@Body body: de.ledgerline.app.data.remote.dto.CurrentPasswordRequest): Response<de.ledgerline.app.data.remote.dto.RecoveryCodesResponse>
 
     @POST("api/v1/user/two-factor/recovery-codes/regenerate")
     suspend fun twoFactorRegenerateRecoveryCodes(@Body body: de.ledgerline.app.data.remote.dto.CurrentPasswordRequest): Response<de.ledgerline.app.data.remote.dto.RecoveryCodesResponse>

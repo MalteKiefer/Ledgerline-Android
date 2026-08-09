@@ -213,7 +213,7 @@ class AccountRepository(
     suspend fun recoveryCodes(currentPassword: String): List<String> {
         val session = sessionHolder.get() ?: return emptyList()
         return try {
-            val r = apiProvider(session).twoFactorRecoveryCodes(currentPassword)
+            val r = apiProvider(session).twoFactorRecoveryCodes(de.ledgerline.app.data.remote.dto.CurrentPasswordRequest(currentPassword))
             if (r.isSuccessful) r.body()?.recovery_codes.orEmpty() else emptyList()
         } catch (_: Exception) { emptyList() }
     }
