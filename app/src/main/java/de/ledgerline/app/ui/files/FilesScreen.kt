@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.Audiotrack
@@ -43,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,7 +85,11 @@ import java.io.File
  * in [de.ledgerline.app.ui.shell.AppShell].
  */
 @Composable
-fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesViewModel = hiltViewModel()) {
+fun FilesSection(
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    onSubPage: (Boolean) -> Unit = {},
+    vm: FilesViewModel = hiltViewModel(),
+) {
     var detailId by remember { mutableStateOf<Int?>(null) }
     var showTrash by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -93,15 +99,18 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
     // (kind, id, folderId) for the public-link share dialog.
     var shareTarget by remember { mutableStateOf<Triple<String, Int, Int?>?>(null) }
 
-    // Sub-screens own their top bar; give them only the bottom-nav clearance.
-    val bottomOnly = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
+    // Tell the shell whether a full-screen sub-page is open (so it hides the bottom nav).
+    val onSubScreen = detailId != null || showTrash || showSearch || showStats || showLabels || showShared
+    LaunchedEffect(onSubScreen) { onSubPage(onSubScreen) }
+
+    // Sub-screens own their top bar; the shell already dropped the bottom nav, so use full size.
     when {
-        detailId != null -> { Box(bottomOnly) { FileDetailScreen(vm, detailId!!, onBack = { detailId = null }) }; return }
-        showTrash -> { Box(bottomOnly) { FilesTrashScreen(vm) { showTrash = false } }; return }
-        showSearch -> { Box(bottomOnly) { FilesSearchScreen(vm, onOpenDetail = { showSearch = false; detailId = it }) { showSearch = false } }; return }
-        showStats -> { Box(bottomOnly) { FilesStatsScreen(vm) { showStats = false } }; return }
-        showLabels -> { Box(bottomOnly) { FilesLabelsScreen(vm) { showLabels = false } }; return }
-        showShared -> { Box(bottomOnly) { SharedWithMeScreen(vm) { showShared = false } }; return }
+        detailId != null -> { FileDetailScreen(vm, detailId!!, onBack = { detailId = null }); return }
+        showTrash -> { FilesTrashScreen(vm) { showTrash = false }; return }
+        showSearch -> { FilesSearchScreen(vm, onOpenDetail = { showSearch = false; detailId = it }) { showSearch = false }; return }
+        showStats -> { FilesStatsScreen(vm) { showStats = false }; return }
+        showLabels -> { FilesLabelsScreen(vm) { showLabels = false }; return }
+        showShared -> { SharedWithMeScreen(vm) { showShared = false }; return }
     }
 
     val ctx = LocalContext.current
@@ -157,12 +166,14 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
             )
             Breadcrumb(stack, onRoot = { vm.goToRoot() }, onCrumb = { vm.goTo(it) })
 
+            val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+            de.ledgerline.app.ui.common.RefreshBox(refreshing = refreshing, onRefresh = { vm.pullRefresh() }) {
             when {
                 loading && data == null ->
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
 
                 folders.isEmpty() && files.isEmpty() ->
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
                         Text(stringResource(R.string.files_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
 
@@ -205,6 +216,7 @@ fun FilesSection(contentPadding: PaddingValues = PaddingValues(0.dp), vm: FilesV
                         }
                     }
                 }
+            }
             }
         }
 

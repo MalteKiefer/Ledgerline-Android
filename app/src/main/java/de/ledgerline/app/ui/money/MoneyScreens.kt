@@ -51,10 +51,12 @@ import kotlinx.serialization.json.put
 @Composable
 fun InvoicesTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit) {
     val data by vm.data.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {
         val invoices = data?.invoices?.filter { it.deletedAt == null }?.sortedByDescending { it.issueDate ?: "" }.orEmpty()
+        de.ledgerline.app.ui.common.RefreshBox(refreshing = refreshing, onRefresh = { vm.pullRefresh() }) {
         if (invoices.isEmpty()) {
-            EmptyState(stringResource(R.string.invoices_empty))
+            ScrollableEmptyState(stringResource(R.string.invoices_empty))
         } else {
             LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(invoices, key = { it.id }) { inv ->
@@ -77,12 +79,26 @@ fun InvoicesTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit) {
                 }
             }
         }
+        }
         ExtendedFloatingActionButton(
             onClick = { onEdit(null) },
             icon = { Icon(Icons.Outlined.Add, null) },
             text = { Text(stringResource(R.string.invoice_new)) },
             modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
         )
+    }
+}
+
+/** Empty state that still allows a pull-to-refresh (scrollable so the gesture registers). */
+@Composable
+internal fun ScrollableEmptyState(text: String) {
+    Box(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.fillMaxWidth().padding(top = 120.dp), contentAlignment = Alignment.Center) {
+            Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -382,13 +398,15 @@ private fun TotalRow(label: String, value: String, bold: Boolean = false) {
 @Composable
 fun TransactionsTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit, onImport: () -> Unit) {
     val data by vm.data.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
     Box(Modifier.fillMaxSize()) {
-        val tx = data?.transactions?.sortedByDescending { it.date }.orEmpty()
+        val tx = data?.transactions?.filter { it.deletedAt == null }?.sortedByDescending { it.date }.orEmpty()
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.End) {
                 TextButton(onClick = onImport) { Text(stringResource(R.string.transactions_import)) }
             }
-        if (tx.isEmpty()) EmptyState(stringResource(R.string.transactions_empty))
+        de.ledgerline.app.ui.common.RefreshBox(refreshing = refreshing, onRefresh = { vm.pullRefresh() }) {
+        if (tx.isEmpty()) ScrollableEmptyState(stringResource(R.string.transactions_empty))
         else LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(tx, key = { it.id }) { t ->
                 Column(Modifier.fillMaxWidth().clickable { onEdit(t.id) }.cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -399,6 +417,7 @@ fun TransactionsTab(vm: FinanceViewModel, onEdit: (Int?) -> Unit, onImport: () -
                     Text(listOfNotNull(t.date, t.purpose).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+        }
         }
         }
         ExtendedFloatingActionButton(
@@ -692,6 +711,7 @@ fun PartnersScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
         title = stringResource(R.string.more_partners), onBack = onBack, onAdd = { creating = true },
         items = partners.map { it.id to it.name }, subtitle = { id -> vm.partner(id)?.email }, onClick = { editing = it },
         empty = stringResource(R.string.partners_empty),
+        refreshing = vm.refreshing.collectAsStateWithLifecycle().value, onRefresh = { vm.pullRefresh() },
     )
 }
 
@@ -769,6 +789,7 @@ fun PaymentMethodsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
         title = stringResource(R.string.more_payment_methods), onBack = onBack, onAdd = { creating = true },
         items = list.map { it.id to it.name }, subtitle = { id -> vm.paymentMethod(id)?.iban }, onClick = { editing = it },
         empty = stringResource(R.string.payment_methods_empty),
+        refreshing = vm.refreshing.collectAsStateWithLifecycle().value, onRefresh = { vm.pullRefresh() },
     )
 }
 
@@ -812,6 +833,7 @@ fun ProjectsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
         title = stringResource(R.string.more_projects), onBack = onBack, onAdd = { creating = true },
         items = list.map { it.id to it.name }, subtitle = { null }, onClick = { editing = it },
         empty = stringResource(R.string.projects_empty),
+        refreshing = vm.refreshing.collectAsStateWithLifecycle().value, onRefresh = { vm.pullRefresh() },
     )
 }
 
@@ -967,10 +989,13 @@ private fun NamedListScaffold(
     subtitle: (Int) -> String?,
     onClick: (Int) -> Unit,
     empty: String,
+    refreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     AppScaffold(topBar = { AppTopBar(title = title, onBack = onBack) }) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
-            if (items.isEmpty()) EmptyState(empty)
+            de.ledgerline.app.ui.common.RefreshBox(refreshing = refreshing, onRefresh = onRefresh) {
+            if (items.isEmpty()) ScrollableEmptyState(empty)
             else LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(items, key = { it.first }) { (id, name) ->
                     Column(Modifier.fillMaxWidth().clickable { onClick(id) }.cardSurface(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -980,6 +1005,7 @@ private fun NamedListScaffold(
                         }
                     }
                 }
+            }
             }
             ExtendedFloatingActionButton(
                 onClick = onAdd,

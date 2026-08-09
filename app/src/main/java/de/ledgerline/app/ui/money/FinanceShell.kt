@@ -150,6 +150,8 @@ private fun DashboardTab(vm: FinanceViewModel, onOpenInvoices: () -> Unit) {
     val reports by vm.reports.collectAsStateWithLifecycle()
     val data by vm.data.collectAsStateWithLifecycle()
     val year by vm.year.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    de.ledgerline.app.ui.common.RefreshBox(refreshing = refreshing, onRefresh = { vm.pullRefresh() }) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -185,6 +187,7 @@ private fun DashboardTab(vm: FinanceViewModel, onOpenInvoices: () -> Unit) {
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
     }
 }
 

@@ -73,6 +73,11 @@ fun AppShell(
     var section by rememberSaveable { mutableStateOf(Section.FILES) }
     LaunchedEffect(visible) { if (section !in visible) section = visible.first() }
 
+    // A section may drill into a full-screen sub-page (file detail, a settings sub-screen). While one
+    // is open the bottom nav is hidden so the sub-page is a proper full window. Reset on section switch.
+    var subPage by remember { mutableStateOf(false) }
+    LaunchedEffect(section) { subPage = false }
+
     var route by remember { mutableStateOf<MoneyRoute?>(null) }
     route?.let { r ->
         MoneyRouteHost(route = r, vm = financeVm, onBack = { route = null })
@@ -81,7 +86,7 @@ fun AppShell(
 
     AppScaffold(
         bottomBar = {
-            NavigationBar {
+            if (!subPage) NavigationBar {
                 visible.forEach { s ->
                     NavigationBarItem(
                         selected = section == s,
@@ -94,11 +99,11 @@ fun AppShell(
         },
     ) { pad ->
         when (section) {
-            Section.FILES -> FilesSection(contentPadding = pad)
+            Section.FILES -> FilesSection(contentPadding = pad, onSubPage = { subPage = it })
             Section.FINANCE -> FinanceSection(onPush = { route = it }, modifier = Modifier.padding(pad), vm = financeVm)
             // The settings hub owns its own top bar; give it only bottom-nav clearance.
             Section.ACCOUNT -> Box(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) {
-                MoneySettingsScreen(onBack = null, onLoggedOut = onDisconnected)
+                MoneySettingsScreen(onBack = null, onLoggedOut = onDisconnected, onSubPage = { subPage = it })
             }
         }
     }
