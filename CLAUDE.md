@@ -123,9 +123,12 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   `ModuleAccess` (`/me.modules`). Finance-Detail/Edit-Flows als `MoneyRoute`-Overlays.
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte
   Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
-  Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung. `data/files/FilesRepository`
-  (online-only Snapshot + per-Record-CRUD, `NetworkFactory.createFiles` + `FilesApi`); Download →
-  `DocOpener.openFile` (FileProvider). **Offen (Rest):** Sharing-UI, In-App-PDF-Viewer, Share-Target.
+  Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung, **Favoriten-Filter, Label-
+  Filter, Thumbnails, Quota-Balken, Multi-Select-ZIP, In-App-PDF-Viewer (`ui/common/PdfViewerScreen`
+  via PdfRenderer)**, volles Sharing (Public-Links + Ablauf/Bearbeiten, Ordnerfreigaben, für-mich-
+  freigegeben). `data/files/FilesRepository` (online-only Snapshot + per-Record-CRUD,
+  `NetworkFactory.createFiles` + `FilesApi`); Download → `DocOpener.openFile` (FileProvider).
+  **Offen (Rest):** Share-Target (`ACTION_SEND`).
 - **`ui/money/FinanceSection`** — Top-Tab-Row (Dashboard/Rechnungen/Umsätze/Mehr) über geteiltes
   **`FinanceViewModel`**; „Mehr" → Partner/Zahlungsmittel/Projekte/Belege(Fremdbelege)/Insights/
   Firmenprofil. Dashboard (Server-KPIs/USt/Top-Kunden), Rechnungen (Anlegen/Bearbeiten/Finalize/
@@ -156,10 +159,23 @@ Neu: **Files-Modul** komplett (Datenschicht `FilesModels`/`FilesApi`/`FilesRepos
 Detail/Trash/Suche/Stats/Labels-UI), **Multi-Modul-Shell** `AppShell` (Tabs gated über `/me.modules`),
 **Finance-Abgleich** auf aktuellen Server (`standaloneReceipts`/Fremdbelege, tx `deleted_at`, Partner
 `hourly_rate`/`currency`, Company `website`/`font`/`vat_ist`), **Settings** komplettiert (Sprache,
-`file_max_versions`, Recovery-Codes). `assembleDebug` + Unit-Tests grün. **On-device-Verifikation offen**
-(FLAG_SECURE → visuell am Gerät prüfen). **Offen (Rest):** Files-Sharing-UI (Datenschicht fertig),
-In-App-PDF-Viewer, Share-Target (`ACTION_SEND`), `documentfile`/Deps-Feinschliff, Finance-Logo-Upload,
-MT940/CAMT-Import, mehr Tests.
+`file_max_versions`, Recovery-Codes). `assembleDebug` + Unit-Tests grün.
+
+**Auth-Umbau (2026-08): QR-Pairing → direkter Login** (URL + E-Mail + Passwort + optional 2FA, `POST
+/auth/login`; `data/LoginRepository` + `ui/auth/Login*`; Kamera/QR/Standort/Kontakte-Perms entfernt).
+Web-Seite setzt Login-Token als Gerät (spec `$HOME/Downloads/ledgerline-mobile-login-spec.md`,
+serverseitig umgesetzt).
+
+**Web-Paritäts-Offensive (2026-08, 8 Batches):** OpenAPI + Web-SPA gegen Android geauditet (API-Schicht
+war schon 100 % abgedeckt). Umgesetzt: Files (Tags/Notiz-Edit, Favoriten, Label-Filter, Thumbnails,
+Quota-Balken, Multi-Select-ZIP, Share-Ablauf/-Edit, In-App-PDF-Viewer), Finance (Kategorie-Verwaltung,
+Fremdbelege im Trash, Dashboard-Tiefe [YoY/Aging/Monatschart/volle Kundenliste], Rechnung Partner-
+Auswahl + Als gesendet/bezahlt, tx↔Rechnung-Link, Beleg-Metadaten-Edit, Firmen-Branding-Felder +
+Kontaktpersonen, Partner-Kontaktpersonen, Rechnungssuche, Projekt-Nesting, Quartals-USt, Konto-USt).
+Datenmodell-Fixes: `company_contacts`, `InvoiceAging.buckets`, `FinanceTrash.standaloneReceipts`.
+**Bewusst weggelassen (User):** client-seitige Rechnungs-PDF-Erzeugung (bleibt web-seitig).
+**Offen (Rest):** Share-Target (`ACTION_SEND`), MT940/CAMT-Import, mehr Tests. **On-device-Verifikation
+offen** (FLAG_SECURE → visuell am Gerät prüfen).
 
 **Finance-Basis (aus finance-pivot):** Datenschicht (Modelle + `FinanceApi` + Repository cache-first/CRUD + Offline-Write-Queue
 `FinanceOutbox` für update/delete), biometrischer App-Lock, Finance-Shell + alle Kern-Screens, Nav,
