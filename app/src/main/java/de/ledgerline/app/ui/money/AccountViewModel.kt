@@ -31,7 +31,11 @@ class AccountViewModel @Inject constructor(
     private val settings: SettingsStore,
     private val appLockState: AppLockState,
     private val forceLogout: ForceLogout,
+    private val sessionHolder: de.ledgerline.app.core.SessionHolder,
 ) : ViewModel() {
+
+    /** The connected server's base URL (for the About page). */
+    fun serverUrl(): String? = sessionHolder.get()?.baseUrl
     private val _me = MutableStateFlow<MeUser?>(null)
     val me: StateFlow<MeUser?> = _me.asStateFlow()
 

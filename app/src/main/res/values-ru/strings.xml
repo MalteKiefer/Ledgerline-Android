@@ -1351,4 +1351,11 @@
     <string name="more_trash">Корзина</string>
     <string name="company_logo">Логотип компании</string>
     <string name="action_remove">Удалить</string>
+    <!-- About page -->
+    <string name="about_blurb">Нативный клиент для вашего Ledgerline — файлы и финансы, приватность по умолчанию.</string>
+    <string name="about_version">Версия</string>
+    <string name="about_server">Подключённый сервер</string>
+    <string name="about_source">Исходный код</string>
+    <string name="about_licenses">Лицензии открытого кода</string>
+    <string name="about_made_by">Автор: Malte Kiefer</string>
 </resources>

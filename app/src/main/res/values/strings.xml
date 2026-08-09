@@ -1350,4 +1350,12 @@
     <string name="more_trash">Trash</string>
     <string name="company_logo">Company logo</string>
     <string name="action_remove">Remove</string>
+    <!-- About page -->
+    <string name="about_blurb">A native client for your self-hosted Ledgerline — files and finances, private by design.</string>
+    <string name="about_version">Version</string>
+    <string name="about_server">Connected server</string>
+    <string name="about_source">Source code</string>
+    <string name="about_source_url">https://github.com/MalteKiefer/Ledgerline-Android</string>
+    <string name="about_licenses">Open-source licenses</string>
+    <string name="about_made_by">Made by Malte Kiefer</string>
 </resources>

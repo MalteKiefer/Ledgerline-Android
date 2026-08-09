@@ -86,8 +86,7 @@ fun FinanceSection(
                 androidx.compose.material3.Tab(
                     selected = tab == t,
                     onClick = { tab = t },
-                    text = { Text(stringResource(t.labelRes)) },
-                    icon = { Icon(t.icon, contentDescription = null) },
+                    icon = { Icon(t.icon, contentDescription = stringResource(t.labelRes)) },
                 )
             }
         }

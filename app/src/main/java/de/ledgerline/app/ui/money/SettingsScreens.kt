@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
@@ -59,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -89,7 +91,7 @@ fun MoneySettingsScreen(onBack: (() -> Unit)? = null, onLoggedOut: () -> Unit, v
         SettingsSub.Devices -> DevicesScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Notifications -> NotificationsScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Security -> SecurityScreen(vm, onLoggedOut) { sub = SettingsSub.Hub }
-        SettingsSub.About -> AboutScreen { sub = SettingsSub.Hub }
+        SettingsSub.About -> AboutScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Hub -> SettingsHub(vm, onBack, onLoggedOut, open = { sub = it })
     }
 }
@@ -401,12 +403,67 @@ private fun SecurityScreen(vm: AccountViewModel, onLoggedOut: () -> Unit, onBack
 }
 
 @Composable
-private fun AboutScreen(onBack: () -> Unit) {
+private fun AboutScreen(vm: AccountViewModel, onBack: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val sourceUrl = stringResource(R.string.about_source_url)
+    val server = remember { vm.serverUrl() }
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.settings_about), onBack = onBack) }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
-            Text("Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(BuildConfig.GIT_SHA, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(
+            Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Spacer(Modifier.height(8.dp))
+            androidx.compose.foundation.Image(
+                painterResource(R.drawable.ic_ledgerline_logo),
+                contentDescription = null,
+                modifier = Modifier.size(88.dp),
+            )
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
+            Text(
+                stringResource(R.string.about_blurb),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+
+            // Version + build metadata card.
+            ListSectionCard {
+                AboutInfoRow(stringResource(R.string.about_version), "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+                RowDivider()
+                val dirty = if (BuildConfig.GIT_DIRTY) "*" else ""
+                AboutInfoRow(stringResource(R.string.about_build), "${BuildConfig.GIT_SHA}$dirty · ${BuildConfig.BUILD_DATE}")
+                server?.let {
+                    RowDivider()
+                    AboutInfoRow(stringResource(R.string.about_server), it.removePrefix("https://").removePrefix("http://"))
+                }
+            }
+
+            // Links.
+            ListSectionCard {
+                LedgerRow(
+                    title = stringResource(R.string.about_source),
+                    subtitle = sourceUrl.removePrefix("https://"),
+                    leading = { SoftIconChip(Icons.Outlined.Code, tint = Brand.tintViolet) },
+                    trailing = { RowChevron() },
+                    onClick = { de.ledgerline.app.ui.common.openUrl(ctx, sourceUrl, chooser = false) },
+                )
+            }
+
+            Text(
+                stringResource(R.string.about_made_by),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
         }
+    }
+}
+
+@Composable
+private fun AboutInfoRow(label: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

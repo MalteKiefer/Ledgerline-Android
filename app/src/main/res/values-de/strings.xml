@@ -1348,4 +1348,11 @@
     <string name="more_trash">Papierkorb</string>
     <string name="company_logo">Firmenlogo</string>
     <string name="action_remove">Entfernen</string>
+    <!-- About page -->
+    <string name="about_blurb">Ein nativer Client für deine selbst-gehostete Ledgerline — Dateien und Finanzen, privat by design.</string>
+    <string name="about_version">Version</string>
+    <string name="about_server">Verbundener Server</string>
+    <string name="about_source">Quellcode</string>
+    <string name="about_licenses">Open-Source-Lizenzen</string>
+    <string name="about_made_by">Erstellt von Malte Kiefer</string>
 </resources>
