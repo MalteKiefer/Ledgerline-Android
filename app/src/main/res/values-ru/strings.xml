@@ -1397,4 +1397,28 @@
     <string name="partner_contacts">Контактные лица</string>
     <string name="contact_name">Имя</string>
     <string name="contact_add">Добавить контакт</string>
+    <!-- Admin -->
+    <string name="admin_title">Администрирование</string>
+    <string name="admin_users">Пользователи</string>
+    <string name="admin_access">Доступ и лимиты</string>
+    <string name="admin_notifications">Уведомления (SMTP/ntfy)</string>
+    <string name="admin_system">Состояние системы</string>
+    <string name="admin_user_new">Новый пользователь</string>
+    <string name="admin_role">Роль</string>
+    <string name="admin_role_admin">Админ</string>
+    <string name="admin_role_user">Пользователь</string>
+    <string name="admin_reset_password">Отправить сброс пароля</string>
+    <string name="admin_reset_2fa">Сбросить 2FA</string>
+    <string name="admin_invite_link">Ссылка-приглашение</string>
+    <string name="admin_invite_created">Ссылка создана</string>
+    <string name="admin_max_devices">Макс. устройств</string>
+    <string name="admin_modules">Разрешённые модули</string>
+    <string name="admin_registration">Разрешить саморегистрацию</string>
+    <string name="admin_device_cap">Лимит устройств (воркспейс)</string>
+    <string name="admin_files_max_upload">Макс. размер загрузки (МБ)</string>
+    <string name="admin_files_orphan_grace">Срок висячих блобов (ч)</string>
+    <string name="admin_password_optional">Пароль (необяз., мин. 12)</string>
+    <string name="admin_send_email">Отправить ссылку на почту</string>
+    <string name="admin_done">Готово</string>
+    <string name="admin_failed">Ошибка действия</string>
 </resources>

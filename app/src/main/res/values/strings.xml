@@ -1397,4 +1397,28 @@
     <string name="partner_contacts">Contact persons</string>
     <string name="contact_name">Name</string>
     <string name="contact_add">Add contact</string>
+    <!-- Admin -->
+    <string name="admin_title">Administration</string>
+    <string name="admin_users">Users</string>
+    <string name="admin_access">Access &amp; limits</string>
+    <string name="admin_notifications">Notifications (SMTP/ntfy)</string>
+    <string name="admin_system">System status</string>
+    <string name="admin_user_new">New user</string>
+    <string name="admin_role">Role</string>
+    <string name="admin_role_admin">Admin</string>
+    <string name="admin_role_user">User</string>
+    <string name="admin_reset_password">Send password reset</string>
+    <string name="admin_reset_2fa">Reset 2FA</string>
+    <string name="admin_invite_link">Invite link</string>
+    <string name="admin_invite_created">Invite link created</string>
+    <string name="admin_max_devices">Max connected devices</string>
+    <string name="admin_modules">Allowed modules</string>
+    <string name="admin_registration">Allow self-registration</string>
+    <string name="admin_device_cap">Workspace device cap</string>
+    <string name="admin_files_max_upload">Max upload size (MB)</string>
+    <string name="admin_files_orphan_grace">Orphan blob grace (hours)</string>
+    <string name="admin_password_optional">Password (optional, min 12)</string>
+    <string name="admin_send_email">Email the link</string>
+    <string name="admin_done">Done</string>
+    <string name="admin_failed">Action failed</string>
 </resources>

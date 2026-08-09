@@ -44,6 +44,11 @@ object NetworkFactory {
         retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
             .create(FilesApi::class.java)
 
+    /** The admin API (workspace settings/users/groups) over the same pinned, authenticated transport. */
+    fun createAdmin(baseUrl: String, tokenProvider: () -> String?, pin: String?): AdminApi =
+        retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
+            .create(AdminApi::class.java)
+
     /**
      * A minimal HTTPS client (RESTRICTED_TLS + SPKI pinning, short timeouts, no auth) for the
      * server-reachability health ping (`GET {baseUrl}/up`). Same fail-closed transport as the API,

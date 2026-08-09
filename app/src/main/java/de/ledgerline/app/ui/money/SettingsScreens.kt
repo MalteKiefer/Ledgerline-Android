@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Delete
@@ -80,6 +81,7 @@ private sealed interface SettingsSub {
     data object Notifications : SettingsSub
     data object Security : SettingsSub
     data object About : SettingsSub
+    data object Admin : SettingsSub
 }
 
 /** Settings hub with internal sub-navigation (devices / notifications / about). [onBack] is null when
@@ -92,6 +94,7 @@ fun MoneySettingsScreen(onBack: (() -> Unit)? = null, onLoggedOut: () -> Unit, v
         SettingsSub.Notifications -> NotificationsScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Security -> SecurityScreen(vm, onLoggedOut) { sub = SettingsSub.Hub }
         SettingsSub.About -> AboutScreen(vm) { sub = SettingsSub.Hub }
+        SettingsSub.Admin -> de.ledgerline.app.ui.admin.AdminScreen(onBack = { sub = SettingsSub.Hub })
         SettingsSub.Hub -> SettingsHub(vm, onBack, onLoggedOut, open = { sub = it })
     }
 }
@@ -132,6 +135,13 @@ private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut
                 SettingRow(stringResource(R.string.security_title), null, Icons.Outlined.Shield, Brand.tintGreen) { open(SettingsSub.Security) }
                 RowDivider()
                 SettingRow(stringResource(R.string.settings_about), null, Icons.Outlined.Info, Brand.tintGray) { open(SettingsSub.About) }
+            }
+
+            if (me?.groups?.contains("admin") == true) {
+                SectionLabel(stringResource(R.string.admin_title))
+                ListSectionCard {
+                    SettingRow(stringResource(R.string.admin_title), null, Icons.Outlined.AdminPanelSettings, Brand.accent) { open(SettingsSub.Admin) }
+                }
             }
 
             SectionLabel(stringResource(R.string.settings_security))

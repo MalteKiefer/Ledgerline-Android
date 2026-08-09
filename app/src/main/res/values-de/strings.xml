@@ -1394,4 +1394,28 @@
     <string name="partner_contacts">Ansprechpartner</string>
     <string name="contact_name">Name</string>
     <string name="contact_add">Ansprechpartner hinzufügen</string>
+    <!-- Admin -->
+    <string name="admin_title">Verwaltung</string>
+    <string name="admin_users">Nutzer</string>
+    <string name="admin_access">Zugriff &amp; Limits</string>
+    <string name="admin_notifications">Benachrichtigungen (SMTP/ntfy)</string>
+    <string name="admin_system">Systemstatus</string>
+    <string name="admin_user_new">Neuer Nutzer</string>
+    <string name="admin_role">Rolle</string>
+    <string name="admin_role_admin">Admin</string>
+    <string name="admin_role_user">Nutzer</string>
+    <string name="admin_reset_password">Passwort-Reset senden</string>
+    <string name="admin_reset_2fa">2FA zurücksetzen</string>
+    <string name="admin_invite_link">Einladungslink</string>
+    <string name="admin_invite_created">Einladungslink erstellt</string>
+    <string name="admin_max_devices">Max. verbundene Geräte</string>
+    <string name="admin_modules">Erlaubte Module</string>
+    <string name="admin_registration">Selbstregistrierung erlauben</string>
+    <string name="admin_device_cap">Geräte-Limit (Workspace)</string>
+    <string name="admin_files_max_upload">Max. Upload-Größe (MB)</string>
+    <string name="admin_files_orphan_grace">Verwaiste-Blobs-Frist (Std.)</string>
+    <string name="admin_password_optional">Passwort (optional, min. 12)</string>
+    <string name="admin_send_email">Link per E-Mail senden</string>
+    <string name="admin_done">Erledigt</string>
+    <string name="admin_failed">Aktion fehlgeschlagen</string>
 </resources>
