@@ -735,12 +735,14 @@ fun PartnersScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
         var vatId by remember { mutableStateOf(p?.vatId ?: "") }
         var url by remember { mutableStateOf(p?.url ?: "") }
         var note by remember { mutableStateOf(p?.note ?: "") }
+        var contacts by remember { mutableStateOf(p?.contacts ?: emptyList()) }
         var busy by remember { mutableStateOf(false) }
         fun body() = buildJsonObject {
             p?.let { put("version", it.version) }
             put("name", name.trim()); put("email", email.trim()); put("phone", phone.trim()); put("category", category.trim())
             put("kind", kind.trim()); put("address", address.trim()); put("vat_id", vatId.trim())
             put("url", url.trim()); put("note", note.trim()); put("invoice_email", invoiceEmail.trim())
+            put("contacts", kotlinx.serialization.json.JsonArray(contacts))
         }
         AppScaffold(topBar = {
             AppTopBar(title = stringResource(R.string.more_partners), onBack = { editing = null; creating = false }, actions = {
@@ -764,6 +766,9 @@ fun PartnersScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
                 }
                 FormSection(stringResource(R.string.section_note)) {
                     Field(note, { note = it }, R.string.partner_note)
+                }
+                FormSection(stringResource(R.string.partner_contacts)) {
+                    ContactsEditor(contacts) { contacts = it }
                 }
             }
         }
@@ -949,6 +954,7 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
     var vatIst by remember(p) { mutableStateOf(p.invoiceVatIst ?: false) }
     var payMethodsText by remember(p) { mutableStateOf(p.invoicePaymentMethods ?: "") }
     var payTermsText by remember(p) { mutableStateOf(p.invoicePaymentTermsText ?: "") }
+    var contacts by remember(p) { mutableStateOf(p.companyContacts) }
     var busy by remember { mutableStateOf(false) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -982,6 +988,7 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
                     invoiceVatIst = vatIst,
                     invoicePaymentMethods = payMethodsText.ifBlank { null },
                     invoicePaymentTermsText = payTermsText.ifBlank { null },
+                    companyContacts = contacts,
                 )) { ok -> busy = false; if (ok) onBack?.invoke() }
             }) { Text(stringResource(R.string.action_save)) }
         })
@@ -1029,6 +1036,9 @@ fun CompanyScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
                 Field(font, { font = it }, R.string.company_font)
                 Field(payMethodsText, { payMethodsText = it }, R.string.company_payment_methods)
                 Field(payTermsText, { payTermsText = it }, R.string.company_payment_terms_text)
+            }
+            FormSection(stringResource(R.string.company_contacts)) {
+                ContactsEditor(contacts) { contacts = it }
             }
         }
     }

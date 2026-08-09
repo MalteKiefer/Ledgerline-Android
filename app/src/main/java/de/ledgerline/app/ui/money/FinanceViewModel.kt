@@ -127,6 +127,7 @@ class FinanceViewModel @Inject constructor(
     suspend fun loadSuggestions() = repo.categorySuggestions()
     suspend fun loadVatAdvance(year: Int?, quarter: Int?) = repo.vatAdvance(year, quarter)
     suspend fun loadEuer(year: Int?) = repo.euer(year)
+    suspend fun loadAccountVat(accountId: Int, year: Int?) = repo.accountVat(accountId, year)
 
     fun stornoInvoice(id: Int, done: (Boolean) -> Unit) = run({ repo.stornoInvoice(id) }, done)
     fun emailInvoice(id: Int, to: String?, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.emailInvoice(id, to)) }

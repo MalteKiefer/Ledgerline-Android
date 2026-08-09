@@ -50,6 +50,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -131,6 +132,9 @@ fun FilesSection(
     var favoritesOnly by remember { mutableStateOf(false) }
     // Optional label filter (null = all).
     var labelFilter by remember { mutableStateOf<Int?>(null) }
+    // Multi-select mode for bulk ZIP.
+    var selecting by remember { mutableStateOf(false) }
+    val selected = remember { mutableStateListOf<Int>() }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -160,9 +164,27 @@ fun FilesSection(
 
     Box(Modifier.fillMaxSize().padding(contentPadding)) {
         Column(Modifier.fillMaxSize()) {
+            if (selecting) {
+                SelectionBar(
+                    count = selected.size,
+                    onClose = { selecting = false; selected.clear() },
+                    onZip = {
+                        if (selected.isNotEmpty()) scope.launch {
+                            busy = ctx.getString(R.string.files_downloading)
+                            val dir = java.io.File(ctx.cacheDir, "docs").apply { mkdirs() }
+                            val dest = java.io.File(dir, "selection.zip")
+                            val ok = vm.zipSelection(selected.toList(), dest)
+                            busy = null
+                            if (ok) DocOpener.openFile(ctx, dest, "application/zip") else busy = ctx.getString(R.string.files_open_failed)
+                            selecting = false; selected.clear()
+                        }
+                    },
+                )
+            } else
             FilesTopBar(
                 favoritesOnly = favoritesOnly,
                 onToggleFavorites = { favoritesOnly = !favoritesOnly; if (favoritesOnly) labelFilter = null },
+                onSelect = { selecting = true },
                 onSearch = { showSearch = true }, onTrash = { showTrash = true }, onStats = { showStats = true },
                 onLabels = { showLabels = true }, onShared = { showShared = true },
                 onDownloadFolder = vm.currentFolderId?.let { fid ->
@@ -231,6 +253,9 @@ fun FilesSection(
                             FileRow(
                                 file = file,
                                 thumb = thumb,
+                                selecting = selecting,
+                                checked = file.id in selected,
+                                onToggleSelect = { if (file.id in selected) selected.remove(file.id) else selected.add(file.id) },
                                 onDetail = { detailId = file.id },
                                 onOpenExternal = {
                                     scope.launch {
@@ -383,6 +408,9 @@ private fun FolderRow(folder: FileFolder, onOpen: () -> Unit, onShare: () -> Uni
 private fun FileRow(
     file: FileEntry,
     thumb: androidx.compose.ui.graphics.ImageBitmap? = null,
+    selecting: Boolean = false,
+    checked: Boolean = false,
+    onToggleSelect: () -> Unit = {},
     onDetail: () -> Unit,
     onOpenExternal: () -> Unit,
     onShare: () -> Unit,
@@ -396,16 +424,18 @@ private fun FileRow(
         title = file.name,
         subtitle = formatBytes(file.size),
         leading = {
-            if (thumb != null) {
-                androidx.compose.foundation.Image(
+            when {
+                selecting -> androidx.compose.material3.Checkbox(checked = checked, onCheckedChange = { onToggleSelect() })
+                thumb != null -> androidx.compose.foundation.Image(
                     thumb, contentDescription = null,
-                    modifier = Modifier.size(38.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(Brand.chipRadius)),
+                    modifier = Modifier.size(38.dp).clip(RoundedCornerShape(Brand.chipRadius)),
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
                 )
-            } else SoftIconChip(icon, tint = tint)
+                else -> SoftIconChip(icon, tint = tint)
+            }
         },
         trailing = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            if (!selecting) Row(verticalAlignment = Alignment.CenterVertically) {
                 if (file.favorite) Icon(Icons.Outlined.Star, contentDescription = null, tint = Brand.accent, modifier = Modifier.height(18.dp))
                 RowMenu(
                     items = listOf(
@@ -419,7 +449,18 @@ private fun FileRow(
                 )
             }
         },
-        onClick = onDetail,
+        onClick = if (selecting) onToggleSelect else onDetail,
+    )
+}
+
+@Composable
+private fun SelectionBar(count: Int, onClose: () -> Unit, onZip: () -> Unit) {
+    de.ledgerline.app.ui.common.AppTopBar(
+        title = "$count",
+        onBack = onClose,
+        actions = {
+            androidx.compose.material3.IconButton(onClick = onZip) { Icon(Icons.Outlined.FolderZip, contentDescription = stringResource(R.string.files_download_zip)) }
+        },
     )
 }
 
@@ -427,6 +468,7 @@ private fun FileRow(
 private fun FilesTopBar(
     favoritesOnly: Boolean,
     onToggleFavorites: () -> Unit,
+    onSelect: () -> Unit,
     onSearch: () -> Unit,
     onTrash: () -> Unit,
     onStats: () -> Unit,
@@ -446,6 +488,7 @@ private fun FilesTopBar(
             Box {
                 androidx.compose.material3.IconButton(onClick = { overflow = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
                 DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
+                    DropdownMenuItem(text = { Text(stringResource(R.string.files_select)) }, onClick = { overflow = false; onSelect() })
                     DropdownMenuItem(text = { Text(stringResource(R.string.shared_with_me)) }, onClick = { overflow = false; onShared() })
                     onDownloadFolder?.let { dl ->
                         DropdownMenuItem(text = { Text(stringResource(R.string.files_download_zip)) }, onClick = { overflow = false; dl() })

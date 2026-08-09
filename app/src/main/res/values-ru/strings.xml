@@ -1274,6 +1274,7 @@
     <string name="files_move_title">Переместить в…</string>
     <string name="files_all">Все файлы</string>
     <string name="files_favorites">Избранное</string>
+    <string name="files_select">Выбрать</string>
     <string name="files_uploading">Загрузка…</string>
     <string name="files_upload_failed">Ошибка загрузки</string>
     <string name="files_delete_confirm">Удалить этот файл?</string>
@@ -1390,4 +1391,9 @@
     <string name="project_parent">Родительский проект</string>
     <string name="share_expires">Истекает (ГГГГ-ММ-ДД, необяз.)</string>
     <string name="dashboard_monthly">Выручка по месяцам</string>
+    <string name="insights_account_vat">НДС по счёту</string>
+    <string name="company_contacts">Контактные лица</string>
+    <string name="partner_contacts">Контактные лица</string>
+    <string name="contact_name">Имя</string>
+    <string name="contact_add">Добавить контакт</string>
 </resources>

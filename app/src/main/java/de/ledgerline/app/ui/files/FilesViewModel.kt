@@ -152,6 +152,9 @@ class FilesViewModel @Inject constructor(
     /** Zip a whole folder subtree server-side into [dest]. */
     suspend fun zipFolder(folderId: Int, dest: File): Boolean = repo.zipToFile(dest, folderId = folderId)
 
+    /** Zip a selection of files server-side into [dest]. */
+    suspend fun zipSelection(ids: List<Int>, dest: File): Boolean = repo.zipToFile(dest, ids = ids)
+
     /** Replace a file's content with new bytes (adds a version). */
     fun replaceContent(id: Int, file: File, name: String, mime: String?, done: (Boolean) -> Unit) =
         run({ repo.replaceContent(id, file, name, mime) }, done)

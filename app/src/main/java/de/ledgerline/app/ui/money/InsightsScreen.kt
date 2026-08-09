@@ -75,6 +75,27 @@ fun InsightsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
 
+            // Per-account VAT: pick a payment method → its output/input VAT summary.
+            val accounts = vm.data.collectAsStateWithLifecycle().value?.paymentMethods?.filter { it.deletedAt == null }.orEmpty()
+            if (accounts.isNotEmpty()) {
+                var accId by remember { mutableStateOf(accounts.first().id) }
+                var accVat by remember { mutableStateOf<de.ledgerline.app.domain.model.finance.AccountVatSummary?>(null) }
+                LaunchedEffect(accId, year) { accVat = vm.loadAccountVat(accId, year) }
+                SectionLabel(stringResource(R.string.insights_account_vat))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    accounts.forEach { a ->
+                        androidx.compose.material3.FilterChip(selected = accId == a.id, onClick = { accId = a.id }, label = { Text(a.name) })
+                    }
+                }
+                accVat?.let { av ->
+                    Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        ReportRow(stringResource(R.string.insights_output_vat), FinanceViewModel.money(av.outputVat))
+                        ReportRow(stringResource(R.string.insights_input_vat), FinanceViewModel.money(av.inputVat))
+                        ReportRow(stringResource(R.string.insights_payable), FinanceViewModel.money(av.payable), bold = true)
+                    }
+                }
+            }
+
             SectionLabel(stringResource(R.string.insights_suggestions))
             if (suggestions.isEmpty()) {
                 Text(stringResource(R.string.insights_no_suggestions), color = MaterialTheme.colorScheme.onSurfaceVariant)

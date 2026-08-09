@@ -1271,6 +1271,7 @@
     <string name="files_move_title">Verschieben nach…</string>
     <string name="files_all">Alle Dateien</string>
     <string name="files_favorites">Favoriten</string>
+    <string name="files_select">Auswählen</string>
     <string name="files_uploading">Wird hochgeladen…</string>
     <string name="files_upload_failed">Upload fehlgeschlagen</string>
     <string name="files_delete_confirm">Diese Datei löschen?</string>
@@ -1387,4 +1388,9 @@
     <string name="project_parent">Übergeordnetes Projekt</string>
     <string name="share_expires">Ablauf (JJJJ-MM-TT, optional)</string>
     <string name="dashboard_monthly">Monatsumsatz</string>
+    <string name="insights_account_vat">USt je Konto</string>
+    <string name="company_contacts">Ansprechpartner</string>
+    <string name="partner_contacts">Ansprechpartner</string>
+    <string name="contact_name">Name</string>
+    <string name="contact_add">Ansprechpartner hinzufügen</string>
 </resources>

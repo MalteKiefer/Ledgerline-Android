@@ -1273,6 +1273,7 @@
     <string name="files_move_title">Move to…</string>
     <string name="files_all">All files</string>
     <string name="files_favorites">Favorites</string>
+    <string name="files_select">Select</string>
     <string name="files_uploading">Uploading…</string>
     <string name="files_upload_failed">Upload failed</string>
     <string name="files_delete_confirm">Delete this file?</string>
@@ -1390,4 +1391,9 @@
     <string name="project_parent">Parent project</string>
     <string name="share_expires">Expires (YYYY-MM-DD, optional)</string>
     <string name="dashboard_monthly">Monthly revenue</string>
+    <string name="insights_account_vat">VAT per account</string>
+    <string name="company_contacts">Contact persons</string>
+    <string name="partner_contacts">Contact persons</string>
+    <string name="contact_name">Name</string>
+    <string name="contact_add">Add contact</string>
 </resources>
