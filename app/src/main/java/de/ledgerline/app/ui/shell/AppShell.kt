@@ -73,20 +73,14 @@ fun AppShell(
     var section by rememberSaveable { mutableStateOf(Section.FILES) }
     LaunchedEffect(visible) { if (section !in visible) section = visible.first() }
 
-    // A section may drill into a full-screen sub-page (file detail, a settings sub-screen). While one
-    // is open the bottom nav is hidden so the sub-page is a proper full window. Reset on section switch.
-    var subPage by remember { mutableStateOf(false) }
-    LaunchedEffect(section) { subPage = false }
-
+    // A pushed finance sub-screen (invoice/transaction edit, CSV import). Rendered INSIDE the shell so
+    // the bottom nav stays visible on every screen. Cleared when switching sections.
     var route by remember { mutableStateOf<MoneyRoute?>(null) }
-    route?.let { r ->
-        MoneyRouteHost(route = r, vm = financeVm, onBack = { route = null })
-        return
-    }
+    LaunchedEffect(section) { route = null }
 
     AppScaffold(
         bottomBar = {
-            if (!subPage) NavigationBar {
+            NavigationBar {
                 visible.forEach { s ->
                     NavigationBarItem(
                         selected = section == s,
@@ -98,12 +92,16 @@ fun AppShell(
             }
         },
     ) { pad ->
+        // Screens that bring their own top bar (finance routes, settings hub) only need bottom-nav
+        // clearance; sections with a top tab row / breadcrumb take the full inset.
+        val bottomOnly = Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())
         when (section) {
-            Section.FILES -> FilesSection(contentPadding = pad, onSubPage = { subPage = it })
-            Section.FINANCE -> FinanceSection(onPush = { route = it }, modifier = Modifier.padding(pad), vm = financeVm)
-            // The settings hub owns its own top bar; give it only bottom-nav clearance.
-            Section.ACCOUNT -> Box(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) {
-                MoneySettingsScreen(onBack = null, onLoggedOut = onDisconnected, onSubPage = { subPage = it })
+            Section.FILES -> FilesSection(contentPadding = pad)
+            Section.FINANCE ->
+                if (route != null) Box(bottomOnly) { MoneyRouteHost(route!!, financeVm, onBack = { route = null }) }
+                else FinanceSection(onPush = { route = it }, modifier = Modifier.padding(pad), vm = financeVm)
+            Section.ACCOUNT -> Box(bottomOnly) {
+                MoneySettingsScreen(onBack = null, onLoggedOut = onDisconnected)
             }
         }
     }

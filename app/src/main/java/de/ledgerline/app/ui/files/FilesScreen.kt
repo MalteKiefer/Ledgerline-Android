@@ -87,7 +87,6 @@ import java.io.File
 @Composable
 fun FilesSection(
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    onSubPage: (Boolean) -> Unit = {},
     vm: FilesViewModel = hiltViewModel(),
 ) {
     var detailId by remember { mutableStateOf<Int?>(null) }
@@ -99,18 +98,16 @@ fun FilesSection(
     // (kind, id, folderId) for the public-link share dialog.
     var shareTarget by remember { mutableStateOf<Triple<String, Int, Int?>?>(null) }
 
-    // Tell the shell whether a full-screen sub-page is open (so it hides the bottom nav).
-    val onSubScreen = detailId != null || showTrash || showSearch || showStats || showLabels || showShared
-    LaunchedEffect(onSubScreen) { onSubPage(onSubScreen) }
-
-    // Sub-screens own their top bar; the shell already dropped the bottom nav, so use full size.
+    // Sub-screens own their top bar; the shell keeps the bottom nav visible, so give them only its
+    // clearance at the bottom.
+    val bottomOnly = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
     when {
-        detailId != null -> { FileDetailScreen(vm, detailId!!, onBack = { detailId = null }); return }
-        showTrash -> { FilesTrashScreen(vm) { showTrash = false }; return }
-        showSearch -> { FilesSearchScreen(vm, onOpenDetail = { showSearch = false; detailId = it }) { showSearch = false }; return }
-        showStats -> { FilesStatsScreen(vm) { showStats = false }; return }
-        showLabels -> { FilesLabelsScreen(vm) { showLabels = false }; return }
-        showShared -> { SharedWithMeScreen(vm) { showShared = false }; return }
+        detailId != null -> { Box(bottomOnly) { FileDetailScreen(vm, detailId!!, onBack = { detailId = null }) }; return }
+        showTrash -> { Box(bottomOnly) { FilesTrashScreen(vm) { showTrash = false } }; return }
+        showSearch -> { Box(bottomOnly) { FilesSearchScreen(vm, onOpenDetail = { showSearch = false; detailId = it }) { showSearch = false } }; return }
+        showStats -> { Box(bottomOnly) { FilesStatsScreen(vm) { showStats = false } }; return }
+        showLabels -> { Box(bottomOnly) { FilesLabelsScreen(vm) { showLabels = false } }; return }
+        showShared -> { Box(bottomOnly) { SharedWithMeScreen(vm) { showShared = false } }; return }
     }
 
     val ctx = LocalContext.current

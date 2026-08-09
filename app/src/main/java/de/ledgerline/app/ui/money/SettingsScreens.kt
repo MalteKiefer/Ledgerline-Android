@@ -85,9 +85,8 @@ private sealed interface SettingsSub {
 /** Settings hub with internal sub-navigation (devices / notifications / about). [onBack] is null when
  *  the hub is a root nav tab (no back affordance), non-null when pushed. */
 @Composable
-fun MoneySettingsScreen(onBack: (() -> Unit)? = null, onLoggedOut: () -> Unit, onSubPage: (Boolean) -> Unit = {}, vm: AccountViewModel = hiltViewModel()) {
+fun MoneySettingsScreen(onBack: (() -> Unit)? = null, onLoggedOut: () -> Unit, vm: AccountViewModel = hiltViewModel()) {
     var sub by remember { mutableStateOf<SettingsSub>(SettingsSub.Hub) }
-    LaunchedEffect(sub) { onSubPage(sub != SettingsSub.Hub) }
     when (sub) {
         SettingsSub.Devices -> DevicesScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Notifications -> NotificationsScreen(vm) { sub = SettingsSub.Hub }
