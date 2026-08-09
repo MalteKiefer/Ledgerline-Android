@@ -53,7 +53,7 @@ private enum class Tab(val labelRes: Int, val icon: ImageVector) {
     MORE(R.string.tab_more, Icons.Outlined.MoreHoriz),
 }
 
-/** A sub-screen pushed on top of the tabbed shell (detail/edit/list flows). */
+/** A sub-screen pushed on top of the finance section (detail/edit/list flows). */
 sealed interface MoneyRoute {
     data class InvoiceEdit(val id: Int?) : MoneyRoute
     data class TransactionEdit(val id: Int?) : MoneyRoute
@@ -63,70 +63,53 @@ sealed interface MoneyRoute {
     data object Projects : MoneyRoute
     data object Company : MoneyRoute
     data object Insights : MoneyRoute
-    data object Settings : MoneyRoute
+    data object Receipts : MoneyRoute
 }
 
 /**
- * Finance-only app shell (server pivot). A 4-tab bottom bar (Dashboard / Invoices / Transactions /
- * More) over the shared [FinanceViewModel], with detail/edit/list flows pushed as [MoneyRoute]
- * overlays. Replaces the old zero-knowledge WorkspaceScaffold.
+ * The Finance module section: a top tab row (Dashboard / Invoices / Transactions / More) over the
+ * shared [FinanceViewModel]. Detail/edit/list flows are pushed as [MoneyRoute] overlays via [onPush]
+ * (hosted full-screen by [de.ledgerline.app.ui.shell.AppShell]). Embedded as the Finance tab.
  */
 @Composable
-fun FinanceShell(
-    onLockNow: () -> Unit,
-    onDisconnected: () -> Unit,
+fun FinanceSection(
+    onPush: (MoneyRoute) -> Unit,
+    modifier: Modifier = Modifier,
     vm: FinanceViewModel = hiltViewModel(),
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.DASHBOARD) }
-    var route by remember { mutableStateOf<MoneyRoute?>(null) }
-
-    // A pushed route owns the whole screen.
-    route?.let { r ->
-        MoneyRouteHost(route = r, vm = vm, onBack = { route = null }, onLockNow = onLockNow, onDisconnected = onDisconnected)
-        return
-    }
-
-    AppScaffold(
-        topBar = { AppTopBar(title = stringResource(tab.labelRes)) },
-        bottomBar = {
-            NavigationBar {
-                Tab.entries.forEach { t ->
-                    NavigationBarItem(
-                        selected = tab == t,
-                        onClick = { tab = t },
-                        icon = { Icon(t.icon, contentDescription = null) },
-                        label = { Text(stringResource(t.labelRes)) },
-                    )
-                }
+    Column(modifier.fillMaxSize()) {
+        androidx.compose.material3.PrimaryTabRow(selectedTabIndex = tab.ordinal) {
+            Tab.entries.forEach { t ->
+                androidx.compose.material3.Tab(
+                    selected = tab == t,
+                    onClick = { tab = t },
+                    text = { Text(stringResource(t.labelRes)) },
+                    icon = { Icon(t.icon, contentDescription = null) },
+                )
             }
-        },
-    ) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad)) {
+        }
+        Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
                 Tab.DASHBOARD -> DashboardTab(vm, onOpenInvoices = { tab = Tab.INVOICES })
-                Tab.INVOICES -> InvoicesTab(vm, onEdit = { route = MoneyRoute.InvoiceEdit(it) })
-                Tab.TRANSACTIONS -> TransactionsTab(vm, onEdit = { route = MoneyRoute.TransactionEdit(it) }, onImport = { route = MoneyRoute.BulkImport })
+                Tab.INVOICES -> InvoicesTab(vm, onEdit = { onPush(MoneyRoute.InvoiceEdit(it)) })
+                Tab.TRANSACTIONS -> TransactionsTab(vm, onEdit = { onPush(MoneyRoute.TransactionEdit(it)) }, onImport = { onPush(MoneyRoute.BulkImport) })
                 Tab.MORE -> MoreTab(
-                    onPartners = { route = MoneyRoute.Partners },
-                    onPaymentMethods = { route = MoneyRoute.PaymentMethods },
-                    onProjects = { route = MoneyRoute.Projects },
-                    onCompany = { route = MoneyRoute.Company },
-                    onInsights = { route = MoneyRoute.Insights },
-                    onSettings = { route = MoneyRoute.Settings },
+                    onPartners = { onPush(MoneyRoute.Partners) },
+                    onPaymentMethods = { onPush(MoneyRoute.PaymentMethods) },
+                    onProjects = { onPush(MoneyRoute.Projects) },
+                    onCompany = { onPush(MoneyRoute.Company) },
+                    onInsights = { onPush(MoneyRoute.Insights) },
+                    onReceipts = { onPush(MoneyRoute.Receipts) },
                 )
             }
         }
     }
 }
 
+/** Hosts a pushed finance [MoneyRoute] full-screen (each screen owns its own back). */
 @Composable
-private fun MoneyRouteHost(
-    route: MoneyRoute,
-    vm: FinanceViewModel,
-    onBack: () -> Unit,
-    onLockNow: () -> Unit,
-    onDisconnected: () -> Unit,
-) {
+fun MoneyRouteHost(route: MoneyRoute, vm: FinanceViewModel, onBack: () -> Unit) {
     when (route) {
         is MoneyRoute.InvoiceEdit -> InvoiceEditScreen(vm, route.id, onBack)
         is MoneyRoute.TransactionEdit -> TransactionEditScreen(vm, route.id, onBack)
@@ -136,7 +119,7 @@ private fun MoneyRouteHost(
         MoneyRoute.Projects -> ProjectsScreen(vm, onBack)
         MoneyRoute.Company -> CompanyScreen(vm, onBack)
         MoneyRoute.Insights -> InsightsScreen(vm, onBack)
-        MoneyRoute.Settings -> MoneySettingsScreen(onBack = onBack, onLoggedOut = onDisconnected)
+        MoneyRoute.Receipts -> ReceiptsScreen(vm, onBack)
     }
 }
 
@@ -221,7 +204,7 @@ private fun MoreTab(
     onProjects: () -> Unit,
     onCompany: () -> Unit,
     onInsights: () -> Unit,
-    onSettings: () -> Unit,
+    onReceipts: () -> Unit,
 ) {
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -230,9 +213,9 @@ private fun MoreTab(
         MoreRow(stringResource(R.string.more_partners), Icons.Outlined.AccountBalance, Brand.tintBlue, onPartners)
         MoreRow(stringResource(R.string.more_payment_methods), Icons.Outlined.AccountBalance, Brand.tintGreen, onPaymentMethods)
         MoreRow(stringResource(R.string.more_projects), Icons.Outlined.Dashboard, Brand.tintOrange, onProjects)
+        MoreRow(stringResource(R.string.more_receipts), Icons.AutoMirrored.Outlined.ReceiptLong, Brand.tintOrange, onReceipts)
         MoreRow(stringResource(R.string.more_insights), Icons.Outlined.Dashboard, Brand.tintViolet, onInsights)
         MoreRow(stringResource(R.string.more_company), Icons.Outlined.AccountBalance, Brand.tintTeal, onCompany)
-        MoreRow(stringResource(R.string.more_settings), Icons.Outlined.MoreHoriz, Brand.tintGray, onSettings)
     }
 }
 

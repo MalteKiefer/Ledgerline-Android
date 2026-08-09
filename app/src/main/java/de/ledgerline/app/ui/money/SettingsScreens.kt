@@ -17,6 +17,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -52,9 +55,10 @@ private sealed interface SettingsSub {
     data object About : SettingsSub
 }
 
-/** Settings hub with internal sub-navigation (devices / notifications / about). */
+/** Settings hub with internal sub-navigation (devices / notifications / about). [onBack] is null when
+ *  the hub is a root nav tab (no back affordance), non-null when pushed. */
 @Composable
-fun MoneySettingsScreen(onBack: () -> Unit, onLoggedOut: () -> Unit, vm: AccountViewModel = hiltViewModel()) {
+fun MoneySettingsScreen(onBack: (() -> Unit)? = null, onLoggedOut: () -> Unit, vm: AccountViewModel = hiltViewModel()) {
     var sub by remember { mutableStateOf<SettingsSub>(SettingsSub.Hub) }
     when (sub) {
         SettingsSub.Devices -> DevicesScreen(vm) { sub = SettingsSub.Hub }
@@ -66,7 +70,7 @@ fun MoneySettingsScreen(onBack: () -> Unit, onLoggedOut: () -> Unit, vm: Account
 }
 
 @Composable
-private fun SettingsHub(vm: AccountViewModel, onBack: () -> Unit, onLoggedOut: () -> Unit, open: (SettingsSub) -> Unit) {
+private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut: () -> Unit, open: (SettingsSub) -> Unit) {
     val me by vm.me.collectAsStateWithLifecycle()
     val theme by vm.themeMode.collectAsStateWithLifecycle()
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.more_settings), onBack = onBack) }) { pad ->
@@ -84,6 +88,15 @@ private fun SettingsHub(vm: AccountViewModel, onBack: () -> Unit, onLoggedOut: (
                 ThemeRow(stringResource(R.string.theme_light), theme == ThemeMode.LIGHT) { vm.setTheme(ThemeMode.LIGHT) }
                 ThemeRow(stringResource(R.string.theme_dark), theme == ThemeMode.DARK) { vm.setTheme(ThemeMode.DARK) }
             }
+
+            var langOpen by remember { mutableStateOf(false) }
+            val curLang = remember { vm.currentLanguageTag() }
+            HubRow(stringResource(R.string.settings_language) + " · " + languageLabel(curLang)) { langOpen = true }
+            if (langOpen) LanguageDialog(current = curLang, onPick = { vm.setLanguage(it); langOpen = false }, onDismiss = { langOpen = false })
+
+            SectionLabel(stringResource(R.string.settings_files))
+            val maxVersions by vm.fileMaxVersions.collectAsStateWithLifecycle()
+            MaxVersionsRow(current = maxVersions, onPick = { vm.setFileMaxVersions(it) })
 
             SectionLabel(stringResource(R.string.settings_account))
             HubRow(stringResource(R.string.settings_devices)) { open(SettingsSub.Devices) }
@@ -122,6 +135,55 @@ private fun HubRow(label: String, onClick: () -> Unit) {
     ) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
         Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun languageLabel(tag: String): String = when (tag) {
+    "en" -> "English"
+    "de" -> "Deutsch"
+    "ru" -> "Русский"
+    "" -> stringResource(R.string.lang_system)
+    else -> tag
+}
+
+@Composable
+private fun LanguageDialog(current: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    val opts = listOf("" to stringResource(R.string.lang_system), "en" to "English", "de" to "Deutsch", "ru" to "Русский")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_language)) },
+        text = {
+            Column {
+                opts.forEach { (tag, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().selectable(current == tag, onClick = { onPick(tag) }).padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        RadioButton(selected = current == tag, onClick = { onPick(tag) })
+                        Text(label, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun MaxVersionsRow(current: Int, onPick: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Row(Modifier.fillMaxWidth().clickable { open = true }.cardSurface(), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.settings_max_versions), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(current.toString(), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            listOf(5, 10, 20, 50, 100).forEach { n ->
+                DropdownMenuItem(text = { Text(n.toString()) }, onClick = { open = false; onPick(n) })
+            }
+        }
     }
 }
 
@@ -182,6 +244,7 @@ private fun SecurityScreen(vm: AccountViewModel, onLoggedOut: () -> Unit, onBack
     var msg by remember { mutableStateOf<String?>(null) }
     var twoFa by remember { mutableStateOf<de.ledgerline.app.data.remote.dto.TwoFactorQrResponse?>(null) }
     var twoFaCode by remember { mutableStateOf("") }
+    var recoveryCodes by remember { mutableStateOf<List<String>>(emptyList()) }
     var delEmail by remember { mutableStateOf("") }
 
     // SAF: write the export bytes to a user-chosen location (no FileProvider needed).
@@ -220,6 +283,17 @@ private fun SecurityScreen(vm: AccountViewModel, onLoggedOut: () -> Unit, onBack
                 TextButton(enabled = twoFaCode.length >= 6, onClick = {
                     vm.twoFactorConfirm(twoFaCode) { ok -> msg = ctx.getString(if (ok) R.string.security_2fa_enabled else R.string.security_failed); if (ok) { twoFa = null; twoFaCode = "" } }
                 }) { Text(stringResource(R.string.security_2fa_confirm)) }
+            }
+
+            SectionLabel(stringResource(R.string.security_recovery_codes))
+            if (recoveryCodes.isNotEmpty()) {
+                Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    recoveryCodes.forEach { Text(it, style = MaterialTheme.typography.bodyMedium.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)) }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { scope.launch { recoveryCodes = vm.recoveryCodes() } }) { Text(stringResource(R.string.security_recovery_show)) }
+                TextButton(onClick = { scope.launch { recoveryCodes = vm.regenerateRecoveryCodes() } }) { Text(stringResource(R.string.security_recovery_regenerate)) }
             }
 
             SectionLabel(stringResource(R.string.security_data))

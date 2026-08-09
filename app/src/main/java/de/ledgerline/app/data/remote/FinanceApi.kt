@@ -36,6 +36,7 @@ import retrofit2.http.Streaming
 @Serializable data class ProjectResponse(val project: FinanceProject)
 @Serializable data class CategoryResponse(val category: FinanceCategory)
 @Serializable data class CompanyResponse(val company: CompanyProfile)
+@Serializable data class ReceiptResponse(val receipt: de.ledgerline.app.domain.model.finance.FinanceReceipt)
 @Serializable data class OkBody(val ok: Boolean = false)
 @Serializable data class BulkResult(val created: Int = 0, val skipped: Int = 0)
 @Serializable data class CategorySuggestionsResponse(val suggestions: List<de.ledgerline.app.domain.model.finance.CategorySuggestion> = emptyList())
@@ -199,6 +200,27 @@ interface FinanceApi {
 
     @DELETE("api/v1/finance/categories/{id}")
     suspend fun deleteCategory(@Path("id") id: Int): Response<OkBody>
+
+    // ---- Standalone receipts (Fremdbelege) ----
+    @Multipart
+    @POST("api/v1/finance/receipts")
+    suspend fun storeReceipt(@Part parts: List<MultipartBody.Part>): Response<ReceiptResponse>
+
+    @PUT("api/v1/finance/receipts/{id}")
+    suspend fun updateReceipt(@Path("id") id: Int, @Body body: JsonObject): Response<ReceiptResponse>
+
+    @DELETE("api/v1/finance/receipts/{id}")
+    suspend fun deleteStandaloneReceipt(@Path("id") id: Int): Response<OkBody>
+
+    @POST("api/v1/finance/receipts/{id}/restore")
+    suspend fun restoreStandaloneReceipt(@Path("id") id: Int): Response<ReceiptResponse>
+
+    @DELETE("api/v1/finance/receipts/{id}/force")
+    suspend fun forceStandaloneReceipt(@Path("id") id: Int): Response<OkBody>
+
+    @GET("api/v1/finance/receipts/{id}/raw")
+    @Streaming
+    suspend fun standaloneReceiptRaw(@Path("id") id: Int): Response<ResponseBody>
 
     // ---- OCR (transient plaintext) ----
     @Multipart

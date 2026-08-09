@@ -18,10 +18,11 @@ import de.ledgerline.app.core.AuthEventBus
 import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.SessionStore
+import de.ledgerline.app.data.files.FilesRepository
 import de.ledgerline.app.data.finance.FinanceRepository
 import de.ledgerline.app.domain.usecase.ForceLogout
 import de.ledgerline.app.ui.lock.AppLockScreen
-import de.ledgerline.app.ui.money.FinanceShell
+import de.ledgerline.app.ui.shell.AppShell
 import de.ledgerline.app.ui.onboarding.WelcomeScreen
 import de.ledgerline.app.ui.pairing.PairingScreen
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,6 +45,7 @@ class RootViewModel @Inject constructor(
     private val authEventBus: AuthEventBus,
     private val forceLogout: ForceLogout,
     private val financeRepository: FinanceRepository,
+    private val filesRepository: FilesRepository,
     private val accountRepository: AccountRepository,
 ) : ViewModel() {
     private val _dest = MutableStateFlow(Destination.LOADING)
@@ -77,6 +79,7 @@ class RootViewModel @Inject constructor(
         forceLogout.invoke()
         appLockState.lock()
         financeRepository.clear()
+        filesRepository.clear()
         sessionHolder.clear()
         _dest.value = Destination.WELCOME
     }
@@ -116,7 +119,7 @@ fun AppNav(
         Destination.HOME -> {
             val unlocked by vm.unlocked.collectAsStateWithLifecycle()
             if (unlocked) {
-                FinanceShell(onLockNow = { vm.toLock() }, onDisconnected = { vm.toWelcome() })
+                AppShell(onDisconnected = { vm.toWelcome() })
             } else {
                 AppLockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
             }

@@ -1255,4 +1255,66 @@
     <string name="invoice_customer_section">Клиент</string>
     <string name="invoice_dates">Даты</string>
     <string name="pm_no_details">Нет доп. полей для этого типа.</string>
+    <!-- Files rebuild (plaintext) + shell nav -->
+    <string name="action_edit">Изменить</string>
+    <string name="action_rename">Переименовать</string>
+    <string name="action_move">Переместить</string>
+    <string name="action_refresh">Обновить</string>
+    <string name="action_upload">Загрузить</string>
+    <string name="tab_finance">Финансы</string>
+    <string name="tab_account">Аккаунт</string>
+    <string name="files_new_folder">Новая папка</string>
+    <string name="files_folder_name">Имя папки</string>
+    <string name="files_upload">Загрузить файл</string>
+    <string name="files_empty">Папка пуста</string>
+    <string name="files_folder">Папка</string>
+    <string name="files_root">Файлы</string>
+    <string name="files_trash">Корзина</string>
+    <string name="files_move_here">Переместить сюда</string>
+    <string name="files_move_title">Переместить в…</string>
+    <string name="files_all">Все файлы</string>
+    <string name="files_favorites">Избранное</string>
+    <string name="files_uploading">Загрузка…</string>
+    <string name="files_upload_failed">Ошибка загрузки</string>
+    <string name="files_delete_confirm">Удалить этот файл?</string>
+    <string name="files_delete_folder_confirm">Удалить папку и её содержимое?</string>
+    <string name="files_open_failed">Не удалось открыть файл</string>
+    <string name="files_downloading">Загрузка…</string>
+    <!-- Files B3: detail / versions / labels / trash / stats / search -->
+    <string name="files_save_device">Сохранить на устройство</string>
+    <string name="files_saved">Сохранено</string>
+    <string name="files_save_failed">Ошибка сохранения</string>
+    <string name="files_versions">Версии</string>
+    <string name="files_no_versions">Нет прежних версий</string>
+    <string name="files_restore_version">Восстановить эту версию</string>
+    <string name="files_labels">Метки</string>
+    <string name="files_manage_labels">Управление метками</string>
+    <string name="files_new_label">Новая метка</string>
+    <string name="files_label_name">Название метки</string>
+    <string name="files_no_labels">Нет меток</string>
+    <string name="files_trash_empty_action">Очистить корзину</string>
+    <string name="files_trash_is_empty">Корзина пуста</string>
+    <string name="files_stats">Статистика</string>
+    <string name="files_stats_by_type">По типу</string>
+    <string name="files_stats_duplicates">Дубликаты</string>
+    <string name="files_used">Использовано</string>
+    <string name="files_search">Поиск файлов</string>
+    <string name="files_no_results">Ничего не найдено</string>
+    <string name="files_note">Заметка</string>
+    <string name="files_tags">Теги</string>
+    <string name="files_size">Размер</string>
+    <string name="files_modified">Изменено</string>
+    <string name="files_type">Тип</string>
+    <!-- Finance A2: standalone receipts -->
+    <string name="more_receipts">Документы</string>
+    <string name="receipts_title">Отдельные документы</string>
+    <string name="receipts_empty">Пока нет документов</string>
+    <string name="receipts_add">Добавить документ</string>
+    <!-- Settings E: language / files / recovery codes -->
+    <string name="lang_system">Системный</string>
+    <string name="settings_files">Файлы</string>
+    <string name="settings_max_versions">Версий на файл</string>
+    <string name="security_recovery_codes">Коды восстановления</string>
+    <string name="security_recovery_show">Показать коды</string>
+    <string name="security_recovery_regenerate">Создать коды заново</string>
 </resources>

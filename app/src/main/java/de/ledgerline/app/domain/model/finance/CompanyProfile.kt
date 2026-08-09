@@ -28,6 +28,9 @@ data class CompanyProfile(
     @SerialName("invoice_template") val invoiceTemplate: String? = null,
     @SerialName("invoice_payment_methods") val invoicePaymentMethods: String? = null,
     @SerialName("invoice_payment_terms_text") val invoicePaymentTermsText: String? = null,
+    @SerialName("company_website") val companyWebsite: String? = null,
+    @SerialName("invoice_font") val invoiceFont: String? = null,
+    @SerialName("invoice_vat_ist") val invoiceVatIst: Boolean? = null, // Ist (cash) vs Soll (accrual)
     @SerialName("small_business") val smallBusiness: Boolean? = null, // §19 Kleinunternehmer
     @SerialName("has_logo") val hasLogo: Boolean = false,
 )

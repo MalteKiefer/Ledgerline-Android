@@ -247,6 +247,32 @@ class FinanceRepository @Inject constructor(
         } catch (_: Exception) { null }
     }
 
+    // ---- Standalone receipts (Fremdbelege) ----
+    private fun upsertReceipt(v: de.ledgerline.app.domain.model.finance.FinanceReceipt) =
+        publish(cur().let { it.copy(standaloneReceipts = it.standaloneReceipts.upsert(v) { x -> x.id == v.id }) })
+
+    suspend fun storeReceipt(bytes: ByteArray, fileName: String, mime: String): Outcome<de.ledgerline.app.domain.model.finance.FinanceReceipt> {
+        if (!connectivity.isOnline()) return Outcome.Err(ErrorKind.NETWORK)
+        return withContext(Dispatchers.IO) {
+            try {
+                val parts = listOf(
+                    okhttp3.MultipartBody.Part.createFormData("file", fileName, bytes.toRequestBody(mime.toMediaTypeOrNull())),
+                    okhttp3.MultipartBody.Part.createFormData("name", fileName),
+                )
+                val r = api().storeReceipt(parts).takeIf { it.isSuccessful }?.body()?.receipt ?: return@withContext Outcome.Err(ErrorKind.NETWORK)
+                upsertReceipt(r); Outcome.Ok(r)
+            } catch (e: Exception) { Outcome.Err(ErrorKind.NETWORK, e) }
+        }
+    }
+
+    suspend fun deleteStandaloneReceipt(id: Int): Outcome<Unit> = delete({ api().deleteStandaloneReceipt(id) }) {
+        publish(cur().let { d -> d.copy(standaloneReceipts = d.standaloneReceipts.filterNot { it.id == id }) })
+    }
+
+    suspend fun standaloneReceiptBytes(id: Int): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { api().standaloneReceiptRaw(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
+
     // ---- Company profile ----
     suspend fun company(): CompanyProfile? = get { api().company() }?.company
     suspend fun updateCompany(profile: CompanyProfile): CompanyProfile? = get { api().updateCompany(profile) }?.company

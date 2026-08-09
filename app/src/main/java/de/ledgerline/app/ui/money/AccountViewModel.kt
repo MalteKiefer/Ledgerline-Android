@@ -1,8 +1,12 @@
 package de.ledgerline.app.ui.money
 
+import android.app.LocaleManager
+import android.content.Context
+import android.os.LocaleList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import de.ledgerline.app.core.AppLockState
 import de.ledgerline.app.data.AccountRepository
 import de.ledgerline.app.data.SettingsStore
@@ -10,6 +14,7 @@ import de.ledgerline.app.data.ThemeMode
 import de.ledgerline.app.data.remote.dto.DeviceDto
 import de.ledgerline.app.data.remote.dto.MeUser
 import de.ledgerline.app.data.remote.dto.NotificationDto
+import de.ledgerline.app.data.remote.dto.UserSettingsDto
 import de.ledgerline.app.domain.usecase.ForceLogout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +25,7 @@ import javax.inject.Inject
 /** Account + settings state: profile, connected devices, notifications, theme, and logout. */
 @HiltViewModel
 class AccountViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val account: AccountRepository,
     private val settings: SettingsStore,
     private val appLockState: AppLockState,
@@ -39,7 +45,31 @@ class AccountViewModel @Inject constructor(
             MutableStateFlow(ThemeMode.SYSTEM).also { s -> viewModelScope.launch { flow.collect { s.value = it } } }
         }
 
-    init { viewModelScope.launch { _me.value = account.me() } }
+    private val _fileMaxVersions = MutableStateFlow(10)
+    val fileMaxVersions: StateFlow<Int> = _fileMaxVersions.asStateFlow()
+
+    init {
+        viewModelScope.launch { _me.value = account.me() }
+        viewModelScope.launch { account.getSettings()?.fileMaxVersions?.let { _fileMaxVersions.value = it } }
+    }
+
+    // ---- Language (per-app locale, Android 13+ LocaleManager) ----
+    /** The current per-app language tag ("" = follow system). */
+    fun currentLanguageTag(): String =
+        context.getSystemService(LocaleManager::class.java)?.applicationLocales
+            ?.takeIf { !it.isEmpty }?.get(0)?.language ?: ""
+
+    fun setLanguage(tag: String) {
+        val lm = context.getSystemService(LocaleManager::class.java) ?: return
+        lm.applicationLocales = if (tag.isBlank()) LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(tag)
+        if (tag.isNotBlank()) viewModelScope.launch { account.pushLocale(tag) }
+    }
+
+    // ---- Files setting: kept versions per file ----
+    fun setFileMaxVersions(n: Int) = viewModelScope.launch {
+        val echoed = account.putSettings(UserSettingsDto(fileMaxVersions = n))
+        _fileMaxVersions.value = echoed?.fileMaxVersions ?: n
+    }
 
     fun loadDevices() = viewModelScope.launch { _devices.value = account.devices() }
     fun revokeDevice(id: Long) = viewModelScope.launch { if (account.revokeDevice(id)) loadDevices() }
@@ -68,6 +98,7 @@ class AccountViewModel @Inject constructor(
     fun twoFactorConfirm(code: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(account.twoFactorConfirm(code)) }
     fun twoFactorDisable(done: (Boolean) -> Unit) = viewModelScope.launch { done(account.twoFactorDisable()) }
     suspend fun recoveryCodes() = account.recoveryCodes()
+    suspend fun regenerateRecoveryCodes() = account.regenerateRecoveryCodes()
 
     // ---- password / account ----
     fun changePassword(current: String, new: String, done: (Boolean) -> Unit) =

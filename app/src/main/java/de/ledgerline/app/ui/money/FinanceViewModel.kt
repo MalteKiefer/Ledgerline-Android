@@ -131,6 +131,13 @@ class FinanceViewModel @Inject constructor(
         run({ repo.updateTransaction(txId, body) }, done)
     }
 
+    // ---- Standalone receipts (Fremdbelege) ----
+    fun storeReceipt(bytes: ByteArray, name: String, mime: String, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.storeReceipt(bytes, name, mime) is Outcome.Ok) }
+    fun deleteStandaloneReceipt(id: Int, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.deleteStandaloneReceipt(id) is Outcome.Ok) }
+    suspend fun standaloneReceiptBytes(id: Int): ByteArray? = repo.standaloneReceiptBytes(id)
+
     suspend fun loadCompany(): CompanyProfile? = repo.company()
     fun saveCompany(profile: CompanyProfile, done: (Boolean) -> Unit) {
         viewModelScope.launch { done(repo.updateCompany(profile) != null) }

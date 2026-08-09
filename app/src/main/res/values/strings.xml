@@ -1254,4 +1254,66 @@
     <string name="invoice_customer_section">Customer</string>
     <string name="invoice_dates">Dates</string>
     <string name="pm_no_details">No extra details for this type.</string>
+    <!-- Files rebuild (plaintext) + shell nav -->
+    <string name="action_edit">Edit</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_move">Move</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_upload">Upload</string>
+    <string name="tab_finance">Finance</string>
+    <string name="tab_account">Account</string>
+    <string name="files_new_folder">New folder</string>
+    <string name="files_folder_name">Folder name</string>
+    <string name="files_upload">Upload file</string>
+    <string name="files_empty">This folder is empty</string>
+    <string name="files_folder">Folder</string>
+    <string name="files_root">Files</string>
+    <string name="files_trash">Trash</string>
+    <string name="files_move_here">Move here</string>
+    <string name="files_move_title">Move to…</string>
+    <string name="files_all">All files</string>
+    <string name="files_favorites">Favorites</string>
+    <string name="files_uploading">Uploading…</string>
+    <string name="files_upload_failed">Upload failed</string>
+    <string name="files_delete_confirm">Delete this file?</string>
+    <string name="files_delete_folder_confirm">Delete this folder and its contents?</string>
+    <string name="files_open_failed">Couldn\'t open file</string>
+    <string name="files_downloading">Downloading…</string>
+    <!-- Files B3: detail / versions / labels / trash / stats / search -->
+    <string name="files_save_device">Save to device</string>
+    <string name="files_saved">Saved</string>
+    <string name="files_save_failed">Save failed</string>
+    <string name="files_versions">Versions</string>
+    <string name="files_no_versions">No previous versions</string>
+    <string name="files_restore_version">Restore this version</string>
+    <string name="files_labels">Labels</string>
+    <string name="files_manage_labels">Manage labels</string>
+    <string name="files_new_label">New label</string>
+    <string name="files_label_name">Label name</string>
+    <string name="files_no_labels">No labels</string>
+    <string name="files_trash_empty_action">Empty trash</string>
+    <string name="files_trash_is_empty">Trash is empty</string>
+    <string name="files_stats">Statistics</string>
+    <string name="files_stats_by_type">By type</string>
+    <string name="files_stats_duplicates">Duplicates</string>
+    <string name="files_used">Used</string>
+    <string name="files_search">Search files</string>
+    <string name="files_no_results">No results</string>
+    <string name="files_note">Note</string>
+    <string name="files_tags">Tags</string>
+    <string name="files_size">Size</string>
+    <string name="files_modified">Modified</string>
+    <string name="files_type">Type</string>
+    <!-- Finance A2: standalone receipts -->
+    <string name="more_receipts">Receipts</string>
+    <string name="receipts_title">Receipts</string>
+    <string name="receipts_empty">No receipts yet</string>
+    <string name="receipts_add">Add receipt</string>
+    <!-- Settings E: language / files / recovery codes -->
+    <string name="lang_system">System default</string>
+    <string name="settings_files">Files</string>
+    <string name="settings_max_versions">Kept versions per file</string>
+    <string name="security_recovery_codes">Recovery codes</string>
+    <string name="security_recovery_show">Show recovery codes</string>
+    <string name="security_recovery_regenerate">Regenerate codes</string>
 </resources>

@@ -1,14 +1,15 @@
 # Ledgerline Android — Projekt- & Technik-Kontext
 
-Native Android-Client für die selbst-gehostete **Ledgerline**. **Server-Pivot v1.5xx (Juli 2026):
+Native Android-Client für die selbst-gehostete **Ledgerline**. **Server-Pivot v1.5xx (2026):
 das Zero-Knowledge-/Vault-/Sealed-Store-Modell wurde vollständig entfernt.** Der Server ist jetzt
-eine **plaintext-relationale Finance-API** (Laravel-13, `/api/v1`, aktuell **v1.528.x**). Es gibt nur
-noch ein Modul: **Finance** (Rechnungen, Bank-Umsätze, Zahlungsmittel, Geschäftspartner, Projekte,
-Kategorien) + Firmenprofil. Web-App = Referenz/Superset; iOS = Look-&-Feel-Referenz.
+eine **plaintext-relationale API** (Laravel-13, `/api/v1`) mit den Modulen `files, finance, contacts,
+calendar` (`config/modules.php`). **Diese Android-App bildet bewusst nur zwei davon ab: Dateien
+(Files) + Finanzen (Finance)** — plus alle Nutzer-Einstellungen. Web-App = Referenz/Superset; iOS =
+Look-&-Feel-Referenz. (Rebuild-Basis war der Branch `finance-pivot`; Files wurde 2026-08 neu ergänzt.)
 
 > **Diese Datei MUSS den aktuellen Stand widerspiegeln. Nach jeder Änderung pflegen.**
-> Ground truth API: `../ledgerline/openapi.yaml` (title „Ledgerline API", finance-only) +
-> `../ledgerline/routes/api.php`. Ground truth Logik/Design: `../ledgerline` Web + `../ledgerline-ios`.
+> Ground truth API: `../ledgerline/openapi.yaml` + `../ledgerline/routes/api.php`.
+> Ground truth Logik/Design: `../ledgerline` Web + `../ledgerline-ios`.
 
 ---
 
@@ -46,9 +47,10 @@ Self-hosted, variabel — die App bekommt die Base-URL aus dem QR-Pairing (§2).
 `GET /me` `wipe:true` → `AuthEventBus.wipe` → `ForceLogout` (alles lokal löschen + neu pairen);
 auch bei authentifiziertem `401` (widerrufenes Token).
 
-## 3. API — `/api/v1` (finance-only)
+## 3. API — `/api/v1` (Files + Finance)
 
-**Konto/Gerät:** `GET /me` (`{user, wipe}`; `user.modules ∈ {finance}`), `GET /avatar`,
+**Konto/Gerät:** `GET /me` (`{user, wipe}`; `user.modules ⊆ {files, finance, contacts, calendar}` —
+`ModuleAccess` blendet Tabs für nicht erlaubte Module aus; `groups`=["admin"] → Admin), `GET /avatar`,
 `POST /device/heartbeat`, `DELETE /auth/session`, `GET/DELETE /devices`, `POST /devices/{t}/wipe`,
 `GET /notifications` (+read/read-all), `GET /account/export`, `DELETE /account`,
 `DELETE /account/sessions/{id}`, `POST /locale` · `/theme` · `/preferences`, `GET/PUT /settings`,
@@ -66,7 +68,22 @@ auch bei authentifiziertem `401` (widerrufenes Token).
   `/receipts/{r}/raw`), `partners`, `payment-methods`, `projects` (+`/move`), `categories`.
 - `POST /invoices/ocr` (multipart, transient Klartext → `{text, source, pages}`).
 - `GET/PUT /company` (Firmenprofil + Rechnungs-Defaults; PUT JSON oder multipart mit `logo`/
-  `remove_logo`), `GET /company/logo`.
+  `remove_logo`), `GET /company/logo`. Fremdbelege: `POST /finance/receipts` (multipart),
+  `PUT/DELETE .../{id}` (+restore/force), `GET .../{id}/raw`.
+
+**Files** (alle `Bearer`, `module:files`; Bytes = Klartext octet-stream, **kein Client-Crypto**):
+- `GET /files/data` → `{folders[], files[], usage{used,quota?}, labels[]}` (flache Ordner mit
+  `parent_id`; kein Paging/ETag). `GET /files/trash`, `GET /files/search?q`, `GET /files/stats`.
+- **FileEntry:** `id, file_folder_id, name, mime, size, sha256, tags[], note, favorite, version`
+  (optimistic → **409** `{error:version_conflict,version}`), `created/updated/deleted_at, labels[]`.
+- Upload: `POST /files/entries` (multipart) **oder** chunked `upload/chunk/{init,part(8 MiB),
+  complete,abort}`. `GET .../{id}/raw` + `.../thumb` (400² webp, 404 für Nicht-Bilder). Quota → **413**.
+- `PUT .../{id}` (Metadaten), `.../toggle`, `.../content` (neue Version), Versionen (`versions`,
+  `versions/{v}/{raw,restore}`), Trash (`restore`/`force`/`trash/empty`), `POST /files/zip`.
+- Ordner CRUD + `.../{id}/move` (422 `cycle`). Labels CRUD + `POST .../{id}/labels {label_ids}`.
+- Sharing (Datenschicht fertig, UI = „Rest"): `/files/rel-shares` (Public-Link, Token in
+  `/file-share/{token}`, Passwort + HMAC-Grant), `/files/folder-shares` (+members viewer/editor),
+  `/shared-with-me` (browse/raw/upload/rename/delete).
 
 **Record-Shape:** int `id`, `version` (optimistic), `created_at/updated_at`, meist `deleted_at`.
 Additiv/lenient dekodieren (`ignoreUnknownKeys`); offene Spalten (invoice `customer`/`lines`,
@@ -95,18 +112,27 @@ EncryptedSharedPreferences/Keystore, DataStore (UI-Prefs). `minSdk 36`, `targetS
 `compileSdk 37`. Paket `de.ledgerline.app`. Versions-Policy: neueste stabile Libs (§`gradle/
 libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
 
-**Schichten:** `ui/*` (Compose + VMs), `domain/model/finance/*` + `domain/model/Session`,
+**Schichten:** `ui/*` (Compose + VMs), `domain/model/{finance,files}/*` + `domain/model/Session`,
 `data/*` (Repos), `core/*`, `di/*`.
 
 ## 6. Android-Architektur (Ist)
 
-- **Flow** (`ui/nav/AppNav`): `WELCOME → PAIRING → LOCK (biometrisch) → HOME (FinanceShell)`.
+- **Flow** (`ui/nav/AppNav`): `WELCOME → PAIRING → LOCK (biometrisch) → HOME (`ui/shell/AppShell`)`.
   `RootViewModel` gated auf `AppLockState.unlocked`; 401/Remote-Wipe → `ForceLogout` + re-pair.
-- **`ui/money/FinanceShell`** — 4-Tab-Bottom-Nav (Dashboard/Rechnungen/Umsätze/Mehr) über geteiltes
-  **`FinanceViewModel`**; Detail/Edit/Listen als `MoneyRoute`-Overlays (`ui/money/MoneyScreens.kt`).
-  Screens: Dashboard (Server-KPIs/USt/Top-Kunden), Rechnungen (Liste/Anlegen/Bearbeiten/Finalize/
-  Löschen), Umsätze (Liste/Bearbeiten), Partner/Zahlungsmittel/Projekte (Listen+Edit), Firmenprofil,
-  Settings (Sperren/Trennen).
+- **`ui/shell/AppShell`** — Multi-Modul-Bottom-Nav **Dateien · Finanzen · Konto**, gated über
+  `ModuleAccess` (`/me.modules`). Finance-Detail/Edit-Flows als `MoneyRoute`-Overlays.
+- **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte
+  Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
+  Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung. `data/files/FilesRepository`
+  (online-only Snapshot + per-Record-CRUD, `NetworkFactory.createFiles` + `FilesApi`); Download →
+  `DocOpener.openFile` (FileProvider). **Offen (Rest):** Sharing-UI, In-App-PDF-Viewer, Share-Target.
+- **`ui/money/FinanceSection`** — Top-Tab-Row (Dashboard/Rechnungen/Umsätze/Mehr) über geteiltes
+  **`FinanceViewModel`**; „Mehr" → Partner/Zahlungsmittel/Projekte/Belege(Fremdbelege)/Insights/
+  Firmenprofil. Dashboard (Server-KPIs/USt/Top-Kunden), Rechnungen (Anlegen/Bearbeiten/Finalize/
+  Storno/Mahnung/PDF), Umsätze (+Belege/CSV-Import).
+- **`ui/money/MoneySettingsScreen`** (Konto-Tab) — Profil, Darstellung (Theme + **Sprache** via
+  Android-13-`LocaleManager` + `/locale`), **Dateien** (`file_max_versions` via `GET/PUT /settings`),
+  Geräte, Notifications, About, Security (Passwort/2FA/**Recovery-Codes**/Export-SAF/Löschen), Logout.
 - **`data/finance/FinanceRepository`** — cache-first Read (Klartext-Disk-Cache `finance_data.json`) +
   Online-CRUD (patcht In-Memory-Snapshot `StateFlow<FinanceData>` + Disk), live Analytics/Company.
   `NetworkFactory.createFinance` (+ `FinanceApi`). **Offline:** Reads aus Cache; **Writes offline
@@ -123,9 +149,19 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   `IconChip`, `HeroIcon`, `PrimaryGradientButton`, `LedgerlineBackground`), `ui/common/{AppScaffold,
   AppTopBar,SectionLabel}`. `FLAG_SECURE` → visuelle Änderungen muss der Nutzer am Gerät prüfen.
 
-## 7. Stand & TODO (finance-pivot)
+## 7. Stand & TODO
 
-**Erledigt:** Datenschicht (Modelle + `FinanceApi` + Repository cache-first/CRUD + Offline-Write-Queue
+**Plaintext-Rebuild 2026-08 (Files + Finance):** Auf `finance-pivot` (ZK bereits entfernt) aufgesetzt.
+Neu: **Files-Modul** komplett (Datenschicht `FilesModels`/`FilesApi`/`FilesRepository` + Browser/
+Detail/Trash/Suche/Stats/Labels-UI), **Multi-Modul-Shell** `AppShell` (Tabs gated über `/me.modules`),
+**Finance-Abgleich** auf aktuellen Server (`standaloneReceipts`/Fremdbelege, tx `deleted_at`, Partner
+`hourly_rate`/`currency`, Company `website`/`font`/`vat_ist`), **Settings** komplettiert (Sprache,
+`file_max_versions`, Recovery-Codes). `assembleDebug` + Unit-Tests grün. **On-device-Verifikation offen**
+(FLAG_SECURE → visuell am Gerät prüfen). **Offen (Rest):** Files-Sharing-UI (Datenschicht fertig),
+In-App-PDF-Viewer, Share-Target (`ACTION_SEND`), `documentfile`/Deps-Feinschliff, Finance-Logo-Upload,
+MT940/CAMT-Import, mehr Tests.
+
+**Finance-Basis (aus finance-pivot):** Datenschicht (Modelle + `FinanceApi` + Repository cache-first/CRUD + Offline-Write-Queue
 `FinanceOutbox` für update/delete), biometrischer App-Lock, Finance-Shell + alle Kern-Screens, Nav,
 Manifest/DI/Entry-Points auf finance-only rewired, ZK-Stack gelöscht (355→~77 Quell-Dateien). **4b
 UI-Tiefe weitgehend erledigt:** Dashboard-Jahr-Picker, Rechnungs-Positionen-Editor (Live-Summen),

@@ -73,6 +73,8 @@ data class FinancePartner(
     @SerialName("invoice_email") val invoiceEmail: String? = null,
     val phone: String? = null,
     @SerialName("vat_id") val vatId: String? = null,
+    @SerialName("hourly_rate") val hourlyRate: String? = null,
+    val currency: String? = null,
     val contacts: List<JsonObject> = emptyList(),
     val version: Int = 0,
     @SerialName("created_at") val createdAt: String? = null,
@@ -147,6 +149,29 @@ data class BankTransaction(
     val version: Int = 0,
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("deleted_at") val deletedAt: String? = null,
+)
+
+/** A standalone receipt document ("Fremdbeleg") — a receipt without a bank transaction. */
+@Serializable
+data class FinanceReceipt(
+    val id: Int = 0,
+    @SerialName("bank_transaction_id") val bankTransactionId: Int? = null,
+    @SerialName("finance_project_id") val financeProjectId: Int? = null,
+    val name: String = "",
+    val mime: String? = null,
+    val size: Long = 0,
+    val kind: String = "receipt",
+    val category: String? = null,
+    val tags: List<String> = emptyList(),
+    val vat: String? = null,
+    val note: String? = null,
+    @SerialName("partner_id") val partnerId: Int? = null,
+    val ocr: String? = null,
+    val version: Int = 0,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("deleted_at") val deletedAt: String? = null,
 )
 
 /** The full owner-scoped finance snapshot (`GET /finance/data`). */
@@ -158,6 +183,7 @@ data class FinanceData(
     val projects: List<FinanceProject> = emptyList(),
     val financeCategories: List<FinanceCategory> = emptyList(),
     val transactions: List<BankTransaction> = emptyList(),
+    val standaloneReceipts: List<FinanceReceipt> = emptyList(),
 )
 
 // ---- Server-computed analytics (client no longer computes these) ----

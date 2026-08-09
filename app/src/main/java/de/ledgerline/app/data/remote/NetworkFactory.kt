@@ -39,6 +39,11 @@ object NetworkFactory {
         retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
             .create(FinanceApi::class.java)
 
+    /** The plaintext-relational files API over the same pinned, authenticated transport. */
+    fun createFiles(baseUrl: String, tokenProvider: () -> String?, pin: String?): FilesApi =
+        retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
+            .create(FilesApi::class.java)
+
     /**
      * A minimal HTTPS client (RESTRICTED_TLS + SPKI pinning, short timeouts, no auth) for the
      * server-reachability health ping (`GET {baseUrl}/up`). Same fail-closed transport as the API,

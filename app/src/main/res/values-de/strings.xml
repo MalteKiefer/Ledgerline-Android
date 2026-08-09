@@ -1252,4 +1252,66 @@
     <string name="invoice_customer_section">Kunde</string>
     <string name="invoice_dates">Daten</string>
     <string name="pm_no_details">Keine weiteren Angaben für diesen Typ.</string>
+    <!-- Files rebuild (plaintext) + shell nav -->
+    <string name="action_edit">Bearbeiten</string>
+    <string name="action_rename">Umbenennen</string>
+    <string name="action_move">Verschieben</string>
+    <string name="action_refresh">Aktualisieren</string>
+    <string name="action_upload">Hochladen</string>
+    <string name="tab_finance">Finanzen</string>
+    <string name="tab_account">Konto</string>
+    <string name="files_new_folder">Neuer Ordner</string>
+    <string name="files_folder_name">Ordnername</string>
+    <string name="files_upload">Datei hochladen</string>
+    <string name="files_empty">Dieser Ordner ist leer</string>
+    <string name="files_folder">Ordner</string>
+    <string name="files_root">Dateien</string>
+    <string name="files_trash">Papierkorb</string>
+    <string name="files_move_here">Hierher verschieben</string>
+    <string name="files_move_title">Verschieben nach…</string>
+    <string name="files_all">Alle Dateien</string>
+    <string name="files_favorites">Favoriten</string>
+    <string name="files_uploading">Wird hochgeladen…</string>
+    <string name="files_upload_failed">Upload fehlgeschlagen</string>
+    <string name="files_delete_confirm">Diese Datei löschen?</string>
+    <string name="files_delete_folder_confirm">Diesen Ordner samt Inhalt löschen?</string>
+    <string name="files_open_failed">Datei konnte nicht geöffnet werden</string>
+    <string name="files_downloading">Wird heruntergeladen…</string>
+    <!-- Files B3: detail / versions / labels / trash / stats / search -->
+    <string name="files_save_device">Auf Gerät speichern</string>
+    <string name="files_saved">Gespeichert</string>
+    <string name="files_save_failed">Speichern fehlgeschlagen</string>
+    <string name="files_versions">Versionen</string>
+    <string name="files_no_versions">Keine früheren Versionen</string>
+    <string name="files_restore_version">Diese Version wiederherstellen</string>
+    <string name="files_labels">Labels</string>
+    <string name="files_manage_labels">Labels verwalten</string>
+    <string name="files_new_label">Neues Label</string>
+    <string name="files_label_name">Label-Name</string>
+    <string name="files_no_labels">Keine Labels</string>
+    <string name="files_trash_empty_action">Papierkorb leeren</string>
+    <string name="files_trash_is_empty">Papierkorb ist leer</string>
+    <string name="files_stats">Statistik</string>
+    <string name="files_stats_by_type">Nach Typ</string>
+    <string name="files_stats_duplicates">Duplikate</string>
+    <string name="files_used">Belegt</string>
+    <string name="files_search">Dateien suchen</string>
+    <string name="files_no_results">Keine Treffer</string>
+    <string name="files_note">Notiz</string>
+    <string name="files_tags">Tags</string>
+    <string name="files_size">Größe</string>
+    <string name="files_modified">Geändert</string>
+    <string name="files_type">Typ</string>
+    <!-- Finance A2: standalone receipts -->
+    <string name="more_receipts">Belege</string>
+    <string name="receipts_title">Fremdbelege</string>
+    <string name="receipts_empty">Noch keine Belege</string>
+    <string name="receipts_add">Beleg hinzufügen</string>
+    <!-- Settings E: language / files / recovery codes -->
+    <string name="lang_system">Systemsprache</string>
+    <string name="settings_files">Dateien</string>
+    <string name="settings_max_versions">Versionen pro Datei</string>
+    <string name="security_recovery_codes">Wiederherstellungscodes</string>
+    <string name="security_recovery_show">Codes anzeigen</string>
+    <string name="security_recovery_regenerate">Codes neu erzeugen</string>
 </resources>
