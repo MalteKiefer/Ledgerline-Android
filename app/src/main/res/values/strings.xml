@@ -1465,4 +1465,6 @@
     <string name="admin_request_log">Request log</string>
     <string name="admin_block_user">Block user</string>
     <string name="admin_unblock_user">Unblock user</string>
+    <string name="security_step_up_pw">Login password (to manage 2FA)</string>
+    <string name="login_verify_email">Please verify your email address, then sign in again.</string>
 </resources>

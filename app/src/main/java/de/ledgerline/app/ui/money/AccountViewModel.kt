@@ -110,12 +110,12 @@ class AccountViewModel @Inject constructor(
 
     fun lockNow() = appLockState.lock()
 
-    // ---- 2FA ----
-    suspend fun twoFactorBegin() = account.twoFactorBegin()
+    // ---- 2FA (v1.562.0: enable/recovery-codes/regenerate/disable need the login password step-up) ----
+    suspend fun twoFactorBegin(currentPassword: String) = account.twoFactorBegin(currentPassword)
     fun twoFactorConfirm(code: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(account.twoFactorConfirm(code)) }
-    fun twoFactorDisable(done: (Boolean) -> Unit) = viewModelScope.launch { done(account.twoFactorDisable()) }
-    suspend fun recoveryCodes() = account.recoveryCodes()
-    suspend fun regenerateRecoveryCodes() = account.regenerateRecoveryCodes()
+    fun twoFactorDisable(currentPassword: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(account.twoFactorDisable(currentPassword)) }
+    suspend fun recoveryCodes(currentPassword: String) = account.recoveryCodes(currentPassword)
+    suspend fun regenerateRecoveryCodes(currentPassword: String) = account.regenerateRecoveryCodes(currentPassword)
 
     // ---- password / account ----
     fun changePassword(current: String, new: String, done: (Boolean) -> Unit) =

@@ -18,6 +18,8 @@ sealed interface LoginOutcome {
     data class Success(val session: Session) : LoginOutcome
     data object TwoFactorRequired : LoginOutcome
     data object InvalidCredentials : LoginOutcome
+    /** v1.562.0: the account's email is not verified yet — server withholds the bearer (HTTP 403). */
+    data object EmailNotVerified : LoginOutcome
     data object NotHttps : LoginOutcome
     data object NetworkError : LoginOutcome
 }
@@ -55,6 +57,8 @@ class LoginRepository(
             when {
                 res.isSuccessful && res.body()?.token != null ->
                     LoginOutcome.Success(Session(url, res.body()!!.token!!, capturePin(url), res.body()!!.user?.name))
+                // Email-not-verified: HTTP 403 {status:"verify-email"} — server withholds the bearer.
+                res.code() == 403 && (res.errorBody()?.string()?.contains("verify-email") == true) -> LoginOutcome.EmailNotVerified
                 // 2FA required arrives as HTTP 422 {two_factor:true} — a non-2xx body, so inspect the error body.
                 res.code() == 422 && (res.errorBody()?.string()?.contains("two_factor") == true) -> LoginOutcome.TwoFactorRequired
                 res.code() == 422 -> LoginOutcome.InvalidCredentials

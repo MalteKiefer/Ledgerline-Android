@@ -1465,4 +1465,6 @@
     <string name="admin_request_log">Журнал запросов</string>
     <string name="admin_block_user">Заблокировать</string>
     <string name="admin_unblock_user">Разблокировать</string>
+    <string name="security_step_up_pw">Пароль входа (для 2FA)</string>
+    <string name="login_verify_email">Подтвердите адрес эл. почты и войдите снова.</string>
 </resources>

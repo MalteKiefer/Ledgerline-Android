@@ -68,6 +68,7 @@ class LoginViewModel @Inject constructor(
                     _state.value = UiState(twoFactor = true, errorRes = if (wrongCode) R.string.login_error_invalid else null)
                 }
                 LoginOutcome.InvalidCredentials -> _state.value = _state.value.copy(submitting = false, errorRes = R.string.login_error_invalid)
+                LoginOutcome.EmailNotVerified -> _state.value = _state.value.copy(submitting = false, errorRes = R.string.login_verify_email)
                 LoginOutcome.NotHttps -> _state.value = _state.value.copy(submitting = false, errorRes = R.string.login_error_https)
                 LoginOutcome.NetworkError -> _state.value = _state.value.copy(submitting = false, errorRes = R.string.login_error_network)
             }

@@ -186,12 +186,16 @@ class AccountRepository(
 
     // ── Login (account) 2FA — orthogonal to the ZK vault passphrase ──
 
-    /** Begin TOTP setup → the QR SVG + secret + otpauth URI (`enable` then `qr`). */
-    suspend fun twoFactorBegin(): de.ledgerline.app.data.remote.dto.TwoFactorQrResponse? {
+    /**
+     * Begin TOTP setup → the QR SVG + secret + otpauth URI (`enable` then `qr`). Since v1.562.0 the
+     * enable step needs the login password (step-up). A 404 from `qr()` means 2FA is already confirmed
+     * (the secret is never re-issued) — surfaced as null.
+     */
+    suspend fun twoFactorBegin(currentPassword: String): de.ledgerline.app.data.remote.dto.TwoFactorQrResponse? {
         val session = sessionHolder.get() ?: return null
         return try {
             val api = apiProvider(session)
-            api.twoFactorEnable()
+            if (!api.twoFactorEnable(de.ledgerline.app.data.remote.dto.CurrentPasswordRequest(currentPassword)).isSuccessful) return null
             val r = api.twoFactorQr()
             if (r.isSuccessful) r.body() else null
         } catch (_: Exception) { null }
@@ -201,23 +205,23 @@ class AccountRepository(
     suspend fun twoFactorConfirm(code: String): Boolean =
         call { it.twoFactorConfirm(de.ledgerline.app.data.remote.dto.TwoFactorConfirmRequest(code)) }
 
-    suspend fun twoFactorDisable(): Boolean {
+    suspend fun twoFactorDisable(currentPassword: String): Boolean {
         val session = sessionHolder.get() ?: return false
-        return try { apiProvider(session).twoFactorDisable().isSuccessful } catch (_: Exception) { false }
+        return try { apiProvider(session).twoFactorDisable(de.ledgerline.app.data.remote.dto.CurrentPasswordRequest(currentPassword)).isSuccessful } catch (_: Exception) { false }
     }
 
-    suspend fun recoveryCodes(): List<String> {
+    suspend fun recoveryCodes(currentPassword: String): List<String> {
         val session = sessionHolder.get() ?: return emptyList()
         return try {
-            val r = apiProvider(session).twoFactorRecoveryCodes()
+            val r = apiProvider(session).twoFactorRecoveryCodes(currentPassword)
             if (r.isSuccessful) r.body()?.recovery_codes.orEmpty() else emptyList()
         } catch (_: Exception) { emptyList() }
     }
 
-    suspend fun regenerateRecoveryCodes(): List<String> {
+    suspend fun regenerateRecoveryCodes(currentPassword: String): List<String> {
         val session = sessionHolder.get() ?: return emptyList()
         return try {
-            val r = apiProvider(session).twoFactorRegenerateRecoveryCodes()
+            val r = apiProvider(session).twoFactorRegenerateRecoveryCodes(de.ledgerline.app.data.remote.dto.CurrentPasswordRequest(currentPassword))
             if (r.isSuccessful) r.body()?.recovery_codes.orEmpty() else emptyList()
         } catch (_: Exception) { emptyList() }
     }

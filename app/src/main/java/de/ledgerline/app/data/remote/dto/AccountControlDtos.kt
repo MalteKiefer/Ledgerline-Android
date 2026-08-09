@@ -17,6 +17,8 @@ import kotlinx.serialization.Serializable
 
 @Serializable data class TwoFactorQrResponse(val svg: String = "", val secret: String = "", val uri: String = "")
 @Serializable data class TwoFactorConfirmRequest(val code: String)
+/** Password step-up body — required (v1.562.0 max-security) on 2FA enable/recovery-codes/regenerate/disable. */
+@Serializable data class CurrentPasswordRequest(val current_password: String)
 @Serializable data class RecoveryCodesResponse(val recovery_codes: List<String> = emptyList())
 @Serializable data class TwoFactorEnabledResponse(val enabled: Boolean = false)
 

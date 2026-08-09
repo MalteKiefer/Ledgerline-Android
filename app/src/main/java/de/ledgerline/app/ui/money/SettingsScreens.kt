@@ -353,6 +353,7 @@ private fun SecurityScreen(vm: AccountViewModel, onLoggedOut: () -> Unit, onBack
     var msg by remember { mutableStateOf<String?>(null) }
     var twoFa by remember { mutableStateOf<de.ledgerline.app.data.remote.dto.TwoFactorQrResponse?>(null) }
     var twoFaCode by remember { mutableStateOf("") }
+    var stepUpPw by remember { mutableStateOf("") } // login password for 2FA/recovery step-up (v1.562.0)
     var recoveryCodes by remember { mutableStateOf<List<String>>(emptyList()) }
     var delEmail by remember { mutableStateOf("") }
 
@@ -381,16 +382,19 @@ private fun SecurityScreen(vm: AccountViewModel, onLoggedOut: () -> Unit, onBack
             }) { Text(stringResource(R.string.security_change_password)) }
 
             SectionLabel(stringResource(R.string.security_2fa))
+            // v1.562.0 max-security: enable / recovery-codes / regenerate / disable require the login
+            // password as step-up. One shared field feeds all four actions.
+            Field(stepUpPw, { stepUpPw = it }, R.string.security_step_up_pw)
             if (twoFa == null) {
-                TextButton(onClick = { scope.launch { twoFa = vm.twoFactorBegin() } }) { Text(stringResource(R.string.security_2fa_enable)) }
-                TextButton(onClick = { vm.twoFactorDisable { msg = ctx.getString(if (it) R.string.security_2fa_disabled else R.string.security_failed) } }) {
+                TextButton(enabled = stepUpPw.isNotBlank(), onClick = { scope.launch { twoFa = vm.twoFactorBegin(stepUpPw); if (twoFa == null) msg = ctx.getString(R.string.security_failed) } }) { Text(stringResource(R.string.security_2fa_enable)) }
+                TextButton(enabled = stepUpPw.isNotBlank(), onClick = { vm.twoFactorDisable(stepUpPw) { msg = ctx.getString(if (it) R.string.security_2fa_disabled else R.string.security_failed) } }) {
                     Text(stringResource(R.string.security_2fa_disable))
                 }
             } else {
                 twoFa?.secret?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.security_2fa_secret) + " " + it, style = MaterialTheme.typography.bodyMedium) }
                 Field(twoFaCode, { twoFaCode = it }, R.string.security_2fa_code)
                 TextButton(enabled = twoFaCode.length >= 6, onClick = {
-                    vm.twoFactorConfirm(twoFaCode) { ok -> msg = ctx.getString(if (ok) R.string.security_2fa_enabled else R.string.security_failed); if (ok) { twoFa = null; twoFaCode = "" } }
+                    vm.twoFactorConfirm(twoFaCode) { ok -> msg = ctx.getString(if (ok) R.string.security_2fa_enabled else R.string.security_failed); if (ok) { twoFa = null; twoFaCode = ""; stepUpPw = "" } }
                 }) { Text(stringResource(R.string.security_2fa_confirm)) }
             }
 
@@ -401,8 +405,8 @@ private fun SecurityScreen(vm: AccountViewModel, onLoggedOut: () -> Unit, onBack
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = { scope.launch { recoveryCodes = vm.recoveryCodes() } }) { Text(stringResource(R.string.security_recovery_show)) }
-                TextButton(onClick = { scope.launch { recoveryCodes = vm.regenerateRecoveryCodes() } }) { Text(stringResource(R.string.security_recovery_regenerate)) }
+                TextButton(enabled = stepUpPw.isNotBlank(), onClick = { scope.launch { recoveryCodes = vm.recoveryCodes(stepUpPw); if (recoveryCodes.isEmpty()) msg = ctx.getString(R.string.security_failed) } }) { Text(stringResource(R.string.security_recovery_show)) }
+                TextButton(enabled = stepUpPw.isNotBlank(), onClick = { scope.launch { recoveryCodes = vm.regenerateRecoveryCodes(stepUpPw); if (recoveryCodes.isEmpty()) msg = ctx.getString(R.string.security_failed) } }) { Text(stringResource(R.string.security_recovery_regenerate)) }
             }
 
             // WebDAV mount password

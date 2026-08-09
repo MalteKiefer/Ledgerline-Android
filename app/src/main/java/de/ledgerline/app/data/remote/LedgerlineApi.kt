@@ -86,9 +86,9 @@ interface LedgerlineApi {
     @PUT("api/v1/user/password")
     suspend fun changePassword(@Body body: de.ledgerline.app.data.remote.dto.ChangePasswordRequest): Response<Unit>
 
-    // ---- Two-factor ----
+    // ---- Two-factor (v1.562.0: enable/recovery-codes/regenerate/disable require password step-up) ----
     @POST("api/v1/user/two-factor/enable")
-    suspend fun twoFactorEnable(): Response<de.ledgerline.app.data.remote.dto.TwoFactorEnabledResponse>
+    suspend fun twoFactorEnable(@Body body: de.ledgerline.app.data.remote.dto.CurrentPasswordRequest): Response<de.ledgerline.app.data.remote.dto.TwoFactorEnabledResponse>
 
     @GET("api/v1/user/two-factor/qr")
     suspend fun twoFactorQr(): Response<de.ledgerline.app.data.remote.dto.TwoFactorQrResponse>
@@ -96,14 +96,16 @@ interface LedgerlineApi {
     @POST("api/v1/user/two-factor/confirm")
     suspend fun twoFactorConfirm(@Body body: de.ledgerline.app.data.remote.dto.TwoFactorConfirmRequest): Response<Unit>
 
+    // The server reads current_password via Laravel input() (query OR body). OkHttp forbids a GET
+    // request body, so we pass it as a query param (transported over TLS).
     @GET("api/v1/user/two-factor/recovery-codes")
-    suspend fun twoFactorRecoveryCodes(): Response<de.ledgerline.app.data.remote.dto.RecoveryCodesResponse>
+    suspend fun twoFactorRecoveryCodes(@retrofit2.http.Query("current_password") currentPassword: String): Response<de.ledgerline.app.data.remote.dto.RecoveryCodesResponse>
 
     @POST("api/v1/user/two-factor/recovery-codes/regenerate")
-    suspend fun twoFactorRegenerateRecoveryCodes(): Response<de.ledgerline.app.data.remote.dto.RecoveryCodesResponse>
+    suspend fun twoFactorRegenerateRecoveryCodes(@Body body: de.ledgerline.app.data.remote.dto.CurrentPasswordRequest): Response<de.ledgerline.app.data.remote.dto.RecoveryCodesResponse>
 
-    @HTTP(method = "DELETE", path = "api/v1/user/two-factor", hasBody = false)
-    suspend fun twoFactorDisable(): Response<de.ledgerline.app.data.remote.dto.TwoFactorEnabledResponse>
+    @HTTP(method = "DELETE", path = "api/v1/user/two-factor", hasBody = true)
+    suspend fun twoFactorDisable(@Body body: de.ledgerline.app.data.remote.dto.CurrentPasswordRequest): Response<de.ledgerline.app.data.remote.dto.TwoFactorEnabledResponse>
 
     // ---- Account sessions ----
     @GET("api/v1/account/sessions")
