@@ -81,6 +81,16 @@ class FinanceViewModel @Inject constructor(
     fun saveInvoice(id: Int?, body: JsonObject, done: (Boolean) -> Unit) =
         run({ if (id == null) repo.createInvoice(body) else repo.updateInvoice(id, body) }, done)
     fun finalizeInvoice(id: Int, done: (Boolean) -> Unit) = run({ repo.finalizeInvoice(id) }, done)
+    /** Set an invoice's status (sent/paid); paid also stamps paid_at with today. */
+    fun setInvoiceStatus(id: Int, status: String, done: (Boolean) -> Unit) {
+        val inv = invoice(id) ?: return done(false)
+        val body = kotlinx.serialization.json.buildJsonObject {
+            put("version", kotlinx.serialization.json.JsonPrimitive(inv.version))
+            put("status", kotlinx.serialization.json.JsonPrimitive(status))
+            if (status == "paid") put("paid_at", kotlinx.serialization.json.JsonPrimitive(java.time.LocalDate.now().toString()))
+        }
+        run({ repo.updateInvoice(id, body) }, done)
+    }
     suspend fun invoicePdf(id: Int): ByteArray? = repo.invoicePdf(id)
     fun uploadInvoicePdf(id: Int, bytes: ByteArray, name: String, done: (Boolean) -> Unit) =
         viewModelScope.launch { done(repo.uploadInvoicePdf(id, bytes, name) is Outcome.Ok) }

@@ -1365,4 +1365,13 @@
     <string name="categories_title">Kategorien</string>
     <string name="categories_empty">Noch keine Kategorien</string>
     <string name="category_name">Kategoriename</string>
+    <string name="invoice_mark_sent">Als gesendet markieren</string>
+    <string name="invoice_mark_paid">Als bezahlt markieren</string>
+    <string name="invoice_partner">Partner</string>
+    <string name="invoice_partner_none">Keiner</string>
+    <string name="tx_link_invoice">Verknüpfte Rechnung</string>
+    <string name="receipt_edit">Beleg bearbeiten</string>
+    <string name="receipt_category">Kategorie</string>
+    <string name="receipt_vat">USt</string>
+    <string name="receipt_note">Notiz</string>
 </resources>

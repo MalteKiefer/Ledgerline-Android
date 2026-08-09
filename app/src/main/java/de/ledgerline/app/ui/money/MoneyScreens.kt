@@ -156,6 +156,7 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
     var discountPercent by remember { mutableStateOf((existing?.discountType ?: "percent") == "percent") }
     var skontoPercent by remember { mutableStateOf(existing?.skontoPercent ?: "") }
     var skontoDays by remember { mutableStateOf(existing?.skontoDays?.toString() ?: "") }
+    var partnerId by remember { mutableStateOf(existing?.partnerId) }
     var busy by remember { mutableStateOf(false) }
 
     val lineNet = lines.sumOf { it.net }
@@ -171,6 +172,7 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
 
     fun body(): JsonObject = buildJsonObject {
         existing?.let { put("version", it.version) }
+        partnerId?.let { put("partner_id", it) }
         put("customer", buildJsonObject {
             put("name", customer.trim())
             if (custAttn.isNotBlank()) put("attn", custAttn.trim())
@@ -178,6 +180,7 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
             if (custEmail.isNotBlank()) put("email", custEmail.trim())
             if (custVatId.isNotBlank()) put("vatId", custVatId.trim())
             if (invoiceEmail.isNotBlank()) put("invoiceEmail", invoiceEmail.trim())
+            partnerId?.let { put("partnerId", it) }
         })
         put("issue_date", issueDate.trim())
         put("due_date", dueDate.trim())
@@ -221,6 +224,16 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
     ) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             FormSection(stringResource(R.string.invoice_customer_section)) {
+                val partners = vm.data.collectAsStateWithLifecycle().value?.partners?.filter { it.deletedAt == null }.orEmpty()
+                if (partners.isNotEmpty()) PartnerPicker(partners, partnerId) { p ->
+                    partnerId = p?.id
+                    if (p != null) {
+                        if (customer.isBlank()) customer = p.name
+                        if (custEmail.isBlank()) custEmail = p.email ?: ""
+                        if (custAddress.isBlank()) custAddress = p.address ?: ""
+                        if (custVatId.isBlank()) custVatId = p.vatId ?: ""
+                    }
+                }
                 Field(customer, { customer = it }, R.string.invoice_customer)
                 Field(custAttn, { custAttn = it }, R.string.invoice_customer_attn)
                 Field(custAddress, { custAddress = it }, R.string.invoice_customer_address)
@@ -287,6 +300,10 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
                     TextButton(onClick = { vm.dunInvoice(id, invoiceEmail.ifBlank { null }) { ok -> if (ok) msg = dunCtx } }) { Text(stringResource(R.string.invoice_dun)) }
                     TextButton(onClick = { vm.stornoInvoice(id) { ok -> if (ok) onBack() } }) { Text(stringResource(R.string.invoice_storno), color = MaterialTheme.colorScheme.error) }
                 }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (existing?.status != "sent") TextButton(onClick = { vm.setInvoiceStatus(id, "sent") { } }) { Text(stringResource(R.string.invoice_mark_sent)) }
+                    if (existing?.status != "paid") TextButton(onClick = { vm.setInvoiceStatus(id, "paid") { ok -> if (ok) onBack() } }) { Text(stringResource(R.string.invoice_mark_paid)) }
+                }
                 if (existing != null && existing.reminderCount > 0) {
                     Text(stringResource(R.string.invoice_reminder_level) + " " + existing.reminderCount, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -305,6 +322,24 @@ fun InvoiceEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
 }
 
 private fun roundStr(v: Double): String = (Math.round(v * 100.0) / 100.0).toString()
+
+/** Dropdown to pick a finance partner (or none) — used to link an invoice/transaction to a partner. */
+@Composable
+internal fun PartnerPicker(partners: List<de.ledgerline.app.domain.model.finance.FinancePartner>, selected: Int?, onPick: (de.ledgerline.app.domain.model.finance.FinancePartner?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val current = partners.firstOrNull { it.id == selected }
+    Box {
+        androidx.compose.material3.OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
+            Text(current?.name ?: stringResource(R.string.invoice_partner) + ": " + stringResource(R.string.invoice_partner_none))
+        }
+        androidx.compose.material3.DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.invoice_partner_none)) }, onClick = { open = false; onPick(null) })
+            partners.forEach { p ->
+                androidx.compose.material3.DropdownMenuItem(text = { Text(p.name) }, onClick = { open = false; onPick(p) })
+            }
+        }
+    }
+}
 
 @Composable
 private fun ImportedInvoiceScreen(vm: FinanceViewModel, inv: de.ledgerline.app.domain.model.finance.Invoice, onBack: () -> Unit) {
@@ -496,8 +531,10 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
     var bookingText by remember { mutableStateOf(existing?.bookingText ?: "") }
     var vatCat by remember { mutableStateOf(existing?.vatCat ?: "") }
     var projectId by remember { mutableStateOf(existing?.financeProjectId) }
+    var invoiceId by remember { mutableStateOf(existing?.invoiceId) }
     var busy by remember { mutableStateOf(false) }
     var accountId by remember { mutableStateOf(existing?.paymentMethodId ?: accounts.firstOrNull()?.id) }
+    val invoices = vm.data.collectAsStateWithLifecycle().value?.invoices?.filter { it.deletedAt == null && it.number != null }.orEmpty()
 
     fun body(): JsonObject = buildJsonObject {
         existing?.let { put("version", it.version) }
@@ -511,6 +548,8 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
         put("booking_text", bookingText.trim())
         put("vat_cat", vatCat.trim())
         projectId?.let { put("finance_project_id", it) }
+        put("invoice_id", invoiceId?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+        invoices.firstOrNull { it.id == invoiceId }?.number?.let { put("invoice_number", it) }
     }
 
     AppScaffold(
@@ -555,6 +594,17 @@ fun TransactionEditScreen(vm: FinanceViewModel, id: Int?, onBack: () -> Unit) {
                         androidx.compose.material3.FilterChip(selected = projectId == null, onClick = { projectId = null }, label = { Text(stringResource(R.string.transaction_project_none)) })
                         projects.forEach { pr ->
                             androidx.compose.material3.FilterChip(selected = projectId == pr.id, onClick = { projectId = pr.id }, label = { Text(pr.name) })
+                        }
+                    }
+                }
+            }
+
+            if (invoices.isNotEmpty()) {
+                FormSection(stringResource(R.string.tx_link_invoice)) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        androidx.compose.material3.FilterChip(selected = invoiceId == null, onClick = { invoiceId = null }, label = { Text(stringResource(R.string.invoice_partner_none)) })
+                        invoices.forEach { inv ->
+                            androidx.compose.material3.FilterChip(selected = invoiceId == inv.id, onClick = { invoiceId = inv.id }, label = { Text(inv.number ?: "#${inv.id}") })
                         }
                     }
                 }

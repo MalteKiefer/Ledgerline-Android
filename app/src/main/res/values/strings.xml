@@ -1368,4 +1368,13 @@
     <string name="categories_title">Categories</string>
     <string name="categories_empty">No categories yet</string>
     <string name="category_name">Category name</string>
+    <string name="invoice_mark_sent">Mark as sent</string>
+    <string name="invoice_mark_paid">Mark as paid</string>
+    <string name="invoice_partner">Partner</string>
+    <string name="invoice_partner_none">None</string>
+    <string name="tx_link_invoice">Linked invoice</string>
+    <string name="receipt_edit">Edit receipt</string>
+    <string name="receipt_category">Category</string>
+    <string name="receipt_vat">VAT</string>
+    <string name="receipt_note">Note</string>
 </resources>
