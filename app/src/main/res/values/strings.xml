@@ -626,6 +626,26 @@
     <string name="notifications_mark_all">Mark all read</string>
     <string name="notifications_mark_read">Mark read</string>
     <string name="notifications_empty">No notifications.</string>
+    <string name="notifications_recent">Recent</string>
+    <!-- Push notifications (UnifiedPush) -->
+    <string name="push_title">Push</string>
+    <string name="push_enable">Enable push</string>
+    <string name="push_lockscreen_content">Show content on lock screen</string>
+    <string name="push_categories">Categories</string>
+    <string name="push_via">Delivered via %1$s</string>
+    <string name="push_no_distributor_title">No push distributor installed</string>
+    <string name="push_no_distributor_body">Install a UnifiedPush distributor such as ntfy to receive push notifications in the background. Until then, notifications refresh only while the app is open.</string>
+    <string name="push_default_title">Ledgerline</string>
+    <string name="push_channel_error">Errors</string>
+    <string name="push_channel_warning">Warnings</string>
+    <string name="push_channel_success">Confirmations</string>
+    <string name="push_channel_info">Info</string>
+    <string name="push_cat_invoice">Invoices</string>
+    <string name="push_cat_task">Tasks</string>
+    <string name="push_cat_event">Appointments</string>
+    <string name="push_cat_birthday">Birthdays</string>
+    <string name="push_cat_backup">Backups</string>
+    <string name="push_cat_system">System</string>
     <string name="share_open_title">Open a share link</string>
     <string name="share_open_hint">Paste a link someone shared from this server.</string>
     <string name="share_open_field">Share URL</string>

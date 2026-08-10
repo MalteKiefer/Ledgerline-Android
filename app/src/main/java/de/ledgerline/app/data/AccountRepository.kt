@@ -140,6 +140,18 @@ class AccountRepository(
     /** Mark all notifications read (`POST /notifications/read-all`). */
     suspend fun markAllNotificationsRead(): Boolean = call { it.markAllNotificationsRead() }
 
+    /**
+     * Deliver this device's UnifiedPush endpoint to the server (`POST /device/push-endpoint`).
+     * Needs a live in-memory session (call while unlocked). Returns true only on a 2xx — a 404
+     * means the server hasn't shipped the route yet (surfaced as "server not ready").
+     */
+    suspend fun registerPushEndpoint(endpoint: String): Boolean = call {
+        it.registerPushEndpoint(de.ledgerline.app.data.remote.dto.PushEndpointRequest(endpoint))
+    }
+
+    /** Clear this device's push endpoint server-side (`DELETE /device/push-endpoint`). */
+    suspend fun clearPushEndpoint(): Boolean = call { it.clearPushEndpoint() }
+
     /** Per-user non-display settings (`GET /settings`): contact notify channels + file version cap. */
     suspend fun getSettings(): de.ledgerline.app.data.remote.dto.UserSettingsDto? {
         val session = sessionHolder.get() ?: return null

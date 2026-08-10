@@ -57,6 +57,10 @@ bouncycastle = "1.84"
 # mapsforge — offline vector maps (.map files) + rendering engine (LGPL, 100% OSS, no Google).
 # Powers the Explore/Karte/Tracker feature and (per user directive) all app maps.
 mapsforge = "0.25.0"
+# UnifiedPush connector — FOSS, F-Droid-friendly push delivery (no FCM/Google). The device
+# receives display-ready notifications from the server via the user's distributor (e.g. ntfy),
+# so the biometric-sealed bearer token is never needed to receive a push. Latest stable.
+unifiedpush = "3.3.3"
 
 [libraries]
 androidx-core = { module = "androidx.core:core-ktx", version = "1.19.0" }
@@ -116,6 +120,7 @@ mapsforge-map = { module = "org.mapsforge:mapsforge-map", version.ref = "mapsfor
 mapsforge-map-reader = { module = "org.mapsforge:mapsforge-map-reader", version.ref = "mapsforge" }
 mapsforge-themes = { module = "org.mapsforge:mapsforge-themes", version.ref = "mapsforge" }
 mapsforge-core = { module = "org.mapsforge:mapsforge-core", version.ref = "mapsforge" }
+unifiedpush-connector = { module = "org.unifiedpush.android:connector", version.ref = "unifiedpush" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

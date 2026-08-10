@@ -89,8 +89,17 @@ private sealed interface SettingsSub {
 /** Settings hub with internal sub-navigation (devices / notifications / about). [onBack] is null when
  *  the hub is a root nav tab (no back affordance), non-null when pushed. */
 @Composable
-fun MoneySettingsScreen(onBack: (() -> Unit)? = null, onLoggedOut: () -> Unit, vm: AccountViewModel = hiltViewModel()) {
+fun MoneySettingsScreen(
+    onBack: (() -> Unit)? = null,
+    onLoggedOut: () -> Unit,
+    openNotifications: Boolean = false,
+    onNotificationsOpened: () -> Unit = {},
+    vm: AccountViewModel = hiltViewModel(),
+) {
     var sub by remember { mutableStateOf<SettingsSub>(SettingsSub.Hub) }
+    LaunchedEffect(openNotifications) {
+        if (openNotifications) { sub = SettingsSub.Notifications; onNotificationsOpened() }
+    }
     when (sub) {
         SettingsSub.Devices -> DevicesScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Notifications -> NotificationsScreen(vm) { sub = SettingsSub.Hub }
@@ -321,6 +330,16 @@ private fun DevicesScreen(vm: AccountViewModel, onBack: () -> Unit) {
     }
 }
 
+/** Push categories shown as per-category mute toggles (must match server `category` keys). */
+private val PUSH_CATEGORIES = listOf(
+    "invoice" to R.string.push_cat_invoice,
+    "task" to R.string.push_cat_task,
+    "event" to R.string.push_cat_event,
+    "birthday" to R.string.push_cat_birthday,
+    "backup" to R.string.push_cat_backup,
+    "system" to R.string.push_cat_system,
+)
+
 @Composable
 private fun NotificationsScreen(vm: AccountViewModel, onBack: () -> Unit) {
     val items by vm.notifications.collectAsStateWithLifecycle()
@@ -330,17 +349,87 @@ private fun NotificationsScreen(vm: AccountViewModel, onBack: () -> Unit) {
             TextButton(onClick = { vm.markAllRead() }) { Text(stringResource(R.string.notifications_mark_all)) }
         })
     }) { pad ->
-        Box(Modifier.fillMaxSize().padding(pad)) {
-            if (items.isEmpty()) EmptyState(stringResource(R.string.notifications_empty))
-            else LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(items, key = { it.id }) { n ->
-                    Column(Modifier.fillMaxWidth().clickable { if (!n.read) vm.markRead(n.id) }.cardSurface(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(n.title, style = MaterialTheme.typography.bodyLarge, color = if (n.read) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
-                        n.body?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        LazyColumn(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item { PushSettingsBlock(vm) }
+            item { SectionLabel(stringResource(R.string.notifications_recent)) }
+            if (items.isEmpty()) item { EmptyState(stringResource(R.string.notifications_empty)) }
+            else items(items, key = { it.id }) { n ->
+                Column(Modifier.fillMaxWidth().clickable { if (!n.read) vm.markRead(n.id) }.cardSurface(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(n.title, style = MaterialTheme.typography.bodyLarge, color = if (n.read) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
+                    n.body?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PushSettingsBlock(vm: AccountViewModel) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val enabled by vm.pushEnabled.collectAsStateWithLifecycle()
+    val lockContent by vm.pushLockscreenContent.collectAsStateWithLifecycle()
+    val muted by vm.pushMutedCategories.collectAsStateWithLifecycle()
+    val distributor by vm.pushDistributor.collectAsStateWithLifecycle()
+    val hasDistributor = remember { vm.hasDistributor() }
+
+    // POST_NOTIFICATIONS gate: request on enable, then start UnifiedPush registration.
+    val permLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) (ctx as? android.app.Activity)?.let { act -> vm.enablePush(act) {} }
+    }
+
+    fun toggle(on: Boolean) {
+        if (on) {
+            val needsPerm = android.content.pm.PackageManager.PERMISSION_GRANTED !=
+                androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.POST_NOTIFICATIONS)
+            if (needsPerm) permLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            else (ctx as? android.app.Activity)?.let { act -> vm.enablePush(act) {} }
+        } else {
+            vm.disablePush()
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel(stringResource(R.string.push_title))
+        if (!hasDistributor) {
+            Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(stringResource(R.string.push_no_distributor_title), style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.push_no_distributor_body), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            ListSectionCard {
+                SwitchRow(stringResource(R.string.push_enable), enabled) { toggle(it) }
+                if (enabled) {
+                    RowDivider()
+                    SwitchRow(stringResource(R.string.push_lockscreen_content), lockContent) { vm.setPushLockscreenContent(it) }
+                }
+            }
+            if (enabled) {
+                distributor?.let {
+                    Text(stringResource(R.string.push_via, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                SectionLabel(stringResource(R.string.push_categories))
+                ListSectionCard {
+                    PUSH_CATEGORIES.forEachIndexed { i, (key, labelRes) ->
+                        if (i > 0) RowDivider()
+                        SwitchRow(stringResource(labelRes), !muted.contains(key)) { on -> vm.setCategoryMuted(key, !on) }
                     }
                 }
             }
         }
+    }
+}
+
+/** A labelled row with a trailing Material3 Switch. */
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable { onChange(!checked) }.padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 

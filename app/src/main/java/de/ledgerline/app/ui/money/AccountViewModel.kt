@@ -20,6 +20,7 @@ import de.ledgerline.app.domain.usecase.ForceLogout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -32,6 +33,7 @@ class AccountViewModel @Inject constructor(
     private val appLockState: AppLockState,
     private val forceLogout: ForceLogout,
     private val sessionHolder: de.ledgerline.app.core.SessionHolder,
+    private val pushRegistrar: de.ledgerline.app.push.PushRegistrar,
 ) : ViewModel() {
 
     /** The connected server's base URL (for the About page). */
@@ -95,6 +97,31 @@ class AccountViewModel @Inject constructor(
     fun loadNotifications() = viewModelScope.launch { _notifications.value = account.notifications()?.items.orEmpty() }
     fun markRead(id: Long) = viewModelScope.launch { if (account.markNotificationRead(id)) loadNotifications() }
     fun markAllRead() = viewModelScope.launch { if (account.markAllNotificationsRead()) loadNotifications() }
+
+    // ---- Push notifications (UnifiedPush) ----
+    val pushEnabled: StateFlow<Boolean> =
+        settings.pushEnabled.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, false)
+    val pushLockscreenContent: StateFlow<Boolean> =
+        settings.pushLockscreenContent.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, false)
+    val pushMutedCategories: StateFlow<Set<String>> =
+        settings.pushMutedCategories.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptySet())
+    val pushDistributor: StateFlow<String?> =
+        settings.pushDistributor.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, null)
+
+    /** Whether any UnifiedPush distributor (e.g. ntfy) is installed on the device. */
+    fun hasDistributor(): Boolean = pushRegistrar.hasDistributor(context)
+
+    /** Begin push registration (needs POST_NOTIFICATIONS already granted). [activity] drives the picker. */
+    fun enablePush(activity: android.app.Activity, done: (de.ledgerline.app.push.PushRegistrar.EnableResult) -> Unit) =
+        viewModelScope.launch {
+            val result = pushRegistrar.enable(activity)
+            if (result == de.ledgerline.app.push.PushRegistrar.EnableResult.REGISTERING) settings.setPushEnabled(true)
+            done(result)
+        }
+
+    fun disablePush() = viewModelScope.launch { pushRegistrar.disable(context) }
+    fun setPushLockscreenContent(on: Boolean) = viewModelScope.launch { settings.setPushLockscreenContent(on) }
+    fun setCategoryMuted(category: String, muted: Boolean) = viewModelScope.launch { settings.setCategoryMuted(category, muted) }
 
     fun setTheme(mode: ThemeMode) = viewModelScope.launch {
         settings.setThemeMode(mode)

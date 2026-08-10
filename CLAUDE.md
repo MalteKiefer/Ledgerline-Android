@@ -147,6 +147,16 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
 - **`ui/money/MoneySettingsScreen`** (Konto-Tab) — Profil, Darstellung (Theme + **Sprache** via
   Android-13-`LocaleManager` + `/locale`), **Dateien** (`file_max_versions` via `GET/PUT /settings`),
   Geräte, Notifications, About, Security (Passwort/2FA/**Recovery-Codes**/Export-SAF/Löschen), Logout.
+- **Push (`ui/push/` bzw. `push/`):** **UnifiedPush** (`org.unifiedpush.android:connector`, F-Droid, kein
+  FCM). `LedgerlinePushService : PushService` empfängt server-gepushte `PushPayload`
+  (`{id,category,level,title,body}`) und zeigt sie via `PushNotifier` (Channels pro `level`,
+  Lockscreen-Visibility Toggle) als System-Notification; Tap → `DeepLinkBus` → Konto→Benachrichtigungen.
+  `PushRegistrar` wählt Distributor + meldet den Endpoint an den Server (`POST/DELETE
+  /device/push-endpoint`, **serverseitig noch offen** — Spec `docs/superpowers/specs/…-server-design.md`).
+  **Empfang braucht keinen Bearer-Token** (Biometrie-Siegel unberührt); der Endpoint wird nur bei
+  entsperrter App gesendet (`SessionHolder` in-memory), sonst in `SettingsStore` gequeued + bei Unlock
+  geflusht (`MainActivity`). Push-Prefs (enabled/Kategorie-Mute/Lockscreen-Inhalt) in `SettingsStore`.
+  `PushFilter` = reine, getestete Parse-/Filter-Logik (`PushFilterTest`).
 - **`data/finance/FinanceRepository`** — cache-first Read (Klartext-Disk-Cache `finance_data.json`) +
   Online-CRUD (patcht In-Memory-Snapshot `StateFlow<FinanceData>` + Disk), live Analytics/Company.
   `NetworkFactory.createFinance` (+ `FinanceApi`). **Offline:** Reads aus Cache; **Writes offline
@@ -187,6 +197,15 @@ Datenmodell-Fixes: `company_contacts`, `InvoiceAging.buckets`, `FinanceTrash.sta
 **Bewusst weggelassen (User):** client-seitige Rechnungs-PDF-Erzeugung (bleibt web-seitig).
 **Offen (Rest):** Share-Target (`ACTION_SEND`), MT940/CAMT-Import, mehr Tests. **On-device-Verifikation
 offen** (FLAG_SECURE → visuell am Gerät prüfen).
+
+**Push-Notifications (2026-08-10) — Android fertig, Server offen:** UnifiedPush-Client komplett
+(siehe §6 Push; Client-Build + `PushFilterTest` grün). Zustellung = kein FCM (F-Droid), Server pusht
+fertigen Payload → App zeigt an, ohne Bearer-Token → Biometrie-Siegel unberührt. **Server-Teil = eigenes
+Spec** `docs/superpowers/specs/2026-08-10-push-notifications-server-design.md`: `POST/DELETE
+/device/push-endpoint` + Dispatch-Choke-Point (jede Notification-Zeile → SendPushJob an ntfy-Endpoints)
++ neue Generatoren `tasks:remind`/`calendar:remind`/`contacts:birthday-remind` (Rechnungs-Dunning läuft
+schon). **On-device-Verifikation offen:** ntfy installieren → Push aktivieren → Test-Push → System-
+Notification → Tap → Center.
 
 **Finance-Basis (aus finance-pivot):** Datenschicht (Modelle + `FinanceApi` + Repository cache-first/CRUD + Offline-Write-Queue
 `FinanceOutbox` für update/delete), biometrischer App-Lock, Finance-Shell + alle Kern-Screens, Nav,

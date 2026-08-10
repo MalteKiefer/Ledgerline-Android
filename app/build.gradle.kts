@@ -155,6 +155,8 @@ dependencies {
     implementation(libs.biometric)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
+    implementation(libs.unifiedpush.connector)
+
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
     testImplementation(libs.coroutines.test)

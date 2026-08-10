@@ -59,6 +59,13 @@ interface LedgerlineApi {
     @POST("api/v1/notifications/read-all")
     suspend fun markAllNotificationsRead(): Response<Unit>
 
+    // ---- Push endpoint (UnifiedPush) — per-device delivery target for server-sent pushes ----
+    @POST("api/v1/device/push-endpoint")
+    suspend fun registerPushEndpoint(@Body body: de.ledgerline.app.data.remote.dto.PushEndpointRequest): Response<Unit>
+
+    @DELETE("api/v1/device/push-endpoint")
+    suspend fun clearPushEndpoint(): Response<Unit>
+
     // ---- Preferences / settings ----
     @POST("api/v1/preferences")
     suspend fun putPreferences(@Body body: de.ledgerline.app.data.remote.dto.DisplayPrefsDto): Response<Unit>

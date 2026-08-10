@@ -624,6 +624,26 @@
     <string name="notifications_mark_all">Alle als gelesen</string>
     <string name="notifications_mark_read">Gelesen</string>
     <string name="notifications_empty">Keine Benachrichtigungen.</string>
+    <string name="notifications_recent">Aktuell</string>
+    <!-- Push-Benachrichtigungen (UnifiedPush) -->
+    <string name="push_title">Push</string>
+    <string name="push_enable">Push aktivieren</string>
+    <string name="push_lockscreen_content">Inhalt auf Sperrbildschirm zeigen</string>
+    <string name="push_categories">Kategorien</string>
+    <string name="push_via">Zugestellt über %1$s</string>
+    <string name="push_no_distributor_title">Kein Push-Distributor installiert</string>
+    <string name="push_no_distributor_body">Installiere einen UnifiedPush-Distributor wie ntfy, um Push-Benachrichtigungen im Hintergrund zu erhalten. Bis dahin werden Benachrichtigungen nur bei geöffneter App aktualisiert.</string>
+    <string name="push_default_title">Ledgerline</string>
+    <string name="push_channel_error">Fehler</string>
+    <string name="push_channel_warning">Warnungen</string>
+    <string name="push_channel_success">Bestätigungen</string>
+    <string name="push_channel_info">Info</string>
+    <string name="push_cat_invoice">Rechnungen</string>
+    <string name="push_cat_task">Aufgaben</string>
+    <string name="push_cat_event">Termine</string>
+    <string name="push_cat_birthday">Geburtstage</string>
+    <string name="push_cat_backup">Backups</string>
+    <string name="push_cat_system">System</string>
     <string name="share_open_title">Geteilten Link öffnen</string>
     <string name="share_open_hint">Füge einen von diesem Server geteilten Link ein.</string>
     <string name="share_open_field">Freigabe-URL</string>

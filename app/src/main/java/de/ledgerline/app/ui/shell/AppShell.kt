@@ -53,8 +53,11 @@ private enum class Section(val labelRes: Int, val icon: ImageVector, val moduleK
 class ShellViewModel @Inject constructor(
     moduleAccess: ModuleAccess,
     private val accountRepository: AccountRepository,
+    private val deepLinkBus: de.ledgerline.app.core.DeepLinkBus,
 ) : ViewModel() {
     val allowed: StateFlow<Set<String>?> = moduleAccess.allowed
+    val deepLinks = deepLinkBus.links
+    fun consumeDeepLink() = deepLinkBus.clear()
     init { viewModelScope.launch { accountRepository.me() } } // ensures modules (+ wipe flag) are loaded
 }
 
@@ -74,6 +77,18 @@ fun AppShell(
 
     var section by rememberSaveable { mutableStateOf(Section.FILES) }
     LaunchedEffect(visible) { if (section !in visible) section = visible.first() }
+
+    // A tapped push notification routes here: jump to the Account tab and open the centre.
+    var openNotifications by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        shellVm.deepLinks.collect { link ->
+            if (link == de.ledgerline.app.core.DeepLink.NOTIFICATIONS) {
+                section = Section.ACCOUNT
+                openNotifications = true
+                shellVm.consumeDeepLink()
+            }
+        }
+    }
 
     // A pushed finance sub-screen (invoice/transaction edit, CSV import). Rendered INSIDE the shell so
     // the bottom nav stays visible on every screen. Cleared when switching sections.
@@ -104,7 +119,12 @@ fun AppShell(
                 else FinanceSection(onPush = { route = it }, modifier = bottomOnly, vm = financeVm)
             Section.TODOS -> de.ledgerline.app.ui.todos.TodosSection(modifier = bottomOnly)
             Section.ACCOUNT -> Box(bottomOnly) {
-                MoneySettingsScreen(onBack = null, onLoggedOut = onDisconnected)
+                MoneySettingsScreen(
+                    onBack = null,
+                    onLoggedOut = onDisconnected,
+                    openNotifications = openNotifications,
+                    onNotificationsOpened = { openNotifications = false },
+                )
             }
         }
     }

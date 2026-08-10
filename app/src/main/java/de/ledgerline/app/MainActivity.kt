@@ -38,6 +38,8 @@ class MainActivity : FragmentActivity() {
 
     @Inject lateinit var appLockState: AppLockState
     @Inject lateinit var settingsStore: SettingsStore
+    @Inject lateinit var deepLinkBus: de.ledgerline.app.core.DeepLinkBus
+    @Inject lateinit var pushRegistrar: de.ledgerline.app.push.PushRegistrar
 
     private var idleTimeoutMs = 5 * 60_000L
     @Volatile private var lastInteraction = SystemClock.elapsedRealtime()
@@ -69,8 +71,27 @@ class MainActivity : FragmentActivity() {
         if (keepScreenOn && keepScreenOnMinutes > 0) armKeepScreen()
     }
 
+    /** Route a tapped push notification to the notification centre once the shell is composed. */
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getStringExtra(EXTRA_OPEN) == OPEN_NOTIFICATIONS) {
+            deepLinkBus.emit(de.ledgerline.app.core.DeepLink.NOTIFICATIONS)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
+        de.ledgerline.app.push.PushNotifier.ensureChannels(this)
+        // Deliver any push endpoint that arrived while locked, once we're unlocked again.
+        lifecycleScope.launch {
+            appLockState.unlocked.collect { unlocked -> if (unlocked) pushRegistrar.flushPending() }
+        }
         if (!de.ledgerline.app.BuildConfig.DEBUG) {
             window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         }
@@ -131,5 +152,11 @@ class MainActivity : FragmentActivity() {
                 AppNav(authorize = auth.authorize)
             }
         }
+    }
+
+    companion object {
+        /** Intent extra set by a push notification's tap PendingIntent. */
+        const val EXTRA_OPEN = "ledgerline.open"
+        const val OPEN_NOTIFICATIONS = "notifications"
     }
 }

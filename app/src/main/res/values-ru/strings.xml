@@ -627,6 +627,26 @@
     <string name="notifications_mark_all">Прочитать все</string>
     <string name="notifications_mark_read">Прочитано</string>
     <string name="notifications_empty">Нет уведомлений.</string>
+    <string name="notifications_recent">Недавние</string>
+    <!-- Push-уведомления (UnifiedPush) -->
+    <string name="push_title">Push</string>
+    <string name="push_enable">Включить push</string>
+    <string name="push_lockscreen_content">Показывать содержимое на экране блокировки</string>
+    <string name="push_categories">Категории</string>
+    <string name="push_via">Доставка через %1$s</string>
+    <string name="push_no_distributor_title">Нет установленного push-дистрибьютора</string>
+    <string name="push_no_distributor_body">Установите дистрибьютор UnifiedPush, например ntfy, чтобы получать push-уведомления в фоне. До этого уведомления обновляются только при открытом приложении.</string>
+    <string name="push_default_title">Ledgerline</string>
+    <string name="push_channel_error">Ошибки</string>
+    <string name="push_channel_warning">Предупреждения</string>
+    <string name="push_channel_success">Подтверждения</string>
+    <string name="push_channel_info">Инфо</string>
+    <string name="push_cat_invoice">Счета</string>
+    <string name="push_cat_task">Задачи</string>
+    <string name="push_cat_event">Встречи</string>
+    <string name="push_cat_birthday">Дни рождения</string>
+    <string name="push_cat_backup">Резервные копии</string>
+    <string name="push_cat_system">Система</string>
     <string name="share_open_title">Открыть ссылку общего доступа</string>
     <string name="share_open_hint">Вставьте ссылку, которой поделились с этого сервера.</string>
     <string name="share_open_field">URL общего доступа</string>

@@ -7,8 +7,10 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "ledgerline_settings")
@@ -30,6 +32,13 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val prefTempKey = stringPreferencesKey("pref_temp")
     private val prefGlucoseKey = stringPreferencesKey("pref_glucose")
     private val prefTimeFormatKey = stringPreferencesKey("pref_time_format")
+    // ── Push notifications (UnifiedPush) ──
+    private val pushEnabledKey = booleanPreferencesKey("push_enabled")
+    private val pushLockscreenContentKey = booleanPreferencesKey("push_lockscreen_content")
+    private val pushMutedCategoriesKey = stringSetPreferencesKey("push_muted_categories")
+    private val pushEndpointSentKey = stringPreferencesKey("push_endpoint_sent")
+    private val pushEndpointPendingKey = stringPreferencesKey("push_endpoint_pending")
+    private val pushDistributorKey = stringPreferencesKey("push_distributor")
 
     /** Idle auto-lock timeout in minutes; defaults to [DEFAULT_TIMEOUT_MINUTES]. */
     val timeoutMinutes: Flow<Int> =
@@ -94,6 +103,75 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
             it[prefGlucoseKey] = prefs.glucose
             it[prefTimeFormatKey] = prefs.timeFormat
         }
+    }
+
+    // ── Push notifications (UnifiedPush) ──────────────────────────────────────────
+    // Delivery does not use the biometric-sealed bearer token: the server sends a
+    // display-ready payload to the device's endpoint and the app just renders it.
+
+    /** Whether the user has opted into push. Defaults OFF (opt-in). */
+    val pushEnabled: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[pushEnabledKey] ?: false }
+
+    suspend fun setPushEnabled(on: Boolean) {
+        context.settingsDataStore.edit { it[pushEnabledKey] = on }
+    }
+
+    suspend fun pushEnabledNow(): Boolean =
+        context.settingsDataStore.data.map { it[pushEnabledKey] ?: false }.first()
+
+    /** Show notification body on the lock screen (else title only). Defaults OFF (private). */
+    val pushLockscreenContent: Flow<Boolean> =
+        context.settingsDataStore.data.map { it[pushLockscreenContentKey] ?: false }
+
+    suspend fun setPushLockscreenContent(on: Boolean) {
+        context.settingsDataStore.edit { it[pushLockscreenContentKey] = on }
+    }
+
+    /** Categories the user has muted (empty = every category shows). */
+    val pushMutedCategories: Flow<Set<String>> =
+        context.settingsDataStore.data.map { it[pushMutedCategoriesKey] ?: emptySet() }
+
+    suspend fun setCategoryMuted(category: String, muted: Boolean) {
+        context.settingsDataStore.edit { p ->
+            val cur = (p[pushMutedCategoriesKey] ?: emptySet()).toMutableSet()
+            if (muted) cur.add(category) else cur.remove(category)
+            p[pushMutedCategoriesKey] = cur
+        }
+    }
+
+    /** Blocking read of muted categories for the push service (no coroutine scope there). */
+    suspend fun mutedCategoriesNow(): Set<String> =
+        context.settingsDataStore.data.map { it[pushMutedCategoriesKey] ?: emptySet() }.first()
+
+    suspend fun lockscreenContentNow(): Boolean =
+        context.settingsDataStore.data.map { it[pushLockscreenContentKey] ?: false }.first()
+
+    /** The last endpoint we successfully delivered to the server (dedup re-registration). */
+    val pushEndpointSent: Flow<String?> =
+        context.settingsDataStore.data.map { it[pushEndpointSentKey] }
+
+    suspend fun endpointSentNow(): String? =
+        context.settingsDataStore.data.map { it[pushEndpointSentKey] }.first()
+
+    suspend fun setEndpointSent(url: String?) {
+        context.settingsDataStore.edit { if (url == null) it.remove(pushEndpointSentKey) else it[pushEndpointSentKey] = url }
+    }
+
+    /** An endpoint received while locked/offline, queued to send on the next unlock. */
+    suspend fun endpointPendingNow(): String? =
+        context.settingsDataStore.data.map { it[pushEndpointPendingKey] }.first()
+
+    suspend fun setEndpointPending(url: String?) {
+        context.settingsDataStore.edit { if (url == null) it.remove(pushEndpointPendingKey) else it[pushEndpointPendingKey] = url }
+    }
+
+    /** The distributor package the connector last used (status display). */
+    val pushDistributor: Flow<String?> =
+        context.settingsDataStore.data.map { it[pushDistributorKey] }
+
+    suspend fun setPushDistributor(pkg: String?) {
+        context.settingsDataStore.edit { if (pkg == null) it.remove(pushDistributorKey) else it[pushDistributorKey] = pkg }
     }
 
     companion object {

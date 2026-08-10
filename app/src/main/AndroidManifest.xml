@@ -48,6 +48,17 @@
             android:foregroundServiceType="dataSync"
             android:exported="false" />
 
+        <!-- UnifiedPush v3 push service. Receives display-ready notifications from the server
+             via the user's distributor (e.g. ntfy). No FCM/Google; no bearer token needed to
+             receive. Registration + endpoint upload happen in-app while unlocked. -->
+        <service
+            android:name=".push.LedgerlinePushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
+            </intent-filter>
+        </service>
+
         <!-- Shares downloaded invoice PDFs / receipts to a viewer via a content:// URI. -->
         <provider
             android:name="androidx.core.content.FileProvider"
