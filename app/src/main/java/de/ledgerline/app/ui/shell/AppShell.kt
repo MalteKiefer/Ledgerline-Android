@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -44,6 +45,7 @@ import javax.inject.Inject
 private enum class Section(val labelRes: Int, val icon: ImageVector, val moduleKey: String?) {
     FILES(R.string.tab_files, Icons.Outlined.Folder, "files"),
     FINANCE(R.string.tab_finance, Icons.AutoMirrored.Outlined.ReceiptLong, "finance"),
+    TODOS(R.string.tab_todos, Icons.Outlined.CheckCircle, "calendar"),
     ACCOUNT(R.string.tab_account, Icons.Outlined.AccountCircle, null),
 }
 
@@ -100,6 +102,7 @@ fun AppShell(
             Section.FINANCE ->
                 if (route != null) Box(bottomOnly) { MoneyRouteHost(route!!, financeVm, onBack = { route = null }) }
                 else FinanceSection(onPush = { route = it }, modifier = bottomOnly, vm = financeVm)
+            Section.TODOS -> de.ledgerline.app.ui.todos.TodosSection(modifier = bottomOnly)
             Section.ACCOUNT -> Box(bottomOnly) {
                 MoneySettingsScreen(onBack = null, onLoggedOut = onDisconnected)
             }

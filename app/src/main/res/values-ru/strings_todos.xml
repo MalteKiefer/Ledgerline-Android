@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="todos_default_list">Задачи</string>
+    <string name="todos_all_lists">Все</string>
+    <string name="todos_open">Открытые</string>
+    <string name="todos_all">Все</string>
+    <string name="todos_empty">Нет задач</string>
+    <string name="todos_new">Новая задача</string>
+    <string name="todos_summary">Задача</string>
+    <string name="todos_description">Заметка</string>
+    <string name="todos_due">Срок</string>
+    <string name="todos_all_day">Весь день</string>
+    <string name="todos_priority">Приоритет</string>
+    <string name="todos_prio_none">Нет</string>
+    <string name="todos_prio_high">Высокий</string>
+    <string name="todos_prio_medium">Средний</string>
+    <string name="todos_prio_low">Низкий</string>
+    <string name="todos_list">Список</string>
+    <string name="todos_add_list">Новый список</string>
+</resources>

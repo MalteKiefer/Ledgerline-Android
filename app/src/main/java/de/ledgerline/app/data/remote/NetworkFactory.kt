@@ -49,6 +49,11 @@ object NetworkFactory {
         retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
             .create(AdminApi::class.java)
 
+    /** The task-list (VTODO) slice of the calendar module over the same pinned, authenticated transport. */
+    fun createCalendar(baseUrl: String, tokenProvider: () -> String?, pin: String?): CalendarApi =
+        retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
+            .create(CalendarApi::class.java)
+
     /**
      * A minimal HTTPS client (RESTRICTED_TLS + SPKI pinning, short timeouts, no auth) for the
      * server-reachability health ping (`GET {baseUrl}/up`). Same fail-closed transport as the API,

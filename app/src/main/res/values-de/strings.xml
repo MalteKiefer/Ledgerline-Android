@@ -98,7 +98,7 @@
     <string name="passkey_saved">Passkey gespeichert</string>
     <string name="passkey_error">Passkey fehlgeschlagen</string>
     <string name="tab_bookmarks">Lesezeichen</string>
-    <string name="tab_todos">Todos</string>
+    <string name="tab_todos">Aufgaben</string>
     <string name="ws_empty_files">Noch keine Dateien.</string>
     <string name="files_section_folders">Ordner</string>
     <string name="files_section_files">Dateien</string>

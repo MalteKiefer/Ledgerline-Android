@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="todos_default_list">Tasks</string>
+    <string name="todos_all_lists">All</string>
+    <string name="todos_open">Open</string>
+    <string name="todos_all">All</string>
+    <string name="todos_empty">No tasks</string>
+    <string name="todos_new">New task</string>
+    <string name="todos_summary">Task</string>
+    <string name="todos_description">Notes</string>
+    <string name="todos_due">Due date</string>
+    <string name="todos_all_day">All day</string>
+    <string name="todos_priority">Priority</string>
+    <string name="todos_prio_none">None</string>
+    <string name="todos_prio_high">High</string>
+    <string name="todos_prio_medium">Medium</string>
+    <string name="todos_prio_low">Low</string>
+    <string name="todos_list">List</string>
+    <string name="todos_add_list">New list</string>
+</resources>

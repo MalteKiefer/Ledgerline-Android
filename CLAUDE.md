@@ -3,9 +3,11 @@
 Native Android-Client für die selbst-gehostete **Ledgerline**. **Server-Pivot v1.5xx (2026):
 das Zero-Knowledge-/Vault-/Sealed-Store-Modell wurde vollständig entfernt.** Der Server ist jetzt
 eine **plaintext-relationale API** (Laravel-13, `/api/v1`) mit den Modulen `files, finance, contacts,
-calendar` (`config/modules.php`). **Diese Android-App bildet bewusst nur zwei davon ab: Dateien
-(Files) + Finanzen (Finance)** — plus alle Nutzer-Einstellungen. Web-App = Referenz/Superset; iOS =
-Look-&-Feel-Referenz. (Rebuild-Basis war der Branch `finance-pivot`; Files wurde 2026-08 neu ergänzt.)
+calendar` (`config/modules.php`). **Diese Android-App bildet bewusst nur ab: Dateien (Files) +
+Finanzen (Finance) + Aufgaben (Todos = nur der VTODO-Task-List-Teil des Calendar-Moduls, keine
+Events)** — plus alle Nutzer-Einstellungen. Kalender-Events + Kontakte bleiben ausgeschlossen.
+Web-App = Referenz/Superset; iOS = Look-&-Feel-Referenz. (Rebuild-Basis war der Branch
+`finance-pivot`; Files wurde 2026-08 neu ergänzt, Todos 2026-08-10.)
 
 > **Diese Datei MUSS den aktuellen Stand widerspiegeln. Nach jeder Änderung pflegen.**
 > Ground truth API: `../ledgerline/openapi.yaml` + `../ledgerline/routes/api.php`.
@@ -119,8 +121,17 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
 
 - **Flow** (`ui/nav/AppNav`): `WELCOME → PAIRING → LOCK (biometrisch) → HOME (`ui/shell/AppShell`)`.
   `RootViewModel` gated auf `AppLockState.unlocked`; 401/Remote-Wipe → `ForceLogout` + re-pair.
-- **`ui/shell/AppShell`** — Multi-Modul-Bottom-Nav **Dateien · Finanzen · Konto**, gated über
-  `ModuleAccess` (`/me.modules`). Finance-Detail/Edit-Flows als `MoneyRoute`-Overlays.
+- **`ui/shell/AppShell`** — Multi-Modul-Bottom-Nav **Dateien · Finanzen · Aufgaben · Konto**, gated
+  über `ModuleAccess` (`/me.modules`; Aufgaben-Tab nur bei Modul `calendar`). Finance-Detail/Edit-Flows
+  als `MoneyRoute`-Overlays.
+- **Aufgaben (`ui/todos/`):** `TodosSection`/`TodosViewModel` — VTODO-Task-Lists (nur der Task-Teil des
+  Calendar-Moduls, keine Events). Listen-Auswahl (VTODO-Kalender via `GET /calendar/data`, filter
+  `component==VTODO`; neue Liste = `POST /calendars {component:VTODO}`), Offen/Alle-Filter, Complete-
+  Toggle, Editor (Titel/Notiz/Fällig-DatePicker/Ganztägig/Priorität), Löschen. `data/calendar/
+  TodosRepository` (online-only; per-Record REST mit DAV-`etag`-Optimistic-Concurrency; Complete/Edit
+  senden das volle VTODO neu, da PUT rebuildet) + `NetworkFactory.createCalendar` + `CalendarApi`
+  (`/calendar/todos` CRUD + `/reorder` + ICS `/import`|`/export`). Bewusst weggelassen: Kalender-Events,
+  Kontakte.
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte
   Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
   Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung, **Favoriten-Filter, Label-
