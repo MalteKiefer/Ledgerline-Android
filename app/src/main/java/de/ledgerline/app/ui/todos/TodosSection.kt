@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SubdirectoryArrowRight
 import androidx.compose.material3.AlertDialog
@@ -62,8 +63,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -318,7 +321,7 @@ private fun TodoMeta(todo: CalendarTodo, listName: String?, progress: Pair<Int, 
     val overdue = !todo.done && dueIsOverdue(todo.due)
     val parts = ArrayList<Pair<String, Color>>()
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    todo.due?.takeIf { it.isNotBlank() }?.let { parts += fmtDate(it) to if (overdue) MaterialTheme.colorScheme.error else muted }
+    todo.due?.takeIf { it.isNotBlank() }?.let { parts += fmtDueIso(it, todo.allDay) to if (overdue) MaterialTheme.colorScheme.error else muted }
     progress?.let { parts += "☑ ${it.first}/${it.second}" to muted }
     (todo.percentComplete ?: 0).takeIf { it in 1..99 }?.let { parts += "$it%" to muted }
     priorityLabel(todo.priority)?.let { parts += it to muted }
@@ -433,7 +436,7 @@ private fun TodoEditorSheet(
 
             // Core inline metadata chips.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                MetaChip(Icons.Outlined.CalendarToday, dueMillis?.let { quickLabelFor(it) } ?: stringResource(R.string.todos_due), dueMillis != null) { showDue = true }
+                MetaChip(Icons.Outlined.CalendarToday, dueMillis?.let { dueChipLabel(it, allDay) } ?: stringResource(R.string.todos_due), dueMillis != null) { showDue = true }
                 Box {
                     MetaChip(Icons.Outlined.Flag, priorityChipLabel(priority), priority != 0, tint = if (priority != 0) priorityColor(priority) else null) { prioMenu = true }
                     DropdownMenu(prioMenu, { prioMenu = false }) {
@@ -536,39 +539,88 @@ private fun TodoEditorSheet(
     }
 }
 
-/** Quick due-date picker: preset chips (today/tomorrow/weekend/next week) + a full date picker. */
+/** Due picker: preset chips set the date; a date picker + a time picker (when not all-day) refine it. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun DueDateSheet(current: Long?, allDay: Boolean, onPick: (Long?, Boolean) -> Unit, onClear: () -> Unit, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val zone = java.time.ZoneId.systemDefault()
     var allDayState by remember { mutableStateOf(allDay) }
-    var showPicker by remember { mutableStateOf(false) }
+    var date by remember {
+        mutableStateOf(current?.let { m ->
+            if (allDay) Instant.ofEpochMilli(m).atZone(ZoneOffset.UTC).toLocalDate()
+            else Instant.ofEpochMilli(m).atZone(zone).toLocalDate()
+        })
+    }
+    var time by remember {
+        mutableStateOf(if (!allDay && current != null) Instant.ofEpochMilli(current).atZone(zone).toLocalTime() else java.time.LocalTime.of(9, 0))
+    }
+    var showDate by remember { mutableStateOf(false) }
+    var showTime by remember { mutableStateOf(false) }
+
+    fun compute(): Long? {
+        val d = date ?: return null
+        return if (allDayState) d.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        else java.time.LocalDateTime.of(d, time).atZone(zone).toInstant().toEpochMilli()
+    }
+    val timeFmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(Modifier.fillMaxWidth().padding(16.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(Modifier.fillMaxWidth().padding(16.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.todos_due), style = MaterialTheme.typography.titleMedium)
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = { onPick(dayMillis(0), allDayState) }, label = { Text(stringResource(R.string.todos_due_today)) })
-                AssistChip(onClick = { onPick(dayMillis(1), allDayState) }, label = { Text(stringResource(R.string.todos_due_tomorrow)) })
-                AssistChip(onClick = { onPick(weekendMillis(), allDayState) }, label = { Text(stringResource(R.string.todos_due_weekend)) })
-                AssistChip(onClick = { onPick(nextWeekMillis(), allDayState) }, label = { Text(stringResource(R.string.todos_due_next_week)) })
-                AssistChip(onClick = { showPicker = true }, leadingIcon = { Icon(Icons.Outlined.CalendarToday, null) }, label = { Text(stringResource(R.string.todos_due_pick)) })
+                AssistChip(onClick = { date = LocalDate.now() }, label = { Text(stringResource(R.string.todos_due_today)) })
+                AssistChip(onClick = { date = LocalDate.now().plusDays(1) }, label = { Text(stringResource(R.string.todos_due_tomorrow)) })
+                AssistChip(onClick = { date = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY)) }, label = { Text(stringResource(R.string.todos_due_weekend)) })
+                AssistChip(onClick = { date = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY)) }, label = { Text(stringResource(R.string.todos_due_next_week)) })
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                AssistChip(
+                    onClick = { showDate = true },
+                    leadingIcon = { Icon(Icons.Outlined.CalendarToday, null, Modifier.size(18.dp)) },
+                    label = { Text(date?.let { dateFmt.format(it.atStartOfDay(ZoneOffset.UTC).toInstant()) } ?: stringResource(R.string.todos_due_pick)) },
+                    shape = RoundedCornerShape(10.dp),
+                )
+                if (!allDayState) AssistChip(
+                    onClick = { showTime = true },
+                    leadingIcon = { Icon(Icons.Outlined.Schedule, null, Modifier.size(18.dp)) },
+                    label = { Text(timeFmt.format(time)) },
+                    shape = RoundedCornerShape(10.dp),
+                )
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.todos_all_day), Modifier.weight(1f))
                 Switch(checked = allDayState, onCheckedChange = { allDayState = it })
             }
-            if (current != null) TextButton(onClick = onClear) { Text(stringResource(R.string.todos_due_none), color = MaterialTheme.colorScheme.error) }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (current != null) TextButton(onClick = onClear) { Text(stringResource(R.string.todos_due_none), color = MaterialTheme.colorScheme.error) }
+                Spacer(Modifier.weight(1f))
+                TextButton(enabled = date != null, onClick = { onPick(compute(), allDayState) }) { Text(stringResource(R.string.action_save)) }
+            }
         }
     }
 
-    if (showPicker) {
-        val state = rememberDatePickerState(initialSelectedDateMillis = current)
+    if (showDate) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = date?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli())
         DatePickerDialog(
-            onDismissRequest = { showPicker = false },
-            confirmButton = { TextButton(onClick = { showPicker = false; onPick(state.selectedDateMillis, allDayState) }) { Text(stringResource(R.string.action_save)) } },
-            dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.action_cancel)) } },
+            onDismissRequest = { showDate = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { date = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
+                    showDate = false
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = { TextButton(onClick = { showDate = false }) { Text(stringResource(R.string.action_cancel)) } },
         ) { DatePicker(state = state) }
+    }
+    if (showTime) {
+        val ts = rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { showTime = false },
+            confirmButton = { TextButton(onClick = { time = java.time.LocalTime.of(ts.hour, ts.minute); showTime = false }) { Text(stringResource(R.string.action_save)) } },
+            dismissButton = { TextButton(onClick = { showTime = false }) { Text(stringResource(R.string.action_cancel)) } },
+            text = { TimePicker(state = ts) },
+        )
     }
 }
 
@@ -654,30 +706,44 @@ private fun priorityLabel(p: Int?): String? {
     return priorityChipLabel(v)
 }
 
-// ---- date helpers (UTC-midnight millis, matching the M3 DatePicker) ----
+// ---- date/time helpers ----
+// All-day due/start = a calendar date pinned at UTC-midnight (matches the M3 DatePicker + the
+// server's date semantics). A timed due = an absolute instant; we render/pick it in the device zone.
 private val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy").withZone(ZoneOffset.UTC)
+private val dateTimeFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(java.time.ZoneId.systemDefault())
 
 private fun fmtMillis(millis: Long): String = dateFmt.format(Instant.ofEpochMilli(millis))
 private fun fmtDate(iso: String): String = runCatching { dateFmt.format(Instant.parse(iso)) }.getOrElse { iso.take(10) }
-private fun parseMillis(iso: String): Long? = runCatching { Instant.parse(iso).toEpochMilli() }.getOrNull()
+
+/** Format a due ISO: date only when all-day, else date + local time. */
+private fun fmtDueIso(iso: String, allDay: Boolean): String = runCatching {
+    val inst = parseInstant(iso)!!
+    if (allDay) dateFmt.format(inst) else dateTimeFmt.format(inst)
+}.getOrElse { iso.take(if (allDay) 10 else 16) }
+
+/** Lenient ISO parse: full instant, or a bare date (all-day) → UTC midnight. */
+private fun parseInstant(iso: String): Instant? =
+    runCatching { Instant.parse(iso) }.getOrNull()
+        ?: runCatching { LocalDate.parse(iso.take(10)).atStartOfDay(ZoneOffset.UTC).toInstant() }.getOrNull()
+
+private fun parseMillis(iso: String): Long? = parseInstant(iso)?.toEpochMilli()
 private fun toIsoInstant(millis: Long): String = Instant.ofEpochMilli(millis).toString()
 private fun dueIsOverdue(iso: String?): Boolean {
     if (iso.isNullOrBlank()) return false
-    val d = runCatching { Instant.parse(iso).atZone(ZoneOffset.UTC).toLocalDate() }.getOrNull() ?: return false
-    return d.isBefore(LocalDate.now())
+    val inst = parseInstant(iso) ?: return false
+    return inst.isBefore(Instant.now())
 }
 
-private fun dayMillis(plusDays: Long): Long = LocalDate.now().plusDays(plusDays).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-private fun weekendMillis(): Long = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-private fun nextWeekMillis(): Long = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-
+/** Chip label for the editor: Today/Tomorrow shorthand (+ local time when timed), else the date. */
 @Composable
-private fun quickLabelFor(millis: Long): String {
-    val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+private fun dueChipLabel(millis: Long, allDay: Boolean): String {
+    val zone = if (allDay) ZoneOffset.UTC else java.time.ZoneId.systemDefault()
+    val zdt = Instant.ofEpochMilli(millis).atZone(zone)
     val today = LocalDate.now()
-    return when (date) {
+    val datePart = when (zdt.toLocalDate()) {
         today -> stringResource(R.string.todos_due_today)
         today.plusDays(1) -> stringResource(R.string.todos_due_tomorrow)
-        else -> dateFmt.format(Instant.ofEpochMilli(millis))
+        else -> dateFmt.format(Instant.ofEpochMilli(if (allDay) millis else zdt.toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()))
     }
+    return if (allDay) datePart else "$datePart ${java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(zdt)}"
 }
