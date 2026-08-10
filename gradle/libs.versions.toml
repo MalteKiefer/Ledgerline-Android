@@ -61,6 +61,9 @@ mapsforge = "0.25.0"
 # receives display-ready notifications from the server via the user's distributor (e.g. ntfy),
 # so the biometric-sealed bearer token is never needed to receive a push. Latest stable.
 unifiedpush = "3.3.3"
+# Compose Markdown renderer (OSS, F-Droid-friendly, no Google) for the Notes module's
+# Markdown body preview. m3 variant themes with Material 3. Latest stable.
+markdownRenderer = "0.43.0"
 
 [libraries]
 androidx-core = { module = "androidx.core:core-ktx", version = "1.19.0" }
@@ -121,6 +124,7 @@ mapsforge-map-reader = { module = "org.mapsforge:mapsforge-map-reader", version.
 mapsforge-themes = { module = "org.mapsforge:mapsforge-themes", version.ref = "mapsforge" }
 mapsforge-core = { module = "org.mapsforge:mapsforge-core", version.ref = "mapsforge" }
 unifiedpush-connector = { module = "org.unifiedpush.android:connector", version.ref = "unifiedpush" }
+markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notes_new">New note</string>
+    <string name="notes_edit">Edit note</string>
+    <string name="notes_preview">Preview</string>
+    <string name="notes_title">Title</string>
+    <string name="notes_body_md">Note (Markdown)</string>
+    <string name="notes_empty_body">Nothing to preview.</string>
+    <string name="notes_empty">No notes yet.</string>
+    <string name="notes_untitled">Untitled</string>
+    <string name="notes_search">Search notes</string>
+    <string name="notes_all">All</string>
+    <string name="notes_folder">Folder</string>
+    <string name="notes_no_folder">No folder</string>
+    <string name="notes_folders">Folders</string>
+    <string name="notes_folder_name">Folder name</string>
+    <string name="notes_add_folder">Add folder</string>
+    <string name="notes_tags">Tags</string>
+    <string name="notes_tag_add">Add tag</string>
+    <string name="notes_pin">Pin</string>
+    <string name="notes_favorite">Favorite</string>
+</resources>

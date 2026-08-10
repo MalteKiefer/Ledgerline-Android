@@ -47,6 +47,7 @@ class RootViewModel @Inject constructor(
     private val forceLogout: ForceLogout,
     private val financeRepository: FinanceRepository,
     private val filesRepository: FilesRepository,
+    private val notesRepository: de.ledgerline.app.data.notes.NotesRepository,
     private val accountRepository: AccountRepository,
 ) : ViewModel() {
     private val _dest = MutableStateFlow(Destination.LOADING)
@@ -77,6 +78,7 @@ class RootViewModel @Inject constructor(
         appLockState.lock()
         financeRepository.clear()
         filesRepository.clear()
+        notesRepository.clear()
         sessionHolder.clear()
         _dest.value = Destination.WELCOME
     }

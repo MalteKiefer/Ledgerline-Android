@@ -156,6 +156,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
 
     implementation(libs.unifiedpush.connector)
+    implementation(libs.markdown.renderer.m3)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

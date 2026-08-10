@@ -3,11 +3,11 @@
 Native Android-Client für die selbst-gehostete **Ledgerline**. **Server-Pivot v1.5xx (2026):
 das Zero-Knowledge-/Vault-/Sealed-Store-Modell wurde vollständig entfernt.** Der Server ist jetzt
 eine **plaintext-relationale API** (Laravel-13, `/api/v1`) mit den Modulen `files, finance, contacts,
-calendar` (`config/modules.php`). **Diese Android-App bildet bewusst nur ab: Dateien (Files) +
+calendar, notes` (`config/modules.php`). **Diese Android-App bildet bewusst nur ab: Dateien (Files) +
 Finanzen (Finance) + Aufgaben (Todos = nur der VTODO-Task-List-Teil des Calendar-Moduls, keine
-Events)** — plus alle Nutzer-Einstellungen. Kalender-Events + Kontakte bleiben ausgeschlossen.
+Events) + Notizen (Notes)** — plus alle Nutzer-Einstellungen. Kalender-Events + Kontakte bleiben ausgeschlossen.
 Web-App = Referenz/Superset; iOS = Look-&-Feel-Referenz. (Rebuild-Basis war der Branch
-`finance-pivot`; Files wurde 2026-08 neu ergänzt, Todos 2026-08-10.)
+`finance-pivot`; Files wurde 2026-08 neu ergänzt, Todos 2026-08-10, Notes 2026-08-10.)
 
 > **Diese Datei MUSS den aktuellen Stand widerspiegeln. Nach jeder Änderung pflegen.**
 > Ground truth API: `../ledgerline/openapi.yaml` + `../ledgerline/routes/api.php`.
@@ -121,9 +121,18 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
 
 - **Flow** (`ui/nav/AppNav`): `WELCOME → PAIRING → LOCK (biometrisch) → HOME (`ui/shell/AppShell`)`.
   `RootViewModel` gated auf `AppLockState.unlocked`; 401/Remote-Wipe → `ForceLogout` + re-pair.
-- **`ui/shell/AppShell`** — Multi-Modul-Bottom-Nav **Dateien · Finanzen · Aufgaben · Konto**, gated
-  über `ModuleAccess` (`/me.modules`; Aufgaben-Tab nur bei Modul `calendar`). Finance-Detail/Edit-Flows
-  als `MoneyRoute`-Overlays.
+- **`ui/shell/AppShell`** — Multi-Modul-Bottom-Nav **Dateien · Finanzen · Aufgaben · Notizen · Konto**, gated
+  über `ModuleAccess` (`/me.modules`; Aufgaben-Tab nur bei Modul `calendar`, Notizen nur bei `notes`).
+  Finance-Detail/Edit-Flows als `MoneyRoute`-Overlays.
+- **Notizen (`ui/notes/`):** `NotesSection`/`NotesViewModel` — plaintext-relationales Notes-Modul
+  (Markdown). Ordner-Filter-Chips, Volltextsuche (`GET /notes/search`), Notiz-Liste (Pin/Favorit/Tags),
+  Quick-Add/Edit-Sheet (Titel + **Markdown-Body mit Edit/Vorschau-Toggle** via
+  `com.mikepenz:multiplatform-markdown-renderer-m3`, Ordner-Picker, Tags), Ordner-Verwaltung, Trash
+  (restore/force für Notizen + Ordner). `data/notes/NotesRepository` (online-only Snapshot
+  `folders`/`notes`/`tags` + per-Record-CRUD, optimistic `version`→409) + `NetworkFactory.createNotes`
+  + `NotesApi` (`/notes/data`|`/trash`|`/search` + CRUD + `/favorite`|`/pin`|`/restore`|`/force` +
+  Ordner-CRUD). Body wird on-demand (`GET /notes/{id}`) für den Editor geladen. Server-Follow-ups
+  (Wikilinks/Backlinks, Attachments) noch offen.
 - **Aufgaben (`ui/todos/`):** `TodosSection`/`TodosViewModel` — VTODO-Task-Lists (nur der Task-Teil des
   Calendar-Moduls, keine Events). Listen-Auswahl (VTODO-Kalender via `GET /calendar/data`, filter
   `component==VTODO`; neue Liste = `POST /calendars {component:VTODO}`), Offen/Alle-Filter, Complete-

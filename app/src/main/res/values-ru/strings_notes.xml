@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notes_new">Новая заметка</string>
+    <string name="notes_edit">Изменить заметку</string>
+    <string name="notes_preview">Предпросмотр</string>
+    <string name="notes_title">Заголовок</string>
+    <string name="notes_body_md">Заметка (Markdown)</string>
+    <string name="notes_empty_body">Нечего показать.</string>
+    <string name="notes_empty">Пока нет заметок.</string>
+    <string name="notes_untitled">Без названия</string>
+    <string name="notes_search">Поиск заметок</string>
+    <string name="notes_all">Все</string>
+    <string name="notes_folder">Папка</string>
+    <string name="notes_no_folder">Без папки</string>
+    <string name="notes_folders">Папки</string>
+    <string name="notes_folder_name">Имя папки</string>
+    <string name="notes_add_folder">Добавить папку</string>
+    <string name="notes_tags">Теги</string>
+    <string name="notes_tag_add">Добавить тег</string>
+    <string name="notes_pin">Закрепить</string>
+    <string name="notes_favorite">Избранное</string>
+</resources>

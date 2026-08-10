@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notes_new">Neue Notiz</string>
+    <string name="notes_edit">Notiz bearbeiten</string>
+    <string name="notes_preview">Vorschau</string>
+    <string name="notes_title">Titel</string>
+    <string name="notes_body_md">Notiz (Markdown)</string>
+    <string name="notes_empty_body">Nichts zum Anzeigen.</string>
+    <string name="notes_empty">Noch keine Notizen.</string>
+    <string name="notes_untitled">Ohne Titel</string>
+    <string name="notes_search">Notizen suchen</string>
+    <string name="notes_all">Alle</string>
+    <string name="notes_folder">Ordner</string>
+    <string name="notes_no_folder">Kein Ordner</string>
+    <string name="notes_folders">Ordner</string>
+    <string name="notes_folder_name">Ordnername</string>
+    <string name="notes_add_folder">Ordner anlegen</string>
+    <string name="notes_tags">Schlagworte</string>
+    <string name="notes_tag_add">Schlagwort hinzufügen</string>
+    <string name="notes_pin">Anheften</string>
+    <string name="notes_favorite">Favorit</string>
+</resources>
