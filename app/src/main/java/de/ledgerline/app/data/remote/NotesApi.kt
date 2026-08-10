@@ -91,4 +91,9 @@ interface NotesApi {
 
     @DELETE("api/v1/notes/{note}/attachments/{attachment}")
     suspend fun deleteAttachment(@Path("note") note: Int, @Path("attachment") attachment: Int): Response<Unit>
+
+    /** Stream a note as a `text/markdown` file (YAML frontmatter with title/tags + body). */
+    @GET("api/v1/notes/{note}/export")
+    @Streaming
+    suspend fun export(@Path("note") note: Int): Response<ResponseBody>
 }

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Search
@@ -258,6 +259,19 @@ private fun NoteEditorSheet(
         }
     }
 
+    // Export the note as a .md file to a user-chosen location.
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/markdown"),
+    ) { uri ->
+        val id = existingId
+        if (uri != null && id != null) scope.launch {
+            val bytes = vm.exportMarkdown(id)
+            if (bytes != null) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { ctx.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } }
+            }
+        }
+    }
+
     // Resolve a [[wikilink]] title to an existing note id (case-insensitive), or null if none yet.
     fun resolveWikilink(target: String): Int? =
         rows.firstOrNull { it.title.equals(target.trim(), ignoreCase = true) }?.id
@@ -289,6 +303,9 @@ private fun NoteEditorSheet(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(if (existingId == null) R.string.notes_new else R.string.notes_edit), Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                if (existingId != null) IconButton(onClick = { exportLauncher.launch("${title.ifBlank { "note" }}.md") }) {
+                    Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.notes_export))
+                }
                 if (existingId != null) IconButton(onClick = { vm.delete(existingId) { onDismiss() } }) {
                     Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error)
                 }

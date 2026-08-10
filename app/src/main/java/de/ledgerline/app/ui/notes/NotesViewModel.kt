@@ -87,6 +87,7 @@ class NotesViewModel @Inject constructor(
         repo.attachmentToCache(cacheDir, noteId, att)
     fun deleteAttachment(noteId: Int, attId: Int, done: (Boolean) -> Unit) =
         viewModelScope.launch { done(repo.deleteAttachment(noteId, attId)) }
+    suspend fun exportMarkdown(noteId: Int): ByteArray? = repo.exportMarkdown(noteId)
 
     // ---- Trash ----
     suspend fun loadTrash(): NotesTrash? = repo.trash()

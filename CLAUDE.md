@@ -137,8 +137,8 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   geladenen Rows → öffnet Ziel-Notiz); Backlinks-Panel („Verlinkt von") aus `note.backlinks`
   (show/store/update liefern sie). **Attachments:** `note.attachments` (show), Editor-Sektion mit
   SAF-Upload (`POST /notes/{note}/attachments` multipart, MIME-Allowlist pdf/jpg/png/webp/gif),
-  Öffnen via Cache-Download (`GET .../raw`) + `DocOpener`, Löschen. (Server-Attachments waren beim
-  Bau erst als openapi-Entwurf, noch nicht committet → Client vorgebaut wie bei Push.)
+  Öffnen via Cache-Download (`GET .../raw`) + `DocOpener`, Löschen. **Markdown-Export:**
+  `GET /notes/{note}/export` (YAML-Frontmatter + Body) → SAF-`CreateDocument("text/markdown")`.
 - **Aufgaben (`ui/todos/`):** `TodosSection`/`TodosViewModel` — VTODO-Task-Lists (nur der Task-Teil des
   Calendar-Moduls, keine Events). Listen-Auswahl (VTODO-Kalender via `GET /calendar/data`, filter
   `component==VTODO`; neue Liste = `POST /calendars {component:VTODO}`), Offen/Alle-Filter, Complete-

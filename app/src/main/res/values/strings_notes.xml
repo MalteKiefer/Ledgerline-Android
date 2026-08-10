@@ -22,4 +22,5 @@
     <string name="notes_backlinks">Linked from</string>
     <string name="notes_attachments">Attachments</string>
     <string name="notes_attach_add">Add</string>
+    <string name="notes_export">Export as Markdown</string>
 </resources>

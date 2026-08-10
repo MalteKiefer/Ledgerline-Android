@@ -130,6 +130,10 @@ class NotesRepository @Inject constructor(
     suspend fun deleteAttachment(noteId: Int, attId: Int): Boolean =
         withContext(Dispatchers.IO) { runCatching { api().deleteAttachment(noteId, attId).isSuccessful }.getOrDefault(false) }
 
+    /** The note as Markdown bytes (YAML frontmatter + body) for a SAF export. Null on failure. */
+    suspend fun exportMarkdown(noteId: Int): ByteArray? =
+        withContext(Dispatchers.IO) { runCatching { api().export(noteId).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull() }
+
     suspend fun search(q: String): List<NoteRow> = withContext(Dispatchers.IO) {
         if (q.isBlank()) return@withContext emptyList()
         runCatching { api().search(q).takeIf { it.isSuccessful }?.body()?.notes.orEmpty() }.getOrDefault(emptyList())

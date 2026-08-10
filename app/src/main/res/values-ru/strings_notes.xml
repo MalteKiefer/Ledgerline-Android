@@ -22,4 +22,5 @@
     <string name="notes_backlinks">Ссылаются сюда</string>
     <string name="notes_attachments">Вложения</string>
     <string name="notes_attach_add">Добавить</string>
+    <string name="notes_export">Экспорт в Markdown</string>
 </resources>
