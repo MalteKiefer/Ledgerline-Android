@@ -70,6 +70,17 @@ import de.ledgerline.app.ui.common.SectionLabel
 import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.cardSurface
 
+/** Internal URI scheme used to route a tapped [[wikilink]] back to a note id. */
+private const val WIKI_SCHEME = "ll-wiki:"
+private val WIKILINK_RE = Regex("""\[\[([^\]\[]+)]]""")
+
+/** Rewrite `[[Title]]` → a Markdown link `[Title](ll-wiki:Title)` so the renderer makes it tappable. */
+private fun rewriteWikilinks(md: String): String =
+    WIKILINK_RE.replace(md) { m ->
+        val target = m.groupValues[1].trim()
+        "[$target]($WIKI_SCHEME$target)"
+    }
+
 /** The Notes tab: folder filter + search + note list (pin/favorite) with a quick-add/edit sheet + trash. */
 @Composable
 fun NotesSection(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewModel()) {
@@ -154,7 +165,12 @@ fun NotesSection(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMod
     }
 
     if (editorOpen) {
-        NoteEditorSheet(vm, existingId = editId, defaultFolder = selectedFolder, onDismiss = { editorOpen = false })
+        NoteEditorSheet(
+            vm, existingId = editId, defaultFolder = selectedFolder,
+            rows = notes,
+            onOpenNote = { targetId -> editId = targetId },
+            onDismiss = { editorOpen = false },
+        )
     }
     if (manageFolders) {
         NotesFoldersSheet(vm, onDismiss = { manageFolders = false })
@@ -178,28 +194,53 @@ private fun NoteCard(n: NoteRow, onOpen: () -> Unit, onFav: () -> Unit, onPin: (
 }
 
 @Composable
-private fun NoteEditorSheet(vm: NotesViewModel, existingId: Int?, defaultFolder: Int?, onDismiss: () -> Unit) {
+private fun NoteEditorSheet(
+    vm: NotesViewModel,
+    existingId: Int?,
+    defaultFolder: Int?,
+    rows: List<NoteRow>,
+    onOpenNote: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val folders by vm.folders.collectAsStateWithLifecycle()
 
-    var loaded by remember { mutableStateOf(existingId == null) }
+    var loaded by remember(existingId) { mutableStateOf(existingId == null) }
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
     val tags = remember { mutableStateListOf<String>() }
     var folderId by remember { mutableStateOf(defaultFolder) }
     var version by remember { mutableIntStateOf(0) }
+    var backlinks by remember { mutableStateOf<List<de.ledgerline.app.domain.model.notes.NoteBacklink>>(emptyList()) }
     var preview by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
 
-    // Fetch the full body for an existing note.
+    // Fetch the full body (+ backlinks) for an existing note.
     LaunchedEffect(existingId) {
         if (existingId != null) {
             vm.openNote(existingId)?.let { note ->
                 title = note.title; body = note.body; folderId = note.folderId; version = note.version
                 tags.clear(); tags.addAll(note.tags)
+                backlinks = note.backlinks
             }
             loaded = true
+        }
+    }
+
+    // Resolve a [[wikilink]] title to an existing note id (case-insensitive), or null if none yet.
+    fun resolveWikilink(target: String): Int? =
+        rows.firstOrNull { it.title.equals(target.trim(), ignoreCase = true) }?.id
+
+    // Compose UriHandler that intercepts our rewritten wikilink scheme and opens the target note.
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val wikiHandler = remember(rows) {
+        object : androidx.compose.ui.platform.UriHandler {
+            override fun openUri(uri: String) {
+                if (uri.startsWith(WIKI_SCHEME)) {
+                    resolveWikilink(uri.removePrefix(WIKI_SCHEME))?.let(onOpenNote)
+                } else runCatching { uriHandler.openUri(uri) }
+            }
         }
     }
 
@@ -229,7 +270,12 @@ private fun NoteEditorSheet(vm: NotesViewModel, existingId: Int?, defaultFolder:
             OutlinedTextField(value = title, onValueChange = { title = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.notes_title)) }, singleLine = true)
 
             if (preview) {
-                Box(Modifier.fillMaxWidth().cardSurface()) { Markdown(content = body.ifBlank { stringResource(R.string.notes_empty_body) }) }
+                // Rewrite [[Title]] into a tappable internal link before rendering; the wikiHandler
+                // resolves the title to a note id and re-targets the editor.
+                val rendered = remember(body) { rewriteWikilinks(body) }.ifBlank { stringResource(R.string.notes_empty_body) }
+                androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalUriHandler provides wikiHandler) {
+                    Box(Modifier.fillMaxWidth().cardSurface()) { Markdown(content = rendered) }
+                }
             } else {
                 OutlinedTextField(value = body, onValueChange = { body = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.notes_body_md)) }, minLines = 6)
             }
@@ -254,6 +300,17 @@ private fun NoteEditorSheet(vm: NotesViewModel, existingId: Int?, defaultFolder:
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { val t = tagInput.trim(); if (t.isNotEmpty() && t !in tags) tags.add(t); tagInput = "" }),
             )
+
+            // Backlinks — notes that link here via [[wikilink]]. Tap to open.
+            if (backlinks.isNotEmpty()) {
+                SectionLabel(stringResource(R.string.notes_backlinks))
+                backlinks.forEach { bl ->
+                    Column(Modifier.fillMaxWidth().clickable { onOpenNote(bl.id) }.cardSurface(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(bl.title.ifBlank { stringResource(R.string.notes_untitled) }, style = MaterialTheme.typography.bodyLarge)
+                        if (bl.snippet.isNotBlank()) Text(bl.snippet, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                    }
+                }
+            }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 FilledIconButton(

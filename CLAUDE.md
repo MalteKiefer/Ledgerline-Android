@@ -131,8 +131,11 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   (restore/force für Notizen + Ordner). `data/notes/NotesRepository` (online-only Snapshot
   `folders`/`notes`/`tags` + per-Record-CRUD, optimistic `version`→409) + `NetworkFactory.createNotes`
   + `NotesApi` (`/notes/data`|`/trash`|`/search` + CRUD + `/favorite`|`/pin`|`/restore`|`/force` +
-  Ordner-CRUD). Body wird on-demand (`GET /notes/{id}`) für den Editor geladen. Server-Follow-ups
-  (Wikilinks/Backlinks, Attachments) noch offen.
+  Ordner-CRUD). Body wird on-demand (`GET /notes/{id}`) für den Editor geladen.
+  **Wikilinks/Backlinks:** `[[Titel]]` im Body wird in der Vorschau zu tappbaren internen Links
+  umgeschrieben (`ll-wiki:`-Scheme via `LocalUriHandler`-Override → Titel→id-Auflösung gegen die
+  geladenen Rows → öffnet Ziel-Notiz); Backlinks-Panel („Verlinkt von") aus `note.backlinks`
+  (show/store/update liefern sie). Server-Follow-up **Attachments** noch offen.
 - **Aufgaben (`ui/todos/`):** `TodosSection`/`TodosViewModel` — VTODO-Task-Lists (nur der Task-Teil des
   Calendar-Moduls, keine Events). Listen-Auswahl (VTODO-Kalender via `GET /calendar/data`, filter
   `component==VTODO`; neue Liste = `POST /calendars {component:VTODO}`), Offen/Alle-Filter, Complete-

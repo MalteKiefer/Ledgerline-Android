@@ -19,4 +19,5 @@
     <string name="notes_tag_add">Schlagwort hinzufügen</string>
     <string name="notes_pin">Anheften</string>
     <string name="notes_favorite">Favorit</string>
+    <string name="notes_backlinks">Verlinkt von</string>
 </resources>

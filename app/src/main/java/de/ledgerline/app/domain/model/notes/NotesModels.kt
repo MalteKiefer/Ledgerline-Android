@@ -26,7 +26,11 @@ data class NoteRow(
     @SerialName("updated_at") val updatedAt: String? = null,
 )
 
-/** A full note (editor view) — includes the plaintext Markdown body. */
+/** A note linking to the current one, with a short body snippet (wikilink backlink). */
+@Serializable
+data class NoteBacklink(val id: Int = 0, val title: String = "", val snippet: String = "")
+
+/** A full note (editor view) — includes the plaintext Markdown body + inbound wikilink backlinks. */
 @Serializable
 data class Note(
     val id: Int = 0,
@@ -38,6 +42,8 @@ data class Note(
     val favorite: Boolean = false,
     @SerialName("updated_at") val updatedAt: String? = null,
     val version: Int = 0,
+    // Present on show/store/update: notes that link to this one via [[wikilink]] syntax.
+    val backlinks: List<NoteBacklink> = emptyList(),
 )
 
 /** A tag with its usage count (from the aggregate in `/notes/data`). */
