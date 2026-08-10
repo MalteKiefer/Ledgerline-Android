@@ -30,6 +30,15 @@ data class NoteRow(
 @Serializable
 data class NoteBacklink(val id: Int = 0, val title: String = "", val snippet: String = "")
 
+/** A file/image attached to a note; bytes served sandboxed via `.../raw`. */
+@Serializable
+data class NoteAttachment(
+    val id: Int = 0,
+    val name: String = "",
+    val mime: String? = null,
+    val size: Long = 0,
+)
+
 /** A full note (editor view) — includes the plaintext Markdown body + inbound wikilink backlinks. */
 @Serializable
 data class Note(
@@ -44,6 +53,8 @@ data class Note(
     val version: Int = 0,
     // Present on show/store/update: notes that link to this one via [[wikilink]] syntax.
     val backlinks: List<NoteBacklink> = emptyList(),
+    // Present on show: file/image attachments.
+    val attachments: List<NoteAttachment> = emptyList(),
 )
 
 /** A tag with its usage count (from the aggregate in `/notes/data`). */
@@ -70,5 +81,6 @@ data class NotesTrash(
 )
 
 @Serializable data class NoteResponse(val note: Note = Note())
+@Serializable data class NoteAttachmentResponse(val attachment: NoteAttachment = NoteAttachment())
 @Serializable data class NoteFolderResponse(val folder: NoteFolder = NoteFolder())
 @Serializable data class NotesSearchResponse(val notes: List<NoteRow> = emptyList())

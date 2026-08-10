@@ -69,10 +69,19 @@ import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.common.SectionLabel
 import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.cardSurface
+import kotlinx.coroutines.launch
 
 /** Internal URI scheme used to route a tapped [[wikilink]] back to a note id. */
 private const val WIKI_SCHEME = "ll-wiki:"
 private val WIKILINK_RE = Regex("""\[\[([^\]\[]+)]]""")
+
+/** Best-effort display name for a picked content:// URI (falls back to the last path segment). */
+private fun queryDisplayName(ctx: android.content.Context, uri: android.net.Uri): String? =
+    runCatching {
+        ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    }.getOrNull() ?: uri.lastPathSegment
 
 /** Rewrite `[[Title]]` → a Markdown link `[Title](ll-wiki:Title)` so the renderer makes it tappable. */
 private fun rewriteWikilinks(md: String): String =
@@ -212,6 +221,7 @@ private fun NoteEditorSheet(
     var folderId by remember { mutableStateOf(defaultFolder) }
     var version by remember { mutableIntStateOf(0) }
     var backlinks by remember { mutableStateOf<List<de.ledgerline.app.domain.model.notes.NoteBacklink>>(emptyList()) }
+    var attachments by remember { mutableStateOf<List<de.ledgerline.app.domain.model.notes.NoteAttachment>>(emptyList()) }
     var preview by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -223,8 +233,28 @@ private fun NoteEditorSheet(
                 title = note.title; body = note.body; folderId = note.folderId; version = note.version
                 tags.clear(); tags.addAll(note.tags)
                 backlinks = note.backlinks
+                attachments = note.attachments
             }
             loaded = true
+        }
+    }
+
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    suspend fun refreshAttachments() { if (existingId != null) vm.openNote(existingId)?.let { attachments = it.attachments } }
+
+    // Pick a file/image (server enforces the pdf/jpg/png/webp/gif allowlist) and upload it.
+    val attachPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.GetContent(),
+    ) { uri ->
+        val id = existingId
+        if (uri != null && id != null) scope.launch {
+            val (bytes, name, mime) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val b = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                val n = queryDisplayName(ctx, uri) ?: "attachment"
+                Triple(b, n, ctx.contentResolver.getType(uri))
+            }
+            if (bytes != null) vm.attach(id, bytes, name, mime) { ok -> if (ok) scope.launch { refreshAttachments() } }
         }
     }
 
@@ -300,6 +330,31 @@ private fun NoteEditorSheet(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { val t = tagInput.trim(); if (t.isNotEmpty() && t !in tags) tags.add(t); tagInput = "" }),
             )
+
+            // Attachments — only for a saved note (needs an id). Tap opens; trash deletes.
+            if (existingId != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionLabel(stringResource(R.string.notes_attachments))
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = { attachPicker.launch("*/*") }) { Text(stringResource(R.string.notes_attach_add)) }
+                }
+                attachments.forEach { att ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable {
+                            scope.launch {
+                                val f = vm.attachmentFile(ctx.cacheDir, existingId, att)
+                                if (f != null) de.ledgerline.app.ui.common.DocOpener.openFile(ctx, f, att.mime ?: "*/*")
+                            }
+                        }.cardSurface(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(att.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        IconButton(onClick = { vm.deleteAttachment(existingId, att.id) { ok -> if (ok) scope.launch { refreshAttachments() } } }) {
+                            Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+            }
 
             // Backlinks — notes that link here via [[wikilink]]. Tap to open.
             if (backlinks.isNotEmpty()) {

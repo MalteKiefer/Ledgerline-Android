@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -100,6 +102,33 @@ class NotesRepository @Inject constructor(
     suspend fun trash(): NotesTrash? = withContext(Dispatchers.IO) {
         runCatching { api().trash().takeIf { it.isSuccessful }?.body() }.getOrNull()
     }
+
+    // ---- Attachments ----
+    /** Upload a file/image to a note. Returns the attachment metadata, or null on failure. */
+    suspend fun attach(noteId: Int, bytes: ByteArray, name: String, mime: String?): de.ledgerline.app.domain.model.notes.NoteAttachment? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val media = (mime ?: "application/octet-stream").toMediaTypeOrNull()
+                val part = okhttp3.MultipartBody.Part.createFormData("file", name, bytes.toRequestBody(media))
+                val namePart = name.toRequestBody("text/plain".toMediaTypeOrNull())
+                api().attach(noteId, part, namePart).takeIf { it.isSuccessful }?.body()?.attachment
+            }.getOrNull()
+        }
+
+    /** Download an attachment's bytes into the cache dir and return the file (for DocOpener). */
+    suspend fun attachmentToCache(cacheDir: java.io.File, noteId: Int, att: de.ledgerline.app.domain.model.notes.NoteAttachment): java.io.File? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val res = api().attachmentRaw(noteId, att.id)
+                val body = res.takeIf { it.isSuccessful }?.body() ?: return@runCatching null
+                val out = java.io.File(cacheDir, "note_att_${att.id}_${att.name}")
+                body.byteStream().use { input -> out.outputStream().use { input.copyTo(it) } }
+                out
+            }.getOrNull()
+        }
+
+    suspend fun deleteAttachment(noteId: Int, attId: Int): Boolean =
+        withContext(Dispatchers.IO) { runCatching { api().deleteAttachment(noteId, attId).isSuccessful }.getOrDefault(false) }
 
     suspend fun search(q: String): List<NoteRow> = withContext(Dispatchers.IO) {
         if (q.isBlank()) return@withContext emptyList()

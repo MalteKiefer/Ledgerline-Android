@@ -80,6 +80,14 @@ class NotesViewModel @Inject constructor(
     fun deleteFolder(id: Int, done: (Boolean) -> Unit = {}) =
         viewModelScope.launch { done(repo.deleteFolder(id)) }
 
+    // ---- Attachments ----
+    fun attach(noteId: Int, bytes: ByteArray, name: String, mime: String?, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.attach(noteId, bytes, name, mime) != null) }
+    suspend fun attachmentFile(cacheDir: java.io.File, noteId: Int, att: de.ledgerline.app.domain.model.notes.NoteAttachment) =
+        repo.attachmentToCache(cacheDir, noteId, att)
+    fun deleteAttachment(noteId: Int, attId: Int, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.deleteAttachment(noteId, attId)) }
+
     // ---- Trash ----
     suspend fun loadTrash(): NotesTrash? = repo.trash()
     fun restore(id: Int, done: () -> Unit) = viewModelScope.launch { if (repo.restore(id)) done() }

@@ -1,20 +1,27 @@
 package de.ledgerline.app.data.remote
 
+import de.ledgerline.app.domain.model.notes.NoteAttachmentResponse
 import de.ledgerline.app.domain.model.notes.NoteFolderResponse
 import de.ledgerline.app.domain.model.notes.NoteResponse
 import de.ledgerline.app.domain.model.notes.NotesData
 import de.ledgerline.app.domain.model.notes.NotesSearchResponse
 import de.ledgerline.app.domain.model.notes.NotesTrash
 import kotlinx.serialization.json.JsonObject
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
+import retrofit2.http.Streaming
 
 /**
  * The Notes module REST surface (`module:notes`, plaintext-relational, Markdown). Snapshot read +
@@ -68,4 +75,20 @@ interface NotesApi {
 
     @POST("api/v1/notes/folders/{id}/restore")
     suspend fun restoreFolder(@Path("id") id: Int): Response<Unit>
+
+    // ---- Attachments (MIME allowlist pdf/jpg/png/webp/gif; bytes served sandboxed) ----
+    @Multipart
+    @POST("api/v1/notes/{note}/attachments")
+    suspend fun attach(
+        @Path("note") note: Int,
+        @Part file: MultipartBody.Part,
+        @Part("name") name: RequestBody?,
+    ): Response<NoteAttachmentResponse>
+
+    @GET("api/v1/notes/{note}/attachments/{attachment}/raw")
+    @Streaming
+    suspend fun attachmentRaw(@Path("note") note: Int, @Path("attachment") attachment: Int): Response<ResponseBody>
+
+    @DELETE("api/v1/notes/{note}/attachments/{attachment}")
+    suspend fun deleteAttachment(@Path("note") note: Int, @Path("attachment") attachment: Int): Response<Unit>
 }

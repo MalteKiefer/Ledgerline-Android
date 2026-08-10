@@ -20,4 +20,6 @@
     <string name="notes_pin">Pin</string>
     <string name="notes_favorite">Favorite</string>
     <string name="notes_backlinks">Linked from</string>
+    <string name="notes_attachments">Attachments</string>
+    <string name="notes_attach_add">Add</string>
 </resources>

@@ -20,4 +20,6 @@
     <string name="notes_pin">Закрепить</string>
     <string name="notes_favorite">Избранное</string>
     <string name="notes_backlinks">Ссылаются сюда</string>
+    <string name="notes_attachments">Вложения</string>
+    <string name="notes_attach_add">Добавить</string>
 </resources>

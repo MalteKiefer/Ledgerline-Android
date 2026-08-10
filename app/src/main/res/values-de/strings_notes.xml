@@ -20,4 +20,6 @@
     <string name="notes_pin">Anheften</string>
     <string name="notes_favorite">Favorit</string>
     <string name="notes_backlinks">Verlinkt von</string>
+    <string name="notes_attachments">Anhänge</string>
+    <string name="notes_attach_add">Hinzufügen</string>
 </resources>
