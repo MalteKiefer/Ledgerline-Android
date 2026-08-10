@@ -36,6 +36,7 @@ import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
@@ -368,6 +369,8 @@ private fun TodoEditorSheet(
     var rrule by remember { mutableStateOf(existing?.rrule) }
     val tags = remember { androidx.compose.runtime.mutableStateListOf<String>().apply { existing?.categories?.let { addAll(it) } } }
     var parentUid by remember { mutableStateOf(existing?.relatedTo) }
+    var alarmMinutes by remember { mutableStateOf(existing?.alarmMinutes) }
+    var reminderMenu by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var showNotes by remember { mutableStateOf(!existing?.description.isNullOrBlank()) }
     var advanced by remember { mutableStateOf(!existing?.rrule.isNullOrBlank() || (existing?.percentComplete ?: 0) > 0 || !existing?.dtstart.isNullOrBlank() || existing?.categories?.isNotEmpty() == true) }
@@ -398,7 +401,7 @@ private fun TodoEditorSheet(
             dtstart = startMillis?.let { toIsoInstant(it) }, due = dueMillis?.let { toIsoInstant(it) },
             allDay = allDay, status = status, priority = priority.takeIf { it != 0 },
             percent = percent.takeIf { it in 1..100 }, rrule = rrule, categories = tags.toList(),
-            parentUid = parentUid, etag = existing?.etag,
+            parentUid = parentUid, alarmMinutes = alarmMinutes, etag = existing?.etag,
         ) { ok -> busy = false; if (ok) onDismiss() }
     }
 
@@ -437,6 +440,14 @@ private fun TodoEditorSheet(
             // Core inline metadata chips.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 MetaChip(Icons.Outlined.CalendarToday, dueMillis?.let { dueChipLabel(it, allDay) } ?: stringResource(R.string.todos_due), dueMillis != null) { showDue = true }
+                Box {
+                    MetaChip(Icons.Outlined.Notifications, reminderChipLabel(alarmMinutes), alarmMinutes != null) { reminderMenu = true }
+                    DropdownMenu(reminderMenu, { reminderMenu = false }) {
+                        reminderOptions().forEach { (min, labelRes) ->
+                            DropdownMenuItem(text = { Text(stringResource(labelRes)) }, onClick = { alarmMinutes = min; reminderMenu = false })
+                        }
+                    }
+                }
                 Box {
                     MetaChip(Icons.Outlined.Flag, priorityChipLabel(priority), priority != 0, tint = if (priority != 0) priorityColor(priority) else null) { prioMenu = true }
                     DropdownMenu(prioMenu, { prioMenu = false }) {
@@ -671,6 +682,31 @@ private fun repeatOptions() = listOf(
     "FREQ=WEEKLY" to R.string.todos_repeat_weekly,
     "FREQ=MONTHLY" to R.string.todos_repeat_monthly,
     "FREQ=YEARLY" to R.string.todos_repeat_yearly,
+)
+
+// Reminder presets (VALARM minutes-before due), mirroring the web task editor.
+private fun reminderOptions(): List<Pair<Int?, Int>> = listOf(
+    null to R.string.todos_reminder_none,
+    0 to R.string.todos_reminder_at,
+    5 to R.string.todos_reminder_5m,
+    15 to R.string.todos_reminder_15m,
+    30 to R.string.todos_reminder_30m,
+    60 to R.string.todos_reminder_1h,
+    1440 to R.string.todos_reminder_1d,
+)
+
+@Composable
+private fun reminderChipLabel(min: Int?): String = stringResource(
+    when (min) {
+        null -> R.string.todos_reminder
+        0 -> R.string.todos_reminder_at
+        5 -> R.string.todos_reminder_5m
+        15 -> R.string.todos_reminder_15m
+        30 -> R.string.todos_reminder_30m
+        60 -> R.string.todos_reminder_1h
+        1440 -> R.string.todos_reminder_1d
+        else -> R.string.todos_reminder
+    },
 )
 
 private fun repeatLabelRes(rrule: String?): Int = when {

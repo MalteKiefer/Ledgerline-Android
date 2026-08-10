@@ -40,6 +40,7 @@ data class CalendarTodo(
     val rrule: String? = null,
     val categories: List<String> = emptyList(),
     @SerialName("related_to") val relatedTo: String? = null,
+    @SerialName("alarm_minutes_before") val alarmMinutes: Int? = null,
     val sequence: Int = 0,
     @SerialName("sort_order") val sortOrder: Int = 0,
     val color: String? = null,

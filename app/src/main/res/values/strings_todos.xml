@@ -41,6 +41,15 @@
     <string name="todos_status_cancelled">Cancelled</string>
     <string name="todos_repeat">Repeat</string>
     <string name="todos_repeat_none">No repeat</string>
+    <!-- Task reminder (VALARM, minutes before due) -->
+    <string name="todos_reminder">Reminder</string>
+    <string name="todos_reminder_none">No reminder</string>
+    <string name="todos_reminder_at">At due time</string>
+    <string name="todos_reminder_5m">5 minutes before</string>
+    <string name="todos_reminder_15m">15 minutes before</string>
+    <string name="todos_reminder_30m">30 minutes before</string>
+    <string name="todos_reminder_1h">1 hour before</string>
+    <string name="todos_reminder_1d">1 day before</string>
     <string name="todos_repeat_daily">Daily</string>
     <string name="todos_repeat_weekly">Weekly</string>
     <string name="todos_repeat_monthly">Monthly</string>

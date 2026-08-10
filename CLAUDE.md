@@ -127,7 +127,8 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
 - **Aufgaben (`ui/todos/`):** `TodosSection`/`TodosViewModel` — VTODO-Task-Lists (nur der Task-Teil des
   Calendar-Moduls, keine Events). Listen-Auswahl (VTODO-Kalender via `GET /calendar/data`, filter
   `component==VTODO`; neue Liste = `POST /calendars {component:VTODO}`), Offen/Alle-Filter, Complete-
-  Toggle, Editor (Titel/Notiz/Fällig-DatePicker/Ganztägig/Priorität), Löschen. `data/calendar/
+  Toggle, Editor (Titel/Notiz/Fällig-DatePicker/Ganztägig/Priorität/**Erinnerung** =
+  `alarm_minutes_before`→VALARM, Web-Parität), Löschen. `data/calendar/
   TodosRepository` (online-only; per-Record REST mit DAV-`etag`-Optimistic-Concurrency; Complete/Edit
   senden das volle VTODO neu, da PUT rebuildet) + `NetworkFactory.createCalendar` + `CalendarApi`
   (`/calendar/todos` CRUD + `/reorder` + ICS `/import`|`/export`). Bewusst weggelassen: Kalender-Events,

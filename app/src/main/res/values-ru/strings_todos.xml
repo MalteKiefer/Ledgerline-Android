@@ -41,6 +41,15 @@
     <string name="todos_status_cancelled">Отменено</string>
     <string name="todos_repeat">Повтор</string>
     <string name="todos_repeat_none">Без повтора</string>
+    <!-- Напоминание о задаче (VALARM, минут до срока) -->
+    <string name="todos_reminder">Напоминание</string>
+    <string name="todos_reminder_none">Без напоминания</string>
+    <string name="todos_reminder_at">В момент срока</string>
+    <string name="todos_reminder_5m">За 5 минут</string>
+    <string name="todos_reminder_15m">За 15 минут</string>
+    <string name="todos_reminder_30m">За 30 минут</string>
+    <string name="todos_reminder_1h">За 1 час</string>
+    <string name="todos_reminder_1d">За 1 день</string>
     <string name="todos_repeat_daily">Ежедневно</string>
     <string name="todos_repeat_weekly">Еженедельно</string>
     <string name="todos_repeat_monthly">Ежемесячно</string>

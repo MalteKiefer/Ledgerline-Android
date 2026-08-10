@@ -101,6 +101,7 @@ class TodosRepository @Inject constructor(
             put("priority", t.priority?.let { JsonPrimitive(it) } ?: JsonNull)
             put("rrule", if (t.rrule.isNullOrBlank()) JsonNull else JsonPrimitive(t.rrule))
             put("related_to", if (t.relatedTo.isNullOrBlank()) JsonNull else JsonPrimitive(t.relatedTo))
+            put("alarm_minutes_before", t.alarmMinutes?.let { JsonPrimitive(it) } ?: JsonNull)
             put("categories", buildJsonArray { t.categories.forEach { add(it) } })
             if (t.etag.isNotBlank()) put("etag", t.etag)
             if (done) {
@@ -141,6 +142,7 @@ class TodosRepository @Inject constructor(
         rrule: String?,
         categories: List<String>,
         relatedTo: String?,
+        alarmMinutes: Int?,
         etag: String?,
         completed: String? = null,
     ): JsonObject = buildJsonObject {
@@ -157,6 +159,7 @@ class TodosRepository @Inject constructor(
         put("percent_complete", pct?.let { JsonPrimitive(it) } ?: JsonNull)
         put("rrule", if (rrule.isNullOrBlank()) JsonNull else JsonPrimitive(rrule))
         put("related_to", if (relatedTo.isNullOrBlank()) JsonNull else JsonPrimitive(relatedTo))
+        put("alarm_minutes_before", alarmMinutes?.let { JsonPrimitive(it) } ?: JsonNull)
         put("categories", buildJsonArray { categories.forEach { add(it) } })
         if (status == "COMPLETED") put("completed", if (completed.isNullOrBlank()) Instant.now().toString() else completed)
         if (!etag.isNullOrBlank()) put("etag", etag)

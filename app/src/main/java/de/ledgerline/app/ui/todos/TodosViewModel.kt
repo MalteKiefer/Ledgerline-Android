@@ -72,13 +72,14 @@ class TodosViewModel @Inject constructor(
         rrule: String?,
         categories: List<String>,
         parentUid: String?,
+        alarmMinutes: Int?,
         etag: String?,
         done: (Boolean) -> Unit,
     ) = viewModelScope.launch {
         val prev = id?.let { todo(it) }
         val body = repo.todoBody(
             calendarId, summary, description, dtstart, due, allDay, status, priority, percent, rrule,
-            categories, parentUid, etag, completed = prev?.completedAt,
+            categories, parentUid, alarmMinutes, etag, completed = prev?.completedAt,
         )
         val ok = if (id == null) repo.create(body) else repo.update(id, body)
         done(ok)
