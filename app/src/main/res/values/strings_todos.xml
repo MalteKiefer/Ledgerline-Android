@@ -17,4 +17,12 @@
     <string name="todos_prio_low">Low</string>
     <string name="todos_list">List</string>
     <string name="todos_add_list">New list</string>
+    <string name="todos_title_hint">What needs doing?</string>
+    <string name="todos_notes_hint">Add note</string>
+    <string name="todos_due_today">Today</string>
+    <string name="todos_due_tomorrow">Tomorrow</string>
+    <string name="todos_due_weekend">Weekend</string>
+    <string name="todos_due_next_week">Next week</string>
+    <string name="todos_due_pick">Pick date…</string>
+    <string name="todos_due_none">No date</string>
 </resources>

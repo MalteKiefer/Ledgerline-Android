@@ -17,4 +17,12 @@
     <string name="todos_prio_low">Низкий</string>
     <string name="todos_list">Список</string>
     <string name="todos_add_list">Новый список</string>
+    <string name="todos_title_hint">Что нужно сделать?</string>
+    <string name="todos_notes_hint">Добавить заметку</string>
+    <string name="todos_due_today">Сегодня</string>
+    <string name="todos_due_tomorrow">Завтра</string>
+    <string name="todos_due_weekend">Выходные</string>
+    <string name="todos_due_next_week">След. неделя</string>
+    <string name="todos_due_pick">Выбрать дату…</string>
+    <string name="todos_due_none">Без даты</string>
 </resources>

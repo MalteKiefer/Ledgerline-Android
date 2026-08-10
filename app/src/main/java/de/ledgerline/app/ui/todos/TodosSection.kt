@@ -7,32 +7,54 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,7 +64,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -50,18 +76,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.calendar.Calendar
 import de.ledgerline.app.domain.model.calendar.CalendarTodo
-import de.ledgerline.app.ui.common.AppScaffold
 import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.common.RefreshBox
-import de.ledgerline.app.ui.common.SectionLabel
 import de.ledgerline.app.ui.money.FilledField
 import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.cardSurface
+import java.time.DayOfWeek
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.temporal.TemporalAdjusters
 
-/** The "Aufgaben" (VTODO task-list) tab: task lists, tasks with a completion toggle, and CRUD. */
+/** The "Aufgaben" (VTODO task-list) tab: task lists, tasks with a completion toggle, quick-add editor. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewModel()) {
     val defaultName = stringResource(R.string.todos_default_list)
@@ -73,20 +101,9 @@ fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMod
     val showDone by vm.showDone.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
 
-    var editing by remember { mutableStateOf<String?>(null) }
-    var creating by remember { mutableStateOf(false) }
+    // null = closed; "" = create; other = edit that todo id.
+    var editorTarget by remember { mutableStateOf<String?>(null) }
     var addingList by remember { mutableStateOf(false) }
-
-    if (creating || editing != null) {
-        TodoEditScreen(
-            vm = vm,
-            todoId = editing,
-            lists = lists,
-            defaultCalendar = selectedList ?: lists.firstOrNull()?.id,
-            onBack = { creating = false; editing = null },
-        )
-        return
-    }
 
     Column(modifier.fillMaxSize()) {
         AppTopBar(title = stringResource(R.string.tab_todos))
@@ -120,18 +137,28 @@ fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMod
                             todo = t,
                             listName = vm.listName(t.calendar).takeIf { selectedList == null },
                             onToggle = { vm.setDone(t, !t.done) },
-                            onClick = { editing = t.id },
+                            onClick = { editorTarget = t.id },
                         )
                     }
                 }
             }
             ExtendedFloatingActionButton(
-                onClick = { creating = true },
+                onClick = { editorTarget = "" },
                 icon = { Icon(Icons.Outlined.Add, null) },
                 text = { Text(stringResource(R.string.todos_new)) },
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
             )
         }
+    }
+
+    if (editorTarget != null) {
+        TodoEditorSheet(
+            vm = vm,
+            todoId = editorTarget!!.ifBlank { null },
+            lists = lists,
+            defaultCalendar = selectedList ?: lists.firstOrNull()?.id,
+            onDismiss = { editorTarget = null },
+        )
     }
 
     if (addingList) {
@@ -178,25 +205,22 @@ private fun TodoRow(todo: CalendarTodo, listName: String?, onToggle: () -> Unit,
 private fun PriorityDot(priority: Int?) {
     val p = priority ?: 0
     if (p == 0) return
-    val color = when {
-        p in 1..4 -> MaterialTheme.colorScheme.error
-        p == 5 -> Brand.tintOrange
-        else -> Brand.tintBlue
-    }
-    Box(Modifier.padding(end = 12.dp).size(10.dp).clip(CircleShape).background(color))
+    Box(Modifier.padding(end = 12.dp).size(10.dp).clip(CircleShape).background(priorityColor(p)))
 }
 
 // ---------------------------------------------------------------------------
-//  Editor
+//  Quick-add editor — a modern task-app bottom sheet: title-first (autofocus +
+//  keyboard), inline metadata chips (due with quick presets / priority / list),
+//  a collapsible note, and a round send button.
 // ---------------------------------------------------------------------------
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TodoEditScreen(
+private fun TodoEditorSheet(
     vm: TodosViewModel,
     todoId: String?,
     lists: List<Calendar>,
     defaultCalendar: String?,
-    onBack: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
     val existing = todoId?.let { vm.todo(it) }
     var summary by remember { mutableStateOf(existing?.summary ?: "") }
@@ -206,74 +230,199 @@ private fun TodoEditScreen(
     var allDay by remember { mutableStateOf(existing?.allDay ?: false) }
     var priority by remember { mutableStateOf(existing?.priority ?: 0) }
     var busy by remember { mutableStateOf(false) }
-    var showPicker by remember { mutableStateOf(false) }
+    var showNotes by remember { mutableStateOf(!existing?.description.isNullOrBlank()) }
+    var showDate by remember { mutableStateOf(false) }
+    var prioMenu by remember { mutableStateOf(false) }
+    var listMenu by remember { mutableStateOf(false) }
 
-    AppScaffold(topBar = {
-        AppTopBar(
-            title = stringResource(if (todoId == null) R.string.todos_new else R.string.action_edit),
-            onBack = onBack,
-            actions = {
-                TextButton(enabled = !busy && summary.isNotBlank() && calendarId.isNotBlank(), onClick = {
-                    busy = true
-                    val due = dueMillis?.let { toIsoInstant(it) }
-                    vm.save(todoId, calendarId, summary, description, due, allDay, priority.takeIf { it != 0 }, existing?.etag) { ok ->
-                        busy = false; if (ok) onBack()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    fun save() {
+        if (summary.isBlank() || calendarId.isBlank() || busy) return
+        busy = true
+        val due = dueMillis?.let { toIsoInstant(it) }
+        vm.save(todoId, calendarId, summary, description, due, allDay, priority.takeIf { it != 0 }, existing?.etag) { ok ->
+            busy = false; if (ok) onDismiss()
+        }
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 12.dp).imePadding().navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (todoId != null) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    IconButton(onClick = { vm.delete(todoId) { onDismiss() } }) {
+                        Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error)
                     }
-                }) { Text(stringResource(R.string.action_save)) }
-            },
-        )
-    }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            FilledField(summary, { summary = it }, R.string.todos_summary)
-            FilledField(description, { description = it }, R.string.todos_description, singleLine = false)
-
-            if (lists.size > 1) {
-                SectionLabel(stringResource(R.string.todos_list))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    lists.forEach { l -> FilterChip(calendarId == l.id, { calendarId = l.id }, label = { Text(l.name) }) }
                 }
             }
 
-            SectionLabel(stringResource(R.string.todos_due))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = { showPicker = true }) { Text(dueMillis?.let { fmtMillis(it) } ?: stringResource(R.string.todos_due)) }
-                if (dueMillis != null) TextButton(onClick = { dueMillis = null }) { Text(stringResource(R.string.action_delete)) }
+            // Title — the hero input, autofocused with the keyboard up.
+            TextField(
+                value = summary,
+                onValueChange = { summary = it },
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
+                placeholder = { Text(stringResource(R.string.todos_title_hint), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                textStyle = MaterialTheme.typography.titleLarge,
+                colors = bareFieldColors(),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { save() }),
+            )
+
+            if (showNotes) {
+                TextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.todos_notes_hint), color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    colors = bareFieldColors(),
+                )
+            }
+
+            // Inline metadata chips.
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                MetaChip(
+                    icon = Icons.Outlined.CalendarToday,
+                    label = dueMillis?.let { quickLabelFor(it) } ?: stringResource(R.string.todos_due),
+                    active = dueMillis != null,
+                    onClick = { showDate = true },
+                )
+                Box {
+                    MetaChip(
+                        icon = Icons.Outlined.Flag,
+                        label = priorityChipLabel(priority),
+                        active = priority != 0,
+                        tint = if (priority != 0) priorityColor(priority) else null,
+                        onClick = { prioMenu = true },
+                    )
+                    DropdownMenu(expanded = prioMenu, onDismissRequest = { prioMenu = false }) {
+                        listOf(0, 1, 5, 9).forEach { p ->
+                            DropdownMenuItem(
+                                text = { Text(priorityChipLabel(p)) },
+                                leadingIcon = { Icon(Icons.Outlined.Flag, null, tint = if (p == 0) MaterialTheme.colorScheme.onSurfaceVariant else priorityColor(p)) },
+                                onClick = { priority = p; prioMenu = false },
+                            )
+                        }
+                    }
+                }
+                if (lists.size > 1) {
+                    Box {
+                        MetaChip(
+                            icon = Icons.Outlined.Inbox,
+                            label = lists.firstOrNull { it.id == calendarId }?.name ?: stringResource(R.string.todos_list),
+                            active = false,
+                            onClick = { listMenu = true },
+                        )
+                        DropdownMenu(expanded = listMenu, onDismissRequest = { listMenu = false }) {
+                            lists.forEach { l ->
+                                DropdownMenuItem(text = { Text(l.name) }, onClick = { calendarId = l.id; listMenu = false })
+                            }
+                        }
+                    }
+                }
+                if (!showNotes) {
+                    MetaChip(icon = Icons.Outlined.Notes, label = stringResource(R.string.todos_description), active = false, onClick = { showNotes = true })
+                }
+            }
+
+            // Send.
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                FilledIconButton(
+                    onClick = { save() },
+                    enabled = summary.isNotBlank() && !busy,
+                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = Brand.accent, contentColor = Color.White),
+                ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.action_save)) }
+            }
+            Spacer(Modifier.size(4.dp))
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // Only autofocus on create — editing should not force the keyboard over the content.
+        if (todoId == null) { focus.requestFocus(); keyboard?.show() }
+    }
+
+    if (showDate) {
+        DueDateSheet(
+            current = dueMillis,
+            allDay = allDay,
+            onPick = { m, ad -> dueMillis = m; allDay = ad; showDate = false },
+            onClear = { dueMillis = null; showDate = false },
+            onDismiss = { showDate = false },
+        )
+    }
+}
+
+/** Quick due-date picker: preset chips (today/tomorrow/weekend/next week) + a full date picker. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DueDateSheet(current: Long?, allDay: Boolean, onPick: (Long?, Boolean) -> Unit, onClear: () -> Unit, onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var allDayState by remember { mutableStateOf(allDay) }
+    var showPicker by remember { mutableStateOf(false) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(Modifier.fillMaxWidth().padding(16.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(stringResource(R.string.todos_due), style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(onClick = { onPick(dayMillis(0), allDayState) }, label = { Text(stringResource(R.string.todos_due_today)) })
+                AssistChip(onClick = { onPick(dayMillis(1), allDayState) }, label = { Text(stringResource(R.string.todos_due_tomorrow)) })
+                AssistChip(onClick = { onPick(weekendMillis(), allDayState) }, label = { Text(stringResource(R.string.todos_due_weekend)) })
+                AssistChip(onClick = { onPick(nextWeekMillis(), allDayState) }, label = { Text(stringResource(R.string.todos_due_next_week)) })
+                AssistChip(onClick = { showPicker = true }, leadingIcon = { Icon(Icons.Outlined.CalendarToday, null) }, label = { Text(stringResource(R.string.todos_due_pick)) })
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.todos_all_day), Modifier.weight(1f))
-                Switch(checked = allDay, onCheckedChange = { allDay = it })
+                Switch(checked = allDayState, onCheckedChange = { allDayState = it })
             }
-
-            SectionLabel(stringResource(R.string.todos_priority))
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PrioChip(0, priority) { priority = 0 }
-                PrioChip(1, priority) { priority = 1 }
-                PrioChip(5, priority) { priority = 5 }
-                PrioChip(9, priority) { priority = 9 }
-            }
-
-            if (todoId != null) {
-                TextButton(onClick = { vm.delete(todoId) { onBack() } }) {
-                    Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error)
-                }
+            if (current != null) {
+                TextButton(onClick = onClear) { Text(stringResource(R.string.todos_due_none), color = MaterialTheme.colorScheme.error) }
             }
         }
     }
 
     if (showPicker) {
-        val state = rememberDatePickerState(initialSelectedDateMillis = dueMillis)
+        val state = rememberDatePickerState(initialSelectedDateMillis = current)
         DatePickerDialog(
             onDismissRequest = { showPicker = false },
-            confirmButton = { TextButton(onClick = { dueMillis = state.selectedDateMillis; showPicker = false }) { Text(stringResource(R.string.action_save)) } },
+            confirmButton = { TextButton(onClick = { showPicker = false; onPick(state.selectedDateMillis, allDayState) }) { Text(stringResource(R.string.action_save)) } },
             dismissButton = { TextButton(onClick = { showPicker = false }) { Text(stringResource(R.string.action_cancel)) } },
         ) { DatePicker(state = state) }
     }
 }
 
 @Composable
-private fun PrioChip(value: Int, selected: Int, onClick: () -> Unit) {
-    FilterChip(selected == value, onClick, label = { Text(priorityChipLabel(value)) })
+private fun MetaChip(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, active: Boolean, tint: Color? = null, onClick: () -> Unit) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text(label) },
+        leadingIcon = { Icon(icon, null, tint = tint ?: if (active) Brand.accent else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) },
+        shape = RoundedCornerShape(10.dp),
+        colors = if (active) AssistChipDefaults.assistChipColors(
+            containerColor = Brand.accent.copy(alpha = 0.12f),
+            labelColor = Brand.accent,
+        ) else AssistChipDefaults.assistChipColors(),
+    )
 }
+
+@Composable
+private fun bareFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = Color.Transparent,
+    unfocusedContainerColor = Color.Transparent,
+    disabledContainerColor = Color.Transparent,
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    disabledIndicatorColor = Color.Transparent,
+)
 
 @Composable
 private fun priorityChipLabel(p: Int): String = stringResource(
@@ -286,16 +435,43 @@ private fun priorityChipLabel(p: Int): String = stringResource(
 )
 
 @Composable
+private fun priorityColor(p: Int): Color = when {
+    p in 1..4 -> MaterialTheme.colorScheme.error
+    p == 5 -> Brand.tintOrange
+    else -> Brand.tintBlue
+}
+
+@Composable
 private fun priorityLabel(p: Int?): String? {
     val v = p ?: 0
     if (v == 0) return null
     return priorityChipLabel(v)
 }
 
-// ---- date helpers ----
+// ---- date helpers (UTC-midnight millis, matching the M3 DatePicker) ----
 private val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy").withZone(ZoneOffset.UTC)
 
-private fun fmtMillis(millis: Long): String = dateFmt.format(Instant.ofEpochMilli(millis))
 private fun fmtDate(iso: String): String = runCatching { dateFmt.format(Instant.parse(iso)) }.getOrElse { iso.take(10) }
 private fun parseMillis(iso: String): Long? = runCatching { Instant.parse(iso).toEpochMilli() }.getOrNull()
 private fun toIsoInstant(millis: Long): String = Instant.ofEpochMilli(millis).toString()
+
+private fun dayMillis(plusDays: Long): Long =
+    LocalDate.now().plusDays(plusDays).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+private fun weekendMillis(): Long =
+    LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+private fun nextWeekMillis(): Long =
+    LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+/** Human label for a due millis: Today/Tomorrow if near, else the date. */
+@Composable
+private fun quickLabelFor(millis: Long): String {
+    val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+    val today = LocalDate.now()
+    return when (date) {
+        today -> stringResource(R.string.todos_due_today)
+        today.plusDays(1) -> stringResource(R.string.todos_due_tomorrow)
+        else -> dateFmt.format(Instant.ofEpochMilli(millis))
+    }
+}
