@@ -104,7 +104,8 @@ fun ShareDialog(vm: FilesViewModel, kind: String, id: Int, folderId: Int?, onDis
                         })
                     }
                 }
-                if (kind == "folder" && folderId != null) FolderMembersSection(vm, folderId)
+                if (kind == "folder" && folderId != null) ShareMembersSection(vm, kind = "folder", targetId = folderId)
+                else if (kind == "file") ShareMembersSection(vm, kind = "file", targetId = id)
             }
         },
         confirmButton = {
@@ -129,9 +130,13 @@ fun ShareDialog(vm: FilesViewModel, kind: String, id: Int, folderId: Int?, onDis
     )
 }
 
-/** Cross-user folder membership: list members + add by email with a role. */
+/**
+ * Cross-user membership for a folder subtree OR a single file (server `kind=file|folder`):
+ * list members + add by email with a role. Reuses the generic `/folder-shares/{id}/members`
+ * endpoints; only the create call differs by [kind].
+ */
 @Composable
-private fun FolderMembersSection(vm: FilesViewModel, folderId: Int) {
+private fun ShareMembersSection(vm: FilesViewModel, kind: String, targetId: Int) {
     val scope = rememberCoroutineScope()
     var members by remember { mutableStateOf<List<ShareMember>>(emptyList()) }
     var shareId by remember { mutableStateOf<Int?>(null) }
@@ -140,12 +145,14 @@ private fun FolderMembersSection(vm: FilesViewModel, folderId: Int) {
     var error by remember { mutableStateOf(false) }
 
     suspend fun reload() {
-        val fs = vm.folderShares().firstOrNull { it.folderId == folderId }
+        val fs = vm.folderShares().firstOrNull {
+            if (kind == "file") it.kind == "file" && it.fileId == targetId else it.folderId == targetId
+        }
         shareId = fs?.id; members = fs?.members.orEmpty()
     }
-    LaunchedEffect(folderId) { reload() }
+    LaunchedEffect(kind, targetId) { reload() }
 
-    SectionLabel(stringResource(R.string.share_manage_folder))
+    SectionLabel(stringResource(if (kind == "file") R.string.share_manage_file else R.string.share_manage_folder))
     members.forEach { m ->
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -165,7 +172,9 @@ private fun FolderMembersSection(vm: FilesViewModel, folderId: Int) {
     if (error) Text(stringResource(R.string.share_member_not_found), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
     TextButton(enabled = email.isNotBlank(), onClick = {
         scope.launch {
-            val res = vm.createUserFolderShare(folderId, email.trim(), if (editor) "editor" else "viewer")
+            val role = if (editor) "editor" else "viewer"
+            val res = if (kind == "file") vm.createUserFileShare(targetId, email.trim(), role)
+            else vm.createUserFolderShare(targetId, email.trim(), role)
             if (res != null) { email = ""; error = false; reload() } else error = true
         }
     }) { Text(stringResource(R.string.share_add_member)) }
@@ -214,10 +223,12 @@ private fun SharedBrowseScreen(vm: FilesViewModel, share: SharedWithMe, onBack: 
 
     AppScaffold(topBar = { AppTopBar(title = share.folderName, onBack = onBack) }) { pad ->
         val b = browse
+        // A lone-file share (kind=file) carries the single file under `file`; fold it into the list.
+        val files = b?.let { it.file?.let { f -> listOf(f) } ?: it.files } ?: emptyList()
         Box(Modifier.fillMaxSize().padding(pad)) {
             when {
                 b == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                b.files.isEmpty() && b.folders.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.files_empty), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                files.isEmpty() && b.folders.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.files_empty), color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = ListBottomPadding) {
                     if (b.folders.isNotEmpty()) {
                         item { SectionLabel(stringResource(R.string.files_section_folders)) }
@@ -225,9 +236,9 @@ private fun SharedBrowseScreen(vm: FilesViewModel, share: SharedWithMe, onBack: 
                             LedgerRow(title = f.name, leading = { SoftIconChip(Icons.Outlined.Folder, tint = Brand.tintBlue) })
                         }
                     }
-                    if (b.files.isNotEmpty()) {
+                    if (files.isNotEmpty()) {
                         item { SectionLabel(stringResource(R.string.files_section_files)) }
-                        listSection(b.files, key = { "sfl${it.id}" }) { f ->
+                        listSection(files, key = { "sfl${it.id}" }) { f ->
                             LedgerRow(
                                 title = f.name,
                                 subtitle = formatBytes(f.size),

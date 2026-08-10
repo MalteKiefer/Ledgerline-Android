@@ -1363,6 +1363,7 @@
     <string name="share_add_member">Добавить</string>
     <string name="share_member_not_found">Нет пользователя с такой почтой</string>
     <string name="share_manage_folder">Доступ к папке</string>
+    <string name="share_manage_file">Поделиться с пользователем</string>
     <string name="shared_with_me">Доступно мне</string>
     <string name="shared_by">Поделился %1$s</string>
     <string name="shared_empty">Вам пока ничего не открыли</string>

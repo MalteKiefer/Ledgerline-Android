@@ -62,6 +62,10 @@ class AccountViewModel @Inject constructor(
         viewModelScope.launch {
             val u = account.me()
             _me.value = u
+            // Hydrate local per-category mutes from the server profile so web ↔ app agree.
+            u?.preferences?.notifications?.forEach { (cat, pref) ->
+                settings.setCategoryMuted(cat, muted = !pref.push)
+            }
             if (u?.hasAvatar == true) {
                 val bytes = account.avatar()
                 _avatar.value = bytes?.let {
@@ -121,7 +125,10 @@ class AccountViewModel @Inject constructor(
 
     fun disablePush() = viewModelScope.launch { pushRegistrar.disable(context) }
     fun setPushLockscreenContent(on: Boolean) = viewModelScope.launch { settings.setPushLockscreenContent(on) }
-    fun setCategoryMuted(category: String, muted: Boolean) = viewModelScope.launch { settings.setCategoryMuted(category, muted) }
+    fun setCategoryMuted(category: String, muted: Boolean) = viewModelScope.launch {
+        settings.setCategoryMuted(category, muted)            // local (immediate display filter)
+        account.setPushCategory(category, push = !muted)      // server (suppress at source; web parity)
+    }
 
     fun setTheme(mode: ThemeMode) = viewModelScope.launch {
         settings.setThemeMode(mode)

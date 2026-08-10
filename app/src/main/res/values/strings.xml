@@ -1362,6 +1362,7 @@
     <string name="share_add_member">Add</string>
     <string name="share_member_not_found">No user with that email</string>
     <string name="share_manage_folder">Folder sharing</string>
+    <string name="share_manage_file">Share with a user</string>
     <string name="shared_with_me">Shared with me</string>
     <string name="shared_by">Shared by %1$s</string>
     <string name="shared_empty">Nothing shared with you yet</string>

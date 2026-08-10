@@ -180,6 +180,8 @@ class FilesViewModel @Inject constructor(
     suspend fun loadTrash(): de.ledgerline.app.domain.model.files.FilesTrash? = repo.trash()
     fun restoreFile(id: Int, done: (Boolean) -> Unit) = run({ repo.restoreFile(id) }, done)
     fun forceFile(id: Int, done: (Boolean) -> Unit) = run({ repo.forceFile(id) }, done)
+    fun restoreFolder(id: Int, done: (Boolean) -> Unit) = run({ repo.restoreFolder(id) }, done)
+    fun forceFolder(id: Int, done: (Boolean) -> Unit) = run({ repo.forceFolder(id) }, done)
     fun emptyTrash(done: (Boolean) -> Unit) = viewModelScope.launch { val n = repo.emptyTrash(); done(n != null) }
 
     // ---- Stats ----
@@ -213,6 +215,7 @@ class FilesViewModel @Inject constructor(
     // ---- Sharing: cross-user folder shares ----
     suspend fun folderShares() = repo.folderShares()
     suspend fun createUserFolderShare(folderId: Int, email: String, role: String) = repo.createFolderShare(folderId, email, role)
+    suspend fun createUserFileShare(fileId: Int, email: String, role: String) = repo.createFileShareUser(fileId, email, role)
     fun updateFolderShareMember(shareId: Int, userId: Int, role: String, done: (Boolean) -> Unit) =
         viewModelScope.launch { done(repo.updateFolderShareMember(shareId, userId, role) != null) }
     fun removeFolderShareMember(shareId: Int, userId: Int, done: (Boolean) -> Unit) =

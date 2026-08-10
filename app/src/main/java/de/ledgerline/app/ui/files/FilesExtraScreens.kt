@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,17 +61,34 @@ fun FilesTrashScreen(vm: FilesViewModel, onBack: () -> Unit) {
     var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(reload) { trash = vm.loadTrash() }
     val files = trash?.files.orEmpty()
+    val folders = trash?.folders.orEmpty()
     AppScaffold(topBar = {
         AppTopBar(title = stringResource(R.string.files_trash), onBack = onBack, actions = {
-            if (files.isNotEmpty()) TextButton(onClick = { vm.emptyTrash { reload++ } }) { Text(stringResource(R.string.files_trash_empty_action)) }
+            if (files.isNotEmpty() || folders.isNotEmpty()) TextButton(onClick = { vm.emptyTrash { reload++ } }) { Text(stringResource(R.string.files_trash_empty_action)) }
         })
     }) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
-            if (files.isEmpty()) {
+            if (files.isEmpty() && folders.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.files_trash_is_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else LazyColumn(Modifier.fillMaxSize(), contentPadding = ListBottomPadding) {
+                // Trashed folders first (restoring a folder brings back its whole subtree).
+                listSection(folders, key = { "tf${it.id}" }) { d ->
+                    LedgerRow(
+                        title = d.name,
+                        subtitle = stringResource(R.string.files_folder),
+                        leading = { SoftIconChip(Icons.Outlined.Folder, tint = Brand.tintBlue) },
+                        trailing = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                TextButton(onClick = { vm.restoreFolder(d.id) { reload++ } }) { Text(stringResource(R.string.action_restore)) }
+                                IconButton(onClick = { vm.forceFolder(d.id) { reload++ } }) {
+                                    Icon(Icons.Outlined.DeleteForever, contentDescription = stringResource(R.string.action_delete_forever), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        },
+                    )
+                }
                 listSection(files, key = { "t${it.id}" }) { f ->
                     LedgerRow(
                         title = f.name,

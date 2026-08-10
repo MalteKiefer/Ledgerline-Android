@@ -146,6 +146,12 @@ interface FilesApi {
     @DELETE("api/v1/files/folders/{id}")
     suspend fun deleteFolder(@Path("id") id: Int): Response<OkBody>
 
+    @POST("api/v1/files/folders/{id}/restore")
+    suspend fun restoreFolder(@Path("id") id: Int): Response<FolderResponse>
+
+    @DELETE("api/v1/files/folders/{id}/force")
+    suspend fun forceFolder(@Path("id") id: Int): Response<OkBody>
+
     // ---- Labels ----
     @GET("api/v1/files/labels")
     suspend fun labels(): Response<LabelsResponse>

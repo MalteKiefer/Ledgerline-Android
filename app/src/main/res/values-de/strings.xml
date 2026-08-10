@@ -1360,6 +1360,7 @@
     <string name="share_add_member">Hinzufügen</string>
     <string name="share_member_not_found">Kein Nutzer mit dieser E-Mail</string>
     <string name="share_manage_folder">Ordnerfreigabe</string>
+    <string name="share_manage_file">Mit Nutzer teilen</string>
     <string name="shared_with_me">Für mich freigegeben</string>
     <string name="shared_by">Freigegeben von %1$s</string>
     <string name="shared_empty">Noch nichts für dich freigegeben</string>

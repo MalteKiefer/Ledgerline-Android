@@ -42,6 +42,9 @@ import kotlinx.serialization.Serializable
     val wipe: Boolean = false,
 )
 
+/** Per-category push preference (server-side): `push=false` suppresses push for that category. */
+@Serializable data class PushCategoryPref(val push: Boolean = true)
+
 /** Global non-secret display preferences (units + 12/24h clock). Also the `POST /preferences` body. */
 @Serializable data class DisplayPrefsDto(
     val distance: String? = null,
@@ -50,6 +53,9 @@ import kotlinx.serialization.Serializable
     val temp: String? = null,
     val glucose: String? = null,
     @SerialName("time_format") val timeFormat: String? = null,
+    // Per-category push prefs, keyed by category (task/event/birthday/invoice/…). Read from
+    // GET /me; absent category = push enabled. `encodeDefaults=false` omits it on display writes.
+    val notifications: Map<String, PushCategoryPref>? = null,
 )
 
 @Serializable data class MeUser(

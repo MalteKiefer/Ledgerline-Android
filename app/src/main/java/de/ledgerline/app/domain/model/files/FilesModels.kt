@@ -134,7 +134,11 @@ data class ShareMember(
 @Serializable
 data class FolderShareView(
     val id: Int = 0,
+    // Cross-user shares are now folder-subtree OR single-file (server d55caef3). `kind` selects
+    // which; file shares carry `fileId` and leave `folderId` at 0.
+    val kind: String = "folder", // file | folder
     @SerialName("file_folder_id") val folderId: Int = 0,
+    @SerialName("file_id") val fileId: Int? = null,
     @SerialName("folder_name") val folderName: String? = null,
     val members: List<ShareMember> = emptyList(),
 )
@@ -178,7 +182,10 @@ data class SharedFolder(
 data class SharedBrowse(
     @SerialName("share_id") val shareId: Int = 0,
     val role: String = "viewer",
+    val kind: String = "folder", // file | folder
     @SerialName("root_id") val rootId: Int = 0,
     val folders: List<SharedFolder> = emptyList(),
     val files: List<SharedFile> = emptyList(),
+    // A lone shared file (kind=file) arrives under `file`, not in `files[]`.
+    val file: SharedFile? = null,
 )

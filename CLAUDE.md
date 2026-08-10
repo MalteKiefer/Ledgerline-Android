@@ -137,8 +137,9 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
   Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung, **Favoriten-Filter, Label-
   Filter, Thumbnails, Quota-Balken, Multi-Select-ZIP, In-App-PDF-Viewer (`ui/common/PdfViewerScreen`
-  via PdfRenderer)**, volles Sharing (Public-Links + Ablauf/Bearbeiten, Ordnerfreigaben, für-mich-
-  freigegeben). `data/files/FilesRepository` (online-only Snapshot + per-Record-CRUD,
+  via PdfRenderer)**, volles Sharing (Public-Links + Ablauf/Bearbeiten, Ordnerfreigaben +
+  **Einzeldatei-Cross-User-Share** `kind=file`, für-mich-freigegeben inkl. Lone-File),
+  **Trash restore/force für Ordner** (nicht nur Dateien). `data/files/FilesRepository` (online-only Snapshot + per-Record-CRUD,
   `NetworkFactory.createFiles` + `FilesApi`); Download → `DocOpener.openFile` (FileProvider).
   **Offen (Rest):** Share-Target (`ACTION_SEND`).
 - **`ui/money/FinanceSection`** — Top-Tab-Row (Dashboard/Rechnungen/Umsätze/Mehr) über geteiltes
@@ -156,7 +157,9 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   /device/push-endpoint`, **serverseitig noch offen** — Spec `docs/superpowers/specs/…-server-design.md`).
   **Empfang braucht keinen Bearer-Token** (Biometrie-Siegel unberührt); der Endpoint wird nur bei
   entsperrter App gesendet (`SessionHolder` in-memory), sonst in `SettingsStore` gequeued + bei Unlock
-  geflusht (`MainActivity`). Push-Prefs (enabled/Kategorie-Mute/Lockscreen-Inhalt) in `SettingsStore`.
+  geflusht (`MainActivity`). Push-Prefs (enabled/Kategorie-Mute/Lockscreen-Inhalt) in `SettingsStore`;
+  **Kategorie-Mute wird server-synchronisiert** (`/me.preferences.notifications` lesen → hydrieren;
+  Toggle → `POST /preferences {notifications:{cat:{push}}}`, damit `SendPushJob` an der Quelle filtert).
   `PushFilter` = reine, getestete Parse-/Filter-Logik (`PushFilterTest`).
 - **`data/finance/FinanceRepository`** — cache-first Read (Klartext-Disk-Cache `finance_data.json`) +
   Online-CRUD (patcht In-Memory-Snapshot `StateFlow<FinanceData>` + Disk), live Analytics/Company.

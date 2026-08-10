@@ -70,6 +70,10 @@ interface LedgerlineApi {
     @POST("api/v1/preferences")
     suspend fun putPreferences(@Body body: de.ledgerline.app.data.remote.dto.DisplayPrefsDto): Response<Unit>
 
+    /** Merge per-category push prefs into the profile: `{ "notifications": { "<cat>": { "push": bool } } }`. */
+    @POST("api/v1/preferences")
+    suspend fun putNotificationPrefs(@Body body: kotlinx.serialization.json.JsonObject): Response<Unit>
+
     @POST("api/v1/locale")
     suspend fun putLocale(@Body body: de.ledgerline.app.data.remote.dto.LocaleRequest): Response<Unit>
 

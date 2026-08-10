@@ -94,6 +94,8 @@ class FilesRepository @Inject constructor(
         record({ api().moveFolder(id, buildJsonObject { put("parent_id", parentId) }) }, { it.folder }, ::upsertFolder)
 
     suspend fun deleteFolder(id: Int): Outcome<Unit> = delete({ api().deleteFolder(id) }) { removeFolder(id) }
+    suspend fun restoreFolder(id: Int): Outcome<FileFolder> = record({ api().restoreFolder(id) }, { it.folder }, ::upsertFolder)
+    suspend fun forceFolder(id: Int): Outcome<Unit> = delete({ api().forceFolder(id) }) { }
 
     // ---- File metadata / lifecycle ----
     /** Patch metadata. Send the current [FileEntry.version] as the optimistic guard → 409 CONFLICT. */
@@ -226,7 +228,10 @@ class FilesRepository @Inject constructor(
     // ---- Sharing: cross-user folder shares ----
     suspend fun folderShares(): List<FolderShareView> = get { api().folderShares() }?.shares.orEmpty()
     suspend fun createFolderShare(folderId: Int, email: String, role: String): FolderShareView? =
-        get { api().createFolderShare(buildJsonObject { put("file_folder_id", folderId); put("email", email); put("role", role) }) }?.share
+        get { api().createFolderShare(buildJsonObject { put("kind", "folder"); put("file_folder_id", folderId); put("email", email); put("role", role) }) }?.share
+    /** Cross-user share of a single owned file with a registered user (viewer|editor). Same endpoint, `kind=file`. */
+    suspend fun createFileShareUser(fileId: Int, email: String, role: String): FolderShareView? =
+        get { api().createFolderShare(buildJsonObject { put("kind", "file"); put("file_id", fileId); put("email", email); put("role", role) }) }?.share
     suspend fun updateFolderShareMember(shareId: Int, userId: Int, role: String): FolderShareView? =
         get { api().updateFolderShareMember(shareId, buildJsonObject { put("user_id", userId); put("role", role) }) }?.share
     suspend fun removeFolderShareMember(shareId: Int, userId: Int): Boolean =

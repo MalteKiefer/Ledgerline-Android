@@ -6,6 +6,8 @@ import de.ledgerline.app.data.remote.LedgerlineApi
 import de.ledgerline.app.data.remote.NetworkFactory
 import de.ledgerline.app.data.remote.dto.MeUser
 import de.ledgerline.app.domain.model.Session
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
@@ -151,6 +153,21 @@ class AccountRepository(
 
     /** Clear this device's push endpoint server-side (`DELETE /device/push-endpoint`). */
     suspend fun clearPushEndpoint(): Boolean = call { it.clearPushEndpoint() }
+
+    /**
+     * Persist a per-category push preference server-side (`POST /preferences`, merged) so the
+     * server's SendPushJob suppresses that category at source — keeping web and app in sync.
+     * `push=false` mutes the category. Best-effort.
+     */
+    suspend fun setPushCategory(category: String, push: Boolean): Boolean {
+        val session = sessionHolder.get() ?: return false
+        val body = kotlinx.serialization.json.buildJsonObject {
+            putJsonObject("notifications") {
+                putJsonObject(category) { put("push", push) }
+            }
+        }
+        return try { apiProvider(session).putNotificationPrefs(body).isSuccessful } catch (_: Exception) { false }
+    }
 
     /** Per-user non-display settings (`GET /settings`): contact notify channels + file version cap. */
     suspend fun getSettings(): de.ledgerline.app.data.remote.dto.UserSettingsDto? {
