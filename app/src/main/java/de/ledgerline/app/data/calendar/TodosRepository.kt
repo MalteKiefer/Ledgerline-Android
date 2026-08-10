@@ -100,6 +100,7 @@ class TodosRepository @Inject constructor(
             put("all_day", t.allDay)
             put("priority", t.priority?.let { JsonPrimitive(it) } ?: JsonNull)
             put("rrule", if (t.rrule.isNullOrBlank()) JsonNull else JsonPrimitive(t.rrule))
+            put("related_to", if (t.relatedTo.isNullOrBlank()) JsonNull else JsonPrimitive(t.relatedTo))
             put("categories", buildJsonArray { t.categories.forEach { add(it) } })
             if (t.etag.isNotBlank()) put("etag", t.etag)
             if (done) {
@@ -123,35 +124,41 @@ class TodosRepository @Inject constructor(
         if (ok) load(); ok
     }
 
-    /** Build a CalendarTodoInput body from editor fields (nulls are sent to clear). */
+    /**
+     * Build a full CalendarTodoInput body from editor fields (nulls clear). Covers web parity:
+     * dtstart, due, status, priority, percent, rrule, categories (tags), related_to (subtask parent).
+     */
     fun todoBody(
         calendarId: String,
         summary: String,
         description: String,
+        dtstart: String?,
         due: String?,
         allDay: Boolean,
+        status: String,
         priority: Int?,
+        percent: Int?,
+        rrule: String?,
         categories: List<String>,
+        relatedTo: String?,
         etag: String?,
-        status: String? = null,
         completed: String? = null,
     ): JsonObject = buildJsonObject {
         put("calendar_id", calendarId)
         put("summary", summary.trim())
         val desc = description.trim()
         put("description", if (desc.isEmpty()) JsonNull else JsonPrimitive(desc))
+        put("dtstart", if (dtstart.isNullOrBlank()) JsonNull else JsonPrimitive(dtstart))
         put("due", if (due.isNullOrBlank()) JsonNull else JsonPrimitive(due))
         put("all_day", allDay)
+        put("status", status)
         put("priority", priority?.let { JsonPrimitive(it) } ?: JsonNull)
+        val pct = if (status == "COMPLETED") (percent ?: 100) else percent
+        put("percent_complete", pct?.let { JsonPrimitive(it) } ?: JsonNull)
+        put("rrule", if (rrule.isNullOrBlank()) JsonNull else JsonPrimitive(rrule))
+        put("related_to", if (relatedTo.isNullOrBlank()) JsonNull else JsonPrimitive(relatedTo))
         put("categories", buildJsonArray { categories.forEach { add(it) } })
-        // Preserve completion state across an edit (the PUT rebuilds the VTODO from the input).
-        if (status != null) {
-            put("status", status)
-            if (status == "COMPLETED") {
-                put("percent_complete", 100)
-                put("completed", if (completed.isNullOrBlank()) Instant.now().toString() else completed)
-            }
-        }
+        if (status == "COMPLETED") put("completed", if (completed.isNullOrBlank()) Instant.now().toString() else completed)
         if (!etag.isNullOrBlank()) put("etag", etag)
     }
 }

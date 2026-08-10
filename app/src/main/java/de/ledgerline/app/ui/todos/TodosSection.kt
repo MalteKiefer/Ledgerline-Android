@@ -6,6 +6,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -28,10 +31,14 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.ExpandLess
+import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Flag
 import androidx.compose.material.icons.outlined.Inbox
 import androidx.compose.material.icons.outlined.Notes
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SubdirectoryArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -46,8 +53,10 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,6 +67,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,8 +76,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -78,7 +90,6 @@ import de.ledgerline.app.domain.model.calendar.Calendar
 import de.ledgerline.app.domain.model.calendar.CalendarTodo
 import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.common.RefreshBox
-import de.ledgerline.app.ui.money.FilledField
 import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.cardSurface
 import java.time.DayOfWeek
@@ -87,8 +98,9 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAdjusters
+import kotlin.math.roundToInt
 
-/** The "Aufgaben" (VTODO task-list) tab: task lists, tasks with a completion toggle, quick-add editor. */
+/** The "Aufgaben" (VTODO task-list) tab: lists, search, due sections, nested subtasks, quick-add editor. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewModel()) {
@@ -101,16 +113,27 @@ fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMod
     val showDone by vm.showDone.collectAsStateWithLifecycle()
     val refreshing by vm.refreshing.collectAsStateWithLifecycle()
 
-    // null = closed; "" = create; other = edit that todo id.
-    var editorTarget by remember { mutableStateOf<String?>(null) }
+    var editorTarget by remember { mutableStateOf<String?>(null) } // null closed, "" create, id edit
     var addingList by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
 
     Column(modifier.fillMaxSize()) {
         AppTopBar(title = stringResource(R.string.tab_todos))
 
+        // Search.
+        TextField(
+            value = query, onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            placeholder = { Text(stringResource(R.string.todos_search)) },
+            leadingIcon = { Icon(Icons.Outlined.Search, null) },
+            singleLine = true,
+            shape = RoundedCornerShape(14.dp),
+            colors = searchFieldColors(),
+        )
+
         // Task-list picker.
         Row(
-            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 4.dp),
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -119,26 +142,39 @@ fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMod
             AssistChip(onClick = { addingList = true }, label = { Text(stringResource(R.string.todos_add_list)) }, leadingIcon = { Icon(Icons.Outlined.Add, null) })
         }
         // Open / all filter.
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(!showDone, { if (showDone) vm.toggleShowDone() }, label = { Text(stringResource(R.string.todos_open)) })
             FilterChip(showDone, { if (!showDone) vm.toggleShowDone() }, label = { Text(stringResource(R.string.todos_all)) })
         }
 
-        val shown = todos.filter { (selectedList == null || it.calendar == selectedList) && (showDone || !it.done) }
+        val entries = buildEntries(
+            todos = todos, selectedList = selectedList, showDone = showDone, query = query.trim(),
+            headers = sectionHeaders(),
+        )
         Box(Modifier.weight(1f).fillMaxWidth()) {
             RefreshBox(refreshing = refreshing, onRefresh = { vm.refresh() }) {
-                if (shown.isEmpty()) {
+                if (entries.isEmpty()) {
                     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
                         Text(stringResource(R.string.todos_empty), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(48.dp))
                     }
-                } else LazyColumn(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(shown, key = { it.id }) { t ->
-                        TodoRow(
-                            todo = t,
-                            listName = vm.listName(t.calendar).takeIf { selectedList == null },
-                            onToggle = { vm.setDone(t, !t.done) },
-                            onClick = { editorTarget = t.id },
-                        )
+                } else LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 88.dp, top = 4.dp)) {
+                    items(entries, key = { it.key }) { e ->
+                        when (e) {
+                            is Entry.Header -> Text(
+                                e.title,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (e.overdue) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(start = 4.dp, top = 10.dp, bottom = 2.dp),
+                            )
+                            is Entry.Item -> TodoRow(
+                                todo = e.todo,
+                                listName = vm.listName(e.todo.calendar).takeIf { selectedList == null },
+                                indent = e.child,
+                                progress = e.progress,
+                                onToggle = { vm.setDone(e.todo, !e.todo.done) },
+                                onClick = { editorTarget = e.todo.id },
+                            )
+                        }
                     }
                 }
             }
@@ -166,20 +202,97 @@ fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMod
         AlertDialog(
             onDismissRequest = { addingList = false },
             title = { Text(stringResource(R.string.todos_add_list)) },
-            text = { FilledField(name, { name = it }, R.string.todos_list) },
+            text = { TextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.todos_list)) }) },
             confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { vm.addList(name) {}; addingList = false }) { Text(stringResource(R.string.action_save)) } },
             dismissButton = { TextButton(onClick = { addingList = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
 
+// ---------------------------------------------------------------------------
+//  List model — headers + (nested) items
+// ---------------------------------------------------------------------------
+private sealed interface Entry {
+    val key: String
+    data class Header(val title: String, val overdue: Boolean, override val key: String) : Entry
+    data class Item(val todo: CalendarTodo, val child: Boolean, val progress: Pair<Int, Int>?, override val key: String) : Entry
+}
+
+private data class SectionHeaders(val overdue: String, val today: String, val upcoming: String, val nodate: String, val done: String)
+
 @Composable
-private fun TodoRow(todo: CalendarTodo, listName: String?, onToggle: () -> Unit, onClick: () -> Unit) {
+private fun sectionHeaders() = SectionHeaders(
+    overdue = stringResource(R.string.todos_sec_overdue),
+    today = stringResource(R.string.todos_sec_today),
+    upcoming = stringResource(R.string.todos_sec_upcoming),
+    nodate = stringResource(R.string.todos_sec_nodate),
+    done = stringResource(R.string.todos_sec_done),
+)
+
+/** Build the flat render list: search → flat matches; else due-sections with subtasks nested under parents. */
+private fun buildEntries(
+    todos: List<CalendarTodo>,
+    selectedList: String?,
+    showDone: Boolean,
+    query: String,
+    headers: SectionHeaders,
+): List<Entry> {
+    val scoped = todos.filter { selectedList == null || it.calendar == selectedList }
+
+    if (query.isNotBlank()) {
+        return scoped.filter { showDone || !it.done }
+            .filter { it.summary.orEmpty().contains(query, true) || it.description.orEmpty().contains(query, true) }
+            .sortedWith(compareBy({ it.done }, { it.due ?: "￿" }))
+            .map { Entry.Item(it, child = false, progress = null, key = "i${it.id}") }
+    }
+
+    val byUid = scoped.filter { !it.uid.isNullOrBlank() }.associateBy { it.uid }
+    val childrenOf = scoped.filter { !it.relatedTo.isNullOrBlank() && byUid.containsKey(it.relatedTo) }
+        .groupBy { it.relatedTo }
+    val topLevel = scoped.filter { it.relatedTo.isNullOrBlank() || !byUid.containsKey(it.relatedTo) }
+
+    val today = LocalDate.now()
+    fun bucket(t: CalendarTodo): Int = when {
+        t.done -> 4
+        t.due.isNullOrBlank() -> 3
+        else -> {
+            val d = runCatching { Instant.parse(t.due).atZone(ZoneOffset.UTC).toLocalDate() }.getOrNull()
+            when { d == null -> 3; d.isBefore(today) -> 0; d == today -> 1; else -> 2 }
+        }
+    }
+    val labels = listOf(headers.overdue, headers.today, headers.upcoming, headers.nodate, headers.done)
+
+    val out = ArrayList<Entry>()
+    for (b in 0..4) {
+        if (b == 4 && !showDone) continue
+        val inBucket = topLevel.filter { (showDone || !it.done) && bucket(it) == b }
+            .sortedWith(compareBy({ it.sortOrder }, { it.due ?: "￿" }))
+        if (inBucket.isEmpty()) continue
+        out += Entry.Header(labels[b], overdue = b == 0, key = "h$b")
+        for (t in inBucket) {
+            val kids = childrenOf[t.uid].orEmpty().filter { showDone || !it.done }
+            val allKids = childrenOf[t.uid].orEmpty()
+            val progress = if (allKids.isNotEmpty()) allKids.count { it.done } to allKids.size else null
+            out += Entry.Item(t, child = false, progress = progress, key = "i${t.id}")
+            kids.sortedWith(compareBy({ it.sortOrder }, { it.due ?: "￿" })).forEach { c ->
+                out += Entry.Item(c, child = true, progress = null, key = "i${c.id}")
+            }
+        }
+    }
+    return out
+}
+
+// ---------------------------------------------------------------------------
+//  Row
+// ---------------------------------------------------------------------------
+@Composable
+private fun TodoRow(todo: CalendarTodo, listName: String?, indent: Boolean, progress: Pair<Int, Int>?, onToggle: () -> Unit, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().cardSurface(),
+        Modifier.fillMaxWidth().padding(start = if (indent) 24.dp else 0.dp).cardSurface(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        if (indent) Icon(Icons.Outlined.SubdirectoryArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
         IconButton(onClick = onToggle) {
             if (todo.done) Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = Brand.tintGreen)
             else Icon(Icons.Outlined.RadioButtonUnchecked, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -194,10 +307,29 @@ private fun TodoRow(todo: CalendarTodo, listName: String?, onToggle: () -> Unit,
                 textDecoration = if (todo.done) TextDecoration.LineThrough else null,
                 color = if (todo.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )
-            val sub = listOfNotNull(todo.due?.let { fmtDate(it) }, priorityLabel(todo.priority), listName).joinToString(" · ")
-            if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            TodoMeta(todo, listName, progress)
         }
         PriorityDot(todo.priority)
+    }
+}
+
+@Composable
+private fun TodoMeta(todo: CalendarTodo, listName: String?, progress: Pair<Int, Int>?) {
+    val overdue = !todo.done && dueIsOverdue(todo.due)
+    val parts = ArrayList<Pair<String, Color>>()
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    todo.due?.takeIf { it.isNotBlank() }?.let { parts += fmtDate(it) to if (overdue) MaterialTheme.colorScheme.error else muted }
+    progress?.let { parts += "☑ ${it.first}/${it.second}" to muted }
+    (todo.percentComplete ?: 0).takeIf { it in 1..99 }?.let { parts += "$it%" to muted }
+    priorityLabel(todo.priority)?.let { parts += it to muted }
+    todo.rrule?.takeIf { it.isNotBlank() }?.let { parts += "↻" to muted }
+    listName?.let { parts += it to muted }
+    if (parts.isEmpty()) return
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        parts.forEachIndexed { i, (t, c) ->
+            if (i > 0) Text("·", style = MaterialTheme.typography.bodySmall, color = muted)
+            Text(t, style = MaterialTheme.typography.bodySmall, color = c)
+        }
     }
 }
 
@@ -209,11 +341,9 @@ private fun PriorityDot(priority: Int?) {
 }
 
 // ---------------------------------------------------------------------------
-//  Quick-add editor — a modern task-app bottom sheet: title-first (autofocus +
-//  keyboard), inline metadata chips (due with quick presets / priority / list),
-//  a collapsible note, and a round send button.
+//  Editor — quick-add sheet with full VTODO parity (start/status/repeat/progress/tags/subtask)
 // ---------------------------------------------------------------------------
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun TodoEditorSheet(
     vm: TodosViewModel,
@@ -226,26 +356,47 @@ private fun TodoEditorSheet(
     var summary by remember { mutableStateOf(existing?.summary ?: "") }
     var description by remember { mutableStateOf(existing?.description ?: "") }
     var calendarId by remember { mutableStateOf(existing?.calendar ?: defaultCalendar ?: lists.firstOrNull()?.id ?: "") }
+    var startMillis by remember { mutableStateOf(existing?.dtstart?.let { parseMillis(it) }) }
     var dueMillis by remember { mutableStateOf(existing?.due?.let { parseMillis(it) }) }
     var allDay by remember { mutableStateOf(existing?.allDay ?: false) }
-    var priority by remember { mutableStateOf(existing?.priority ?: 0) }
+    var priority by remember { mutableIntStateOf(existing?.priority ?: 0) }
+    var status by remember { mutableStateOf(existing?.status ?: "NEEDS-ACTION") }
+    var percent by remember { mutableIntStateOf(existing?.percentComplete ?: 0) }
+    var rrule by remember { mutableStateOf(existing?.rrule) }
+    val tags = remember { androidx.compose.runtime.mutableStateListOf<String>().apply { existing?.categories?.let { addAll(it) } } }
+    var parentUid by remember { mutableStateOf(existing?.relatedTo) }
     var busy by remember { mutableStateOf(false) }
     var showNotes by remember { mutableStateOf(!existing?.description.isNullOrBlank()) }
-    var showDate by remember { mutableStateOf(false) }
+    var advanced by remember { mutableStateOf(!existing?.rrule.isNullOrBlank() || (existing?.percentComplete ?: 0) > 0 || !existing?.dtstart.isNullOrBlank() || existing?.categories?.isNotEmpty() == true) }
+    var showDue by remember { mutableStateOf(false) }
+    var showStart by remember { mutableStateOf(false) }
     var prioMenu by remember { mutableStateOf(false) }
     var listMenu by remember { mutableStateOf(false) }
+    var parentMenu by remember { mutableStateOf(false) }
+    var repeatMenu by remember { mutableStateOf(false) }
+    var tagInput by remember { mutableStateOf("") }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val focus = remember { androidx.compose.ui.focus.FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
+    // Subtask parent candidates: other top-level, non-completed tasks in the same list with a uid.
+    val parentCandidates = vm.todos.value.filter {
+        it.id != todoId && !it.uid.isNullOrBlank() && it.relatedTo.isNullOrBlank() && !it.done &&
+            (calendarId.isBlank() || it.calendar == calendarId)
+    }
+    val parentSummary = parentUid?.let { uid -> vm.todos.value.firstOrNull { it.uid == uid }?.summary }
+
     fun save() {
         if (summary.isBlank() || calendarId.isBlank() || busy) return
         busy = true
-        val due = dueMillis?.let { toIsoInstant(it) }
-        vm.save(todoId, calendarId, summary, description, due, allDay, priority.takeIf { it != 0 }, existing?.etag) { ok ->
-            busy = false; if (ok) onDismiss()
-        }
+        vm.save(
+            id = todoId, calendarId = calendarId, summary = summary, description = description,
+            dtstart = startMillis?.let { toIsoInstant(it) }, due = dueMillis?.let { toIsoInstant(it) },
+            allDay = allDay, status = status, priority = priority.takeIf { it != 0 },
+            percent = percent.takeIf { it in 1..100 }, rrule = rrule, categories = tags.toList(),
+            parentUid = parentUid, etag = existing?.etag,
+        ) { ok -> busy = false; if (ok) onDismiss() }
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -261,10 +412,8 @@ private fun TodoEditorSheet(
                 }
             }
 
-            // Title — the hero input, autofocused with the keyboard up.
             TextField(
-                value = summary,
-                onValueChange = { summary = it },
+                value = summary, onValueChange = { summary = it },
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
                 placeholder = { Text(stringResource(R.string.todos_title_hint), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 textStyle = MaterialTheme.typography.titleLarge,
@@ -275,70 +424,98 @@ private fun TodoEditorSheet(
 
             if (showNotes) {
                 TextField(
-                    value = description,
-                    onValueChange = { description = it },
+                    value = description, onValueChange = { description = it },
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text(stringResource(R.string.todos_notes_hint), color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                    textStyle = MaterialTheme.typography.bodyMedium,
-                    colors = bareFieldColors(),
+                    textStyle = MaterialTheme.typography.bodyMedium, colors = bareFieldColors(),
                 )
             }
 
-            // Inline metadata chips.
-            Row(
-                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                MetaChip(
-                    icon = Icons.Outlined.CalendarToday,
-                    label = dueMillis?.let { quickLabelFor(it) } ?: stringResource(R.string.todos_due),
-                    active = dueMillis != null,
-                    onClick = { showDate = true },
-                )
+            // Core inline metadata chips.
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                MetaChip(Icons.Outlined.CalendarToday, dueMillis?.let { quickLabelFor(it) } ?: stringResource(R.string.todos_due), dueMillis != null) { showDue = true }
                 Box {
-                    MetaChip(
-                        icon = Icons.Outlined.Flag,
-                        label = priorityChipLabel(priority),
-                        active = priority != 0,
-                        tint = if (priority != 0) priorityColor(priority) else null,
-                        onClick = { prioMenu = true },
-                    )
-                    DropdownMenu(expanded = prioMenu, onDismissRequest = { prioMenu = false }) {
+                    MetaChip(Icons.Outlined.Flag, priorityChipLabel(priority), priority != 0, tint = if (priority != 0) priorityColor(priority) else null) { prioMenu = true }
+                    DropdownMenu(prioMenu, { prioMenu = false }) {
                         listOf(0, 1, 5, 9).forEach { p ->
-                            DropdownMenuItem(
-                                text = { Text(priorityChipLabel(p)) },
-                                leadingIcon = { Icon(Icons.Outlined.Flag, null, tint = if (p == 0) MaterialTheme.colorScheme.onSurfaceVariant else priorityColor(p)) },
-                                onClick = { priority = p; prioMenu = false },
-                            )
+                            DropdownMenuItem(text = { Text(priorityChipLabel(p)) }, leadingIcon = { Icon(Icons.Outlined.Flag, null, tint = if (p == 0) MaterialTheme.colorScheme.onSurfaceVariant else priorityColor(p)) }, onClick = { priority = p; prioMenu = false })
                         }
                     }
                 }
-                if (lists.size > 1) {
+                if (lists.size > 1) Box {
+                    MetaChip(Icons.Outlined.Inbox, lists.firstOrNull { it.id == calendarId }?.name ?: stringResource(R.string.todos_list), false) { listMenu = true }
+                    DropdownMenu(listMenu, { listMenu = false }) {
+                        lists.forEach { l -> DropdownMenuItem(text = { Text(l.name) }, onClick = { calendarId = l.id; listMenu = false }) }
+                    }
+                }
+                Box {
+                    MetaChip(Icons.Outlined.SubdirectoryArrowRight, parentSummary ?: stringResource(R.string.todos_subtask_of), parentUid != null) { parentMenu = true }
+                    DropdownMenu(parentMenu, { parentMenu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.todos_subtask_none)) }, onClick = { parentUid = null; parentMenu = false })
+                        parentCandidates.forEach { c -> DropdownMenuItem(text = { Text(c.summary.orEmpty().ifBlank { "—" }) }, onClick = { parentUid = c.uid; parentMenu = false }) }
+                    }
+                }
+                if (!showNotes) MetaChip(Icons.Outlined.Notes, stringResource(R.string.todos_description), false) { showNotes = true }
+            }
+
+            // Advanced (web parity): start / status / repeat / progress / tags.
+            TextButton(onClick = { advanced = !advanced }) {
+                Icon(if (advanced) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null)
+                Spacer(Modifier.width(4.dp))
+                Text(stringResource(if (advanced) R.string.todos_less else R.string.todos_more))
+            }
+            if (advanced) {
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // Start date.
+                    FieldLabel(stringResource(R.string.todos_start))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AssistChip(onClick = { showStart = true }, leadingIcon = { Icon(Icons.Outlined.CalendarToday, null, Modifier.size(18.dp)) }, label = { Text(startMillis?.let { fmtMillis(it) } ?: stringResource(R.string.todos_start)) }, shape = RoundedCornerShape(10.dp))
+                        if (startMillis != null) TextButton(onClick = { startMillis = null }) { Text(stringResource(R.string.todos_due_none), color = MaterialTheme.colorScheme.error) }
+                    }
+                    // Status.
+                    FieldLabel(stringResource(R.string.todos_status))
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        statusOptions().forEach { (code, labelRes) ->
+                            FilterChip(status == code, { status = code; if (code == "COMPLETED") percent = 100 }, label = { Text(stringResource(labelRes)) })
+                        }
+                    }
+                    // Repeat.
+                    FieldLabel(stringResource(R.string.todos_repeat))
                     Box {
-                        MetaChip(
-                            icon = Icons.Outlined.Inbox,
-                            label = lists.firstOrNull { it.id == calendarId }?.name ?: stringResource(R.string.todos_list),
-                            active = false,
-                            onClick = { listMenu = true },
-                        )
-                        DropdownMenu(expanded = listMenu, onDismissRequest = { listMenu = false }) {
-                            lists.forEach { l ->
-                                DropdownMenuItem(text = { Text(l.name) }, onClick = { calendarId = l.id; listMenu = false })
+                        AssistChip(onClick = { repeatMenu = true }, label = { Text(stringResource(repeatLabelRes(rrule))) }, shape = RoundedCornerShape(10.dp))
+                        DropdownMenu(repeatMenu, { repeatMenu = false }) {
+                            repeatOptions().forEach { (value, labelRes) ->
+                                DropdownMenuItem(text = { Text(stringResource(labelRes)) }, onClick = { rrule = value; repeatMenu = false })
                             }
                         }
                     }
-                }
-                if (!showNotes) {
-                    MetaChip(icon = Icons.Outlined.Notes, label = stringResource(R.string.todos_description), active = false, onClick = { showNotes = true })
+                    // Progress.
+                    FieldLabel("${stringResource(R.string.todos_progress)} — $percent%")
+                    Slider(value = percent / 100f, onValueChange = { percent = (it * 100).roundToInt() }, steps = 19)
+                    // Tags.
+                    FieldLabel(stringResource(R.string.todos_tags))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        tags.forEach { tag ->
+                            InputChip(selected = false, onClick = { tags.remove(tag) }, label = { Text(tag) }, trailingIcon = { Icon(Icons.Outlined.Delete, null, Modifier.size(16.dp)) })
+                        }
+                    }
+                    TextField(
+                        value = tagInput, onValueChange = { tagInput = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text(stringResource(R.string.todos_tag_add)) }, singleLine = true,
+                        shape = RoundedCornerShape(12.dp), colors = bareFieldColors(),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            val t = tagInput.trim()
+                            if (t.isNotEmpty() && t !in tags) tags.add(t); tagInput = ""
+                        }),
+                    )
                 }
             }
 
-            // Send.
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                 FilledIconButton(
-                    onClick = { save() },
-                    enabled = summary.isNotBlank() && !busy,
+                    onClick = { save() }, enabled = summary.isNotBlank() && !busy,
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Brand.accent, contentColor = Color.White),
                 ) { Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.action_save)) }
             }
@@ -346,19 +523,16 @@ private fun TodoEditorSheet(
         }
     }
 
-    LaunchedEffect(Unit) {
-        // Only autofocus on create — editing should not force the keyboard over the content.
-        if (todoId == null) { focus.requestFocus(); keyboard?.show() }
-    }
+    LaunchedEffect(Unit) { if (todoId == null) { focus.requestFocus(); keyboard?.show() } }
 
-    if (showDate) {
-        DueDateSheet(
-            current = dueMillis,
-            allDay = allDay,
-            onPick = { m, ad -> dueMillis = m; allDay = ad; showDate = false },
-            onClear = { dueMillis = null; showDate = false },
-            onDismiss = { showDate = false },
-        )
+    if (showDue) DueDateSheet(dueMillis, allDay, { m, ad -> dueMillis = m; allDay = ad; showDue = false }, { dueMillis = null; showDue = false }, { showDue = false })
+    if (showStart) {
+        val state = rememberDatePickerState(initialSelectedDateMillis = startMillis)
+        DatePickerDialog(
+            onDismissRequest = { showStart = false },
+            confirmButton = { TextButton(onClick = { startMillis = state.selectedDateMillis; showStart = false }) { Text(stringResource(R.string.action_save)) } },
+            dismissButton = { TextButton(onClick = { showStart = false }) { Text(stringResource(R.string.action_cancel)) } },
+        ) { DatePicker(state = state) }
     }
 }
 
@@ -384,9 +558,7 @@ private fun DueDateSheet(current: Long?, allDay: Boolean, onPick: (Long?, Boolea
                 Text(stringResource(R.string.todos_all_day), Modifier.weight(1f))
                 Switch(checked = allDayState, onCheckedChange = { allDayState = it })
             }
-            if (current != null) {
-                TextButton(onClick = onClear) { Text(stringResource(R.string.todos_due_none), color = MaterialTheme.colorScheme.error) }
-            }
+            if (current != null) TextButton(onClick = onClear) { Text(stringResource(R.string.todos_due_none), color = MaterialTheme.colorScheme.error) }
         }
     }
 
@@ -401,18 +573,27 @@ private fun DueDateSheet(current: Long?, allDay: Boolean, onPick: (Long?, Boolea
 }
 
 @Composable
-private fun MetaChip(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, active: Boolean, tint: Color? = null, onClick: () -> Unit) {
+private fun MetaChip(icon: ImageVector, label: String, active: Boolean, tint: Color? = null, onClick: () -> Unit) {
     AssistChip(
         onClick = onClick,
         label = { Text(label) },
         leadingIcon = { Icon(icon, null, tint = tint ?: if (active) Brand.accent else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) },
         shape = RoundedCornerShape(10.dp),
-        colors = if (active) AssistChipDefaults.assistChipColors(
-            containerColor = Brand.accent.copy(alpha = 0.12f),
-            labelColor = Brand.accent,
-        ) else AssistChipDefaults.assistChipColors(),
+        colors = if (active) AssistChipDefaults.assistChipColors(containerColor = Brand.accent.copy(alpha = 0.12f), labelColor = Brand.accent) else AssistChipDefaults.assistChipColors(),
     )
 }
+
+@Composable
+private fun FieldLabel(text: String) = Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Medium)
+
+@Composable
+private fun searchFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    disabledIndicatorColor = Color.Transparent,
+)
 
 @Composable
 private fun bareFieldColors() = TextFieldDefaults.colors(
@@ -423,6 +604,31 @@ private fun bareFieldColors() = TextFieldDefaults.colors(
     unfocusedIndicatorColor = Color.Transparent,
     disabledIndicatorColor = Color.Transparent,
 )
+
+// ---- status / repeat / priority mapping ----
+private fun statusOptions() = listOf(
+    "NEEDS-ACTION" to R.string.todos_status_open,
+    "IN-PROCESS" to R.string.todos_status_progress,
+    "COMPLETED" to R.string.todos_status_done,
+    "CANCELLED" to R.string.todos_status_cancelled,
+)
+
+private fun repeatOptions() = listOf(
+    null to R.string.todos_repeat_none,
+    "FREQ=DAILY" to R.string.todos_repeat_daily,
+    "FREQ=WEEKLY" to R.string.todos_repeat_weekly,
+    "FREQ=MONTHLY" to R.string.todos_repeat_monthly,
+    "FREQ=YEARLY" to R.string.todos_repeat_yearly,
+)
+
+private fun repeatLabelRes(rrule: String?): Int = when {
+    rrule.isNullOrBlank() -> R.string.todos_repeat_none
+    rrule.contains("FREQ=DAILY") -> R.string.todos_repeat_daily
+    rrule.contains("FREQ=WEEKLY") -> R.string.todos_repeat_weekly
+    rrule.contains("FREQ=MONTHLY") -> R.string.todos_repeat_monthly
+    rrule.contains("FREQ=YEARLY") -> R.string.todos_repeat_yearly
+    else -> R.string.todos_repeat_custom
+}
 
 @Composable
 private fun priorityChipLabel(p: Int): String = stringResource(
@@ -451,20 +657,20 @@ private fun priorityLabel(p: Int?): String? {
 // ---- date helpers (UTC-midnight millis, matching the M3 DatePicker) ----
 private val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy").withZone(ZoneOffset.UTC)
 
+private fun fmtMillis(millis: Long): String = dateFmt.format(Instant.ofEpochMilli(millis))
 private fun fmtDate(iso: String): String = runCatching { dateFmt.format(Instant.parse(iso)) }.getOrElse { iso.take(10) }
 private fun parseMillis(iso: String): Long? = runCatching { Instant.parse(iso).toEpochMilli() }.getOrNull()
 private fun toIsoInstant(millis: Long): String = Instant.ofEpochMilli(millis).toString()
+private fun dueIsOverdue(iso: String?): Boolean {
+    if (iso.isNullOrBlank()) return false
+    val d = runCatching { Instant.parse(iso).atZone(ZoneOffset.UTC).toLocalDate() }.getOrNull() ?: return false
+    return d.isBefore(LocalDate.now())
+}
 
-private fun dayMillis(plusDays: Long): Long =
-    LocalDate.now().plusDays(plusDays).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+private fun dayMillis(plusDays: Long): Long = LocalDate.now().plusDays(plusDays).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+private fun weekendMillis(): Long = LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+private fun nextWeekMillis(): Long = LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
-private fun weekendMillis(): Long =
-    LocalDate.now().with(TemporalAdjusters.nextOrSame(DayOfWeek.SATURDAY)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-
-private fun nextWeekMillis(): Long =
-    LocalDate.now().with(TemporalAdjusters.next(DayOfWeek.MONDAY)).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-
-/** Human label for a due millis: Today/Tomorrow if near, else the date. */
 @Composable
 private fun quickLabelFor(millis: Long): String {
     val date = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
