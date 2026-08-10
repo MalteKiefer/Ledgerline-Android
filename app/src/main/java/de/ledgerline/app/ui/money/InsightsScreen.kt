@@ -32,9 +32,9 @@ import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.common.SectionLabel
 import de.ledgerline.app.ui.theme.cardSurface
 
-/** Read-only insights: tax reports (VAT advance + EÜR) + duplicates + category suggestions. */
+/** Read-only insights (inline tab): tax reports (VAT advance + EÜR) + duplicates + category suggestions. */
 @Composable
-fun InsightsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
+fun InsightsTab(vm: FinanceViewModel) {
     var dups by remember { mutableStateOf<FinanceDuplicates?>(null) }
     var suggestions by remember { mutableStateOf<List<CategorySuggestion>>(emptyList()) }
     var vatAdvance by remember { mutableStateOf<de.ledgerline.app.domain.model.finance.VatAdvanceReturn?>(null) }
@@ -48,8 +48,7 @@ fun InsightsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
         dups = vm.loadDuplicates()
         suggestions = vm.loadSuggestions()
     }
-    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.more_insights), onBack = onBack) }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             // Full year / quarter selector for the USt-Voranmeldung.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 androidx.compose.material3.FilterChip(selected = quarter == null, onClick = { quarter = null }, label = { Text(year.toString()) })
@@ -116,7 +115,6 @@ fun InsightsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
             SectionLabel(stringResource(R.string.insights_duplicate_transactions))
             DupGroups(dups?.transactions.orEmpty())
         }
-    }
 }
 
 @Composable

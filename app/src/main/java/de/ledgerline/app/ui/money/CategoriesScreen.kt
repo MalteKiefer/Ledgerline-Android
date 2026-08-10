@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
@@ -46,37 +47,37 @@ import kotlinx.serialization.json.put
 
 private val CATEGORY_COLORS = listOf("#7066F5", "#3B9FD6", "#59AD6B", "#E2915A", "#3FAE9F", "#9E70FA", "#6B7280", "#D6455D")
 
-/** Finance categories: list + create/edit (name + colour) + delete. */
+/** Finance categories: inline list tab + create/edit (name + colour) via dialog + delete. */
 @Composable
-fun CategoriesScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
+fun CategoriesTab(vm: FinanceViewModel) {
     val data by vm.data.collectAsStateWithLifecycle()
     val categories = data?.financeCategories.orEmpty()
     var editing by remember { mutableStateOf<FinanceCategory?>(null) }
     var creating by remember { mutableStateOf(false) }
 
-    AppScaffold(topBar = {
-        AppTopBar(title = stringResource(R.string.categories_title), onBack = onBack, actions = {
-            TextButton(onClick = { creating = true }) { Text(stringResource(R.string.action_add)) }
-        })
-    }) { pad ->
-        Box(Modifier.fillMaxSize().padding(pad)) {
-            if (categories.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.categories_empty), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            } else LazyColumn(Modifier.fillMaxSize(), contentPadding = ListBottomPadding) {
-                listSection(categories, key = { "c${it.id}" }) { c ->
-                    LedgerRow(
-                        title = c.name,
-                        leading = { Box(Modifier.size(24.dp).clip(CircleShape).background(parseHex(c.color ?: "#6b7280"))) },
-                        trailing = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                TextButton(onClick = { editing = c }) { Text(stringResource(R.string.action_edit)) }
-                                IconButton(onClick = { vm.deleteCategory(c.id) {} }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete)) }
-                            }
-                        },
-                    )
-                }
+    Box(Modifier.fillMaxSize()) {
+        if (categories.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(stringResource(R.string.categories_empty), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else LazyColumn(Modifier.fillMaxSize(), contentPadding = ListBottomPadding) {
+            listSection(categories, key = { "c${it.id}" }) { c ->
+                LedgerRow(
+                    title = c.name,
+                    leading = { Box(Modifier.size(24.dp).clip(CircleShape).background(parseHex(c.color ?: "#6b7280"))) },
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { editing = c }) { Text(stringResource(R.string.action_edit)) }
+                            IconButton(onClick = { vm.deleteCategory(c.id) {} }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete)) }
+                        }
+                    },
+                )
             }
         }
+        androidx.compose.material3.ExtendedFloatingActionButton(
+            onClick = { creating = true },
+            icon = { Icon(Icons.Outlined.Add, null) },
+            text = { Text(stringResource(R.string.action_add)) },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+        )
     }
 
     if (creating) CategoryEditDialog(
@@ -107,7 +108,7 @@ private fun CategoryEditDialog(initial: FinanceCategory?, onConfirm: (String, St
         title = { Text(stringResource(if (initial == null) R.string.action_add else R.string.action_edit)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(stringResource(R.string.category_name)) }, singleLine = true)
+                Field(name, { name = it }, R.string.category_name)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     CATEGORY_COLORS.forEach { hex ->
                         Box(

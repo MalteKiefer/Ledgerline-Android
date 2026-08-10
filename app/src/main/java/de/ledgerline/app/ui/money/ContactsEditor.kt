@@ -4,11 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import de.ledgerline.app.R
-import de.ledgerline.app.ui.theme.cardSurface
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -51,16 +50,17 @@ internal fun ContactsEditor(initial: List<JsonObject>, onChange: (List<JsonObjec
     val rows = remember { mutableStateListOf<ContactRow>().apply { initial.forEach { add(ContactRow(str(it, "name"), str(it, "role"), str(it, "email"), str(it, "phone"))) } } }
     fun emit() = onChange(rows.filterNot { it.isBlank() }.map { it.toJson() })
 
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         rows.forEachIndexed { i, c ->
-            Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(c.name, { c.name = it; emit() }, Modifier.weight(1f), label = { Text(stringResource(R.string.contact_name)) }, singleLine = true)
+            if (i > 0) androidx.compose.material3.HorizontalDivider(Modifier.padding(vertical = 2.dp))
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FilledField(c.name, { c.name = it; emit() }, R.string.contact_name, Modifier.weight(1f))
                     IconButton(onClick = { rows.removeAt(i); emit() }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete)) }
                 }
-                OutlinedTextField(c.role, { c.role = it; emit() }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.contact_role)) }, singleLine = true)
-                OutlinedTextField(c.email, { c.email = it; emit() }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.contact_email)) }, singleLine = true)
-                OutlinedTextField(c.phone, { c.phone = it; emit() }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.contact_phone)) }, singleLine = true)
+                FilledField(c.role, { c.role = it; emit() }, R.string.contact_role, Modifier.fillMaxWidth())
+                FilledField(c.email, { c.email = it; emit() }, R.string.contact_email, Modifier.fillMaxWidth())
+                FilledField(c.phone, { c.phone = it; emit() }, R.string.contact_phone, Modifier.fillMaxWidth())
             }
         }
         TextButton(onClick = { rows.add(ContactRow("", "", "", "")) }) { Text(stringResource(R.string.contact_add)) }

@@ -70,26 +70,23 @@ private enum class Tab(val labelRes: Int, val icon: ImageVector) {
     TRASH(R.string.more_trash, Icons.Outlined.Delete),
 }
 
-/** A finance screen pushed full-screen over the section (each owns its own top bar + back). */
+/**
+ * A finance **editor** pushed full-screen over the section (each owns its own top bar + back).
+ * Only create/edit forms push now — every list/read area renders inline as tab content.
+ */
 sealed interface MoneyRoute {
     data class InvoiceEdit(val id: Int?) : MoneyRoute
     data class TransactionEdit(val id: Int?) : MoneyRoute
     data object BulkImport : MoneyRoute
-    data object Partners : MoneyRoute
-    data object PaymentMethods : MoneyRoute
-    data object Projects : MoneyRoute
-    data object Company : MoneyRoute
-    data object Insights : MoneyRoute
-    data object Receipts : MoneyRoute
-    data object Categories : MoneyRoute
-    data object Trash : MoneyRoute
+    data class PartnerEdit(val id: Int?) : MoneyRoute
+    data class PaymentMethodEdit(val id: Int?) : MoneyRoute
+    data class ProjectEdit(val id: Int?) : MoneyRoute
 }
 
 /**
  * The Finance module section: a **scrollable icon tab row** with one icon per area — no "More"
- * bucket. Dashboard / Rechnungen / Umsätze render inline as tab content; the remaining areas
- * (Partner, Zahlungsmittel, Projekte, Belege, Insights, Firma, Papierkorb) each open their own
- * screen via [onPush] (they bring their own top bar + back). Edit/import flows are pushed too.
+ * bucket. **Every** area renders inline as tab content; only create/edit forms (invoice, transaction,
+ * partner, payment-method, project) and the CSV import push a full-screen [MoneyRoute] overlay.
  */
 @Composable
 fun FinanceSection(
@@ -98,56 +95,45 @@ fun FinanceSection(
     vm: FinanceViewModel = hiltViewModel(),
 ) {
     var tab by rememberSaveable { mutableStateOf(Tab.DASHBOARD) }
-    // The route each non-inline tab opens (null = an inline tab that just switches content).
-    fun routeFor(t: Tab): MoneyRoute? = when (t) {
-        Tab.PARTNERS -> MoneyRoute.Partners
-        Tab.PAYMENT_METHODS -> MoneyRoute.PaymentMethods
-        Tab.PROJECTS -> MoneyRoute.Projects
-        Tab.RECEIPTS -> MoneyRoute.Receipts
-        Tab.CATEGORIES -> MoneyRoute.Categories
-        Tab.INSIGHTS -> MoneyRoute.Insights
-        Tab.COMPANY -> MoneyRoute.Company
-        Tab.TRASH -> MoneyRoute.Trash
-        else -> null
-    }
     Column(modifier.fillMaxSize()) {
         AppTopBar(title = stringResource(R.string.tab_finance))
         androidx.compose.material3.PrimaryScrollableTabRow(selectedTabIndex = tab.ordinal, edgePadding = 8.dp) {
             Tab.entries.forEach { t ->
                 androidx.compose.material3.Tab(
-                    // Inline tabs stay highlighted; screen-opening tabs act as buttons (keep the
-                    // current inline tab highlighted so the row doesn't jump).
                     selected = tab == t,
-                    onClick = { val r = routeFor(t); if (r != null) onPush(r) else tab = t },
+                    onClick = { tab = t },
                     icon = { Icon(t.icon, contentDescription = stringResource(t.labelRes)) },
                 )
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (tab) {
+                Tab.DASHBOARD -> DashboardTab(vm, onOpenInvoices = { tab = Tab.INVOICES })
                 Tab.INVOICES -> InvoicesTab(vm, onEdit = { onPush(MoneyRoute.InvoiceEdit(it)) })
                 Tab.TRANSACTIONS -> TransactionsTab(vm, onEdit = { onPush(MoneyRoute.TransactionEdit(it)) }, onImport = { onPush(MoneyRoute.BulkImport) })
-                else -> DashboardTab(vm, onOpenInvoices = { tab = Tab.INVOICES })
+                Tab.PARTNERS -> PartnersTab(vm, onEdit = { onPush(MoneyRoute.PartnerEdit(it)) })
+                Tab.PAYMENT_METHODS -> PaymentMethodsTab(vm, onEdit = { onPush(MoneyRoute.PaymentMethodEdit(it)) })
+                Tab.PROJECTS -> ProjectsTab(vm, onEdit = { onPush(MoneyRoute.ProjectEdit(it)) })
+                Tab.RECEIPTS -> ReceiptsTab(vm)
+                Tab.CATEGORIES -> CategoriesTab(vm)
+                Tab.INSIGHTS -> InsightsTab(vm)
+                Tab.COMPANY -> CompanyTab(vm)
+                Tab.TRASH -> TrashTab(vm)
             }
         }
     }
 }
 
-/** Hosts a pushed finance [MoneyRoute] overlay full-screen (each screen owns its own back). */
+/** Hosts a pushed finance editor [MoneyRoute] overlay full-screen (each screen owns its own back). */
 @Composable
 fun MoneyRouteHost(route: MoneyRoute, vm: FinanceViewModel, onBack: () -> Unit) {
     when (route) {
         is MoneyRoute.InvoiceEdit -> InvoiceEditScreen(vm, route.id, onBack)
         is MoneyRoute.TransactionEdit -> TransactionEditScreen(vm, route.id, onBack)
         MoneyRoute.BulkImport -> BulkImportScreen(vm, onBack)
-        MoneyRoute.Partners -> PartnersScreen(vm, onBack)
-        MoneyRoute.PaymentMethods -> PaymentMethodsScreen(vm, onBack)
-        MoneyRoute.Projects -> ProjectsScreen(vm, onBack)
-        MoneyRoute.Company -> CompanyScreen(vm, onBack)
-        MoneyRoute.Insights -> InsightsScreen(vm, onBack)
-        MoneyRoute.Receipts -> ReceiptsScreen(vm, onBack)
-        MoneyRoute.Categories -> CategoriesScreen(vm, onBack)
-        MoneyRoute.Trash -> FinanceTrashScreen(vm, onBack)
+        is MoneyRoute.PartnerEdit -> PartnerEditScreen(vm, route.id, onBack)
+        is MoneyRoute.PaymentMethodEdit -> PaymentMethodEditScreen(vm, route.id, onBack)
+        is MoneyRoute.ProjectEdit -> ProjectEditScreen(vm, route.id, onBack)
     }
 }
 

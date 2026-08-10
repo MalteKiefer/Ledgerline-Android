@@ -35,15 +35,15 @@ import de.ledgerline.app.ui.common.listSection
 /** Finance trash: soft-deleted invoices/transactions/partners/payment-methods/projects with
  *  restore + permanent-delete per row. */
 @Composable
-fun FinanceTrashScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
+fun TrashTab(vm: FinanceViewModel) {
     var trash by remember { mutableStateOf<FinanceTrash?>(null) }
     var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(reload) { trash = vm.loadTrash() }
     val t = trash
 
-    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.trash_title), onBack = onBack) }) { pad ->
+    run {
         val empty = t == null || (t.invoices.isEmpty() && t.transactions.isEmpty() && t.partners.isEmpty() && t.paymentMethods.isEmpty() && t.projects.isEmpty() && t.standaloneReceipts.isEmpty())
-        Box(Modifier.fillMaxSize().padding(pad)) {
+        Box(Modifier.fillMaxSize()) {
             if (empty) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(stringResource(R.string.files_trash_is_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -1416,7 +1416,7 @@
     <string name="admin_registration">Разрешить саморегистрацию</string>
     <string name="admin_device_cap">Лимит устройств (воркспейс)</string>
     <string name="admin_files_max_upload">Макс. размер загрузки (МБ)</string>
-    <string name="admin_files_orphan_grace">Срок висячих блобов (ч)</string>
+    <string name="admin_files_orphan_grace">Очистка незавершённых загрузок (ч)</string>
     <string name="admin_password_optional">Пароль (необяз., мин. 12)</string>
     <string name="admin_send_email">Отправить ссылку на почту</string>
     <string name="admin_done">Готово</string>

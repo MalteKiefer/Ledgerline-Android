@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_search">Suchen</string>
+    <string name="admin_actions">Aktionen</string>
+    <string name="admin_sort_newest">Neueste</string>
+    <string name="admin_sort_oldest">Älteste</string>
+    <string name="admin_sort_status">Status</string>
+    <string name="admin_backup_next">Nächster: %1$s</string>
+    <string name="admin_backup_success_rate">%1$d%% OK</string>
+</resources>

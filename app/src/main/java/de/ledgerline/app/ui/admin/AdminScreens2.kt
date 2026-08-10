@@ -1,6 +1,8 @@
 package de.ledgerline.app.ui.admin
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -13,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -51,7 +54,9 @@ import de.ledgerline.app.ui.common.AppTopBar
 import de.ledgerline.app.ui.common.LedgerRow
 import de.ledgerline.app.ui.common.ListBottomPadding
 import de.ledgerline.app.ui.common.SectionLabel
+import de.ledgerline.app.ui.common.SoftIconChip
 import de.ledgerline.app.ui.common.listSection
+import de.ledgerline.app.ui.theme.Brand
 import de.ledgerline.app.ui.theme.cardSurface
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -263,16 +268,23 @@ internal fun BackupScreen(vm: AdminViewModel, onBack: () -> Unit) {
     var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(reload) { jobs = vm.backupJobs(); runs = vm.backupRuns(); dests = vm.backupDestinations() }
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.admin_backup), onBack = onBack) }) { pad ->
-        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             SectionLabel(stringResource(R.string.admin_backup_destinations))
             if (dests.isEmpty()) EmptyHint() else dests.forEach { d ->
-                LedgerRow(title = d.name, subtitle = d.driver)
+                LedgerRow(title = d.name, subtitle = d.driver, leading = { SoftIconChip(Icons.Outlined.Backup, tint = Brand.tintBlue) })
             }
             SectionLabel(stringResource(R.string.admin_backup_jobs))
             if (jobs.isEmpty()) EmptyHint() else jobs.forEach { j ->
+                val st = j.statistics
                 LedgerRow(
                     title = j.name,
-                    subtitle = "${j.sources.joinToString(",")} · ${j.cron} · ${j.lastStatus ?: "—"}",
+                    subtitle = listOfNotNull(
+                        j.sources.joinToString(", "),
+                        j.cron,
+                        st.nextRun?.let { stringResource(R.string.admin_backup_next, it.take(16).replace('T', ' ')) },
+                        st.runs.takeIf { it > 0 }?.let { stringResource(R.string.admin_backup_success_rate, (st.successRate * 100).toInt()) },
+                        j.lastStatus,
+                    ).joinToString(" · ").ifBlank { null },
                     trailing = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { vm.runBackupJob(j.id) { reload++ } }) { Text(stringResource(R.string.admin_run_now)) }
@@ -285,7 +297,7 @@ internal fun BackupScreen(vm: AdminViewModel, onBack: () -> Unit) {
             if (runs.isEmpty()) EmptyHint() else runs.forEach { r ->
                 LedgerRow(
                     title = (r.job ?: "#${r.id}") + " · " + r.status,
-                    subtitle = listOfNotNull(r.startedHuman, r.size).joinToString(" · ").ifBlank { null },
+                    subtitle = listOfNotNull(r.startedHuman, r.size, r.message?.takeIf { r.status.equals("failed", true) }).joinToString(" · ").ifBlank { null },
                     trailing = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (r.verifyStatus == null && r.archives.isNotEmpty()) TextButton(onClick = { vm.verifyBackupRun(r.id, r.archives.first().source, null) { reload++ } }) { Text(stringResource(R.string.admin_verify)) }
@@ -316,16 +328,31 @@ private fun fmtBytes(b: Long): String {
 // ---------------------------------------------------------------------------
 @Composable
 internal fun SecurityPortalScreen(vm: AdminViewModel, onBack: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var blocks by remember { mutableStateOf<List<de.ledgerline.app.domain.model.admin.BlockedIp>>(emptyList()) }
     var reqLog by remember { mutableStateOf<List<de.ledgerline.app.domain.model.admin.RequestLogRow>>(emptyList()) }
     var reload by remember { mutableIntStateOf(0) }
     var cidr by remember { mutableStateOf("") }
     var reason by remember { mutableStateOf("") }
+    var sort by remember { mutableIntStateOf(0) } // 0 = newest, 1 = oldest, 2 = status ↓
     LaunchedEffect(reload) {
         blocks = vm.blockedIps()
         reqLog = vm.requestLog(1)?.data.orEmpty()
     }
-    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.admin_security_portal), onBack = onBack) }) { pad ->
+    val exporter = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) scope.launch { vm.requestLogExport()?.let { b -> runCatching { ctx.contentResolver.openOutputStream(uri)?.use { it.write(b) } } } }
+    }
+    val sorted = when (sort) {
+        1 -> reqLog.sortedBy { it.time ?: "" }
+        2 -> reqLog.sortedByDescending { it.status }
+        else -> reqLog.sortedByDescending { it.time ?: "" }
+    }
+    AppScaffold(topBar = {
+        AppTopBar(title = stringResource(R.string.admin_security_portal), onBack = onBack, actions = {
+            TextButton(onClick = { exporter.launch("request-log.csv") }) { Text(stringResource(R.string.admin_export)) }
+        })
+    }) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad), contentPadding = ListBottomPadding) {
             item { SectionLabel(stringResource(R.string.admin_blocked_ips)) }
             item {
@@ -336,15 +363,54 @@ internal fun SecurityPortalScreen(vm: AdminViewModel, onBack: () -> Unit) {
                 }
             }
             listSection(blocks, key = { "b${it.id}" }) { b ->
-                LedgerRow(title = b.cidr, subtitle = b.reason, trailing = { IconButton(onClick = { vm.unblockIp(b.id) { reload++ } }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete)) } })
+                LedgerRow(
+                    title = b.cidr,
+                    subtitle = listOfNotNull(b.reason, b.createdAt?.take(19)?.replace('T', ' ')).joinToString(" · ").ifBlank { null },
+                    trailing = { IconButton(onClick = { vm.unblockIp(b.id) { reload++ } }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete)) } },
+                )
             }
-            item { SectionLabel(stringResource(R.string.admin_request_log)) }
-            listSection(reqLog, key = { "r${it.id}" }) { r ->
+            item {
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SectionLabel(stringResource(R.string.admin_request_log), Modifier.weight(1f))
+                }
+            }
+            item {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    androidx.compose.material3.FilterChip(sort == 0, { sort = 0 }, label = { Text(stringResource(R.string.admin_sort_newest)) })
+                    androidx.compose.material3.FilterChip(sort == 1, { sort = 1 }, label = { Text(stringResource(R.string.admin_sort_oldest)) })
+                    androidx.compose.material3.FilterChip(sort == 2, { sort = 2 }, label = { Text(stringResource(R.string.admin_sort_status)) })
+                }
+            }
+            listSection(sorted, key = { "r${it.id}" }) { r ->
                 LedgerRow(
                     title = "${r.method} ${r.path}",
-                    subtitle = listOfNotNull(r.status.toString(), r.ip, r.time?.take(19)?.replace('T', ' ')).joinToString(" · "),
+                    subtitle = listOfNotNull(
+                        r.ip,
+                        r.user?.name,
+                        r.durationMs?.let { "$it ms" },
+                        r.time?.take(19)?.replace('T', ' '),
+                    ).joinToString(" · ").ifBlank { null },
+                    leading = { StatusPill(r.status) },
                 )
             }
         }
     }
+}
+
+/** Coloured HTTP-status pill: green 2xx, blue 3xx, amber 4xx, red 5xx. */
+@Composable
+private fun StatusPill(status: Int) {
+    val color = when (status / 100) {
+        2 -> Brand.tintGreen
+        3 -> Brand.tintBlue
+        4 -> Brand.tintOrange
+        else -> MaterialTheme.colorScheme.error
+    }
+    Box(
+        Modifier.background(color.copy(alpha = 0.18f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) { Text(status.toString(), style = MaterialTheme.typography.labelMedium, color = color) }
 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,9 +43,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-/** Standalone receipts (Fremdbelege): list, add via SAF, view externally, delete. */
+/** Standalone receipts (Fremdbelege): inline list tab, add via SAF, view externally, delete. */
 @Composable
-fun ReceiptsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
+fun ReceiptsTab(vm: FinanceViewModel) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val data by vm.data.collectAsStateWithLifecycle()
@@ -62,40 +63,40 @@ fun ReceiptsScreen(vm: FinanceViewModel, onBack: (() -> Unit)? = null) {
         }
     }
 
-    AppScaffold(topBar = {
-        AppTopBar(title = stringResource(R.string.receipts_title), onBack = onBack, actions = {
-            TextButton(onClick = { picker.launch("*/*") }) { Text(stringResource(R.string.receipts_add)) }
-        })
-    }) { pad ->
-        Box(Modifier.fillMaxSize().padding(pad)) {
-            if (receipts.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(stringResource(R.string.receipts_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            } else LazyColumn(Modifier.fillMaxSize(), contentPadding = ListBottomPadding) {
-                listSection(receipts, key = { "r${it.id}" }) { r ->
-                    LedgerRow(
-                        title = r.name,
-                        subtitle = listOfNotNull(r.category, r.createdAt?.take(10)).joinToString(" · ").ifBlank { null },
-                        leading = { SoftIconChip(Icons.AutoMirrored.Outlined.ReceiptLong, tint = Brand.tintOrange) },
-                        trailing = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { editing = r }) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.action_edit)) }
-                                IconButton(onClick = { vm.deleteStandaloneReceipt(r.id) {} }) {
-                                    Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete))
-                                }
+    Box(Modifier.fillMaxSize()) {
+        if (receipts.isEmpty()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.receipts_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else LazyColumn(Modifier.fillMaxSize(), contentPadding = ListBottomPadding) {
+            listSection(receipts, key = { "r${it.id}" }) { r ->
+                LedgerRow(
+                    title = r.name,
+                    subtitle = listOfNotNull(r.category, r.createdAt?.take(10)).joinToString(" · ").ifBlank { null },
+                    leading = { SoftIconChip(Icons.AutoMirrored.Outlined.ReceiptLong, tint = Brand.tintOrange) },
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { editing = r }) { Icon(Icons.Outlined.Edit, contentDescription = stringResource(R.string.action_edit)) }
+                            IconButton(onClick = { vm.deleteStandaloneReceipt(r.id) {} }) {
+                                Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete))
                             }
-                        },
-                        onClick = {
-                            scope.launch {
-                                val bytes = vm.standaloneReceiptBytes(r.id) ?: return@launch
-                                DocOpener.open(ctx, bytes, r.name, r.mime ?: "application/octet-stream")
-                            }
-                        },
-                    )
-                }
+                        }
+                    },
+                    onClick = {
+                        scope.launch {
+                            val bytes = vm.standaloneReceiptBytes(r.id) ?: return@launch
+                            DocOpener.open(ctx, bytes, r.name, r.mime ?: "application/octet-stream")
+                        }
+                    },
+                )
             }
         }
+        androidx.compose.material3.ExtendedFloatingActionButton(
+            onClick = { picker.launch("*/*") },
+            icon = { Icon(Icons.Outlined.Add, null) },
+            text = { Text(stringResource(R.string.receipts_add)) },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
+        )
     }
 
     editing?.let { r ->

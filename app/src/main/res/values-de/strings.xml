@@ -1413,7 +1413,7 @@
     <string name="admin_registration">Selbstregistrierung erlauben</string>
     <string name="admin_device_cap">Geräte-Limit (Workspace)</string>
     <string name="admin_files_max_upload">Max. Upload-Größe (MB)</string>
-    <string name="admin_files_orphan_grace">Verwaiste-Blobs-Frist (Std.)</string>
+    <string name="admin_files_orphan_grace">Aufräumfrist unfertige Uploads (Std.)</string>
     <string name="admin_password_optional">Passwort (optional, min. 12)</string>
     <string name="admin_send_email">Link per E-Mail senden</string>
     <string name="admin_done">Erledigt</string>

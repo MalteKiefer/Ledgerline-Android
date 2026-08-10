@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_search">Поиск</string>
+    <string name="admin_actions">Действия</string>
+    <string name="admin_sort_newest">Новые</string>
+    <string name="admin_sort_oldest">Старые</string>
+    <string name="admin_sort_status">Статус</string>
+    <string name="admin_backup_next">Следующий: %1$s</string>
+    <string name="admin_backup_success_rate">%1$d%% OK</string>
+</resources>

@@ -1416,7 +1416,7 @@
     <string name="admin_registration">Allow self-registration</string>
     <string name="admin_device_cap">Workspace device cap</string>
     <string name="admin_files_max_upload">Max upload size (MB)</string>
-    <string name="admin_files_orphan_grace">Orphan blob grace (hours)</string>
+    <string name="admin_files_orphan_grace">Incomplete-upload cleanup (hours)</string>
     <string name="admin_password_optional">Password (optional, min 12)</string>
     <string name="admin_send_email">Email the link</string>
     <string name="admin_done">Done</string>

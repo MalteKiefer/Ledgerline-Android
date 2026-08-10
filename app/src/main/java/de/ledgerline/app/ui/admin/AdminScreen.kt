@@ -122,42 +122,50 @@ private fun UsersScreen(vm: AdminViewModel, onBack: () -> Unit) {
     var editing by remember { mutableStateOf<AdminUser?>(null) }
     var creating by remember { mutableStateOf(false) }
     var invite by remember { mutableStateOf<String?>(null) }
+    var query by remember { mutableStateOf("") }
     LaunchedEffect(reload) { users = vm.users() }
 
-    AppScaffold(topBar = {
-        AppTopBar(title = stringResource(R.string.admin_users), onBack = onBack, actions = {
-            TextButton(onClick = { creating = true }) { Text(stringResource(R.string.action_add)) }
-        })
-    }) { pad ->
-        Box(Modifier.fillMaxSize().padding(pad)) {
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = ListBottomPadding) {
-                listSection(users, key = { "u${it.id}" }) { u ->
-                    LedgerRow(
-                        title = u.name,
-                        subtitle = "${u.email} · ${if (u.role == "admin") stringResource(R.string.admin_role_admin) else stringResource(R.string.admin_role_user)}",
-                        leading = { SoftIconChip(Icons.Outlined.Person, tint = if (u.role == "admin") Brand.accent else Brand.tintGray) },
-                        trailing = { de.ledgerline.app.ui.common.RowChevron() },
-                        onClick = { editing = u },
-                    )
+    if (creating || editing != null) {
+        val u = editing
+        UserEditScreen(
+            initial = u,
+            onSave = { body -> creating = false; editing = null; vm.saveUser(u?.id, body) { reload++ } },
+            onDelete = u?.let { { editing = null; vm.deleteUser(it.id) { reload++ } } },
+            onResetPw = u?.let { { vm.resetPassword(it.id) {} } },
+            onReset2fa = u?.let { { vm.resetTwoFactor(it.id) {} } },
+            onInvite = u?.let { { vm.inviteLink(it.id, 168, false) { r -> invite = r?.url } } },
+            onBlock = u?.let { { vm.blockUser(it.id) {} } },
+            onUnblock = u?.let { { vm.unblockUser(it.id) {} } },
+            onBack = { creating = false; editing = null },
+        )
+    } else {
+        AppScaffold(topBar = {
+            AppTopBar(title = stringResource(R.string.admin_users), onBack = onBack, actions = {
+                TextButton(onClick = { creating = true }) { Text(stringResource(R.string.action_add)) }
+            })
+        }) { pad ->
+            Column(Modifier.fillMaxSize().padding(pad)) {
+                OutlinedTextField(
+                    query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    label = { Text(stringResource(R.string.action_search)) }, singleLine = true,
+                )
+                val shown = users.filter { query.isBlank() || it.name.contains(query, true) || it.email.contains(query, true) }
+                    .sortedBy { it.name.lowercase() }
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = ListBottomPadding) {
+                    listSection(shown, key = { "u${it.id}" }) { u ->
+                        LedgerRow(
+                            title = u.name,
+                            subtitle = "${u.email} · ${if (u.role == "admin") stringResource(R.string.admin_role_admin) else stringResource(R.string.admin_role_user)}",
+                            leading = { SoftIconChip(Icons.Outlined.Person, tint = if (u.role == "admin") Brand.accent else Brand.tintGray) },
+                            trailing = { de.ledgerline.app.ui.common.RowChevron() },
+                            onClick = { editing = u },
+                        )
+                    }
                 }
             }
         }
     }
 
-    if (creating) UserEditDialog(null, onSave = { body -> creating = false; vm.saveUser(null, body) { reload++ } }, onDismiss = { creating = false })
-    editing?.let { u ->
-        UserEditDialog(
-            u,
-            onSave = { body -> editing = null; vm.saveUser(u.id, body) { reload++ } },
-            onDelete = { editing = null; vm.deleteUser(u.id) { reload++ } },
-            onResetPw = { vm.resetPassword(u.id) {} },
-            onReset2fa = { vm.resetTwoFactor(u.id) {} },
-            onInvite = { vm.inviteLink(u.id, 168, false) { r -> invite = r?.url } },
-            onBlock = { vm.blockUser(u.id) {} },
-            onUnblock = { vm.unblockUser(u.id) {} },
-            onDismiss = { editing = null },
-        )
-    }
     invite?.let { url ->
         AlertDialog(
             onDismissRequest = { invite = null },
@@ -169,8 +177,9 @@ private fun UsersScreen(vm: AdminViewModel, onBack: () -> Unit) {
     }
 }
 
+/** Full-screen user editor (was an AlertDialog) — its own top bar + Save, back returns to the list. */
 @Composable
-private fun UserEditDialog(
+private fun UserEditScreen(
     initial: AdminUser?,
     onSave: (kotlinx.serialization.json.JsonObject) -> Unit,
     onDelete: (() -> Unit)? = null,
@@ -179,7 +188,7 @@ private fun UserEditDialog(
     onInvite: (() -> Unit)? = null,
     onBlock: (() -> Unit)? = null,
     onUnblock: (() -> Unit)? = null,
-    onDismiss: () -> Unit,
+    onBack: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var email by remember { mutableStateOf(initial?.email ?: "") }
@@ -188,31 +197,46 @@ private fun UserEditDialog(
     var maxDevices by remember { mutableStateOf(initial?.maxConnectedDevices?.toString() ?: "") }
     val modules = remember { mutableStateListOfInit(initial?.modules) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(if (initial == null) R.string.admin_user_new else R.string.action_edit)) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(name, { name = it }, label = { Text(stringResource(R.string.contact_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                OutlinedTextField(email, { email = it }, label = { Text(stringResource(R.string.login_email)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                if (initial == null) OutlinedTextField(password, { password = it }, label = { Text(stringResource(R.string.admin_password_optional)) }, singleLine = true, visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
-                Row(verticalAlignment = Alignment.CenterVertically) {
+    fun body() = buildJsonObject {
+        put("name", name.trim()); put("email", email.trim()); put("role", if (admin) "admin" else "user")
+        if (initial == null && password.isNotBlank()) put("password", password)
+        put("max_connected_devices", maxDevices.toIntOrNull()?.let { JsonPrimitive(it) } ?: JsonNull)
+        // Empty selection = all modules → send null; else the allow-list.
+        put("modules", if (modules.isEmpty()) JsonNull else JsonArray(modules.map { JsonPrimitive(it) }))
+    }
+
+    AppScaffold(topBar = {
+        AppTopBar(
+            title = stringResource(if (initial == null) R.string.admin_user_new else R.string.action_edit),
+            onBack = onBack,
+            actions = {
+                TextButton(enabled = name.isNotBlank() && email.isNotBlank(), onClick = { onSave(body()) }) { Text(stringResource(R.string.action_save)) }
+            },
+        )
+    }) { pad ->
+        Column(Modifier.fillMaxSize().padding(pad).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ASection(stringResource(R.string.section_general)) {
+                AField(name, { name = it }, R.string.contact_name)
+                AField(email, { email = it }, R.string.login_email)
+                if (initial == null) AField(password, { password = it }, R.string.admin_password_optional, password = true)
+                AField(maxDevices, { maxDevices = it }, R.string.admin_max_devices, number = true)
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.admin_role_admin), Modifier.weight(1f))
                     Switch(checked = admin, onCheckedChange = { admin = it })
                 }
-                OutlinedTextField(maxDevices, { maxDevices = it }, label = { Text(stringResource(R.string.admin_max_devices)) }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-                SectionLabel(stringResource(R.string.admin_modules))
+            }
+            ASection(stringResource(R.string.admin_modules)) {
                 androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     ADMIN_MODULES.forEach { m ->
                         FilterChip(selected = m in modules, onClick = { if (m in modules) modules.remove(m) else modules.add(m) }, label = { Text(m) })
                     }
                 }
-                if (initial != null) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            }
+            if (initial != null) {
+                ASection(stringResource(R.string.admin_actions)) {
+                    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         onResetPw?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_reset_password)) }) }
                         onReset2fa?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_reset_2fa)) }) }
-                    }
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         onInvite?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_invite_link)) }) }
                         onBlock?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_block_user)) }) }
                         onUnblock?.let { AssistChip(onClick = it, label = { Text(stringResource(R.string.admin_unblock_user)) }) }
@@ -220,21 +244,39 @@ private fun UserEditDialog(
                     onDelete?.let { TextButton(onClick = it) { Text(stringResource(R.string.action_delete), color = MaterialTheme.colorScheme.error) } }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(enabled = name.isNotBlank() && email.isNotBlank(), onClick = {
-                onSave(buildJsonObject {
-                    put("name", name.trim()); put("email", email.trim()); put("role", if (admin) "admin" else "user")
-                    if (initial == null && password.isNotBlank()) put("password", password)
-                    put("max_connected_devices", maxDevices.toIntOrNull()?.let { JsonPrimitive(it) } ?: JsonNull)
-                    // Empty selection = all modules → send null; else the allow-list.
-                    put("modules", if (modules.isEmpty()) JsonNull else JsonArray(modules.map { JsonPrimitive(it) }))
-                })
-            }) { Text(stringResource(R.string.action_save)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+        }
+    }
+}
+
+/** Admin form section (filled fields, no card) — mirrors the finance FormSection look. */
+@Composable
+private fun ASection(label: String, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    SectionLabel(label)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+}
+
+/** Filled admin form field — matches the app-wide M3 filled style. */
+@Composable
+private fun AField(value: String, onChange: (String) -> Unit, labelRes: Int, number: Boolean = false, password: Boolean = false) {
+    androidx.compose.material3.TextField(
+        value, onChange, Modifier.fillMaxWidth(),
+        label = { Text(stringResource(labelRes)) }, singleLine = true,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+        colors = adminFieldColors(),
+        visualTransformation = if (password) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = if (number) KeyboardType.Number else KeyboardType.Text),
     )
 }
+
+@Composable
+private fun adminFieldColors() = androidx.compose.material3.TextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+    unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+    disabledIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+)
 
 private fun mutableStateListOfInit(init: List<String>?) =
     androidx.compose.runtime.mutableStateListOf<String>().apply { init?.let { addAll(it) } }
@@ -279,7 +321,11 @@ private fun AccessScreen(vm: AdminViewModel, onBack: () -> Unit) {
 @Composable
 private fun NumberSave(value: String, onChange: (String) -> Unit, labelRes: Int, onSave: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedTextField(value, onChange, label = { Text(stringResource(labelRes)) }, singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+        androidx.compose.material3.TextField(
+            value, onChange, Modifier.weight(1f), label = { Text(stringResource(labelRes)) }, singleLine = true,
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp), colors = adminFieldColors(),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
         TextButton(onClick = onSave) { Text(stringResource(R.string.action_save)) }
     }
 }
