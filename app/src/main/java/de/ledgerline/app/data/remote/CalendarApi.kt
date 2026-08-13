@@ -76,6 +76,14 @@ interface CalendarApi {
     @POST("api/v1/calendars")
     suspend fun createCalendar(@Body body: JsonObject): Response<JsonObject>
 
+    /** Rename / recolor a task list (calendar). Body: {name?, color?}. */
+    @PUT("api/v1/calendars/{id}")
+    suspend fun updateCalendar(@Path("id") id: String, @Body body: JsonObject): Response<JsonObject>
+
+    /** Delete a task list (422 on the last remaining calendar). */
+    @DELETE("api/v1/calendars/{id}")
+    suspend fun deleteCalendar(@Path("id") id: String): Response<Unit>
+
     @GET("api/v1/calendar/todos/export")
     @Streaming
     suspend fun exportTodos(@Query("calendar_id") calendarId: String? = null): Response<ResponseBody>

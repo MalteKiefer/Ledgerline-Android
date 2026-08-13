@@ -68,4 +68,8 @@
     <string name="todos_share_editor">Редактор</string>
     <string name="todos_share_add">Поделиться</string>
     <string name="todos_share_failed">Неизвестный пользователь или нельзя поделиться с собой.</string>
+    <string name="todos_manage_list">Управление списком</string>
+    <string name="todos_rename_list">Переименовать список</string>
+    <string name="todos_delete_list">Удалить список</string>
+    <string name="todos_delete_list_confirm">Удалить список «%1$s» и его задачи?</string>
 </resources>

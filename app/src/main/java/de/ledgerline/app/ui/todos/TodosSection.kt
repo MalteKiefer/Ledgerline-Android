@@ -30,7 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.PersonAdd
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -123,12 +123,22 @@ fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMod
     var addingList by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var sharingList by remember { mutableStateOf<String?>(null) }
+    var renamingList by remember { mutableStateOf<String?>(null) }
+    var deletingList by remember { mutableStateOf<String?>(null) }
 
     Column(modifier.fillMaxSize()) {
         AppTopBar(title = stringResource(R.string.tab_todos), actions = {
             selectedList?.let { lid ->
-                IconButton(onClick = { sharingList = lid }) {
-                    Icon(Icons.Outlined.PersonAdd, contentDescription = stringResource(R.string.todos_share_list))
+                var listMenu by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { listMenu = true }) {
+                        Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.todos_manage_list))
+                    }
+                    DropdownMenu(expanded = listMenu, onDismissRequest = { listMenu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.todos_share_list)) }, onClick = { listMenu = false; sharingList = lid })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.todos_rename_list)) }, onClick = { listMenu = false; renamingList = lid })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.todos_delete_list)) }, onClick = { listMenu = false; deletingList = lid })
+                    }
                 }
             }
         })
@@ -223,6 +233,33 @@ fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMod
 
     sharingList?.let { lid ->
         TodoShareDialog(vm = vm, calendarId = lid, onDismiss = { sharingList = null })
+    }
+
+    renamingList?.let { lid ->
+        var name by remember(lid) { mutableStateOf(vm.listName(lid) ?: "") }
+        AlertDialog(
+            onDismissRequest = { renamingList = null },
+            title = { Text(stringResource(R.string.todos_rename_list)) },
+            text = { TextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.todos_list)) }) },
+            confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { vm.renameList(lid, name) {}; renamingList = null }) { Text(stringResource(R.string.action_save)) } },
+            dismissButton = { TextButton(onClick = { renamingList = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+
+    deletingList?.let { lid ->
+        AlertDialog(
+            onDismissRequest = { deletingList = null },
+            title = { Text(stringResource(R.string.todos_delete_list)) },
+            text = { Text(stringResource(R.string.todos_delete_list_confirm, vm.listName(lid) ?: "")) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val target = lid
+                    vm.deleteList(target) { ok -> if (ok && selectedList == target) vm.selectList(null) }
+                    deletingList = null
+                }) { Text(stringResource(R.string.action_delete)) }
+            },
+            dismissButton = { TextButton(onClick = { deletingList = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
     }
 }
 

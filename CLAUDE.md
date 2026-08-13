@@ -151,10 +151,12 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   Endpunkte `POST /calendar/todos/{id}/complete`|`/uncomplete` (server-seitig feld-erhaltend +
   **recurring roll-forward** von DUE; ersetzt das alte Voll-VTODO-Resend). **Listen-Sharing**
   `/calendar/shares` (GET/POST/DELETE): eine VTODO-Liste per E-Mail an registrierte Nutzer teilen
-  (viewer/editor), Share-Dialog über die Teilen-Aktion in der Top-Bar bei ausgewählter Liste.
+  (viewer/editor). **Listen-Verwaltung:** Top-Bar-Overflow bei ausgewählter Liste → Teilen /
+  **Umbenennen** (`PUT /calendars/{id}`) / **Löschen** (`DELETE /calendars/{id}`, 422 bei letzter Liste).
   `data/calendar/TodosRepository` (online-only; per-Record REST mit DAV-`etag`-Optimistic-Concurrency)
   + `NetworkFactory.createCalendar` + `CalendarApi` (`/calendar/todos` CRUD + `/complete`|`/uncomplete`
-  + `/reorder` + `/shares` + ICS `/import`|`/export`). Bewusst weggelassen: Kalender-Events, Kontakte.
+  + `/reorder` + `/shares` + `/calendars` create/update/delete + ICS `/import`|`/export`). Bewusst
+  weggelassen: Kalender-Events, Kontakte, Spezial-Kalender (`/calendars/special`), Feed-Regenerate.
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte
   Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
   Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung, **Favoriten-Filter, Label-

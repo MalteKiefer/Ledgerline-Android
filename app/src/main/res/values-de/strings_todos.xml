@@ -68,4 +68,8 @@
     <string name="todos_share_editor">Bearbeiter</string>
     <string name="todos_share_add">Teilen</string>
     <string name="todos_share_failed">Unbekannter Nutzer oder Teilen mit sich selbst nicht möglich.</string>
+    <string name="todos_manage_list">Liste verwalten</string>
+    <string name="todos_rename_list">Liste umbenennen</string>
+    <string name="todos_delete_list">Liste löschen</string>
+    <string name="todos_delete_list_confirm">Die Liste \"%1$s\" und ihre Aufgaben löschen?</string>
 </resources>

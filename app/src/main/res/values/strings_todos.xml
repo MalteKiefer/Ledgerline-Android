@@ -68,4 +68,8 @@
     <string name="todos_share_editor">Editor</string>
     <string name="todos_share_add">Share</string>
     <string name="todos_share_failed">Unknown user or cannot share with yourself.</string>
+    <string name="todos_manage_list">Manage list</string>
+    <string name="todos_rename_list">Rename list</string>
+    <string name="todos_delete_list">Delete list</string>
+    <string name="todos_delete_list_confirm">Delete the list \"%1$s\" and its tasks?</string>
 </resources>

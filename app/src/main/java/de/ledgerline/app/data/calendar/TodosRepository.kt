@@ -70,6 +70,18 @@ class TodosRepository @Inject constructor(
         if (ok) load(); ok
     }
 
+    /** Rename a task list, then reload. */
+    suspend fun renameList(id: String, name: String): Boolean = withContext(Dispatchers.IO) {
+        val ok = runCatching { api().updateCalendar(id, buildJsonObject { put("name", name.trim()) }).isSuccessful }.getOrDefault(false)
+        if (ok) load(); ok
+    }
+
+    /** Delete a task list (server 422s on the last remaining calendar), then reload. */
+    suspend fun deleteList(id: String): Boolean = withContext(Dispatchers.IO) {
+        val ok = runCatching { api().deleteCalendar(id).isSuccessful }.getOrDefault(false)
+        if (ok) load(); ok
+    }
+
     suspend fun create(body: JsonObject): Boolean = withContext(Dispatchers.IO) {
         val ok = runCatching { api().createTodo(body).isSuccessful }.getOrDefault(false)
         if (ok) load(); ok

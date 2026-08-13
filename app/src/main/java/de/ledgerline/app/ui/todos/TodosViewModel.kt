@@ -88,6 +88,8 @@ class TodosViewModel @Inject constructor(
     fun addList(name: String, done: (Boolean) -> Unit) = viewModelScope.launch {
         done(repo.createListNamed(name))
     }
+    fun renameList(id: String, name: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.renameList(id, name)) }
+    fun deleteList(id: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteList(id)) }
 
     fun reorder(ids: List<String>) = viewModelScope.launch { repo.reorder(ids) }
 
