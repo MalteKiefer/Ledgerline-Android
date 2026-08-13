@@ -114,6 +114,11 @@ class AccountViewModel @Inject constructor(
         account.pushPreferences(displayPrefs.value.copy(dateFormat = fmt))
     }
 
+    /** Set the IANA timezone override ("" = follow the device zone) and sync it to the server. */
+    fun setTimezone(tz: String) = viewModelScope.launch {
+        account.pushPreferences(displayPrefs.value.copy(timezone = tz))
+    }
+
     // ---- Push notifications (UnifiedPush) ----
     val pushEnabled: StateFlow<Boolean> =
         settings.pushEnabled.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, false)

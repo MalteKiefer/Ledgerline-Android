@@ -215,9 +215,10 @@ FrankenPHP-Infra) bewusst ignoriert. Umgesetzt: **Files-Info-Panel** (`/files/en
 **Aktivitäts-Feed** (`/files/activity` +per-file) Datenschicht/Dialog; **Notes attach-from-Files**
 (`/notes/{note}/attachments/from`); **globale Suche** (`GET /search`, `GlobalSearchResponse`) mit eigener **Bottom-Nav-Sektion „Suche"**
 (`ui/search/GlobalSearchScreen` + `GlobalSearchViewModel`, debounced, Gruppen files/notes/finance,
-Tap öffnet den Record: files → `FileDetailScreen`, notes → Notiz-Editor (`AppShell` reicht die
-Ziel-id via `openFileId`/`openNoteId` in die Sektion; finance → nur Tab-Wechsel, kein Typ im
-Suchergebnis) + **Reindex** (`POST /me/reindex`, Settings-Button) in
+Tap öffnet den Record: files → `FileDetailScreen`, notes → Notiz-Editor, finance → Rechnung
+(`MoneyRoute.InvoiceEdit`; die Server-Suche liefert für finance nur Invoices) — `AppShell` reicht die
+Ziel-id via `openFileId`/`openNoteId`/`openInvoiceId` in die Sektion) + **Reindex** (`POST /me/reindex`,
+Settings-Button) in
 `AccountRepository`; Prefs `timezone`+`date_format` additiv in `DisplayPrefsDto` (round-trip-sicher).
 Kein Finance-Drift (GoCardless serverseitig wieder entfernt). `assembleDebug` + Unit-Tests grün.
 
@@ -235,14 +236,13 @@ Kein Finance-Drift (GoCardless serverseitig wieder entfernt). `assembleDebug` + 
   (Appearance-Settings; `DisplayPrefs.dateFormat`/`timezone` durch Sink/Store/`/preferences`
   round-trip, `setDateFormat` synct server).
 
-**Nachgezogen (2026-08-13, 2. Runde):** Todos = dedizierte complete/uncomplete (recurring
-roll-forward) + Listen-Sharing `/calendar/shares`; globale Suche = record-level Deep-Open (files→Detail,
-notes→Editor). `assembleDebug` + Tests grün.
+**Nachgezogen (2026-08-13, 2.+3. Runde):** Todos = dedizierte complete/uncomplete (recurring
+roll-forward) + Listen-Sharing `/calendar/shares`; globale Suche = record-level Deep-Open für **alle**
+in-scope Module (files→Detail, notes→Editor, finance→Rechnung); **Timezone-Picker** (durchsuchbare
+IANA-Zonenliste + „Systemzeitzone", `setTimezone`→`/preferences`). `assembleDebug` + Tests grün.
 
-**Offen (Rest, verschoben/optional):** externe Mounts `/mounts/*` (S3+SFTP, großes eigenes Feature);
-Finance-Suchtreffer-Deep-Open (Server liefert keinen invoice/tx-Typ → nur Tab-Wechsel) +
-`/files/entries/{id}/show` (Flat-Snapshot deckt Files-Deep-Open bereits ab); `timezone`-Picker-UI
-(round-trippt, IANA-Freitext auf Mobile schlechte UX).
+**Offen (Rest):** externe Mounts `/mounts/*` (S3+SFTP, großes eigenes Feature — noch nicht gebaut).
+`/files/entries/{id}/show` bewusst ungenutzt (Flat-Snapshot deckt Files-Deep-Open ab).
 **Bewusst out-of-scope:** Gallery, Contacts, Kalender-Events (rsvp/imip/free-busy/slots), Admin, Passkeys, Docker.
 
 

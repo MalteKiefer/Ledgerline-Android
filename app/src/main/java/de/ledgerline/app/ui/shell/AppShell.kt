@@ -97,11 +97,19 @@ fun AppShell(
     // A pushed finance sub-screen (invoice/transaction edit, CSV import). Rendered INSIDE the shell so
     // the bottom nav stays visible on every screen. Cleared when switching sections.
     var route by remember { mutableStateOf<MoneyRoute?>(null) }
-    LaunchedEffect(section) { route = null }
 
     // Global-search deep-open: the target record id handed to the owning module's section.
     var openFileId by remember { mutableStateOf<Int?>(null) }
     var openNoteId by remember { mutableStateOf<Int?>(null) }
+    var openInvoiceId by remember { mutableStateOf<Int?>(null) }
+
+    // Switching section clears any finance overlay — unless a search deep-open queued an invoice, in
+    // which case open it (consumed once). Keyed on section only so it runs on every tab change.
+    LaunchedEffect(section) {
+        route = openInvoiceId?.takeIf { section == Section.FINANCE }?.let { id ->
+            openInvoiceId = null; MoneyRoute.InvoiceEdit(id)
+        }
+    }
 
     AppScaffold(
         bottomBar = {
@@ -133,7 +141,7 @@ fun AppShell(
                         when (m) {
                             "files" -> { openFileId = id; section = Section.FILES }
                             "notes" -> { openNoteId = id; section = Section.NOTES }
-                            "finance" -> section = Section.FINANCE
+                            "finance" -> { openInvoiceId = id; section = Section.FINANCE }
                         }
                     },
                     contentPadding = pad,

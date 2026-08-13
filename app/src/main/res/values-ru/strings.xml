@@ -130,6 +130,8 @@
     <string name="device_last_used">Последнее использование</string>
     <string name="device_connected">Подключено</string>
     <string name="device_expires">Истекает</string>
+    <string name="settings_timezone">Часовой пояс</string>
+    <string name="settings_timezone_system">Как в системе</string>
     <string name="ws_empty_notes">Пока нет заметок.</string>
     <string name="ws_empty_bookmarks">Пока нет закладок.</string>
     <string name="ws_empty_todos">Пока нет задач.</string>

@@ -129,6 +129,8 @@
     <string name="device_last_used">Zuletzt verwendet</string>
     <string name="device_connected">Verbunden</string>
     <string name="device_expires">Läuft ab</string>
+    <string name="settings_timezone">Zeitzone</string>
+    <string name="settings_timezone_system">Systemzeitzone</string>
     <string name="ws_empty_notes">Noch keine Notizen.</string>
     <string name="ws_empty_bookmarks">Noch keine Lesezeichen.</string>
     <string name="ws_empty_todos">Noch keine Todos.</string>

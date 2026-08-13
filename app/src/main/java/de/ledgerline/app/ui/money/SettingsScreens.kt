@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Translate
@@ -44,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.draw.clip
@@ -126,6 +129,7 @@ private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut
     var themeOpen by remember { mutableStateOf(false) }
     var maxOpen by remember { mutableStateOf(false) }
     var dateOpen by remember { mutableStateOf(false) }
+    var tzOpen by remember { mutableStateOf(false) }
     val curLang = remember { vm.currentLanguageTag() }
 
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.more_settings), onBack = onBack) }) { pad ->
@@ -139,6 +143,8 @@ private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut
                 SettingRow(stringResource(R.string.settings_language), languageLabel(curLang), Icons.Outlined.Translate, Brand.tintBlue) { langOpen = true }
                 RowDivider()
                 SettingRow(stringResource(R.string.settings_date_format), dateFormatLabel(prefs.dateFormat), Icons.Outlined.CalendarMonth, Brand.tintTeal) { dateOpen = true }
+                RowDivider()
+                SettingRow(stringResource(R.string.settings_timezone), prefs.timezone.ifBlank { stringResource(R.string.settings_timezone_system) }, Icons.Outlined.Schedule, Brand.tintOrange) { tzOpen = true }
             }
 
             SectionLabel(stringResource(R.string.settings_files))
@@ -190,6 +196,43 @@ private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut
     if (langOpen) LanguageDialog(current = curLang, onPick = { vm.setLanguage(it); langOpen = false }, onDismiss = { langOpen = false })
     if (maxOpen) MaxVersionsDialog(current = maxVersions, onPick = { vm.setFileMaxVersions(it); maxOpen = false }, onDismiss = { maxOpen = false })
     if (dateOpen) DateFormatDialog(current = prefs.dateFormat, onPick = { vm.setDateFormat(it); dateOpen = false }, onDismiss = { dateOpen = false })
+    if (tzOpen) TimezoneDialog(current = prefs.timezone, onPick = { vm.setTimezone(it); tzOpen = false }, onDismiss = { tzOpen = false })
+}
+
+@Composable
+private fun TimezoneDialog(current: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    val zones = remember { java.time.ZoneId.getAvailableZoneIds().filter { '/' in it }.sorted() }
+    var q by remember { mutableStateOf("") }
+    val filtered = remember(q) { if (q.isBlank()) zones else zones.filter { it.contains(q, ignoreCase = true) } }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_timezone)) },
+        text = {
+            Column(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                OutlinedTextField(
+                    value = q, onValueChange = { q = it }, modifier = Modifier.fillMaxWidth(),
+                    singleLine = true, label = { Text(stringResource(R.string.action_search)) },
+                    leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyColumn(Modifier.fillMaxWidth()) {
+                    item(key = "__system") {
+                        Row(Modifier.fillMaxWidth().clickable { onPick("") }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.RadioButton(selected = current.isBlank(), onClick = { onPick("") })
+                            Text(stringResource(R.string.settings_timezone_system), Modifier.padding(start = 8.dp))
+                        }
+                    }
+                    items(filtered, key = { it }) { zone ->
+                        Row(Modifier.fillMaxWidth().clickable { onPick(zone) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.RadioButton(selected = zone == current, onClick = { onPick(zone) })
+                            Text(zone, Modifier.padding(start = 8.dp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+    )
 }
 
 private val DATE_FORMATS = listOf("system", "dmy", "dmy_dot", "mdy", "ymd")
