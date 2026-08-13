@@ -4,13 +4,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -20,7 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.Upload
 import androidx.compose.material3.CircularProgressIndicator
@@ -28,7 +34,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,6 +75,8 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
     var lightboxId by remember { mutableStateOf<Int?>(null) }
     var showTrash by remember { mutableStateOf(false) }
     var showArchive by remember { mutableStateOf(false) }
+    var showAlbums by remember { mutableStateOf(false) }
+    var addToAlbum by remember { mutableStateOf(false) }
     val selection = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
     var msg by remember { mutableStateOf<String?>(null) }
 
@@ -96,6 +106,7 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
 
     if (showTrash) { GalleryTrashScreen(vm) { showTrash = false }; return }
     if (showArchive) { GalleryArchiveScreen(vm) { showArchive = false; vm.refresh() }; return }
+    if (showAlbums) { GalleryAlbumsScreen(vm) { showAlbums = false }; return }
     lightboxId?.let { id ->
         val photo = data?.photos?.firstOrNull { it.id == id }
         if (photo != null) { GalleryLightbox(vm, photo, onClose = { lightboxId = null }); return }
@@ -110,6 +121,9 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
                 else stringResource(R.string.tab_gallery),
                 actions = {
                     if (selection.isNotEmpty()) {
+                        IconButton(onClick = { addToAlbum = true }) {
+                            Icon(Icons.Outlined.PlaylistAdd, contentDescription = stringResource(R.string.gallery_add_to_album))
+                        }
                         IconButton(onClick = {
                             val ids = selection.toList()
                             vm.bulkArchive(ids, true) { ok -> if (ok) { selection.clear(); vm.refresh() } }
@@ -121,6 +135,9 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
                     } else {
                         IconButton(onClick = { uploadLauncher.launch("image/*") }) {
                             Icon(Icons.Outlined.Upload, contentDescription = stringResource(R.string.gallery_upload_photos))
+                        }
+                        IconButton(onClick = { showAlbums = true }) {
+                            Icon(Icons.Outlined.PhotoAlbum, contentDescription = stringResource(R.string.gallery_albums))
                         }
                         IconButton(onClick = { showArchive = true }) {
                             Icon(Icons.Outlined.Archive, contentDescription = stringResource(R.string.gallery_archived))
@@ -156,6 +173,36 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
             }
             msg?.let { Text(it, Modifier.align(Alignment.BottomCenter).padding(12.dp), color = MaterialTheme.colorScheme.primary) }
         }
+    }
+
+    if (addToAlbum) {
+        var albums by remember { mutableStateOf<List<de.ledgerline.app.domain.model.gallery.GalleryAlbum>?>(null) }
+        LaunchedEffect(Unit) { albums = vm.albums() }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { addToAlbum = false },
+            title = { Text(stringResource(R.string.gallery_add_to_album)) },
+            text = {
+                val list = albums
+                when {
+                    list == null -> CircularProgressIndicator()
+                    list.isEmpty() -> Text(stringResource(R.string.gallery_albums_empty))
+                    else -> Column(Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                        list.forEach { a ->
+                            Text(
+                                a.name,
+                                Modifier.fillMaxWidth().clickable {
+                                    val ids = selection.toList()
+                                    addToAlbum = false
+                                    vm.addToAlbum(a.id, ids) { ok -> selection.clear(); msg = ctx.getString(if (ok) R.string.gallery_added_to_album else R.string.files_save_failed) }
+                                }.padding(vertical = 12.dp),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { addToAlbum = false }) { Text(stringResource(R.string.action_close)) } },
+        )
     }
 }
 

@@ -149,6 +149,14 @@
     <string name="gallery_archived">Archiviert</string>
     <string name="gallery_unarchive">Aus Archiv</string>
     <string name="gallery_archive_empty">Keine archivierten Fotos.</string>
+    <string name="gallery_albums">Alben</string>
+    <string name="gallery_albums_empty">Noch keine Alben.</string>
+    <string name="gallery_album_new">Neues Album</string>
+    <string name="gallery_album_name">Albumname</string>
+    <string name="gallery_album_count">%1$d Fotos</string>
+    <string name="gallery_add_to_album">Zu Album hinzufügen</string>
+    <string name="gallery_added_to_album">Zum Album hinzugefügt</string>
+    <string name="gallery_album_remove">Aus Album entfernen</string>
     <string name="ws_empty_notes">Noch keine Notizen.</string>
     <string name="ws_empty_bookmarks">Noch keine Lesezeichen.</string>
     <string name="ws_empty_todos">Noch keine Todos.</string>

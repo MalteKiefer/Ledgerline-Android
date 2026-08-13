@@ -150,6 +150,14 @@
     <string name="gallery_archived">Архив</string>
     <string name="gallery_unarchive">Из архива</string>
     <string name="gallery_archive_empty">Нет архивированных фото.</string>
+    <string name="gallery_albums">Альбомы</string>
+    <string name="gallery_albums_empty">Пока нет альбомов.</string>
+    <string name="gallery_album_new">Новый альбом</string>
+    <string name="gallery_album_name">Название альбома</string>
+    <string name="gallery_album_count">Фото: %1$d</string>
+    <string name="gallery_add_to_album">Добавить в альбом</string>
+    <string name="gallery_added_to_album">Добавлено в альбом</string>
+    <string name="gallery_album_remove">Убрать из альбома</string>
     <string name="ws_empty_notes">Пока нет заметок.</string>
     <string name="ws_empty_bookmarks">Пока нет закладок.</string>
     <string name="ws_empty_todos">Пока нет задач.</string>

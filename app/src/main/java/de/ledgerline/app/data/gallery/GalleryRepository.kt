@@ -203,6 +203,29 @@ class GalleryRepository @Inject constructor(
         }.getOrDefault(false)
     }
 
+    // ---- Albums ----
+    suspend fun albums(): List<de.ledgerline.app.domain.model.gallery.GalleryAlbum> = withContext(Dispatchers.IO) {
+        runCatching { api().albums().takeIf { it.isSuccessful }?.body()?.albums.orEmpty() }.getOrDefault(emptyList())
+    }
+    suspend fun albumPhotos(albumId: Int): List<GalleryPhoto> = withContext(Dispatchers.IO) {
+        runCatching { api().data(albumId = albumId).takeIf { it.isSuccessful }?.body()?.photos.orEmpty() }.getOrDefault(emptyList())
+    }
+    suspend fun createAlbum(name: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching { api().createAlbum(buildJsonObject { put("name", name.trim()) }).isSuccessful }.getOrDefault(false)
+    }
+    suspend fun renameAlbum(id: Int, name: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching { api().updateAlbum(id, buildJsonObject { put("name", name.trim()) }).isSuccessful }.getOrDefault(false)
+    }
+    suspend fun deleteAlbum(id: Int): Boolean = withContext(Dispatchers.IO) {
+        runCatching { api().deleteAlbum(id).isSuccessful }.getOrDefault(false)
+    }
+    suspend fun addToAlbum(albumId: Int, ids: List<Int>): Boolean = withContext(Dispatchers.IO) {
+        runCatching { api().attachToAlbum(albumId, buildJsonObject { put("ids", JsonArray(ids.map { JsonPrimitive(it) })) }).isSuccessful }.getOrDefault(false)
+    }
+    suspend fun removeFromAlbum(albumId: Int, ids: List<Int>): Boolean = withContext(Dispatchers.IO) {
+        runCatching { api().detachFromAlbum(albumId, buildJsonObject { put("ids", JsonArray(ids.map { JsonPrimitive(it) })) }).isSuccessful }.getOrDefault(false)
+    }
+
     private fun copyBody(body: ResponseBody, out: OutputStream) { body.byteStream().use { it.copyTo(out) } }
     private fun String.textPart() = toRequestBody("text/plain".toMediaTypeOrNull())
 

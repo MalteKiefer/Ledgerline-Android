@@ -72,6 +72,17 @@ class GalleryViewModel @Inject constructor(
         return bmp
     }
 
+    /** Decoded thumbnail fetched directly by id (album covers, where no row object is at hand). */
+    suspend fun thumbById(id: Int?): ImageBitmap? {
+        if (id == null) return null
+        val key = "cover:$id"
+        thumbCache[key]?.let { return it }
+        if (thumbCache.containsKey(key)) return null
+        val bmp = repo.thumbBytes(id)?.let { decode(it) }
+        thumbCache[key] = bmp
+        return bmp
+    }
+
     private suspend fun decode(bytes: ByteArray): ImageBitmap? = withContext(Dispatchers.Default) {
         runCatching { android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap() }.getOrNull()
     }
@@ -110,6 +121,15 @@ class GalleryViewModel @Inject constructor(
         val tmp = downloadToCache(p) ?: return@withContext false
         runCatching { tmp.inputStream().use { it.copyTo(out) }; true }.getOrDefault(false)
     }
+
+    // ---- Albums ----
+    suspend fun albums() = repo.albums()
+    suspend fun albumPhotos(albumId: Int): List<GalleryPhoto> = repo.albumPhotos(albumId)
+    fun createAlbum(name: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.createAlbum(name)) }
+    fun renameAlbum(id: Int, name: String, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.renameAlbum(id, name)) }
+    fun deleteAlbum(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteAlbum(id)) }
+    fun addToAlbum(albumId: Int, ids: List<Int>, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.addToAlbum(albumId, ids)) }
+    fun removeFromAlbum(albumId: Int, ids: List<Int>, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.removeFromAlbum(albumId, ids)) }
 
     // ---- Trash ----
     suspend fun loadTrash(): List<GalleryPhoto> = repo.trash()

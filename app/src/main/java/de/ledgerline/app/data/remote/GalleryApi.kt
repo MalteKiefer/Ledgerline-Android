@@ -1,5 +1,6 @@
 package de.ledgerline.app.data.remote
 
+import de.ledgerline.app.domain.model.gallery.GalleryAlbum
 import de.ledgerline.app.domain.model.gallery.GalleryData
 import de.ledgerline.app.domain.model.gallery.GalleryExif
 import de.ledgerline.app.domain.model.gallery.GalleryPhoto
@@ -12,6 +13,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
@@ -23,6 +25,8 @@ import retrofit2.http.Streaming
 @Serializable data class GalleryPhotoResponse(val photo: GalleryPhoto)
 @Serializable data class GalleryChunkInit(val id: String = "", val partSize: Long = 8_388_608)
 @Serializable data class GalleryChunkPart(val ok: Boolean = false, val index: Int = 0)
+@Serializable data class GalleryAlbumsResponse(val albums: List<GalleryAlbum> = emptyList())
+@Serializable data class GalleryAlbumResponse(val album: GalleryAlbum)
 
 /**
  * The Gallery module REST surface — Phase 1 (MVP viewing): timeline read, sandboxed bytes
@@ -118,4 +122,23 @@ interface GalleryApi {
 
     @POST("api/v1/gallery/trash/empty")
     suspend fun emptyTrash(): Response<OkBody>
+
+    // ---- Albums ----
+    @GET("api/v1/gallery/albums")
+    suspend fun albums(): Response<GalleryAlbumsResponse>
+
+    @POST("api/v1/gallery/albums")
+    suspend fun createAlbum(@Body body: JsonObject): Response<GalleryAlbumResponse>
+
+    @retrofit2.http.PUT("api/v1/gallery/albums/{id}")
+    suspend fun updateAlbum(@Path("id") id: Int, @Body body: JsonObject): Response<GalleryAlbumResponse>
+
+    @DELETE("api/v1/gallery/albums/{id}")
+    suspend fun deleteAlbum(@Path("id") id: Int): Response<OkBody>
+
+    @POST("api/v1/gallery/albums/{id}/photos")
+    suspend fun attachToAlbum(@Path("id") id: Int, @Body body: JsonObject): Response<OkBody>
+
+    @HTTP(method = "DELETE", path = "api/v1/gallery/albums/{id}/photos", hasBody = true)
+    suspend fun detachFromAlbum(@Path("id") id: Int, @Body body: JsonObject): Response<OkBody>
 }

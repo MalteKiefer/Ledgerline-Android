@@ -48,6 +48,16 @@ data class GalleryData(
     val photos: List<GalleryPhoto> = emptyList(),
 )
 
+/** A gallery album (`/gallery/albums`); [count] is the photo count, [coverPhotoId] an optional cover. */
+@Serializable
+data class GalleryAlbum(
+    val id: Int = 0,
+    val name: String = "",
+    val count: Int = 0,
+    @SerialName("cover_photo_id") val coverPhotoId: Int? = null,
+    val version: Int = 0,
+)
+
 /** `GET /gallery/{photo}/exif` — photo overview + section-grouped EXIF for the lightbox sidebar. */
 @Serializable
 data class GalleryExif(
