@@ -142,6 +142,9 @@
     <string name="gallery_camera">Kamera</string>
     <string name="gallery_place">Ort</string>
     <string name="gallery_trash_empty">Papierkorb ist leer.</string>
+    <string name="gallery_play">Abspielen</string>
+    <string name="gallery_live">Live</string>
+    <string name="gallery_video_failed">Video konnte nicht geladen werden.</string>
     <string name="ws_empty_notes">Noch keine Notizen.</string>
     <string name="ws_empty_bookmarks">Noch keine Lesezeichen.</string>
     <string name="ws_empty_todos">Noch keine Todos.</string>

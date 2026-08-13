@@ -174,6 +174,15 @@ class GalleryRepository @Inject constructor(
         runCatching { api().exif(id).takeIf { it.isSuccessful }?.body() }.getOrNull()
     }
 
+    /** Stream a video's playback rendition (or a Live Photo motion clip) into [dest] over the pinned
+     *  OkHttp transport, so playback keeps SPKI pinning instead of MediaPlayer's unpinned HTTP stack. */
+    suspend fun downloadVideo(id: Int, dest: File, motion: Boolean = false): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val res = if (motion) api().motion(id) else api().play(id)
+            res.takeIf { it.isSuccessful }?.body()?.let { b -> dest.outputStream().use { copyBody(b, it) }; true } ?: false
+        }.getOrDefault(false)
+    }
+
     private fun copyBody(body: ResponseBody, out: OutputStream) { body.byteStream().use { it.copyTo(out) } }
     private fun String.textPart() = toRequestBody("text/plain".toMediaTypeOrNull())
 

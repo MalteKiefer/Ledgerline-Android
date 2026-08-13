@@ -87,6 +87,13 @@ class GalleryViewModel @Inject constructor(
 
     suspend fun exif(id: Int): GalleryExif? = repo.exif(id)
 
+    /** Download a video (or Live Photo motion clip) to cache for inline playback. Null on failure. */
+    suspend fun videoToCache(p: GalleryPhoto, motion: Boolean = false): File? {
+        val dir = File(context.cacheDir, "gallery").apply { mkdirs() }
+        val dest = File(dir, (if (motion) "motion_" else "play_") + "${p.id}.mp4")
+        return if (repo.downloadVideo(p.id, dest, motion)) dest else null
+    }
+
     /** Download original bytes to a private cache file for external open/share. */
     suspend fun downloadToCache(p: GalleryPhoto): File? {
         val dir = File(context.cacheDir, "gallery").apply { mkdirs() }

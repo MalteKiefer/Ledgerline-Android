@@ -28,6 +28,8 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.MotionPhotosOn
+import androidx.compose.material.icons.outlined.PlayCircleFilled
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.StarBorder
@@ -61,6 +63,7 @@ import de.ledgerline.app.ui.common.AppTopBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /** Full-screen single-photo viewer with the light EXIF sheet and per-photo actions. */
 @Composable
@@ -73,10 +76,22 @@ fun GalleryLightbox(vm: GalleryViewModel, photo: GalleryPhoto, onClose: () -> Un
     var exif by remember(photo.id) { mutableStateOf<GalleryExif?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
+    var videoFile by remember(photo.id) { mutableStateOf<File?>(null) }
+    var preparing by remember(photo.id) { mutableStateOf(false) }
 
+    // Still preview only for images; a video shows a poster + play button (fetched on demand).
     LaunchedEffect(photo.id, photo.version) {
-        bmp = vm.preview(photo)
-        loadFailed = bmp == null
+        if (!photo.isVideo) { bmp = vm.preview(photo); loadFailed = bmp == null }
+    }
+
+    fun playVideo(motion: Boolean) {
+        if (preparing) return
+        preparing = true
+        scope.launch {
+            val f = vm.videoToCache(photo, motion)
+            preparing = false
+            if (f != null) videoFile = f else msg = ctx.getString(R.string.gallery_video_failed)
+        }
     }
 
     val saveLauncher = rememberLauncherForActivityResult(
@@ -108,14 +123,29 @@ fun GalleryLightbox(vm: GalleryViewModel, photo: GalleryPhoto, onClose: () -> Un
         })
     }) { pad ->
         Box(Modifier.fillMaxSize().padding(pad).background(Color.Black), contentAlignment = Alignment.Center) {
+            val vf = videoFile
             val b = bmp
             when {
+                vf != null -> VideoPlayer(vf, Modifier.fillMaxSize())
+                photo.isVideo -> {
+                    // Poster + play button (download the web MP4 on demand, then play inline).
+                    IconButton(onClick = { playVideo(false) }, modifier = Modifier.size(72.dp)) {
+                        if (preparing) CircularProgressIndicator(color = Color.White)
+                        else Icon(Icons.Outlined.PlayCircleFilled, contentDescription = stringResource(R.string.gallery_play), tint = Color.White, modifier = Modifier.fillMaxSize())
+                    }
+                }
                 b != null -> Image(b, contentDescription = photo.name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                loadFailed -> Text(
-                    if (photo.isVideo) stringResource(R.string.gallery_video_open_hint) else stringResource(R.string.gallery_preview_pending),
-                    color = Color.White, modifier = Modifier.padding(24.dp),
-                )
+                loadFailed -> Text(stringResource(R.string.gallery_preview_pending), color = Color.White, modifier = Modifier.padding(24.dp))
                 else -> CircularProgressIndicator(color = Color.White)
+            }
+            // Live Photo: a still with an attached motion clip → play it on demand.
+            if (photo.motion && !photo.isVideo && vf == null) {
+                androidx.compose.material3.AssistChip(
+                    onClick = { playVideo(true) },
+                    label = { Text(stringResource(R.string.gallery_live)) },
+                    leadingIcon = { if (preparing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.MotionPhotosOn, contentDescription = null) },
+                    modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+                )
             }
             msg?.let { Text(it, Modifier.align(Alignment.BottomCenter).padding(12.dp), color = MaterialTheme.colorScheme.primary) }
         }
@@ -196,6 +226,23 @@ fun GalleryTrashScreen(vm: GalleryViewModel, onBack: () -> Unit) {
             }
         }
     }
+}
+
+/** Minimal inline player for a locally cached clip (no Media3 dependency): a VideoView with controls. */
+@Composable
+private fun VideoPlayer(file: File, modifier: Modifier = Modifier) {
+    androidx.compose.ui.viewinterop.AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            android.widget.VideoView(ctx).apply {
+                val controller = android.widget.MediaController(ctx)
+                controller.setAnchorView(this)
+                setMediaController(controller)
+                setVideoPath(file.absolutePath)
+                setOnPreparedListener { it.isLooping = false; start() }
+            }
+        },
+    )
 }
 
 /** Human-readable byte size (1 KB = 1024). */

@@ -59,6 +59,16 @@ interface GalleryApi {
     @GET("api/v1/gallery/{id}/exif")
     suspend fun exif(@Path("id") id: Int): Response<GalleryExif>
 
+    /** Web-MP4 rendition (or original) for playback; Range honoured. */
+    @GET("api/v1/gallery/{id}/play")
+    @Streaming
+    suspend fun play(@Path("id") id: Int): Response<ResponseBody>
+
+    /** A Live Photo's motion clip (best-effort, stored as received). */
+    @GET("api/v1/gallery/{id}/motion")
+    @Streaming
+    suspend fun motion(@Path("id") id: Int): Response<ResponseBody>
+
     // ---- Upload (whole + chunked) ----
     @Multipart
     @POST("api/v1/gallery")

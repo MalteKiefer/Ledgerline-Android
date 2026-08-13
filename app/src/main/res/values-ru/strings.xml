@@ -143,6 +143,9 @@
     <string name="gallery_camera">Камера</string>
     <string name="gallery_place">Место</string>
     <string name="gallery_trash_empty">Корзина пуста.</string>
+    <string name="gallery_play">Воспроизвести</string>
+    <string name="gallery_live">Live</string>
+    <string name="gallery_video_failed">Не удалось загрузить видео.</string>
     <string name="ws_empty_notes">Пока нет заметок.</string>
     <string name="ws_empty_bookmarks">Пока нет закладок.</string>
     <string name="ws_empty_todos">Пока нет задач.</string>
