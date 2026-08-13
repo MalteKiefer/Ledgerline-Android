@@ -15,6 +15,8 @@ data class DisplayPrefs(
     val temp: String = "c",            // c | f
     val glucose: String = "mgdl",      // mgdl | mmoll
     val timeFormat: String = "24h",    // 24h | 12h
+    val dateFormat: String = "system", // system | dmy | dmy_dot | mdy | ymd
+    val timezone: String = "",         // IANA override (e.g. Europe/Berlin); "" = follow system
 ) {
     val imperialDistance: Boolean get() = distance == "mi"
     val feetElevation: Boolean get() = elevation == "ft"
@@ -32,6 +34,8 @@ data class DisplayPrefs(
             temp = map["temp"] ?: "c",
             glucose = map["glucose"] ?: "mgdl",
             timeFormat = map["time_format"] ?: "24h",
+            dateFormat = map["date_format"] ?: "system",
+            timezone = map["timezone"] ?: "",
         )
     }
 
@@ -39,6 +43,7 @@ data class DisplayPrefs(
     fun toMap(): Map<String, String> = mapOf(
         "distance" to distance, "elevation" to elevation, "weight" to weight,
         "temp" to temp, "glucose" to glucose, "time_format" to timeFormat,
+        "date_format" to dateFormat, "timezone" to timezone,
     )
 
     /** Distance in the user's unit as a bare number (chart axes / stats). Canonical = metres. */

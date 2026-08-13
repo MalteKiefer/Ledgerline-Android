@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -48,6 +49,7 @@ private enum class Section(val labelRes: Int, val icon: ImageVector, val moduleK
     FINANCE(R.string.tab_finance, Icons.AutoMirrored.Outlined.ReceiptLong, "finance"),
     TODOS(R.string.tab_todos, Icons.Outlined.CheckCircle, "calendar"),
     NOTES(R.string.tab_notes, Icons.AutoMirrored.Outlined.EventNote, "notes"),
+    SEARCH(R.string.tab_search, Icons.Outlined.Search, null),
     ACCOUNT(R.string.tab_account, Icons.Outlined.AccountCircle, null),
 }
 
@@ -121,6 +123,19 @@ fun AppShell(
                 else FinanceSection(onPush = { route = it }, modifier = bottomOnly, vm = financeVm)
             Section.TODOS -> de.ledgerline.app.ui.todos.TodosSection(modifier = bottomOnly)
             Section.NOTES -> de.ledgerline.app.ui.notes.NotesSection(modifier = bottomOnly)
+            Section.SEARCH -> Box(bottomOnly) {
+                de.ledgerline.app.ui.search.GlobalSearchScreen(
+                    onOpenModule = { m ->
+                        section = when (m) {
+                            "files" -> Section.FILES
+                            "notes" -> Section.NOTES
+                            "finance" -> Section.FINANCE
+                            else -> section
+                        }
+                    },
+                    contentPadding = pad,
+                )
+            }
             Section.ACCOUNT -> Box(bottomOnly) {
                 MoneySettingsScreen(
                     onBack = null,

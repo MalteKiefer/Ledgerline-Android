@@ -81,6 +81,8 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
     var share by remember { mutableStateOf(false) }
     var pdfFile by remember { mutableStateOf<java.io.File?>(null) }
     var msg by remember { mutableStateOf<String?>(null) }
+    var showInfo by remember { mutableStateOf(false) }
+    var info by remember(fileId) { mutableStateOf<de.ledgerline.app.domain.model.files.FileInfo?>(null) }
 
     val isPdf = (file.mime?.lowercase() == "application/pdf") || file.name.substringAfterLast('.', "").equals("pdf", true)
 
@@ -159,6 +161,7 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
                 AssistChip(onClick = { scope.launch { openExternal(vm, ctx, file) { msg = it } } }, label = { Text(stringResource(R.string.action_open)) })
                 AssistChip(onClick = { saveLauncher.launch(file.name) }, label = { Text(stringResource(R.string.files_save_device)) })
                 AssistChip(onClick = { share = true }, label = { Text(stringResource(R.string.action_share)) })
+                AssistChip(onClick = { showInfo = true; scope.launch { info = vm.info(file.id) } }, label = { Text(stringResource(R.string.files_info)) })
                 AssistChip(onClick = { replaceLauncher.launch("*/*") }, label = { Text(stringResource(R.string.files_replace_content)) })
                 AssistChip(onClick = { rename = true }, label = { Text(stringResource(R.string.action_rename)) })
                 AssistChip(onClick = { move = true }, label = { Text(stringResource(R.string.action_move)) })
@@ -237,6 +240,48 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
             vm.updateTagsNote(file.id, tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }, note) {}
         },
         onDismiss = { editMeta = false },
+    )
+    if (showInfo) FileInfoDialog(info = info, onDismiss = { showInfo = false })
+}
+
+@Composable
+private fun FileInfoDialog(info: de.ledgerline.app.domain.model.files.FileInfo?, onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.files_info)) },
+        text = {
+            if (info == null) {
+                Text(stringResource(R.string.account_loading))
+            } else Column(
+                Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (info.path.isNotBlank()) MetaRow(stringResource(R.string.files_path), info.path)
+                MetaRow(stringResource(R.string.files_versions), info.versions.toString())
+                info.createdAt?.let { MetaRow(stringResource(R.string.files_created), it.take(19).replace('T', ' ')) }
+                info.updatedAt?.let { MetaRow(stringResource(R.string.files_modified), it.take(19).replace('T', ' ')) }
+                info.sha256?.let { MetaRow("SHA-256", it) }
+                info.metadata?.takeIf { it.fields.isNotEmpty() }?.let { m ->
+                    SectionLabel(stringResource(R.string.files_metadata))
+                    m.fields.forEach { (k, v) -> MetaRow(k, v) }
+                }
+                info.snippet?.takeIf { it.isNotBlank() }?.let {
+                    SectionLabel(stringResource(R.string.files_content_snippet))
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (info.duplicates.isNotEmpty()) {
+                    SectionLabel(stringResource(R.string.files_duplicates))
+                    info.duplicates.forEach { d -> Text("• ${d.name}", style = MaterialTheme.typography.bodySmall) }
+                }
+                if (info.activity.isNotEmpty()) {
+                    SectionLabel(stringResource(R.string.files_activity))
+                    info.activity.take(20).forEach { a ->
+                        MetaRow(a.action, (a.actor ?: "") + " " + (a.createdAt?.take(19)?.replace('T', ' ') ?: ""))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
     )
 }
 

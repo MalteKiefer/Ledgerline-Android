@@ -121,8 +121,9 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
 
 - **Flow** (`ui/nav/AppNav`): `WELCOME → PAIRING → LOCK (biometrisch) → HOME (`ui/shell/AppShell`)`.
   `RootViewModel` gated auf `AppLockState.unlocked`; 401/Remote-Wipe → `ForceLogout` + re-pair.
-- **`ui/shell/AppShell`** — Multi-Modul-Bottom-Nav **Dateien · Finanzen · Aufgaben · Notizen · Konto**, gated
-  über `ModuleAccess` (`/me.modules`; Aufgaben-Tab nur bei Modul `calendar`, Notizen nur bei `notes`).
+- **`ui/shell/AppShell`** — Multi-Modul-Bottom-Nav **Dateien · Finanzen · Aufgaben · Notizen · Suche · Konto**,
+  gated über `ModuleAccess` (`/me.modules`; Aufgaben-Tab nur bei Modul `calendar`, Notizen nur bei `notes`;
+  Suche+Konto immer sichtbar). Suche = globale Cross-Modul-Suche (§7).
   Finance-Detail/Edit-Flows als `MoneyRoute`-Overlays.
 - **Notizen (`ui/notes/`):** `NotesSection`/`NotesViewModel` — plaintext-relationales Notes-Modul
   (Markdown). Ordner-Filter-Chips, Volltextsuche (`GET /notes/search`), Notiz-Liste (Pin/Favorit/Tags),
@@ -137,7 +138,10 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   geladenen Rows → öffnet Ziel-Notiz); Backlinks-Panel („Verlinkt von") aus `note.backlinks`
   (show/store/update liefern sie). **Attachments:** `note.attachments` (show), Editor-Sektion mit
   SAF-Upload (`POST /notes/{note}/attachments` multipart, MIME-Allowlist pdf/jpg/png/webp/gif),
-  Öffnen via Cache-Download (`GET .../raw`) + `DocOpener`, Löschen. **Markdown-Export:**
+  Öffnen via Cache-Download (`GET .../raw`) + `DocOpener`, Löschen. **Attach-from-Files:**
+  `POST /notes/{note}/attachments/from {source:file,id}` bettet ein bestehendes Files-Bild/-Video ohne
+  Re-Upload ein (Editor „Aus Dateien hinzufügen" → Picker über `FilesRepository`-Snapshot, image/video
+  gefiltert). **Markdown-Export:**
   `GET /notes/{note}/export` (YAML-Frontmatter + Body) → SAF-`CreateDocument("text/markdown")`.
 - **Aufgaben (`ui/todos/`):** `TodosSection`/`TodosViewModel` — VTODO-Task-Lists (nur der Task-Teil des
   Calendar-Moduls, keine Events). Listen-Auswahl (VTODO-Kalender via `GET /calendar/data`, filter
@@ -154,9 +158,17 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   Filter, Thumbnails, Quota-Balken, Multi-Select-ZIP, In-App-PDF-Viewer (`ui/common/PdfViewerScreen`
   via PdfRenderer)**, volles Sharing (Public-Links + Ablauf/Bearbeiten, Ordnerfreigaben +
   **Einzeldatei-Cross-User-Share** `kind=file`, für-mich-freigegeben inkl. Lone-File),
-  **Trash restore/force für Ordner** (nicht nur Dateien). `data/files/FilesRepository` (online-only Snapshot + per-Record-CRUD,
-  `NetworkFactory.createFiles` + `FilesApi`); Download → `DocOpener.openFile` (FileProvider).
-  **Offen (Rest):** Share-Target (`ACTION_SEND`).
+  **Trash restore/force für Ordner** (nicht nur Dateien), **Multi-Select Bulk copy/move/delete**
+  (`POST /files/entries/{id}/copy` + per-record move/delete; Selection-Bar), **„Von mir geteilt"**
+  (`SharedByMeScreen`: Public-Links-Index `GET /files/rel-shares` mit Copy/Revoke + **Inbound-Upload-Links**
+  `GET/POST/DELETE /files/upload-links`, Public-Seite `{base}/u/{token}`). `data/files/FilesRepository`
+  (online-only Snapshot + per-Record-CRUD, `NetworkFactory.createFiles` + `FilesApi`); Download →
+  `DocOpener.openFile` (FileProvider). **Info-Panel** (`GET /files/entries/{id}/info`): Metadaten
+  (EXIF/PDF/STL/Text via `FileInfoMetadata`), SHA-256, Pfad, Versionszahl, Inhalts-Snippet,
+  Share-Status, Duplikate + Aktivität als Dialog im Detail-Screen. **Aktivitäts-Feed**
+  (`GET /files/activity` + `/entries/{id}/activity`, `FileActivity`) in der Datenschicht/VM.
+  **Offen (Rest):** Share-Target (`ACTION_SEND`); Aktivitäts-Feed-Screen; externe Mounts (`/mounts/*`
+  S3+SFTP, bewusst verschoben).
 - **`ui/money/FinanceSection`** — Top-Tab-Row (Dashboard/Rechnungen/Umsätze/Mehr) über geteiltes
   **`FinanceViewModel`**; „Mehr" → Partner/Zahlungsmittel/Projekte/Belege(Fremdbelege)/Insights/
   Firmenprofil. Dashboard (Server-KPIs/USt/Top-Kunden), Rechnungen (Anlegen/Bearbeiten/Finalize/
@@ -193,6 +205,38 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   AppTopBar,SectionLabel}`. `FLAG_SECURE` → visuelle Änderungen muss der Nutzer am Gerät prüfen.
 
 ## 7. Stand & TODO
+
+**Server-Sync-Abgleich 2026-08-13 (Server v1.663 vs. Android @`a04e87ca`):** OpenAPI + letzte 100
+Server-Commits geauditet. Out-of-scope (Gallery/Contacts/Kalender-Events/Admin/Docker/Passkeys/
+FrankenPHP-Infra) bewusst ignoriert. Umgesetzt: **Files-Info-Panel** (`/files/entries/{id}/info`) +
+**Aktivitäts-Feed** (`/files/activity` +per-file) Datenschicht/Dialog; **Notes attach-from-Files**
+(`/notes/{note}/attachments/from`); **globale Suche** (`GET /search`, `GlobalSearchResponse`) mit eigener **Bottom-Nav-Sektion „Suche"**
+(`ui/search/GlobalSearchScreen` + `GlobalSearchViewModel`, debounced, Gruppen files/notes/finance,
+Tap wechselt in das Modul-Tab) + **Reindex** (`POST /me/reindex`, Settings-Button) in
+`AccountRepository`; Prefs `timezone`+`date_format` additiv in `DisplayPrefsDto` (round-trip-sicher).
+Kein Finance-Drift (GoCardless serverseitig wieder entfernt). `assembleDebug` + Unit-Tests grün.
+
+**P1–P3-Nachzug 2026-08-13 (umgesetzt):**
+- **P1 Force-2FA-Gate:** Server-403 `{status:"two_factor_required"}` (Policy `force_2fa`) wird im
+  OkHttp-Interceptor via `peekBody` erkannt (`AuthNotifier.onTwoFactorRequired` → `AuthEventBus.
+  twoFactorRequired`) → neue `Destination.TWO_FACTOR` in `AppNav` → `ui/auth/TwoFactorRequiredScreen`
+  (Passwort-Step-up → TOTP-Secret → Confirm, wiederverwendet `AccountViewModel`; kein Enrollment-Loop,
+  bei Erfolg `toHome()`, plus Logout).
+- **P2 Devices-Detailfelder:** `DeviceDto` +`ip`/`last_used_at`/`created_at`/`expires_at`/`os_version`/
+  `app_version`/`abilities`; ausklappbares Detail-Panel im Devices-Screen. **Passwort-Policy:**
+  `changePassword` liefert jetzt die 422-Server-Meldung (`parseValidationMessage`) statt nur generischem
+  Fehler; Security-UI zeigt sie an.
+- **P3 Files-Aktivitäts-Screen** (`FilesActivityScreen`, Overflow-Menü) + **Datumsformat-Picker**
+  (Appearance-Settings; `DisplayPrefs.dateFormat`/`timezone` durch Sink/Store/`/preferences`
+  round-trip, `setDateFormat` synct server).
+
+**Offen (Rest, verschoben/optional):** externe Mounts `/mounts/*` (S3+SFTP, großes Feature);
+Todo-Listen-Sharing `/calendar/shares` (optional, Todos bewusst single-user); globale Suche
+record-level Deep-Open (aktuell nur Tab-Wechsel) + `/files/entries/{id}/show`; `timezone`-Picker-UI
+(round-trippt, IANA-Freitext auf Mobile schlechte UX).
+**Bewusst out-of-scope:** Gallery, Contacts, Kalender-Events (rsvp/imip/free-busy/slots), Admin, Passkeys, Docker.
+
+
 
 **Plaintext-Rebuild 2026-08 (Files + Finance):** Auf `finance-pivot` (ZK bereits entfernt) aufgesetzt.
 Neu: **Files-Modul** komplett (Datenschicht `FilesModels`/`FilesApi`/`FilesRepository` + Browser/

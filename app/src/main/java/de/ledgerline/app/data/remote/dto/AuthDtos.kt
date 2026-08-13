@@ -53,6 +53,10 @@ import kotlinx.serialization.Serializable
     val temp: String? = null,
     val glucose: String? = null,
     @SerialName("time_format") val timeFormat: String? = null,
+    // Hard IANA timezone override (e.g. "Europe/Berlin"); empty string clears it (follow the system zone).
+    val timezone: String? = null,
+    // Date-format preset applied app-wide: system | dmy | dmy_dot | mdy | ymd.
+    @SerialName("date_format") val dateFormat: String? = null,
     // Per-category push prefs, keyed by category (task/event/birthday/invoice/…). Read from
     // GET /me; absent category = push enabled. `encodeDefaults=false` omits it on display writes.
     val notifications: Map<String, PushCategoryPref>? = null,
@@ -102,4 +106,12 @@ data class DeviceDto(
     val installId: String? = null,
     val syncing: Boolean = false,
     val wipeRequested: Boolean = false,
+    // Structured, non-secret owner-scoped detail fields (server 7b3b0804) for a device detail panel.
+    val ip: String? = null,
+    @SerialName("last_used_at") val lastUsedAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("expires_at") val expiresAt: String? = null,
+    @SerialName("os_version") val osVersion: String? = null,
+    @SerialName("app_version") val appVersion: String? = null,
+    val abilities: List<String> = emptyList(),
 )

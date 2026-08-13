@@ -20,9 +20,17 @@ class AuthEventBus @Inject constructor() {
     private val _wipe = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val wipe: SharedFlow<Unit> = _wipe
 
+    /**
+     * Workspace force-2FA policy tripped: an authenticated request got 403
+     * `two_factor_required`. The app must gate the user into 2FA enrollment.
+     */
+    private val _twoFactorRequired = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val twoFactorRequired: SharedFlow<Unit> = _twoFactorRequired
+
     fun emitWipe() { _wipe.tryEmit(Unit) }
 
     init {
         AuthNotifier.onUnauthorized = { _unauthorized.tryEmit(Unit) }
+        AuthNotifier.onTwoFactorRequired = { _twoFactorRequired.tryEmit(Unit) }
     }
 }

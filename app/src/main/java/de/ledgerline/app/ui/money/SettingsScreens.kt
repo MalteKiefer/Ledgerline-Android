@@ -32,7 +32,9 @@ import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Translate
 import androidx.compose.material3.AlertDialog
@@ -59,6 +61,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -117,9 +120,12 @@ private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut
     val avatar by vm.avatar.collectAsStateWithLifecycle()
     val theme by vm.themeMode.collectAsStateWithLifecycle()
     val maxVersions by vm.fileMaxVersions.collectAsStateWithLifecycle()
+    val prefs by vm.displayPrefs.collectAsStateWithLifecycle()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var langOpen by remember { mutableStateOf(false) }
     var themeOpen by remember { mutableStateOf(false) }
     var maxOpen by remember { mutableStateOf(false) }
+    var dateOpen by remember { mutableStateOf(false) }
     val curLang = remember { vm.currentLanguageTag() }
 
     AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.more_settings), onBack = onBack) }) { pad ->
@@ -131,11 +137,19 @@ private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut
                 SettingRow(stringResource(R.string.settings_theme), themeLabel(theme), Icons.Outlined.DarkMode, Brand.tintViolet) { themeOpen = true }
                 RowDivider()
                 SettingRow(stringResource(R.string.settings_language), languageLabel(curLang), Icons.Outlined.Translate, Brand.tintBlue) { langOpen = true }
+                RowDivider()
+                SettingRow(stringResource(R.string.settings_date_format), dateFormatLabel(prefs.dateFormat), Icons.Outlined.CalendarMonth, Brand.tintTeal) { dateOpen = true }
             }
 
             SectionLabel(stringResource(R.string.settings_files))
             ListSectionCard {
                 SettingRow(stringResource(R.string.settings_max_versions), maxVersions.toString(), Icons.Outlined.Folder, Brand.tintTeal) { maxOpen = true }
+                RowDivider()
+                SettingRow(stringResource(R.string.files_reindex), null, Icons.Outlined.Search, Brand.tintBlue) {
+                    vm.reindex { ok ->
+                        android.widget.Toast.makeText(ctx, ctx.getString(if (ok) R.string.files_reindex_queued else R.string.files_save_failed), android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
 
             SectionLabel(stringResource(R.string.settings_account))
@@ -175,6 +189,40 @@ private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut
     if (themeOpen) ThemeDialog(current = theme, onPick = { vm.setTheme(it); themeOpen = false }, onDismiss = { themeOpen = false })
     if (langOpen) LanguageDialog(current = curLang, onPick = { vm.setLanguage(it); langOpen = false }, onDismiss = { langOpen = false })
     if (maxOpen) MaxVersionsDialog(current = maxVersions, onPick = { vm.setFileMaxVersions(it); maxOpen = false }, onDismiss = { maxOpen = false })
+    if (dateOpen) DateFormatDialog(current = prefs.dateFormat, onPick = { vm.setDateFormat(it); dateOpen = false }, onDismiss = { dateOpen = false })
+}
+
+private val DATE_FORMATS = listOf("system", "dmy", "dmy_dot", "mdy", "ymd")
+
+@Composable
+private fun dateFormatLabel(fmt: String): String = when (fmt) {
+    "dmy" -> "31/12/2026"
+    "dmy_dot" -> "31.12.2026"
+    "mdy" -> "12/31/2026"
+    "ymd" -> "2026-12-31"
+    else -> stringResource(R.string.settings_date_format_system)
+}
+
+@Composable
+private fun DateFormatDialog(current: String, onPick: (String) -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.settings_date_format)) },
+        text = {
+            Column {
+                DATE_FORMATS.forEach { fmt ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onPick(fmt) }.padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        androidx.compose.material3.RadioButton(selected = fmt == current, onClick = { onPick(fmt) })
+                        Text(dateFormatLabel(fmt), Modifier.padding(start = 8.dp))
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+    )
 }
 
 /** Account header: circular avatar (or gradient initial) + name + email. */
@@ -314,19 +362,40 @@ private fun DevicesScreen(vm: AccountViewModel, onBack: () -> Unit) {
             if (devices.isEmpty()) EmptyState(stringResource(R.string.devices_empty))
             else LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(devices, key = { it.id }) { d ->
-                    Row(Modifier.fillMaxWidth().cardSurface(), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(d.name + if (d.current) " · " + stringResource(R.string.device_this) else "", style = MaterialTheme.typography.bodyLarge)
-                            if (d.meta.isNotBlank()) Text(d.meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    var expanded by rememberSaveable(d.id) { mutableStateOf(false) }
+                    Column(Modifier.fillMaxWidth().cardSurface()) {
+                        Row(Modifier.fillMaxWidth().clickable { expanded = !expanded }, verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(d.name + if (d.current) " · " + stringResource(R.string.device_this) else "", style = MaterialTheme.typography.bodyLarge)
+                                if (d.meta.isNotBlank()) Text(d.meta, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (!d.current) {
+                                IconButton(onClick = { vm.wipeDevice(d.id) }) { Icon(Icons.Outlined.DeleteForever, stringResource(R.string.device_wipe), tint = MaterialTheme.colorScheme.error) }
+                                IconButton(onClick = { vm.revokeDevice(d.id) }) { Icon(Icons.Outlined.Delete, stringResource(R.string.device_revoke)) }
+                            }
                         }
-                        if (!d.current) {
-                            IconButton(onClick = { vm.wipeDevice(d.id) }) { Icon(Icons.Outlined.DeleteForever, stringResource(R.string.device_wipe), tint = MaterialTheme.colorScheme.error) }
-                            IconButton(onClick = { vm.revokeDevice(d.id) }) { Icon(Icons.Outlined.Delete, stringResource(R.string.device_revoke)) }
+                        if (expanded) Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            DeviceDetailRow(stringResource(R.string.device_os), d.osVersion)
+                            DeviceDetailRow(stringResource(R.string.device_app_version), d.appVersion)
+                            DeviceDetailRow(stringResource(R.string.device_ip), d.ip)
+                            DeviceDetailRow(stringResource(R.string.device_last_used), d.lastUsedAt?.take(19)?.replace('T', ' '))
+                            DeviceDetailRow(stringResource(R.string.device_connected), d.createdAt?.take(19)?.replace('T', ' '))
+                            DeviceDetailRow(stringResource(R.string.device_expires), d.expiresAt?.take(19)?.replace('T', ' '))
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** One non-secret device detail line; hidden when the value is absent. */
+@Composable
+private fun DeviceDetailRow(label: String, value: String?) {
+    if (value.isNullOrBlank()) return
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 16.dp))
     }
 }
 
@@ -467,7 +536,13 @@ private fun SecurityScreen(vm: AccountViewModel, onLoggedOut: () -> Unit, onBack
             Field(curPw, { curPw = it }, R.string.security_current_password)
             Field(newPw, { newPw = it }, R.string.security_new_password)
             TextButton(enabled = curPw.isNotBlank() && newPw.length >= 12, onClick = {
-                vm.changePassword(curPw, newPw) { ok -> msg = ctx.getString(if (ok) R.string.security_password_changed else R.string.security_failed); if (ok) { curPw = ""; newPw = "" } }
+                vm.changePassword(curPw, newPw) { err ->
+                    msg = when {
+                        err == null -> { curPw = ""; newPw = ""; ctx.getString(R.string.security_password_changed) }
+                        err.isNotBlank() -> err // server policy / validation message
+                        else -> ctx.getString(R.string.security_failed)
+                    }
+                }
             }) { Text(stringResource(R.string.security_change_password)) }
 
             SectionLabel(stringResource(R.string.security_2fa))

@@ -86,6 +86,69 @@ data class FilesTrash(
     val folders: List<FileFolder> = emptyList(),
 )
 
+// ---- Activity feed (`/files/activity`, `/files/entries/{id}/activity`) ----
+
+/**
+ * One Files activity-feed entry (owner-scoped, newest first). [actor] is the display name of whoever
+ * performed it, or the upload-link label for anonymous external uploads. The server also returns a
+ * free-form `meta` object which we let `ignoreUnknownKeys` drop.
+ */
+@Serializable
+data class FileActivity(
+    val id: Int = 0,
+    val action: String = "", // upload | external_upload | rename | move | version | trash | restore | delete | share
+    @SerialName("file_id") val fileId: Int? = null,
+    @SerialName("file_name") val fileName: String? = null,
+    @SerialName("file_folder_id") val folderId: Int? = null,
+    val actor: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+// ---- Info panel (`GET /files/entries/{id}/info`) ----
+
+/** Extracted per-filetype metadata (image EXIF, PDF info, audio/video, STL geometry, text/archive). */
+@Serializable
+data class FileInfoMetadata(
+    val kind: String = "",
+    val fields: Map<String, String> = emptyMap(),
+)
+
+/** Sharing status inside the info panel (null = not shared). */
+@Serializable
+data class FileInfoShare(
+    @SerialName("expires_at") val expiresAt: String? = null,
+    @SerialName("allow_download") val allowDownload: Boolean = true,
+    val protected: Boolean = false,
+)
+
+/** A same-checksum duplicate surfaced by the info panel. */
+@Serializable
+data class FileInfoDuplicate(
+    val id: Int = 0,
+    val name: String = "",
+    val path: String = "",
+)
+
+/**
+ * Rich info aggregate for one file (`GET /files/entries/{id}/info`): checksum, dates, version count,
+ * folder [path], extracted [metadata], a content [snippet], [share] status, same-checksum
+ * [duplicates] and recent [activity].
+ */
+@Serializable
+data class FileInfo(
+    val sha256: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    val version: Int = 0,
+    val versions: Int = 0,
+    val path: String = "",
+    val metadata: FileInfoMetadata? = null,
+    val snippet: String? = null,
+    val share: FileInfoShare? = null,
+    val duplicates: List<FileInfoDuplicate> = emptyList(),
+    val activity: List<FileActivity> = emptyList(),
+)
+
 // ---- Stats ----
 
 @Serializable
@@ -118,6 +181,24 @@ data class ShareView(
     @SerialName("allow_download") val allowDownload: Boolean = true,
     @SerialName("expires_at") val expiresAt: String? = null,
     val version: Int = 0,
+    /** Present only in the owner-side index (`GET /files/rel-shares`): the shared file/folder name. */
+    val name: String? = null,
+)
+
+// ---- Sharing: inbound upload links (owner side, `/files/upload-links`) ----
+
+/**
+ * Owner-visible public inbound upload link (`file_upload_links`): external people upload INTO the
+ * owner's folder (write-only, owner quota). The token is the capability; public page = `{base}/u/{token}`.
+ */
+@Serializable
+data class FileUploadLink(
+    val id: Int = 0,
+    val token: String = "",
+    val label: String? = null,
+    @SerialName("file_folder_id") val folderId: Int? = null,
+    @SerialName("folder_name") val folderName: String? = null,
+    @SerialName("expires_at") val expiresAt: String? = null,
 )
 
 // ---- Sharing: cross-user folder shares ----

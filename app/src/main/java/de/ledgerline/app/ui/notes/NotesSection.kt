@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -223,6 +224,8 @@ private fun NoteEditorSheet(
     var version by remember { mutableIntStateOf(0) }
     var backlinks by remember { mutableStateOf<List<de.ledgerline.app.domain.model.notes.NoteBacklink>>(emptyList()) }
     var attachments by remember { mutableStateOf<List<de.ledgerline.app.domain.model.notes.NoteAttachment>>(emptyList()) }
+    var showFilePicker by remember { mutableStateOf(false) }
+    var pickable by remember { mutableStateOf<List<de.ledgerline.app.domain.model.files.FileEntry>>(emptyList()) }
     var preview by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -354,6 +357,9 @@ private fun NoteEditorSheet(
                     SectionLabel(stringResource(R.string.notes_attachments))
                     Spacer(Modifier.width(8.dp))
                     TextButton(onClick = { attachPicker.launch("*/*") }) { Text(stringResource(R.string.notes_attach_add)) }
+                    TextButton(onClick = { scope.launch { pickable = vm.pickableFiles(); showFilePicker = true } }) {
+                        Text(stringResource(R.string.notes_attach_from_files))
+                    }
                 }
                 attachments.forEach { att ->
                     Row(
@@ -392,6 +398,28 @@ private fun NoteEditorSheet(
             }
             Spacer(Modifier.width(4.dp))
         }
+
+        if (showFilePicker) androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showFilePicker = false },
+            title = { Text(stringResource(R.string.notes_attach_from_pick)) },
+            text = {
+                if (pickable.isEmpty()) Text(stringResource(R.string.files_no_results))
+                else Column(Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                    pickable.forEach { f ->
+                        Text(
+                            f.name,
+                            Modifier.fillMaxWidth().clickable {
+                                val id = existingId
+                                showFilePicker = false
+                                if (id != null) vm.attachFromFile(id, f.id) { ok -> if (ok) scope.launch { refreshAttachments() } }
+                            }.padding(vertical = 10.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showFilePicker = false }) { Text(stringResource(R.string.action_close)) } },
+        )
     }
 }
 

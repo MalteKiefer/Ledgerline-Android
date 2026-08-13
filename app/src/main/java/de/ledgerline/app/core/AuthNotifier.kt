@@ -8,4 +8,12 @@ package de.ledgerline.app.core
 object AuthNotifier {
     @Volatile
     var onUnauthorized: (() -> Unit)? = null
+
+    /**
+     * Workspace force-2FA policy: an authenticated request returned 403
+     * `{status:"two_factor_required"}`. The user must enroll a second factor before the
+     * app can be used. Set once at startup by [AuthEventBus].
+     */
+    @Volatile
+    var onTwoFactorRequired: (() -> Unit)? = null
 }

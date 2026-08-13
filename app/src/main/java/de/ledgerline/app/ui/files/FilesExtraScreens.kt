@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
@@ -259,3 +260,33 @@ internal fun parseHex(hex: String): Color = runCatching {
     val v = hex.removePrefix("#")
     Color(("ff" + v).toLong(16))
 }.getOrDefault(Brand.accent)
+
+/** Owner-wide Files activity feed (`GET /files/activity`), newest first. */
+@Composable
+fun FilesActivityScreen(vm: FilesViewModel, onBack: () -> Unit) {
+    var rows by remember { mutableStateOf<List<de.ledgerline.app.domain.model.files.FileActivity>?>(null) }
+    LaunchedEffect(Unit) { rows = vm.activity() }
+    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.files_activity), onBack = onBack) }) { pad ->
+        val list = rows
+        when {
+            list == null -> Box(Modifier.fillMaxSize().padding(pad), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                androidx.compose.material3.CircularProgressIndicator()
+            }
+            list.isEmpty() -> Box(Modifier.fillMaxSize().padding(pad), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Text(stringResource(R.string.files_no_results), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            else -> LazyColumn(Modifier.fillMaxSize().padding(pad).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(list, key = { it.id }) { a ->
+                    Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            (a.fileName ?: "—") + " · " + a.action,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        val sub = listOfNotNull(a.actor?.takeIf { it.isNotBlank() }, a.createdAt?.take(19)?.replace('T', ' ')).joinToString(" · ")
+                        if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}

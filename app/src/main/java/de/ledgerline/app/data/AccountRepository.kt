@@ -43,6 +43,8 @@ class AccountRepository(
                 temp = dto.temp ?: "c",
                 glucose = dto.glucose ?: "mgdl",
                 timeFormat = dto.timeFormat ?: "24h",
+                dateFormat = dto.dateFormat ?: "system",
+                timezone = dto.timezone ?: "",
             ),
         )
     }
@@ -56,6 +58,7 @@ class AccountRepository(
                 de.ledgerline.app.data.remote.dto.DisplayPrefsDto(
                     distance = prefs.distance, elevation = prefs.elevation, weight = prefs.weight,
                     temp = prefs.temp, glucose = prefs.glucose, timeFormat = prefs.timeFormat,
+                    dateFormat = prefs.dateFormat, timezone = prefs.timezone,
                 ),
             ).isSuccessful
         } catch (_: Exception) {
@@ -187,6 +190,25 @@ class AccountRepository(
         } catch (_: Exception) { null }
     }
 
+    /** Queue a re-extraction of the caller's own file text/OCR for global search (`POST /me/reindex`). */
+    suspend fun reindex(): Boolean {
+        val session = sessionHolder.get() ?: return false
+        return try {
+            val r = apiProvider(session).reindex()
+            r.isSuccessful && (r.body()?.queued ?: true)
+        } catch (_: Exception) { false }
+    }
+
+    /** One query across all enabled modules (`GET /search`). Empty on failure or blank query. */
+    suspend fun globalSearch(q: String): de.ledgerline.app.data.remote.dto.GlobalSearchResponse? {
+        if (q.trim().length < 2) return null
+        val session = sessionHolder.get() ?: return null
+        return try {
+            val r = apiProvider(session).globalSearch(q.trim())
+            if (r.isSuccessful) r.body() else null
+        } catch (_: Exception) { null }
+    }
+
     /** GDPR export: stream the account zip (`GET /account/export`) as raw bytes. Null on failure. */
     suspend fun exportAccount(): ByteArray? {
         val session = sessionHolder.get() ?: return null
@@ -256,8 +278,31 @@ class AccountRepository(
     }
 
     /** Change the app LOGIN password (not the vault passphrase). Returns true on success. */
-    suspend fun changePassword(current: String, new: String): Boolean =
-        call { it.changePassword(de.ledgerline.app.data.remote.dto.ChangePasswordRequest(current, new, new)) }
+    /**
+     * Change the login password. Returns null on success, or the server's policy/validation message
+     * on a 422 (workspace password policy: min length + required classes + breach check). An empty
+     * string means a generic non-422 failure (network / wrong current password).
+     */
+    suspend fun changePassword(current: String, new: String): String? {
+        val session = sessionHolder.get() ?: return ""
+        return try {
+            val r = apiProvider(session).changePassword(de.ledgerline.app.data.remote.dto.ChangePasswordRequest(current, new, new))
+            if (r.isSuccessful) null else (parseValidationMessage(r.errorBody()?.string()) ?: "")
+        } catch (_: Exception) { "" }
+    }
+
+    /** Pull the first useful message out of a Laravel 422 body `{message, errors:{field:[...]}}`. */
+    private fun parseValidationMessage(body: String?): String? {
+        if (body.isNullOrBlank()) return null
+        return try {
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            val root = json.parseToJsonElement(body) as? kotlinx.serialization.json.JsonObject ?: return null
+            val errors = root["errors"] as? kotlinx.serialization.json.JsonObject
+            val firstField = errors?.values?.firstOrNull() as? kotlinx.serialization.json.JsonArray
+            val fieldMsg = (firstField?.firstOrNull() as? kotlinx.serialization.json.JsonPrimitive)?.content
+            fieldMsg ?: (root["message"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+        } catch (_: Exception) { null }
+    }
 
     /** The signed-in user's avatar image bytes (non-secret, `GET /avatar`), or null if none/failure. */
     suspend fun avatar(): ByteArray? {

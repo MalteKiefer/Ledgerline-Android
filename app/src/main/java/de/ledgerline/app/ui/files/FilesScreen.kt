@@ -26,8 +26,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Article
 import androidx.compose.material.icons.outlined.Audiotrack
+import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderZip
 import androidx.compose.material.icons.outlined.Home
@@ -100,6 +102,8 @@ fun FilesSection(
     var showStats by remember { mutableStateOf(false) }
     var showLabels by remember { mutableStateOf(false) }
     var showShared by remember { mutableStateOf(false) }
+    var showOwnerShares by remember { mutableStateOf(false) }
+    var showActivity by remember { mutableStateOf(false) }
     // (kind, id, folderId) for the public-link share dialog.
     var shareTarget by remember { mutableStateOf<Triple<String, Int, Int?>?>(null) }
 
@@ -113,6 +117,8 @@ fun FilesSection(
         showStats -> { Box(bottomOnly) { FilesStatsScreen(vm) { showStats = false } }; return }
         showLabels -> { Box(bottomOnly) { FilesLabelsScreen(vm) { showLabels = false } }; return }
         showShared -> { Box(bottomOnly) { SharedWithMeScreen(vm) { showShared = false } }; return }
+        showOwnerShares -> { Box(bottomOnly) { SharedByMeScreen(vm) { showOwnerShares = false } }; return }
+        showActivity -> { Box(bottomOnly) { FilesActivityScreen(vm) { showActivity = false } }; return }
     }
 
     val ctx = LocalContext.current
@@ -132,9 +138,13 @@ fun FilesSection(
     var favoritesOnly by remember { mutableStateOf(false) }
     // Optional label filter (null = all).
     var labelFilter by remember { mutableStateOf<Int?>(null) }
-    // Multi-select mode for bulk ZIP.
+    // Multi-select mode for bulk ZIP / copy / move / delete.
     var selecting by remember { mutableStateOf(false) }
     val selected = remember { mutableStateListOf<Int>() }
+    // Bulk folder-target pickers (copy vs move) + delete confirm over the selection.
+    var bulkCopy by remember { mutableStateOf(false) }
+    var bulkMove by remember { mutableStateOf(false) }
+    var bulkDelete by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -181,6 +191,9 @@ fun FilesSection(
                             selecting = false; selected.clear()
                         }
                     },
+                    onCopy = { if (selected.isNotEmpty()) bulkCopy = true },
+                    onMove = { if (selected.isNotEmpty()) bulkMove = true },
+                    onDelete = { if (selected.isNotEmpty()) bulkDelete = true },
                 )
             } else
             FilesTopBar(
@@ -188,7 +201,8 @@ fun FilesSection(
                 onToggleFavorites = { favoritesOnly = !favoritesOnly; if (favoritesOnly) labelFilter = null },
                 onSelect = { selecting = true },
                 onSearch = { showSearch = true }, onTrash = { showTrash = true }, onStats = { showStats = true },
-                onLabels = { showLabels = true }, onShared = { showShared = true },
+                onLabels = { showLabels = true }, onShared = { showShared = true }, onOwnerShares = { showOwnerShares = true },
+                onActivity = { showActivity = true },
                 onDownloadFolder = vm.currentFolderId?.let { fid ->
                     {
                         scope.launch {
@@ -350,6 +364,35 @@ fun FilesSection(
             onDismiss = { moveFolder = null },
         )
     }
+    if (bulkCopy) MoveDialog(
+        folders = data?.folders.orEmpty().filter { it.deletedAt == null },
+        currentParent = null,
+        onPick = { dest ->
+            bulkCopy = false
+            val ids = selected.toList()
+            vm.copySelection(ids, dest) { selecting = false; selected.clear() }
+        },
+        onDismiss = { bulkCopy = false },
+    )
+    if (bulkMove) MoveDialog(
+        folders = data?.folders.orEmpty().filter { it.deletedAt == null },
+        currentParent = vm.currentFolderId,
+        onPick = { dest ->
+            bulkMove = false
+            val ids = selected.toList()
+            vm.moveSelection(ids, dest) { selecting = false; selected.clear() }
+        },
+        onDismiss = { bulkMove = false },
+    )
+    if (bulkDelete) ConfirmDialog(
+        message = stringResource(R.string.files_delete_selected_confirm), confirmLabel = stringResource(R.string.action_delete),
+        onConfirm = {
+            bulkDelete = false
+            val ids = selected.toList()
+            vm.deleteSelection(ids) { selecting = false; selected.clear() }
+        },
+        onDismiss = { bulkDelete = false },
+    )
 }
 
 @Composable
@@ -456,12 +499,15 @@ private fun FileRow(
 }
 
 @Composable
-private fun SelectionBar(count: Int, onClose: () -> Unit, onZip: () -> Unit) {
+private fun SelectionBar(count: Int, onClose: () -> Unit, onZip: () -> Unit, onCopy: () -> Unit, onMove: () -> Unit, onDelete: () -> Unit) {
     de.ledgerline.app.ui.common.AppTopBar(
         title = "$count",
         onBack = onClose,
         actions = {
             androidx.compose.material3.IconButton(onClick = onZip) { Icon(Icons.Outlined.FolderZip, contentDescription = stringResource(R.string.files_download_zip)) }
+            androidx.compose.material3.IconButton(onClick = onCopy) { Icon(Icons.Outlined.ContentCopy, contentDescription = stringResource(R.string.action_copy)) }
+            androidx.compose.material3.IconButton(onClick = onMove) { Icon(Icons.Outlined.DriveFileMove, contentDescription = stringResource(R.string.action_move)) }
+            androidx.compose.material3.IconButton(onClick = onDelete) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error) }
         },
     )
 }
@@ -476,6 +522,8 @@ private fun FilesTopBar(
     onStats: () -> Unit,
     onLabels: () -> Unit,
     onShared: () -> Unit,
+    onOwnerShares: () -> Unit,
+    onActivity: () -> Unit,
     onDownloadFolder: (() -> Unit)?,
 ) {
     var overflow by remember { mutableStateOf(false) }
@@ -492,10 +540,12 @@ private fun FilesTopBar(
                 DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
                     DropdownMenuItem(text = { Text(stringResource(R.string.files_select)) }, onClick = { overflow = false; onSelect() })
                     DropdownMenuItem(text = { Text(stringResource(R.string.shared_with_me)) }, onClick = { overflow = false; onShared() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.shared_by_me)) }, onClick = { overflow = false; onOwnerShares() })
                     onDownloadFolder?.let { dl ->
                         DropdownMenuItem(text = { Text(stringResource(R.string.files_download_zip)) }, onClick = { overflow = false; dl() })
                     }
                     DropdownMenuItem(text = { Text(stringResource(R.string.files_stats)) }, onClick = { overflow = false; onStats() })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.files_activity)) }, onClick = { overflow = false; onActivity() })
                     DropdownMenuItem(text = { Text(stringResource(R.string.files_manage_labels)) }, onClick = { overflow = false; onLabels() })
                 }
             }

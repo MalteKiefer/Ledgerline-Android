@@ -89,6 +89,9 @@ class AccountViewModel @Inject constructor(
     }
 
     // ---- Files setting: kept versions per file ----
+    /** Queue a global-search reindex of the caller's own files (`POST /me/reindex`). */
+    fun reindex(done: (Boolean) -> Unit) = viewModelScope.launch { done(account.reindex()) }
+
     fun setFileMaxVersions(n: Int) = viewModelScope.launch {
         val echoed = account.putSettings(UserSettingsDto(fileMaxVersions = n))
         _fileMaxVersions.value = echoed?.fileMaxVersions ?: n
@@ -101,6 +104,15 @@ class AccountViewModel @Inject constructor(
     fun loadNotifications() = viewModelScope.launch { _notifications.value = account.notifications()?.items.orEmpty() }
     fun markRead(id: Long) = viewModelScope.launch { if (account.markNotificationRead(id)) loadNotifications() }
     fun markAllRead() = viewModelScope.launch { if (account.markAllNotificationsRead()) loadNotifications() }
+
+    // ---- Display preferences (date format; server-synced) ----
+    val displayPrefs: StateFlow<de.ledgerline.app.core.prefs.DisplayPrefs> =
+        settings.displayPrefs.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, de.ledgerline.app.core.prefs.DisplayPrefs())
+
+    /** Update the app-wide date-format preset and sync it to the server. */
+    fun setDateFormat(fmt: String) = viewModelScope.launch {
+        account.pushPreferences(displayPrefs.value.copy(dateFormat = fmt))
+    }
 
     // ---- Push notifications (UnifiedPush) ----
     val pushEnabled: StateFlow<Boolean> =
@@ -152,7 +164,8 @@ class AccountViewModel @Inject constructor(
     suspend fun regenerateRecoveryCodes(currentPassword: String) = account.regenerateRecoveryCodes(currentPassword)
 
     // ---- password / account ----
-    fun changePassword(current: String, new: String, done: (Boolean) -> Unit) =
+    /** [done] gets null on success, or the server's policy/error message (empty = generic failure). */
+    fun changePassword(current: String, new: String, done: (String?) -> Unit) =
         viewModelScope.launch { done(account.changePassword(current, new)) }
 
     suspend fun exportAccount(): ByteArray? = account.exportAccount()

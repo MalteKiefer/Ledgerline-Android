@@ -30,7 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class Destination { LOADING, WELCOME, LOGIN, LOCK, HOME }
+enum class Destination { LOADING, WELCOME, LOGIN, LOCK, HOME, TWO_FACTOR }
 
 /**
  * Root flow: WELCOME → LOGIN (URL + email + password + optional 2FA) → LOCK (biometric session read)
@@ -71,6 +71,12 @@ class RootViewModel @Inject constructor(
         // Revoked token (authenticated 401) or remote wipe → erase local state + re-pair.
         viewModelScope.launch { authEventBus.unauthorized.collect { wipeToWelcome() } }
         viewModelScope.launch { authEventBus.wipe.collect { wipeToWelcome() } }
+        // Workspace force-2FA (403 two_factor_required) → gate into 2FA enrollment (only while HOME).
+        viewModelScope.launch {
+            authEventBus.twoFactorRequired.collect {
+                if (_dest.value == Destination.HOME) _dest.value = Destination.TWO_FACTOR
+            }
+        }
     }
 
     private suspend fun wipeToWelcome() {
@@ -118,5 +124,9 @@ fun AppNav(
                 AppLockScreen(authorize = authorize, onUnlocked = { vm.toHome() })
             }
         }
+        Destination.TWO_FACTOR -> de.ledgerline.app.ui.auth.TwoFactorRequiredScreen(
+            onEnrolled = { vm.toHome() },
+            onLoggedOut = { vm.toWelcome() },
+        )
     }
 }
