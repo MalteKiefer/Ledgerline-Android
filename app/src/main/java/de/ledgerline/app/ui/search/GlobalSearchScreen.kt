@@ -80,7 +80,7 @@ class GlobalSearchViewModel @Inject constructor(
 
 @Composable
 fun GlobalSearchScreen(
-    onOpenModule: (String) -> Unit,
+    onOpen: (module: String, id: Int) -> Unit,
     contentPadding: androidx.compose.foundation.layout.PaddingValues,
     vm: GlobalSearchViewModel = hiltViewModel(),
 ) {
@@ -114,7 +114,7 @@ fun GlobalSearchScreen(
                         item(key = "h_${group.module}") { SectionLabel(moduleLabel(group.module)) }
                         items(group.items, key = { "${group.module}_${it.id}" }) { hit ->
                             Column(
-                                Modifier.fillMaxWidth().clickable { onOpenModule(group.module) }.cardSurface()
+                                Modifier.fillMaxWidth().clickable { onOpen(group.module, hit.id) }.cardSurface()
                                     .padding(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(2.dp),
                             ) {

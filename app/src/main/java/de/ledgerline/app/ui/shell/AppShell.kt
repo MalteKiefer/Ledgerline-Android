@@ -99,6 +99,10 @@ fun AppShell(
     var route by remember { mutableStateOf<MoneyRoute?>(null) }
     LaunchedEffect(section) { route = null }
 
+    // Global-search deep-open: the target record id handed to the owning module's section.
+    var openFileId by remember { mutableStateOf<Int?>(null) }
+    var openNoteId by remember { mutableStateOf<Int?>(null) }
+
     AppScaffold(
         bottomBar = {
             NavigationBar {
@@ -117,20 +121,19 @@ fun AppShell(
         // clearance; sections with a top tab row / breadcrumb take the full inset.
         val bottomOnly = Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())
         when (section) {
-            Section.FILES -> FilesSection(contentPadding = pad)
+            Section.FILES -> FilesSection(contentPadding = pad, openFileId = openFileId, onFileOpened = { openFileId = null })
             Section.FINANCE ->
                 if (route != null) Box(bottomOnly) { MoneyRouteHost(route!!, financeVm, onBack = { route = null }) }
                 else FinanceSection(onPush = { route = it }, modifier = bottomOnly, vm = financeVm)
             Section.TODOS -> de.ledgerline.app.ui.todos.TodosSection(modifier = bottomOnly)
-            Section.NOTES -> de.ledgerline.app.ui.notes.NotesSection(modifier = bottomOnly)
+            Section.NOTES -> de.ledgerline.app.ui.notes.NotesSection(modifier = bottomOnly, openNoteId = openNoteId, onNoteOpened = { openNoteId = null })
             Section.SEARCH -> Box(bottomOnly) {
                 de.ledgerline.app.ui.search.GlobalSearchScreen(
-                    onOpenModule = { m ->
-                        section = when (m) {
-                            "files" -> Section.FILES
-                            "notes" -> Section.NOTES
-                            "finance" -> Section.FINANCE
-                            else -> section
+                    onOpen = { m, id ->
+                        when (m) {
+                            "files" -> { openFileId = id; section = Section.FILES }
+                            "notes" -> { openNoteId = id; section = Section.NOTES }
+                            "finance" -> section = Section.FINANCE
                         }
                     },
                     contentPadding = pad,

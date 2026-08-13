@@ -60,4 +60,12 @@
     <string name="todos_tag_add">Schlagwort</string>
     <string name="todos_more">Weitere Optionen</string>
     <string name="todos_less">Weniger</string>
+    <string name="todos_loading">Wird geladen…</string>
+    <string name="todos_share_list">Liste teilen</string>
+    <string name="todos_share_none">Noch mit niemandem geteilt.</string>
+    <string name="todos_share_email">E-Mail des Empfängers</string>
+    <string name="todos_share_viewer">Betrachter</string>
+    <string name="todos_share_editor">Bearbeiter</string>
+    <string name="todos_share_add">Teilen</string>
+    <string name="todos_share_failed">Unbekannter Nutzer oder Teilen mit sich selbst nicht möglich.</string>
 </resources>

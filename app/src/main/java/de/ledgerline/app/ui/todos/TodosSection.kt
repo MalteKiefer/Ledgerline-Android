@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.ExpandMore
@@ -88,6 +89,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.ledgerline.app.R
 import de.ledgerline.app.domain.model.calendar.Calendar
@@ -120,9 +122,16 @@ fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMod
     var editorTarget by remember { mutableStateOf<String?>(null) } // null closed, "" create, id edit
     var addingList by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+    var sharingList by remember { mutableStateOf<String?>(null) }
 
     Column(modifier.fillMaxSize()) {
-        AppTopBar(title = stringResource(R.string.tab_todos))
+        AppTopBar(title = stringResource(R.string.tab_todos), actions = {
+            selectedList?.let { lid ->
+                IconButton(onClick = { sharingList = lid }) {
+                    Icon(Icons.Outlined.PersonAdd, contentDescription = stringResource(R.string.todos_share_list))
+                }
+            }
+        })
 
         // Search.
         TextField(
@@ -211,6 +220,63 @@ fun TodosSection(modifier: Modifier = Modifier, vm: TodosViewModel = hiltViewMod
             dismissButton = { TextButton(onClick = { addingList = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
+
+    sharingList?.let { lid ->
+        TodoShareDialog(vm = vm, calendarId = lid, onDismiss = { sharingList = null })
+    }
+}
+
+/** Manage cross-user shares for one task list (`/calendar/shares`): list current, add by email, revoke. */
+@Composable
+private fun TodoShareDialog(vm: TodosViewModel, calendarId: String, onDismiss: () -> Unit) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var shares by remember { mutableStateOf<List<de.ledgerline.app.domain.model.calendar.CalendarShare>?>(null) }
+    var email by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf("viewer") }
+    var msg by remember { mutableStateOf<String?>(null) }
+    fun reload() { scope.launch { shares = vm.shares().filter { it.calendarId == calendarId } } }
+    LaunchedEffect(calendarId) { reload() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.todos_share_list)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                msg?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+                when (val s = shares) {
+                    null -> Text(stringResource(R.string.todos_loading))
+                    else -> {
+                        if (s.isEmpty()) Text(stringResource(R.string.todos_share_none), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                        s.forEach { share ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(share.recipient ?: "—", style = MaterialTheme.typography.bodyMedium)
+                                    Text(share.role, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                IconButton(onClick = { vm.unshare(share.id) { if (it) reload() } }) {
+                                    Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete), tint = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+                TextField(email, { email = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.todos_share_email)) })
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(role == "viewer", { role = "viewer" }, label = { Text(stringResource(R.string.todos_share_viewer)) })
+                    FilterChip(role == "editor", { role = "editor" }, label = { Text(stringResource(R.string.todos_share_editor)) })
+                }
+            }
+        },
+        confirmButton = {
+            val failMsg = stringResource(R.string.todos_share_failed)
+            TextButton(enabled = email.isNotBlank(), onClick = {
+                vm.shareList(calendarId, email, role) { ok ->
+                    if (ok) { email = ""; msg = null; reload() } else msg = failMsg
+                }
+            }) { Text(stringResource(R.string.todos_share_add)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+    )
 }
 
 // ---------------------------------------------------------------------------

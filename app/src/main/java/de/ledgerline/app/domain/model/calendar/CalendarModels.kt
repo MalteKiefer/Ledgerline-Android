@@ -55,3 +55,17 @@ data class CalendarTodo(
 @Serializable data class TodoCreated(val id: String? = null)
 
 @Serializable data class TodoImportResult(val created: Int = 0, val updated: Int = 0, val skipped: Int = 0)
+
+/** Response of the dedicated complete endpoint. [rolled] = a recurring task advanced to its next occurrence. */
+@Serializable data class TodoCompleteResult(val ok: Boolean = false, val rolled: Boolean = false, val todo: CalendarTodo? = null)
+
+/** One calendar/task-list share the current user has granted (`/calendar/shares`). */
+@Serializable data class CalendarShare(
+    val id: Int = 0,
+    @SerialName("calendar_id") val calendarId: String = "",
+    val calendar: String? = null,
+    val recipient: String? = null,
+    val role: String = "viewer", // viewer | editor
+)
+
+@Serializable data class CalendarSharesResponse(val shares: List<CalendarShare> = emptyList())

@@ -94,9 +94,13 @@ import java.io.File
 @Composable
 fun FilesSection(
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    openFileId: Int? = null,
+    onFileOpened: () -> Unit = {},
     vm: FilesViewModel = hiltViewModel(),
 ) {
     var detailId by remember { mutableStateOf<Int?>(null) }
+    // Deep-open a specific file (from global search): show its detail once, then clear the request.
+    LaunchedEffect(openFileId) { if (openFileId != null) { detailId = openFileId; onFileOpened() } }
     var showTrash by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showStats by remember { mutableStateOf(false) }

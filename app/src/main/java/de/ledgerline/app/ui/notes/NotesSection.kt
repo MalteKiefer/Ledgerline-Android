@@ -94,7 +94,12 @@ private fun rewriteWikilinks(md: String): String =
 
 /** The Notes tab: folder filter + search + note list (pin/favorite) with a quick-add/edit sheet + trash. */
 @Composable
-fun NotesSection(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewModel()) {
+fun NotesSection(
+    modifier: Modifier = Modifier,
+    openNoteId: Int? = null,
+    onNoteOpened: () -> Unit = {},
+    vm: NotesViewModel = hiltViewModel(),
+) {
     LaunchedEffect(Unit) { vm.bootstrap() }
     val folders by vm.folders.collectAsStateWithLifecycle()
     val notes by vm.notes.collectAsStateWithLifecycle()
@@ -104,6 +109,8 @@ fun NotesSection(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMod
 
     var editorOpen by remember { mutableStateOf(false) }
     var editId by remember { mutableStateOf<Int?>(null) }
+    // Deep-open a specific note (from global search): open its editor once, then clear the request.
+    LaunchedEffect(openNoteId) { if (openNoteId != null) { editId = openNoteId; editorOpen = true; onNoteOpened() } }
     var searching by remember { mutableStateOf(false) }
     var showTrash by remember { mutableStateOf(false) }
     var manageFolders by remember { mutableStateOf(false) }

@@ -90,4 +90,10 @@ class TodosViewModel @Inject constructor(
     }
 
     fun reorder(ids: List<String>) = viewModelScope.launch { repo.reorder(ids) }
+
+    // ---- Task-list sharing ----
+    suspend fun shares() = repo.shares()
+    fun shareList(calendarId: String, email: String, role: String, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.createShare(calendarId, email, role)) }
+    fun unshare(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteShare(id)) }
 }

@@ -147,11 +147,14 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   Calendar-Moduls, keine Events). Listen-Auswahl (VTODO-Kalender via `GET /calendar/data`, filter
   `component==VTODO`; neue Liste = `POST /calendars {component:VTODO}`), Offen/Alle-Filter, Complete-
   Toggle, Editor (Titel/Notiz/Fällig-DatePicker/Ganztägig/Priorität/**Erinnerung** =
-  `alarm_minutes_before`→VALARM, Web-Parität), Löschen. `data/calendar/
-  TodosRepository` (online-only; per-Record REST mit DAV-`etag`-Optimistic-Concurrency; Complete/Edit
-  senden das volle VTODO neu, da PUT rebuildet) + `NetworkFactory.createCalendar` + `CalendarApi`
-  (`/calendar/todos` CRUD + `/reorder` + ICS `/import`|`/export`). Bewusst weggelassen: Kalender-Events,
-  Kontakte.
+  `alarm_minutes_before`→VALARM, Web-Parität), Löschen. **Complete/Uncomplete** über die dedizierten
+  Endpunkte `POST /calendar/todos/{id}/complete`|`/uncomplete` (server-seitig feld-erhaltend +
+  **recurring roll-forward** von DUE; ersetzt das alte Voll-VTODO-Resend). **Listen-Sharing**
+  `/calendar/shares` (GET/POST/DELETE): eine VTODO-Liste per E-Mail an registrierte Nutzer teilen
+  (viewer/editor), Share-Dialog über die Teilen-Aktion in der Top-Bar bei ausgewählter Liste.
+  `data/calendar/TodosRepository` (online-only; per-Record REST mit DAV-`etag`-Optimistic-Concurrency)
+  + `NetworkFactory.createCalendar` + `CalendarApi` (`/calendar/todos` CRUD + `/complete`|`/uncomplete`
+  + `/reorder` + `/shares` + ICS `/import`|`/export`). Bewusst weggelassen: Kalender-Events, Kontakte.
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte
   Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
   Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung, **Favoriten-Filter, Label-
@@ -212,7 +215,9 @@ FrankenPHP-Infra) bewusst ignoriert. Umgesetzt: **Files-Info-Panel** (`/files/en
 **Aktivitäts-Feed** (`/files/activity` +per-file) Datenschicht/Dialog; **Notes attach-from-Files**
 (`/notes/{note}/attachments/from`); **globale Suche** (`GET /search`, `GlobalSearchResponse`) mit eigener **Bottom-Nav-Sektion „Suche"**
 (`ui/search/GlobalSearchScreen` + `GlobalSearchViewModel`, debounced, Gruppen files/notes/finance,
-Tap wechselt in das Modul-Tab) + **Reindex** (`POST /me/reindex`, Settings-Button) in
+Tap öffnet den Record: files → `FileDetailScreen`, notes → Notiz-Editor (`AppShell` reicht die
+Ziel-id via `openFileId`/`openNoteId` in die Sektion; finance → nur Tab-Wechsel, kein Typ im
+Suchergebnis) + **Reindex** (`POST /me/reindex`, Settings-Button) in
 `AccountRepository`; Prefs `timezone`+`date_format` additiv in `DisplayPrefsDto` (round-trip-sicher).
 Kein Finance-Drift (GoCardless serverseitig wieder entfernt). `assembleDebug` + Unit-Tests grün.
 
@@ -230,9 +235,13 @@ Kein Finance-Drift (GoCardless serverseitig wieder entfernt). `assembleDebug` + 
   (Appearance-Settings; `DisplayPrefs.dateFormat`/`timezone` durch Sink/Store/`/preferences`
   round-trip, `setDateFormat` synct server).
 
-**Offen (Rest, verschoben/optional):** externe Mounts `/mounts/*` (S3+SFTP, großes Feature);
-Todo-Listen-Sharing `/calendar/shares` (optional, Todos bewusst single-user); globale Suche
-record-level Deep-Open (aktuell nur Tab-Wechsel) + `/files/entries/{id}/show`; `timezone`-Picker-UI
+**Nachgezogen (2026-08-13, 2. Runde):** Todos = dedizierte complete/uncomplete (recurring
+roll-forward) + Listen-Sharing `/calendar/shares`; globale Suche = record-level Deep-Open (files→Detail,
+notes→Editor). `assembleDebug` + Tests grün.
+
+**Offen (Rest, verschoben/optional):** externe Mounts `/mounts/*` (S3+SFTP, großes eigenes Feature);
+Finance-Suchtreffer-Deep-Open (Server liefert keinen invoice/tx-Typ → nur Tab-Wechsel) +
+`/files/entries/{id}/show` (Flat-Snapshot deckt Files-Deep-Open bereits ab); `timezone`-Picker-UI
 (round-trippt, IANA-Freitext auf Mobile schlechte UX).
 **Bewusst out-of-scope:** Gallery, Contacts, Kalender-Events (rsvp/imip/free-busy/slots), Admin, Passkeys, Docker.
 
