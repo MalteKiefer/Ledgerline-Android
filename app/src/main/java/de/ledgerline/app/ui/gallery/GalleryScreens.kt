@@ -23,7 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.RotateRight
-import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Download
@@ -116,6 +117,9 @@ fun GalleryLightbox(vm: GalleryViewModel, photo: GalleryPhoto, onClose: () -> Un
             }
             IconButton(onClick = { saveLauncher.launch(photo.name) }) {
                 Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.files_save_device))
+            }
+            IconButton(onClick = { vm.archive(photo.id, true) { onClose() } }) {
+                Icon(Icons.Outlined.Archive, contentDescription = stringResource(R.string.gallery_archive))
             }
             IconButton(onClick = { confirmDelete = true }) {
                 Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete))
@@ -221,6 +225,41 @@ fun GalleryTrashScreen(vm: GalleryViewModel, onBack: () -> Unit) {
                             IconButton(onClick = { vm.restore(p.id) { reload() } }) { Icon(Icons.Outlined.Restore, contentDescription = stringResource(R.string.action_restore), tint = Color.White) }
                             IconButton(onClick = { vm.force(p.id) { reload() } }) { Icon(Icons.Outlined.DeleteForever, contentDescription = stringResource(R.string.action_delete), tint = Color.White) }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Archived photos: a thumbnail grid with per-photo unarchive. Hidden from the main timeline. */
+@Composable
+fun GalleryArchiveScreen(vm: GalleryViewModel, onBack: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var rows by remember { mutableStateOf<List<GalleryPhoto>?>(null) }
+    fun reload() { scope.launch { rows = vm.loadArchived() } }
+    LaunchedEffect(Unit) { reload() }
+
+    AppScaffold(topBar = { AppTopBar(title = stringResource(R.string.gallery_archived), onBack = onBack) }) { pad ->
+        val list = rows
+        when {
+            list == null -> Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            list.isEmpty() -> Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { Text(stringResource(R.string.gallery_archive_empty), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            else -> LazyVerticalGrid(
+                columns = GridCells.Adaptive(112.dp),
+                modifier = Modifier.fillMaxSize().padding(pad).padding(2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                items(list, key = { it.id }) { p ->
+                    var bmp by remember(p.id) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+                    LaunchedEffect(p.id) { bmp = vm.thumbnail(p) }
+                    Box(Modifier.aspectRatio(1f).background(MaterialTheme.colorScheme.surfaceVariant)) {
+                        bmp?.let { Image(it, contentDescription = p.name, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                        IconButton(
+                            onClick = { vm.archive(p.id, false) { reload() } },
+                            modifier = Modifier.align(Alignment.BottomEnd).background(Color(0x88000000)),
+                        ) { Icon(Icons.Outlined.Unarchive, contentDescription = stringResource(R.string.gallery_unarchive), tint = Color.White) }
                     }
                 }
             }

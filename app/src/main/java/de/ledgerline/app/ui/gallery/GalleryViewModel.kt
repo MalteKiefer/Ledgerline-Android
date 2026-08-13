@@ -85,6 +85,11 @@ class GalleryViewModel @Inject constructor(
     fun upload(file: File, name: String, mime: String?, done: (Boolean) -> Unit) =
         viewModelScope.launch { done(repo.upload(file, name, mime) is Outcome.Ok) }
 
+    // ---- Archive ----
+    fun archive(id: Int, value: Boolean, done: () -> Unit = {}) = viewModelScope.launch { if (repo.setArchived(id, value)) done() }
+    fun bulkArchive(ids: List<Int>, value: Boolean, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.bulkArchive(ids, value)) }
+    suspend fun loadArchived(): List<GalleryPhoto> = repo.archivedList()
+
     suspend fun exif(id: Int): GalleryExif? = repo.exif(id)
 
     /** Download a video (or Live Photo motion clip) to cache for inline playback. Null on failure. */

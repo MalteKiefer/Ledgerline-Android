@@ -145,6 +145,10 @@
     <string name="gallery_play">Abspielen</string>
     <string name="gallery_live">Live</string>
     <string name="gallery_video_failed">Video konnte nicht geladen werden.</string>
+    <string name="gallery_archive">Archivieren</string>
+    <string name="gallery_archived">Archiviert</string>
+    <string name="gallery_unarchive">Aus Archiv</string>
+    <string name="gallery_archive_empty">Keine archivierten Fotos.</string>
     <string name="ws_empty_notes">Noch keine Notizen.</string>
     <string name="ws_empty_bookmarks">Noch keine Lesezeichen.</string>
     <string name="ws_empty_todos">Noch keine Todos.</string>

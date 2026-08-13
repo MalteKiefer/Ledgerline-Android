@@ -146,6 +146,10 @@
     <string name="gallery_play">Воспроизвести</string>
     <string name="gallery_live">Live</string>
     <string name="gallery_video_failed">Не удалось загрузить видео.</string>
+    <string name="gallery_archive">В архив</string>
+    <string name="gallery_archived">Архив</string>
+    <string name="gallery_unarchive">Из архива</string>
+    <string name="gallery_archive_empty">Нет архивированных фото.</string>
     <string name="ws_empty_notes">Пока нет заметок.</string>
     <string name="ws_empty_bookmarks">Пока нет закладок.</string>
     <string name="ws_empty_todos">Пока нет задач.</string>

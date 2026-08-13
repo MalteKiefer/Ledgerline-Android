@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Star
@@ -65,6 +66,7 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
 
     var lightboxId by remember { mutableStateOf<Int?>(null) }
     var showTrash by remember { mutableStateOf(false) }
+    var showArchive by remember { mutableStateOf(false) }
     val selection = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
     var msg by remember { mutableStateOf<String?>(null) }
 
@@ -93,6 +95,7 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
     }
 
     if (showTrash) { GalleryTrashScreen(vm) { showTrash = false }; return }
+    if (showArchive) { GalleryArchiveScreen(vm) { showArchive = false; vm.refresh() }; return }
     lightboxId?.let { id ->
         val photo = data?.photos?.firstOrNull { it.id == id }
         if (photo != null) { GalleryLightbox(vm, photo, onClose = { lightboxId = null }); return }
@@ -109,11 +112,18 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
                     if (selection.isNotEmpty()) {
                         IconButton(onClick = {
                             val ids = selection.toList()
+                            vm.bulkArchive(ids, true) { ok -> if (ok) { selection.clear(); vm.refresh() } }
+                        }) { Icon(Icons.Outlined.Archive, contentDescription = stringResource(R.string.gallery_archive)) }
+                        IconButton(onClick = {
+                            val ids = selection.toList()
                             vm.bulkDelete(ids) { ok -> if (ok) { selection.clear(); vm.refresh() }; msg = ctx.getString(if (ok) R.string.gallery_deleted else R.string.files_save_failed) }
                         }) { Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete)) }
                     } else {
                         IconButton(onClick = { uploadLauncher.launch("image/*") }) {
                             Icon(Icons.Outlined.Upload, contentDescription = stringResource(R.string.gallery_upload_photos))
+                        }
+                        IconButton(onClick = { showArchive = true }) {
+                            Icon(Icons.Outlined.Archive, contentDescription = stringResource(R.string.gallery_archived))
                         }
                         IconButton(onClick = { showTrash = true }) {
                             Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.files_trash))

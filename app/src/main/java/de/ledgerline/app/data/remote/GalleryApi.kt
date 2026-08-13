@@ -98,6 +98,12 @@ interface GalleryApi {
     @retrofit2.http.PUT("api/v1/gallery/{id}")
     suspend fun update(@Path("id") id: Int, @Body body: JsonObject): Response<GalleryPhotoResponse>
 
+    @PATCH("api/v1/gallery/{id}/archive")
+    suspend fun archive(@Path("id") id: Int, @Body body: JsonObject): Response<GalleryPhotoResponse>
+
+    @POST("api/v1/gallery/bulk-archive")
+    suspend fun bulkArchive(@Body body: JsonObject): Response<OkBody>
+
     @DELETE("api/v1/gallery/{id}")
     suspend fun destroy(@Path("id") id: Int): Response<OkBody>
 

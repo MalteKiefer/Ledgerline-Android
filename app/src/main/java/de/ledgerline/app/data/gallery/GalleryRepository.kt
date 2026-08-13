@@ -76,6 +76,26 @@ class GalleryRepository @Inject constructor(
         runCatching { api().trash().takeIf { it.isSuccessful }?.body()?.photos.orEmpty() }.getOrDefault(emptyList())
     }
 
+    /** Archived photos (own request, not stored in the timeline snapshot). */
+    suspend fun archivedList(): List<GalleryPhoto> = withContext(Dispatchers.IO) {
+        runCatching { api().data(archived = true).takeIf { it.isSuccessful }?.body()?.photos.orEmpty() }.getOrDefault(emptyList())
+    }
+
+    /** Archive/unarchive a photo. When archiving, drop it from the live timeline snapshot. */
+    suspend fun setArchived(id: Int, value: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val ok = runCatching { api().archive(id, buildJsonObject { put("archived", value) }).isSuccessful }.getOrDefault(false)
+        if (ok && value) remove(id) else if (ok) { /* unarchived → next refresh brings it back */ }
+        ok
+    }
+
+    suspend fun bulkArchive(ids: List<Int>, value: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val ok = runCatching {
+            api().bulkArchive(buildJsonObject { put("ids", JsonArray(ids.map { JsonPrimitive(it) })); put("archived", value) }).isSuccessful
+        }.getOrDefault(false)
+        if (ok && value) removeAll(ids.toSet())
+        ok
+    }
+
     // ---- Mutations ----
     suspend fun setFavorite(id: Int, value: Boolean): Boolean = withContext(Dispatchers.IO) {
         runCatching {
