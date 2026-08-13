@@ -160,14 +160,24 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    items(photos, key = { it.id }) { p ->
-                        GalleryCell(
-                            vm = vm, photo = p, selected = p.id in selection,
-                            selecting = selection.isNotEmpty(),
-                            onClick = { lightboxId = p.id },
-                            onLongClick = { if (p.id in selection) selection.remove(p.id) else selection.add(p.id) },
-                            onToggleSelect = { if (p.id in selection) selection.remove(p.id) else selection.add(p.id) },
-                        )
+                    // Group by capture month so the timeline reads as dated sections (date navigation).
+                    photos.groupBy { it.sortKey.take(7) }.forEach { (month, monthPhotos) ->
+                        item(key = "h_$month", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                monthLabel(month),
+                                style = MaterialTheme.typography.titleSmall,
+                                modifier = Modifier.padding(start = 6.dp, top = 12.dp, bottom = 4.dp),
+                            )
+                        }
+                        items(monthPhotos, key = { it.id }) { p ->
+                            GalleryCell(
+                                vm = vm, photo = p, selected = p.id in selection,
+                                selecting = selection.isNotEmpty(),
+                                onClick = { lightboxId = p.id },
+                                onLongClick = { if (p.id in selection) selection.remove(p.id) else selection.add(p.id) },
+                                onToggleSelect = { if (p.id in selection) selection.remove(p.id) else selection.add(p.id) },
+                            )
+                        }
                     }
                 }
             }
@@ -247,6 +257,18 @@ private fun GalleryCell(
             contentAlignment = Alignment.Center,
         ) { if (selected) Text("✓", color = Color.White, style = MaterialTheme.typography.labelSmall) }
     }
+}
+
+/** "YYYY-MM" → a localized month + year label (e.g. "August 2026"); blank input → "—". */
+@Composable
+private fun monthLabel(ym: String): String {
+    if (ym.length < 7) return "—"
+    return runCatching {
+        val y = ym.substring(0, 4).toInt()
+        val m = ym.substring(5, 7).toInt()
+        val name = java.time.Month.of(m).getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+        "$name $y"
+    }.getOrDefault(ym)
 }
 
 /** Resolve a content Uri's display name via the OpenableColumns projection. */

@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import javax.inject.Inject
 
@@ -89,6 +91,10 @@ class GalleryViewModel @Inject constructor(
 
     // ---- Mutations ----
     fun setFavorite(id: Int, value: Boolean) = viewModelScope.launch { repo.setFavorite(id, value) }
+    /** Edit the capture date (ISO-8601). Server re-sorts the timeline by taken_at. */
+    fun setTakenAt(id: Int, isoDate: String, done: () -> Unit = {}) = viewModelScope.launch {
+        if (repo.update(id, buildJsonObject { put("taken_at", isoDate) })) { refresh(); done() }
+    }
     fun rotate(id: Int, current: Int) = viewModelScope.launch { repo.rotate(id, (current + 90) % 360) }
     fun delete(id: Int, done: () -> Unit = {}) = viewModelScope.launch { if (repo.delete(id)) done() }
     fun bulkDelete(ids: List<Int>, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.bulkDelete(ids)) }

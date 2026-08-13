@@ -168,10 +168,16 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   `/bulk-destroy`), Trash-Grid (`/trash`, `/{id}/restore`|`/force`, `/trash/empty`), SAF-Upload
   (multipart + chunked ≥32 MiB, Quota-413) + Download/Save (`/{id}/download`). `data/gallery/
   GalleryRepository` (online-only `StateFlow<GalleryData>` + In-Memory-Patch) + `NetworkFactory.
-  createGallery` + `GalleryApi`. Tab gated über `/me.modules` „gallery". **Offen (Phasen 2–5):**
-  P2 Video-Playback/Live-Photos/Alben/Archiv/Datum-Scrubber; P3 Sharing (public/internal/upload-links/
-  Kommentare/Reaktionen); P4 ML (CLIP-Suche/Duplikate/People+Faces [ohne Kontakt-Link — kein
-  Contacts-Modul]/Memories/reprocess); P5 Geräte-Kamera-Roll-Backup.
+  createGallery` + `GalleryApi`. Tab gated über `/me.modules` „gallery".
+  **Phase 2 (fertig 2026-08-13):** Video-Playback (`/{id}/play` web-MP4 → pinned-Download → inline
+  `VideoView`, kein Media3) + Live-Photo (`/{id}/motion`); **Archiv** (`/{id}/archive` PATCH,
+  `/bulk-archive`, `GalleryArchiveScreen` + load `?archived=1`); **Alben** (`/albums` CRUD +
+  `/albums/{id}/photos` attach/detach; `GalleryAlbumsScreen`/`GalleryAlbumGridScreen`, „zu Album
+  hinzufügen" aus Multi-Select); **Datum-Navigation** (Monats-Section-Header im Grid) +
+  **Capture-Date-Edit** (`PUT /{id}` taken_at via DatePicker im EXIF-Sheet).
+  **Offen (Phasen 3–5):** P3 Sharing (public/internal/upload-links/Kommentare/Reaktionen); P4 ML
+  (CLIP-Suche/Duplikate/People+Faces [ohne Kontakt-Link — kein Contacts-Modul]/Memories/reprocess;
+  ML-Sidecar serverseitig vorhanden); P5 Geräte-Kamera-Roll-Backup.
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte
   Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
   Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung, **Favoriten-Filter, Label-

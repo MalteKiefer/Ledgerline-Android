@@ -157,6 +157,7 @@
     <string name="gallery_add_to_album">Add to album</string>
     <string name="gallery_added_to_album">Added to album</string>
     <string name="gallery_album_remove">Remove from album</string>
+    <string name="gallery_edit_date">Set date</string>
     <string name="ws_empty_notes">No notes yet.</string>
     <string name="ws_empty_bookmarks">No bookmarks yet.</string>
     <string name="ws_empty_todos">No todos yet.</string>

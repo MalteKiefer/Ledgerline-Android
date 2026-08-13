@@ -158,6 +158,7 @@
     <string name="gallery_add_to_album">Добавить в альбом</string>
     <string name="gallery_added_to_album">Добавлено в альбом</string>
     <string name="gallery_album_remove">Убрать из альбома</string>
+    <string name="gallery_edit_date">Задать дату</string>
     <string name="ws_empty_notes">Пока нет заметок.</string>
     <string name="ws_empty_bookmarks">Пока нет закладок.</string>
     <string name="ws_empty_todos">Пока нет задач.</string>

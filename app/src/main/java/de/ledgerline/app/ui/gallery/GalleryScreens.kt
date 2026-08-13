@@ -155,7 +155,7 @@ fun GalleryLightbox(vm: GalleryViewModel, photo: GalleryPhoto, onClose: () -> Un
         }
     }
 
-    if (showExif) ExifSheet(photo, exif, onDismiss = { showExif = false })
+    if (showExif) ExifSheet(photo, exif, onEditDate = { iso -> vm.setTakenAt(photo.id, iso) }, onDismiss = { showExif = false })
     if (confirmDelete) AlertDialog(
         onDismissRequest = { confirmDelete = false },
         title = { Text(stringResource(R.string.action_delete)) },
@@ -167,14 +167,20 @@ fun GalleryLightbox(vm: GalleryViewModel, photo: GalleryPhoto, onClose: () -> Un
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-private fun ExifSheet(photo: GalleryPhoto, exif: GalleryExif?, onDismiss: () -> Unit) {
+private fun ExifSheet(photo: GalleryPhoto, exif: GalleryExif?, onEditDate: (String) -> Unit, onDismiss: () -> Unit) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var editDate by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
         Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(photo.name, style = MaterialTheme.typography.titleMedium)
             InfoLine(stringResource(R.string.files_size), formatBytesG(photo.size))
             photo.width?.let { w -> photo.height?.let { h -> InfoLine(stringResource(R.string.gallery_dimensions), "$w × $h") } }
-            (exif?.takenAt ?: photo.takenAt)?.let { InfoLine(stringResource(R.string.gallery_taken), it.take(19).replace('T', ' ')) }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.gallery_taken), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = { editDate = true }) {
+                    Text((exif?.takenAt ?: photo.takenAt)?.take(10) ?: stringResource(R.string.gallery_edit_date))
+                }
+            }
             (exif?.camera ?: photo.camera)?.let { InfoLine(stringResource(R.string.gallery_camera), it) }
             (exif?.place ?: photo.place)?.let { InfoLine(stringResource(R.string.gallery_place), it) }
             exif?.exif?.forEach { (section, tags) ->
@@ -182,6 +188,23 @@ private fun ExifSheet(photo: GalleryPhoto, exif: GalleryExif?, onDismiss: () -> 
                 tags.forEach { (k, v) -> InfoLine(k, v) }
             }
         }
+    }
+
+    if (editDate) {
+        val state = androidx.compose.material3.rememberDatePickerState()
+        androidx.compose.material3.DatePickerDialog(
+            onDismissRequest = { editDate = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { ms ->
+                        val d = java.time.Instant.ofEpochMilli(ms).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                        onEditDate(d.toString() + "T12:00:00")
+                    }
+                    editDate = false
+                }) { Text(stringResource(R.string.action_save)) }
+            },
+            dismissButton = { TextButton(onClick = { editDate = false }) { Text(stringResource(R.string.action_cancel)) } },
+        ) { androidx.compose.material3.DatePicker(state = state) }
     }
 }
 
