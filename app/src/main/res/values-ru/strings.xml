@@ -132,6 +132,17 @@
     <string name="device_expires">Истекает</string>
     <string name="settings_timezone">Часовой пояс</string>
     <string name="settings_timezone_system">Как в системе</string>
+    <string name="gallery_uploaded_n">Загружено: %1$d</string>
+    <string name="gallery_deleted">Перемещено в корзину</string>
+    <string name="gallery_rotate">Повернуть</string>
+    <string name="gallery_video_open_hint">Видео — сохраните, чтобы открыть.</string>
+    <string name="gallery_preview_pending">Превью ещё создаётся…</string>
+    <string name="gallery_delete_confirm">Переместить это фото в корзину?</string>
+    <string name="gallery_dimensions">Размеры</string>
+    <string name="gallery_taken">Снято</string>
+    <string name="gallery_camera">Камера</string>
+    <string name="gallery_place">Место</string>
+    <string name="gallery_trash_empty">Корзина пуста.</string>
     <string name="ws_empty_notes">Пока нет заметок.</string>
     <string name="ws_empty_bookmarks">Пока нет закладок.</string>
     <string name="ws_empty_todos">Пока нет задач.</string>

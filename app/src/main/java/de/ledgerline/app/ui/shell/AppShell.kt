@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -46,6 +47,7 @@ import javax.inject.Inject
 /** Top-level module sections. [moduleKey] gates visibility against `/me.user.modules` (null = always). */
 private enum class Section(val labelRes: Int, val icon: ImageVector, val moduleKey: String?) {
     FILES(R.string.tab_files, Icons.Outlined.Folder, "files"),
+    GALLERY(R.string.tab_gallery, Icons.Outlined.PhotoLibrary, "gallery"),
     FINANCE(R.string.tab_finance, Icons.AutoMirrored.Outlined.ReceiptLong, "finance"),
     TODOS(R.string.tab_todos, Icons.Outlined.CheckCircle, "calendar"),
     NOTES(R.string.tab_notes, Icons.AutoMirrored.Outlined.EventNote, "notes"),
@@ -130,6 +132,7 @@ fun AppShell(
         val bottomOnly = Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())
         when (section) {
             Section.FILES -> FilesSection(contentPadding = pad, openFileId = openFileId, onFileOpened = { openFileId = null })
+            Section.GALLERY -> de.ledgerline.app.ui.gallery.GallerySection(modifier = bottomOnly)
             Section.FINANCE ->
                 if (route != null) Box(bottomOnly) { MoneyRouteHost(route!!, financeVm, onBack = { route = null }) }
                 else FinanceSection(onPush = { route = it }, modifier = bottomOnly, vm = financeVm)

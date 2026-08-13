@@ -131,6 +131,17 @@
     <string name="device_expires">Läuft ab</string>
     <string name="settings_timezone">Zeitzone</string>
     <string name="settings_timezone_system">Systemzeitzone</string>
+    <string name="gallery_uploaded_n">%1$d hochgeladen</string>
+    <string name="gallery_deleted">In den Papierkorb verschoben</string>
+    <string name="gallery_rotate">Drehen</string>
+    <string name="gallery_video_open_hint">Video — zum Öffnen speichern.</string>
+    <string name="gallery_preview_pending">Vorschau wird noch erzeugt…</string>
+    <string name="gallery_delete_confirm">Dieses Foto in den Papierkorb verschieben?</string>
+    <string name="gallery_dimensions">Abmessungen</string>
+    <string name="gallery_taken">Aufgenommen</string>
+    <string name="gallery_camera">Kamera</string>
+    <string name="gallery_place">Ort</string>
+    <string name="gallery_trash_empty">Papierkorb ist leer.</string>
     <string name="ws_empty_notes">Noch keine Notizen.</string>
     <string name="ws_empty_bookmarks">Noch keine Lesezeichen.</string>
     <string name="ws_empty_todos">Noch keine Todos.</string>

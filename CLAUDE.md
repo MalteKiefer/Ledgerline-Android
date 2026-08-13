@@ -3,9 +3,10 @@
 Native Android-Client für die selbst-gehostete **Ledgerline**. **Server-Pivot v1.5xx (2026):
 das Zero-Knowledge-/Vault-/Sealed-Store-Modell wurde vollständig entfernt.** Der Server ist jetzt
 eine **plaintext-relationale API** (Laravel-13, `/api/v1`) mit den Modulen `files, finance, contacts,
-calendar, notes` (`config/modules.php`). **Diese Android-App bildet bewusst nur ab: Dateien (Files) +
+calendar, notes` (`config/modules.php`). **Diese Android-App bildet ab: Dateien (Files) +
 Finanzen (Finance) + Aufgaben (Todos = nur der VTODO-Task-List-Teil des Calendar-Moduls, keine
-Events) + Notizen (Notes)** — plus alle Nutzer-Einstellungen. Kalender-Events + Kontakte bleiben ausgeschlossen.
+Events) + Notizen (Notes) + Galerie (Gallery, seit 2026-08-13 im Aufbau — Phase 1 MVP-Viewing)** —
+plus alle Nutzer-Einstellungen. Kalender-Events + Kontakte bleiben ausgeschlossen.
 Web-App = Referenz/Superset; iOS = Look-&-Feel-Referenz. (Rebuild-Basis war der Branch
 `finance-pivot`; Files wurde 2026-08 neu ergänzt, Todos 2026-08-10, Notes 2026-08-10.)
 
@@ -121,9 +122,10 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
 
 - **Flow** (`ui/nav/AppNav`): `WELCOME → PAIRING → LOCK (biometrisch) → HOME (`ui/shell/AppShell`)`.
   `RootViewModel` gated auf `AppLockState.unlocked`; 401/Remote-Wipe → `ForceLogout` + re-pair.
-- **`ui/shell/AppShell`** — Multi-Modul-Bottom-Nav **Dateien · Finanzen · Aufgaben · Notizen · Suche · Konto**,
-  gated über `ModuleAccess` (`/me.modules`; Aufgaben-Tab nur bei Modul `calendar`, Notizen nur bei `notes`;
-  Suche+Konto immer sichtbar). Suche = globale Cross-Modul-Suche (§7).
+- **`ui/shell/AppShell`** — Multi-Modul-Bottom-Nav **Dateien · Galerie · Finanzen · Aufgaben · Notizen ·
+  Suche · Konto**, gated über `ModuleAccess` (`/me.modules`; Galerie-Tab nur bei Modul `gallery`,
+  Aufgaben nur bei `calendar`, Notizen nur bei `notes`; Suche+Konto immer sichtbar). Suche = globale
+  Cross-Modul-Suche (§7).
   Finance-Detail/Edit-Flows als `MoneyRoute`-Overlays.
 - **Notizen (`ui/notes/`):** `NotesSection`/`NotesViewModel` — plaintext-relationales Notes-Modul
   (Markdown). Ordner-Filter-Chips, Volltextsuche (`GET /notes/search`), Notiz-Liste (Pin/Favorit/Tags),
@@ -157,6 +159,19 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   + `NetworkFactory.createCalendar` + `CalendarApi` (`/calendar/todos` CRUD + `/complete`|`/uncomplete`
   + `/reorder` + `/shares` + `/calendars` create/update/delete + ICS `/import`|`/export`). Bewusst
   weggelassen: Kalender-Events, Kontakte, Spezial-Kalender (`/calendars/special`), Feed-Regenerate.
+- **Galerie (`ui/gallery/`) — Phase 1 (MVP-Viewing):** `GallerySection`/`GalleryViewModel` +
+  `GalleryScreens` (Lightbox/Trash). Capture-Date-Timeline (`GET /gallery/data`, non-archived,
+  COALESCE(taken_at,created_at) DESC), adaptives Thumbnail-Grid (`/{id}/thumb`, thumb=false →
+  Processing-Spinner), Vollbild-Lightbox (`/{id}/preview` WebP, Fallback-Hinweis wenn pending; Video =
+  „speichern zum Öffnen", Playback = Phase 2), EXIF-Sheet (`/{id}/exif`), Favorit (`/{id}/favorite`
+  PATCH), Rotieren (non-invasiv `PUT /{id}` rotation), Löschen + **Multi-Select-Bulk** (`DELETE /{id}`,
+  `/bulk-destroy`), Trash-Grid (`/trash`, `/{id}/restore`|`/force`, `/trash/empty`), SAF-Upload
+  (multipart + chunked ≥32 MiB, Quota-413) + Download/Save (`/{id}/download`). `data/gallery/
+  GalleryRepository` (online-only `StateFlow<GalleryData>` + In-Memory-Patch) + `NetworkFactory.
+  createGallery` + `GalleryApi`. Tab gated über `/me.modules` „gallery". **Offen (Phasen 2–5):**
+  P2 Video-Playback/Live-Photos/Alben/Archiv/Datum-Scrubber; P3 Sharing (public/internal/upload-links/
+  Kommentare/Reaktionen); P4 ML (CLIP-Suche/Duplikate/People+Faces [ohne Kontakt-Link — kein
+  Contacts-Modul]/Memories/reprocess); P5 Geräte-Kamera-Roll-Backup.
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte
   Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
   Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung, **Favoriten-Filter, Label-
