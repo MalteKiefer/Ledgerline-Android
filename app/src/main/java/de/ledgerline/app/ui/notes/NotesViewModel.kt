@@ -19,6 +19,7 @@ import javax.inject.Inject
 @HiltViewModel
 class NotesViewModel @Inject constructor(
     private val repo: NotesRepository,
+    private val filesRepo: de.ledgerline.app.data.files.FilesRepository,
 ) : ViewModel() {
 
     val folders: StateFlow<List<NoteFolder>> = repo.folders
@@ -87,6 +88,17 @@ class NotesViewModel @Inject constructor(
         repo.attachmentToCache(cacheDir, noteId, att)
     fun deleteAttachment(noteId: Int, attId: Int, done: (Boolean) -> Unit) =
         viewModelScope.launch { done(repo.deleteAttachment(noteId, attId)) }
+
+    /** Owner-scoped Files images/videos that can be embedded into a note (attach-from-file picker). */
+    suspend fun pickableFiles(): List<de.ledgerline.app.domain.model.files.FileEntry> {
+        filesRepo.load()
+        return filesRepo.data.value?.files.orEmpty().filter {
+            it.deletedAt == null && (it.mime?.startsWith("image/") == true || it.mime?.startsWith("video/") == true)
+        }.sortedByDescending { it.updatedAt ?: "" }
+    }
+    /** Embed an existing Files image/video into a note (no re-upload). */
+    fun attachFromFile(noteId: Int, fileId: Int, done: (Boolean) -> Unit) =
+        viewModelScope.launch { done(repo.attachFromFile(noteId, fileId) != null) }
     suspend fun exportMarkdown(noteId: Int): ByteArray? = repo.exportMarkdown(noteId)
 
     // ---- Trash ----

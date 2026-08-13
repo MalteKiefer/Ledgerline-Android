@@ -13,6 +13,7 @@ import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 import retrofit2.http.Streaming
 
 /**
@@ -29,6 +30,14 @@ interface LedgerlineApi {
     // ---- Account / device ----
     @GET("api/v1/me")
     suspend fun me(): Response<MeResponse>
+
+    /** One query across all enabled modules (Files content+OCR, Notes, Finance, …). Min 2 chars. */
+    @GET("api/v1/search")
+    suspend fun globalSearch(@Query("q") q: String): Response<de.ledgerline.app.data.remote.dto.GlobalSearchResponse>
+
+    /** Queue a re-extraction of the caller's own file text/OCR (feeds global search). */
+    @POST("api/v1/me/reindex")
+    suspend fun reindex(): Response<de.ledgerline.app.data.remote.dto.ReindexResponse>
 
     @GET("api/v1/avatar")
     @Streaming

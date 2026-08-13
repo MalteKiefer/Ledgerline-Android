@@ -117,6 +117,23 @@ class FilesViewModel @Inject constructor(
     fun toggleFavorite(id: Int, value: Boolean, done: (Boolean) -> Unit) = run({ repo.toggleFavorite(id, value) }, done)
     fun deleteFile(id: Int, done: (Boolean) -> Unit) = run({ repo.deleteFile(id) }, done)
 
+    // ---- Bulk actions over a selection (fired sequentially; `ok` is the AND of every call) ----
+    fun copySelection(ids: List<Int>, folderId: Int?, done: (Boolean) -> Unit) = viewModelScope.launch {
+        var ok = true
+        ids.forEach { if (repo.copyFile(it, folderId) !is Outcome.Ok) ok = false }
+        done(ok)
+    }
+    fun moveSelection(ids: List<Int>, folderId: Int?, done: (Boolean) -> Unit) = viewModelScope.launch {
+        var ok = true
+        ids.forEach { if (repo.updateFile(it, buildJsonObject { put("file_folder_id", folderId) }) !is Outcome.Ok) ok = false }
+        done(ok)
+    }
+    fun deleteSelection(ids: List<Int>, done: (Boolean) -> Unit) = viewModelScope.launch {
+        var ok = true
+        ids.forEach { if (repo.deleteFile(it) !is Outcome.Ok) ok = false }
+        done(ok)
+    }
+
     fun upload(file: File, name: String, mime: String?, done: (Boolean) -> Unit) =
         run({ repo.upload(file, name, mime, currentFolderId) }, done)
 
@@ -187,6 +204,11 @@ class FilesViewModel @Inject constructor(
     // ---- Stats ----
     suspend fun stats(): de.ledgerline.app.domain.model.files.FilesStats? = repo.stats()
 
+    // ---- Info panel / activity ----
+    suspend fun info(id: Int): de.ledgerline.app.domain.model.files.FileInfo? = repo.info(id)
+    suspend fun activity(): List<de.ledgerline.app.domain.model.files.FileActivity> = repo.activity()
+    suspend fun fileActivity(id: Int): List<de.ledgerline.app.domain.model.files.FileActivity> = repo.fileActivity(id)
+
     /** Copy a downloaded file's bytes into a user-picked SAF destination (returns true on success). */
     suspend fun saveTo(entry: FileEntry, out: java.io.OutputStream): Boolean = withContext(Dispatchers.IO) {
         val tmp = downloadToCache(entry) ?: return@withContext false
@@ -211,6 +233,15 @@ class FilesViewModel @Inject constructor(
         })
     fun deleteShare(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteShare(id)) }
     suspend fun updateShare(id: Int, body: kotlinx.serialization.json.JsonObject) = repo.updateShare(id, body)
+
+    // ---- Sharing: owner overview (public links + inbound upload links) ----
+    /** All public share links the caller owns. */
+    suspend fun ownerShares() = repo.relShares()
+    suspend fun uploadLinks() = repo.uploadLinks()
+    suspend fun createUploadLink(folderId: Int?, label: String?, expiresAt: String?) = repo.createUploadLink(folderId, label, expiresAt)
+    fun deleteUploadLink(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deleteUploadLink(id)) }
+    /** Public inbound-upload page URL: {baseUrl}/u/{token}. */
+    fun uploadLinkUrl(token: String): String = (baseUrl()?.trimEnd('/') ?: "") + "/u/" + token
 
     // ---- Sharing: cross-user folder shares ----
     suspend fun folderShares() = repo.folderShares()

@@ -32,6 +32,8 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val prefTempKey = stringPreferencesKey("pref_temp")
     private val prefGlucoseKey = stringPreferencesKey("pref_glucose")
     private val prefTimeFormatKey = stringPreferencesKey("pref_time_format")
+    private val prefDateFormatKey = stringPreferencesKey("pref_date_format")
+    private val prefTimezoneKey = stringPreferencesKey("pref_timezone")
     // ── Push notifications (UnifiedPush) ──
     private val pushEnabledKey = booleanPreferencesKey("push_enabled")
     private val pushLockscreenContentKey = booleanPreferencesKey("push_lockscreen_content")
@@ -91,6 +93,8 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
                 temp = p[prefTempKey] ?: "c",
                 glucose = p[prefGlucoseKey] ?: "mgdl",
                 timeFormat = p[prefTimeFormatKey] ?: "24h",
+                dateFormat = p[prefDateFormatKey] ?: "system",
+                timezone = p[prefTimezoneKey] ?: "",
             )
         }
 
@@ -102,6 +106,8 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
             it[prefTempKey] = prefs.temp
             it[prefGlucoseKey] = prefs.glucose
             it[prefTimeFormatKey] = prefs.timeFormat
+            it[prefDateFormatKey] = prefs.dateFormat
+            it[prefTimezoneKey] = prefs.timezone
         }
     }
 

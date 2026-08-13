@@ -103,8 +103,17 @@ object NetworkFactory {
             // header, so their 401s never fire this.
             .addInterceptor { chain ->
                 val r = chain.proceed(chain.request())
-                if (r.code == 401 && chain.request().header("Authorization") != null) {
+                val authed = chain.request().header("Authorization") != null
+                if (r.code == 401 && authed) {
                     AuthNotifier.onUnauthorized?.invoke()
+                } else if (r.code == 403 && authed) {
+                    // Workspace force-2FA: 403 {status:"two_factor_required"} on every gated
+                    // endpoint until the user enrolls a second factor. Peek the (tiny) body so
+                    // it is NOT consumed for the caller.
+                    val peek = runCatching { r.peekBody(2048).string() }.getOrNull()
+                    if (peek?.contains("two_factor_required") == true) {
+                        AuthNotifier.onTwoFactorRequired?.invoke()
+                    }
                 }
                 r
             }

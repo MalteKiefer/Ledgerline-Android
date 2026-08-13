@@ -85,6 +85,10 @@ interface NotesApi {
         @Part("name") name: RequestBody?,
     ): Response<NoteAttachmentResponse>
 
+    /** Embed an existing owner-scoped Files image or video as a note attachment. Body: {source:"file", id}. */
+    @POST("api/v1/notes/{note}/attachments/from")
+    suspend fun attachFrom(@Path("note") note: Int, @Body body: JsonObject): Response<NoteAttachmentResponse>
+
     @GET("api/v1/notes/{note}/attachments/{attachment}/raw")
     @Streaming
     suspend fun attachmentRaw(@Path("note") note: Int, @Path("attachment") attachment: Int): Response<ResponseBody>

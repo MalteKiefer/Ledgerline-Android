@@ -86,35 +86,31 @@ class TodosRepository @Inject constructor(
     }
 
     /**
-     * Toggle a task's completion. The PUT rebuilds the VTODO from the input, so we must resend the
-     * task's other fields (due/description/priority/categories) or they'd be cleared — only status /
-     * percent / completed change.
+     * Toggle a task's completion via the dedicated server endpoints (`/complete` + `/uncomplete`).
+     * These preserve all other VTODO fields server-side and — crucially — roll a recurring task's DUE
+     * forward to the next occurrence instead of just marking it COMPLETED (the old full-PUT could not).
      */
-    suspend fun setDone(t: CalendarTodo, done: Boolean): Boolean {
-        val body = buildJsonObject {
-            put("calendar_id", t.calendar)
-            put("summary", t.summary ?: "")
-            put("description", if (t.description.isNullOrBlank()) JsonNull else JsonPrimitive(t.description))
-            put("due", if (t.due.isNullOrBlank()) JsonNull else JsonPrimitive(t.due))
-            put("dtstart", if (t.dtstart.isNullOrBlank()) JsonNull else JsonPrimitive(t.dtstart))
-            put("all_day", t.allDay)
-            put("priority", t.priority?.let { JsonPrimitive(it) } ?: JsonNull)
-            put("rrule", if (t.rrule.isNullOrBlank()) JsonNull else JsonPrimitive(t.rrule))
-            put("related_to", if (t.relatedTo.isNullOrBlank()) JsonNull else JsonPrimitive(t.relatedTo))
-            put("alarm_minutes_before", t.alarmMinutes?.let { JsonPrimitive(it) } ?: JsonNull)
-            put("categories", buildJsonArray { t.categories.forEach { add(it) } })
-            if (t.etag.isNotBlank()) put("etag", t.etag)
-            if (done) {
-                put("status", "COMPLETED")
-                put("percent_complete", 100)
-                put("completed", Instant.now().toString())
-            } else {
-                put("status", "NEEDS-ACTION")
-                put("percent_complete", 0)
-                put("completed", JsonNull)
-            }
-        }
-        return update(t.id, body)
+    suspend fun setDone(t: CalendarTodo, done: Boolean): Boolean = withContext(Dispatchers.IO) {
+        val ok = runCatching {
+            if (done) api().completeTodo(t.id).isSuccessful else api().uncompleteTodo(t.id).isSuccessful
+        }.getOrDefault(false)
+        if (ok) load(); ok
+    }
+
+    // ---- Task-list (calendar) sharing ----
+    suspend fun shares(): List<de.ledgerline.app.domain.model.calendar.CalendarShare> = withContext(Dispatchers.IO) {
+        runCatching { api().shares().body()?.shares.orEmpty() }.getOrDefault(emptyList())
+    }
+    /** Share a task list with a registered user by email. Returns true on 200/201. */
+    suspend fun createShare(calendarId: String, email: String, role: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            api().createShare(buildJsonObject {
+                put("calendar_id", calendarId); put("email", email.trim()); put("role", role)
+            }).isSuccessful
+        }.getOrDefault(false)
+    }
+    suspend fun deleteShare(id: Int): Boolean = withContext(Dispatchers.IO) {
+        runCatching { api().deleteShare(id).isSuccessful }.getOrDefault(false)
     }
 
     /** Persist a manual ordering of task ids (own tasks only). */

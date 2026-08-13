@@ -1,7 +1,9 @@
 package de.ledgerline.app.data.remote
 
 import de.ledgerline.app.domain.model.calendar.CalendarDataResponse
+import de.ledgerline.app.domain.model.calendar.CalendarSharesResponse
 import de.ledgerline.app.domain.model.calendar.CalendarTodo
+import de.ledgerline.app.domain.model.calendar.TodoCompleteResult
 import de.ledgerline.app.domain.model.calendar.TodoCreated
 import de.ledgerline.app.domain.model.calendar.TodoImportResult
 import de.ledgerline.app.domain.model.calendar.TodosResponse
@@ -49,8 +51,26 @@ interface CalendarApi {
     @DELETE("api/v1/calendar/todos/{id}")
     suspend fun deleteTodo(@Path("id") id: String): Response<Unit>
 
+    /** Dedicated completion (recurring → roll DUE forward; else COMPLETED). Preferred over a full PUT. */
+    @POST("api/v1/calendar/todos/{id}/complete")
+    suspend fun completeTodo(@Path("id") id: String): Response<TodoCompleteResult>
+
+    /** Re-open a task (STATUS=NEEDS-ACTION, PERCENT-COMPLETE=0, drop COMPLETED). */
+    @POST("api/v1/calendar/todos/{id}/uncomplete")
+    suspend fun uncompleteTodo(@Path("id") id: String): Response<TodoCompleteResult>
+
     @POST("api/v1/calendar/todos/reorder")
     suspend fun reorder(@Body body: JsonObject): Response<Unit>
+
+    // ---- Task-list (calendar) sharing ----
+    @GET("api/v1/calendar/shares")
+    suspend fun shares(): Response<CalendarSharesResponse>
+
+    @POST("api/v1/calendar/shares")
+    suspend fun createShare(@Body body: JsonObject): Response<JsonObject>
+
+    @DELETE("api/v1/calendar/shares/{id}")
+    suspend fun deleteShare(@Path("id") id: Int): Response<Unit>
 
     /** Create a calendar collection; send {name, component:"VTODO"} for a task list. */
     @POST("api/v1/calendars")

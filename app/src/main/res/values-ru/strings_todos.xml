@@ -60,4 +60,12 @@
     <string name="todos_tag_add">Метка</string>
     <string name="todos_more">Ещё</string>
     <string name="todos_less">Свернуть</string>
+    <string name="todos_loading">Загрузка…</string>
+    <string name="todos_share_list">Поделиться списком</string>
+    <string name="todos_share_none">Пока ни с кем не поделено.</string>
+    <string name="todos_share_email">Email получателя</string>
+    <string name="todos_share_viewer">Просмотр</string>
+    <string name="todos_share_editor">Редактор</string>
+    <string name="todos_share_add">Поделиться</string>
+    <string name="todos_share_failed">Неизвестный пользователь или нельзя поделиться с собой.</string>
 </resources>

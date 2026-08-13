@@ -60,4 +60,12 @@
     <string name="todos_tag_add">Add tag</string>
     <string name="todos_more">More options</string>
     <string name="todos_less">Fewer options</string>
+    <string name="todos_loading">Loading…</string>
+    <string name="todos_share_list">Share list</string>
+    <string name="todos_share_none">Not shared with anyone yet.</string>
+    <string name="todos_share_email">Recipient email</string>
+    <string name="todos_share_viewer">Viewer</string>
+    <string name="todos_share_editor">Editor</string>
+    <string name="todos_share_add">Share</string>
+    <string name="todos_share_failed">Unknown user or cannot share with yourself.</string>
 </resources>

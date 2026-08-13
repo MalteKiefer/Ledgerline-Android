@@ -6,9 +6,12 @@ import de.ledgerline.app.core.SessionHolder
 import de.ledgerline.app.core.offline.Connectivity
 import de.ledgerline.app.data.remote.FilesApi
 import de.ledgerline.app.data.remote.NetworkFactory
+import de.ledgerline.app.domain.model.files.FileActivity
 import de.ledgerline.app.domain.model.files.FileEntry
 import de.ledgerline.app.domain.model.files.FileFolder
+import de.ledgerline.app.domain.model.files.FileInfo
 import de.ledgerline.app.domain.model.files.FileLabel
+import de.ledgerline.app.domain.model.files.FileUploadLink
 import de.ledgerline.app.domain.model.files.FileVersion
 import de.ledgerline.app.domain.model.files.FilesData
 import de.ledgerline.app.domain.model.files.FilesStats
@@ -112,6 +115,9 @@ class FilesRepository @Inject constructor(
         record({ api().setFileLabels(id, buildJsonObject { put("label_ids", kotlinx.serialization.json.JsonArray(labelIds.map { kotlinx.serialization.json.JsonPrimitive(it) })) }) }, { it.file }, ::upsertFile)
 
     suspend fun deleteFile(id: Int): Outcome<Unit> = delete({ api().deleteFile(id) }) { removeFile(id) }
+    /** Duplicate a file into [folderId] (null = its own folder). Server adds a `(copy)` suffix. */
+    suspend fun copyFile(id: Int, folderId: Int?): Outcome<FileEntry> =
+        record({ api().copyFile(id, buildJsonObject { folderId?.let { put("file_folder_id", it) } }) }, { it.file }, ::upsertFile)
     suspend fun restoreFile(id: Int): Outcome<FileEntry> = record({ api().restoreFile(id) }, { it.file }, ::upsertFile)
     suspend fun forceFile(id: Int): Outcome<Unit> = delete({ api().forceFile(id) }) { }
 
@@ -211,6 +217,14 @@ class FilesRepository @Inject constructor(
         return get { api().search(q) }?.files.orEmpty()
     }
 
+    // ---- Info panel / activity ----
+    /** Rich info aggregate for one file (metadata, checksum, duplicates, sharing status, activity). */
+    suspend fun info(id: Int): FileInfo? = get { api().info(id) }
+    /** Owner-wide Files activity feed (newest first). */
+    suspend fun activity(): List<FileActivity> = get { api().activity() }?.activity.orEmpty()
+    /** Activity history for a single file. */
+    suspend fun fileActivity(id: Int): List<FileActivity> = get { api().fileActivity(id) }?.activity.orEmpty()
+
     /** Zip [ids] (or a whole [folderId]) server-side and stream the archive into [dest]. */
     suspend fun zipToFile(dest: File, ids: List<Int>? = null, folderId: Int? = null): Boolean = withContext(Dispatchers.IO) {
         val body = buildJsonObject {
@@ -221,6 +235,8 @@ class FilesRepository @Inject constructor(
     }
 
     // ---- Sharing: public links (owner side) ----
+    /** All public share links the caller owns (each carries its target file/folder `name`). */
+    suspend fun relShares(): List<ShareView> = get { api().sharesIndex() }?.shares.orEmpty()
     suspend fun createShare(body: JsonObject): ShareView? = get { api().createShare(body) }?.share
     suspend fun updateShare(id: Int, body: JsonObject): ShareView? = get { api().updateShare(id, body) }?.share
     suspend fun deleteShare(id: Int): Boolean = ok { api().deleteShare(id) }
@@ -237,6 +253,16 @@ class FilesRepository @Inject constructor(
     suspend fun removeFolderShareMember(shareId: Int, userId: Int): Boolean =
         ok { api().removeFolderShareMember(shareId, buildJsonObject { put("user_id", userId) }) }
     suspend fun deleteFolderShare(shareId: Int): Boolean = ok { api().deleteFolderShare(shareId) }
+
+    // ---- Sharing: inbound upload links (owner side) ----
+    suspend fun uploadLinks(): List<FileUploadLink> = get { api().uploadLinks() }?.links.orEmpty()
+    suspend fun createUploadLink(folderId: Int?, label: String?, expiresAt: String?): FileUploadLink? =
+        get { api().createUploadLink(buildJsonObject {
+            folderId?.let { put("file_folder_id", it) }
+            if (!label.isNullOrBlank()) put("label", label)
+            if (!expiresAt.isNullOrBlank()) put("expires_at", expiresAt)
+        }) }?.link
+    suspend fun deleteUploadLink(id: Int): Boolean = ok { api().deleteUploadLink(id) }
 
     // ---- Sharing: shared-with-me (member side) ----
     suspend fun sharedWithMe(): List<SharedWithMe> = get { api().sharedWithMe() }?.shares.orEmpty()

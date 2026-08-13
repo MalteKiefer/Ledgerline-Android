@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -93,7 +94,12 @@ private fun rewriteWikilinks(md: String): String =
 
 /** The Notes tab: folder filter + search + note list (pin/favorite) with a quick-add/edit sheet + trash. */
 @Composable
-fun NotesSection(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewModel()) {
+fun NotesSection(
+    modifier: Modifier = Modifier,
+    openNoteId: Int? = null,
+    onNoteOpened: () -> Unit = {},
+    vm: NotesViewModel = hiltViewModel(),
+) {
     LaunchedEffect(Unit) { vm.bootstrap() }
     val folders by vm.folders.collectAsStateWithLifecycle()
     val notes by vm.notes.collectAsStateWithLifecycle()
@@ -103,6 +109,8 @@ fun NotesSection(modifier: Modifier = Modifier, vm: NotesViewModel = hiltViewMod
 
     var editorOpen by remember { mutableStateOf(false) }
     var editId by remember { mutableStateOf<Int?>(null) }
+    // Deep-open a specific note (from global search): open its editor once, then clear the request.
+    LaunchedEffect(openNoteId) { if (openNoteId != null) { editId = openNoteId; editorOpen = true; onNoteOpened() } }
     var searching by remember { mutableStateOf(false) }
     var showTrash by remember { mutableStateOf(false) }
     var manageFolders by remember { mutableStateOf(false) }
@@ -223,6 +231,8 @@ private fun NoteEditorSheet(
     var version by remember { mutableIntStateOf(0) }
     var backlinks by remember { mutableStateOf<List<de.ledgerline.app.domain.model.notes.NoteBacklink>>(emptyList()) }
     var attachments by remember { mutableStateOf<List<de.ledgerline.app.domain.model.notes.NoteAttachment>>(emptyList()) }
+    var showFilePicker by remember { mutableStateOf(false) }
+    var pickable by remember { mutableStateOf<List<de.ledgerline.app.domain.model.files.FileEntry>>(emptyList()) }
     var preview by remember { mutableStateOf(false) }
     var tagInput by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -354,6 +364,9 @@ private fun NoteEditorSheet(
                     SectionLabel(stringResource(R.string.notes_attachments))
                     Spacer(Modifier.width(8.dp))
                     TextButton(onClick = { attachPicker.launch("*/*") }) { Text(stringResource(R.string.notes_attach_add)) }
+                    TextButton(onClick = { scope.launch { pickable = vm.pickableFiles(); showFilePicker = true } }) {
+                        Text(stringResource(R.string.notes_attach_from_files))
+                    }
                 }
                 attachments.forEach { att ->
                     Row(
@@ -392,6 +405,28 @@ private fun NoteEditorSheet(
             }
             Spacer(Modifier.width(4.dp))
         }
+
+        if (showFilePicker) androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showFilePicker = false },
+            title = { Text(stringResource(R.string.notes_attach_from_pick)) },
+            text = {
+                if (pickable.isEmpty()) Text(stringResource(R.string.files_no_results))
+                else Column(Modifier.fillMaxWidth().heightIn(max = 400.dp).verticalScroll(rememberScrollState())) {
+                    pickable.forEach { f ->
+                        Text(
+                            f.name,
+                            Modifier.fillMaxWidth().clickable {
+                                val id = existingId
+                                showFilePicker = false
+                                if (id != null) vm.attachFromFile(id, f.id) { ok -> if (ok) scope.launch { refreshAttachments() } }
+                            }.padding(vertical = 10.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showFilePicker = false }) { Text(stringResource(R.string.action_close)) } },
+        )
     }
 }
 

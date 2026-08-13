@@ -1,8 +1,11 @@
 package de.ledgerline.app.data.remote
 
+import de.ledgerline.app.domain.model.files.FileActivity
 import de.ledgerline.app.domain.model.files.FileEntry
 import de.ledgerline.app.domain.model.files.FileFolder
+import de.ledgerline.app.domain.model.files.FileInfo
 import de.ledgerline.app.domain.model.files.FileLabel
+import de.ledgerline.app.domain.model.files.FileUploadLink
 import de.ledgerline.app.domain.model.files.FileVersion
 import de.ledgerline.app.domain.model.files.FilesData
 import de.ledgerline.app.domain.model.files.FilesStats
@@ -44,6 +47,10 @@ import retrofit2.http.Streaming
 @Serializable data class FolderShareResponse(val share: FolderShareView)
 @Serializable data class FolderSharesResponse(val shares: List<FolderShareView> = emptyList())
 @Serializable data class SharedWithMeResponse(val shares: List<SharedWithMe> = emptyList())
+@Serializable data class SharesIndexResponse(val shares: List<ShareView> = emptyList())
+@Serializable data class UploadLinkResponse(val link: FileUploadLink)
+@Serializable data class UploadLinksResponse(val links: List<FileUploadLink> = emptyList())
+@Serializable data class FileActivityResponse(val activity: List<FileActivity> = emptyList())
 
 /**
  * The plaintext-relational Files REST surface (server pivot v1.5xx). Folders/files/labels are plain
@@ -63,6 +70,18 @@ interface FilesApi {
 
     @GET("api/v1/files/stats")
     suspend fun stats(): Response<FilesStats>
+
+    /** Rich info panel for one file: metadata, checksum, duplicates, sharing status, recent activity. */
+    @GET("api/v1/files/entries/{id}/info")
+    suspend fun info(@Path("id") id: Int): Response<FileInfo>
+
+    /** Owner-wide Files activity feed (newest first). */
+    @GET("api/v1/files/activity")
+    suspend fun activity(): Response<FileActivityResponse>
+
+    /** Activity history for a single file. */
+    @GET("api/v1/files/entries/{id}/activity")
+    suspend fun fileActivity(@Path("id") id: Int): Response<FileActivityResponse>
 
     // ---- Download (binary) ----
     @GET("api/v1/files/entries/{id}/raw")
@@ -109,6 +128,10 @@ interface FilesApi {
 
     @DELETE("api/v1/files/entries/{id}")
     suspend fun deleteFile(@Path("id") id: Int): Response<OkBody>
+
+    /** Duplicate a file into a target folder (or its own folder if omitted); name gains a (copy) suffix. */
+    @POST("api/v1/files/entries/{id}/copy")
+    suspend fun copyFile(@Path("id") id: Int, @Body body: JsonObject): Response<FileResponse>
 
     @POST("api/v1/files/entries/{id}/restore")
     suspend fun restoreFile(@Path("id") id: Int): Response<FileResponse>
@@ -174,6 +197,9 @@ interface FilesApi {
     suspend fun zip(@Body body: JsonObject): Response<ResponseBody>
 
     // ---- Sharing: public links (owner side) ----
+    @GET("api/v1/files/rel-shares")
+    suspend fun sharesIndex(): Response<SharesIndexResponse>
+
     @POST("api/v1/files/rel-shares")
     suspend fun createShare(@Body body: JsonObject): Response<ShareResponse>
 
@@ -198,6 +224,16 @@ interface FilesApi {
 
     @DELETE("api/v1/files/folder-shares/{id}")
     suspend fun deleteFolderShare(@Path("id") id: Int): Response<OkBody>
+
+    // ---- Sharing: inbound upload links (owner side) ----
+    @GET("api/v1/files/upload-links")
+    suspend fun uploadLinks(): Response<UploadLinksResponse>
+
+    @POST("api/v1/files/upload-links")
+    suspend fun createUploadLink(@Body body: JsonObject): Response<UploadLinkResponse>
+
+    @DELETE("api/v1/files/upload-links/{id}")
+    suspend fun deleteUploadLink(@Path("id") id: Int): Response<OkBody>
 
     // ---- Sharing: shared-with-me (member side) ----
     @GET("api/v1/shared-with-me")

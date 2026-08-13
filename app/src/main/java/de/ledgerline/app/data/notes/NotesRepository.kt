@@ -127,6 +127,18 @@ class NotesRepository @Inject constructor(
             }.getOrNull()
         }
 
+    /** Embed an existing owner-scoped Files image or video into a note without re-uploading. */
+    suspend fun attachFromFile(noteId: Int, fileId: Int): de.ledgerline.app.domain.model.notes.NoteAttachment? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val body = kotlinx.serialization.json.buildJsonObject {
+                    put("source", "file")
+                    put("id", fileId)
+                }
+                api().attachFrom(noteId, body).takeIf { it.isSuccessful }?.body()?.attachment
+            }.getOrNull()
+        }
+
     suspend fun deleteAttachment(noteId: Int, attId: Int): Boolean =
         withContext(Dispatchers.IO) { runCatching { api().deleteAttachment(noteId, attId).isSuccessful }.getOrDefault(false) }
 
