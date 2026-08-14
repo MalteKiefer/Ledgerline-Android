@@ -42,11 +42,22 @@ data class GalleryPhoto(
     val sortKey: String get() = takenAt ?: createdAt ?: ""
 }
 
-/** `GET /gallery/data` and `GET /gallery/trash` both return `{ photos: [...] }`. */
+/**
+ * `GET /gallery/data` (keyset-paginated) → `{ photos, next_cursor }`; `/gallery/trash` → `{ photos }`.
+ * [nextCursor] is null when the timeline is exhausted.
+ */
 @Serializable
 data class GalleryData(
     val photos: List<GalleryPhoto> = emptyList(),
+    @SerialName("next_cursor") val nextCursor: String? = null,
 )
+
+/** `GET /gallery/dates` — month histogram for the date scrubber. */
+@Serializable
+data class GalleryDates(val months: List<GalleryMonth> = emptyList())
+
+@Serializable
+data class GalleryMonth(val ym: String = "", val count: Int = 0)
 
 /** A gallery album (`/gallery/albums`); [count] is the photo count, [coverPhotoId] an optional cover. */
 @Serializable

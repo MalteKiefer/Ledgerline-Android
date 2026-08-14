@@ -36,9 +36,18 @@ import retrofit2.http.Streaming
 interface GalleryApi {
     @GET("api/v1/gallery/data")
     suspend fun data(
+        @Query("limit") limit: Int? = null,
+        @Query("cursor") cursor: String? = null,
+        @Query("cursor_ym") cursorYm: String? = null,
         @Query("album_id") albumId: Int? = null,
         @Query("archived") archived: Boolean? = null,
     ): Response<GalleryData>
+
+    @GET("api/v1/gallery/dates")
+    suspend fun dates(
+        @Query("album_id") albumId: Int? = null,
+        @Query("archived") archived: Boolean? = null,
+    ): Response<de.ledgerline.app.domain.model.gallery.GalleryDates>
 
     @GET("api/v1/gallery/trash")
     suspend fun trash(): Response<GalleryData>

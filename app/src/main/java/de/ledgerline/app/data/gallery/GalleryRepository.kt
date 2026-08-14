@@ -41,6 +41,11 @@ class GalleryRepository @Inject constructor(
     private val _data = MutableStateFlow<GalleryData?>(null)
     val data: StateFlow<GalleryData?> = _data.asStateFlow()
 
+    // Keyset-pagination state for the main (non-archived) timeline.
+    private var cursor: String? = null
+    var endReached: Boolean = false
+        private set
+
     private fun api(): GalleryApi {
         val s = sessionHolder.get() ?: error("no session")
         return NetworkFactory.createGallery(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin)
@@ -57,29 +62,70 @@ class GalleryRepository @Inject constructor(
     private fun remove(id: Int) { _data.value = GalleryData(cur().photos.filterNot { it.id == id }) }
     private fun removeAll(ids: Set<Int>) { _data.value = GalleryData(cur().photos.filterNot { it.id in ids }) }
 
-    /** Pull the timeline (archived hidden by default). Keeps the last snapshot on transient failure. */
-    suspend fun load(archived: Boolean = false): Outcome<GalleryData> = withContext(Dispatchers.IO) {
+    /** Load (or reload) the FIRST page of the timeline. Resets the keyset cursor. */
+    suspend fun load(): Outcome<GalleryData> = withContext(Dispatchers.IO) {
         sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
         try {
-            val res = api().data(archived = if (archived) true else null)
+            val res = api().data(limit = PAGE)
             when {
                 res.code() == 401 -> Outcome.Err(ErrorKind.HTTP)
                 !res.isSuccessful -> _data.value?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK)
-                else -> { val body = res.body()!!; _data.value = body; Outcome.Ok(body) }
+                else -> {
+                    val body = res.body()!!
+                    cursor = body.nextCursor
+                    endReached = body.nextCursor == null
+                    _data.value = GalleryData(body.photos)
+                    Outcome.Ok(_data.value!!)
+                }
             }
         } catch (e: Exception) {
             _data.value?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK, e)
         }
     }
 
+    /** Append the next timeline page. No-op when exhausted or offline. Returns true if it grew the list. */
+    suspend fun loadMore(): Boolean = withContext(Dispatchers.IO) {
+        val c = cursor
+        if (endReached || c == null) return@withContext false
+        runCatching {
+            val res = api().data(limit = PAGE, cursor = c)
+            if (!res.isSuccessful) return@runCatching false
+            val body = res.body() ?: return@runCatching false
+            cursor = body.nextCursor
+            endReached = body.nextCursor == null
+            if (body.photos.isEmpty()) return@runCatching false
+            _data.value = GalleryData((cur().photos + body.photos).distinctBy { it.id })
+            true
+        }.getOrDefault(false)
+    }
+
+    /** Walk every page of a filtered timeline (album / archived); used by the smaller sub-lists. */
+    private suspend fun fetchAllPages(albumId: Int? = null, archived: Boolean? = null): List<GalleryPhoto> {
+        val out = ArrayList<GalleryPhoto>()
+        var c: String? = null
+        var guard = 0
+        while (guard++ < 500) {
+            val res = runCatching { api().data(limit = PAGE, cursor = c, albumId = albumId, archived = archived) }.getOrNull() ?: break
+            if (!res.isSuccessful) break
+            val body = res.body() ?: break
+            out += body.photos
+            c = body.nextCursor
+            if (c == null || body.photos.isEmpty()) break
+        }
+        return out
+    }
+
+    suspend fun dates(albumId: Int? = null, archived: Boolean? = null): List<de.ledgerline.app.domain.model.gallery.GalleryMonth> =
+        withContext(Dispatchers.IO) {
+            runCatching { api().dates(albumId = albumId, archived = if (archived == true) true else null).takeIf { it.isSuccessful }?.body()?.months.orEmpty() }.getOrDefault(emptyList())
+        }
+
     suspend fun trash(): List<GalleryPhoto> = withContext(Dispatchers.IO) {
         runCatching { api().trash().takeIf { it.isSuccessful }?.body()?.photos.orEmpty() }.getOrDefault(emptyList())
     }
 
     /** Archived photos (own request, not stored in the timeline snapshot). */
-    suspend fun archivedList(): List<GalleryPhoto> = withContext(Dispatchers.IO) {
-        runCatching { api().data(archived = true).takeIf { it.isSuccessful }?.body()?.photos.orEmpty() }.getOrDefault(emptyList())
-    }
+    suspend fun archivedList(): List<GalleryPhoto> = fetchAllPages(archived = true)
 
     /** Archive/unarchive a photo. When archiving, drop it from the live timeline snapshot. */
     suspend fun setArchived(id: Int, value: Boolean): Boolean = withContext(Dispatchers.IO) {
@@ -207,9 +253,7 @@ class GalleryRepository @Inject constructor(
     suspend fun albums(): List<de.ledgerline.app.domain.model.gallery.GalleryAlbum> = withContext(Dispatchers.IO) {
         runCatching { api().albums().takeIf { it.isSuccessful }?.body()?.albums.orEmpty() }.getOrDefault(emptyList())
     }
-    suspend fun albumPhotos(albumId: Int): List<GalleryPhoto> = withContext(Dispatchers.IO) {
-        runCatching { api().data(albumId = albumId).takeIf { it.isSuccessful }?.body()?.photos.orEmpty() }.getOrDefault(emptyList())
-    }
+    suspend fun albumPhotos(albumId: Int): List<GalleryPhoto> = fetchAllPages(albumId = albumId)
     suspend fun createAlbum(name: String): Boolean = withContext(Dispatchers.IO) {
         runCatching { api().createAlbum(buildJsonObject { put("name", name.trim()) }).isSuccessful }.getOrDefault(false)
     }
@@ -229,5 +273,8 @@ class GalleryRepository @Inject constructor(
     private fun copyBody(body: ResponseBody, out: OutputStream) { body.byteStream().use { it.copyTo(out) } }
     private fun String.textPart() = toRequestBody("text/plain".toMediaTypeOrNull())
 
-    companion object { private const val CHUNK_THRESHOLD = 32L * 1024 * 1024 }
+    companion object {
+        private const val CHUNK_THRESHOLD = 32L * 1024 * 1024
+        private const val PAGE = 200
+    }
 }

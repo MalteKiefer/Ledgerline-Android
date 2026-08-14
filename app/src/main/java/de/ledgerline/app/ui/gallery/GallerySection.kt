@@ -81,6 +81,12 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
     var msg by remember { mutableStateOf<String?>(null) }
 
     val photos = vm.timeline(data)
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    // Keyset pagination: append the next page as the user nears the end of the loaded rows.
+    androidx.compose.runtime.LaunchedEffect(gridState, photos.size) {
+        androidx.compose.runtime.snapshotFlow { gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .collect { last -> if (photos.isNotEmpty() && last >= photos.size - 24) vm.loadMore() }
+    }
 
     val uploadLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         if (uris.isNotEmpty()) scope.launch {
@@ -156,6 +162,7 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
                 photos.isEmpty() -> Text(stringResource(R.string.gallery_empty), Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else -> LazyVerticalGrid(
                     columns = GridCells.Adaptive(112.dp),
+                    state = gridState,
                     modifier = Modifier.fillMaxSize().padding(2.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),

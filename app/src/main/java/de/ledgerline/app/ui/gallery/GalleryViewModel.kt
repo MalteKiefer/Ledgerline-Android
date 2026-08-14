@@ -46,6 +46,16 @@ class GalleryViewModel @Inject constructor(
     }
     fun pullRefresh() { _refreshing.value = true; refresh() }
 
+    private val _loadingMore = MutableStateFlow(false)
+    val loadingMore: StateFlow<Boolean> = _loadingMore.asStateFlow()
+
+    /** Append the next keyset page when the grid nears its end. Guarded against concurrent calls. */
+    fun loadMore() {
+        if (_loadingMore.value || repo.endReached) return
+        _loadingMore.value = true
+        viewModelScope.launch { repo.loadMore(); _loadingMore.value = false }
+    }
+
     /** Live, non-archived photos newest-first by capture date. */
     fun timeline(data: GalleryData?): List<GalleryPhoto> =
         data?.photos.orEmpty().filterNot { it.archived }.sortedByDescending { it.sortKey }

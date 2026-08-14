@@ -58,11 +58,8 @@ object NetworkFactory {
         retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
             .create(NotesApi::class.java)
 
-    // The gallery timeline (`/gallery/data`) is a single un-paged dump of every photo (the server does
-    // per-row disk work), so a large library (10k+) can take well over the default 60s. Give the
-    // gallery transport a generous call timeout so the first load doesn't time out into an empty grid.
     fun createGallery(baseUrl: String, tokenProvider: () -> String?, pin: String?): GalleryApi =
-        retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS), callTimeoutSeconds = 300)
+        retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
             .create(GalleryApi::class.java)
 
     /**
