@@ -47,36 +47,56 @@ import javax.inject.Singleton
  */
 @Singleton
 class FilesRepository @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
     private val sessionHolder: SessionHolder,
     private val connectivity: Connectivity,
 ) {
     private val _data = MutableStateFlow<FilesData?>(null)
     val data: StateFlow<FilesData?> = _data.asStateFlow()
 
+    // Plaintext offline cache of the last folder/file listing (app-private, no backup) so the browser
+    // works cold-offline. Mirrors FinanceRepository's finance_data.json.
+    private val cacheFile = java.io.File(context.filesDir, "files_data.json")
+    private val cacheJson = kotlinx.serialization.json.Json {
+        ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false; coerceInputValues = true
+    }
+    private fun readCache(): FilesData? =
+        runCatching { if (cacheFile.exists()) cacheJson.decodeFromString(FilesData.serializer(), cacheFile.readText()) else null }.getOrNull()
+    private fun writeCache(d: FilesData) = runCatching {
+        val tmp = java.io.File(cacheFile.parentFile, cacheFile.name + ".tmp")
+        tmp.writeText(cacheJson.encodeToString(FilesData.serializer(), d))
+        tmp.renameTo(cacheFile)
+    }
+
     private fun api(): FilesApi {
         val s = sessionHolder.get() ?: error("no session")
         return NetworkFactory.createFiles(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin)
     }
 
-    fun clear() { _data.value = null }
+    fun clear() { _data.value = null; runCatching { cacheFile.delete() } }
 
-    /** Pull the full owner-scoped listing. Keeps the last snapshot on transient failure. */
+    /**
+     * Cache-first read: publish the disk snapshot immediately (instant cold-offline browse), then
+     * refresh from the network and overwrite the cache on success. A transient failure keeps whatever
+     * snapshot we have (in-memory or freshly read from disk).
+     */
     suspend fun load(): Outcome<FilesData> = withContext(Dispatchers.IO) {
         sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        if (_data.value == null) readCache()?.let { _data.value = it }
         try {
             val res = api().filesData()
             when {
                 res.code() == 401 -> Outcome.Err(ErrorKind.HTTP)
                 !res.isSuccessful -> _data.value?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK)
-                else -> { val body = res.body()!!; _data.value = body; Outcome.Ok(body) }
+                else -> { val body = res.body()!!; _data.value = body; writeCache(body); Outcome.Ok(body) }
             }
         } catch (e: Exception) {
-            _data.value?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK, e)
+            (_data.value ?: readCache()?.also { _data.value = it })?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK, e)
         }
     }
 
     private fun cur() = _data.value ?: FilesData()
-    private fun publish(d: FilesData) { _data.value = d }
+    private fun publish(d: FilesData) { _data.value = d; writeCache(d) }
     private fun upsertFile(v: FileEntry) = publish(cur().let { it.copy(files = it.files.upsert(v) { x -> x.id == v.id }) })
     private fun removeFile(id: Int) = publish(cur().let { it.copy(files = it.files.filterNot { f -> f.id == id }) })
     private fun upsertFolder(v: FileFolder) = publish(cur().let { it.copy(folders = it.folders.upsert(v) { x -> x.id == v.id }) })

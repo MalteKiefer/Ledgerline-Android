@@ -168,7 +168,11 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   `/bulk-destroy`), Trash-Grid (`/trash`, `/{id}/restore`|`/force`, `/trash/empty`), SAF-Upload
   (multipart + chunked ≥32 MiB, Quota-413) + Download/Save (`/{id}/download`). `data/gallery/
   GalleryRepository` (online-only `StateFlow<GalleryData>` + In-Memory-Patch) + `NetworkFactory.
-  createGallery` + `GalleryApi`. Tab gated über `/me.modules` „gallery".
+  createGallery` + `GalleryApi`. Tab gated über `/me.modules` „gallery". **Keyset-Pagination** (Server
+  2026-08-14): `/gallery/data?limit&cursor&cursor_ym` liefert Seiten à 200 + `next_cursor`; `load()`
+  holt Seite 1, `loadMore()` (Grid-Scroll-`snapshotFlow`) hängt an; Album/Archiv-Sub-Listen laufen alle
+  Seiten via `fetchAllPages`; `/gallery/dates` Monats-Histogramm (Scrubber, Datenschicht). Server macht
+  readiness (thumb/preview) jetzt DB-basiert (kein per-Row-Disk-Stat mehr).
   **Phase 2 (fertig 2026-08-13):** Video-Playback (`/{id}/play` web-MP4 → pinned-Download → inline
   `VideoView`, kein Media3) + Live-Photo (`/{id}/motion`); **Archiv** (`/{id}/archive` PATCH,
   `/bulk-archive`, `GalleryArchiveScreen` + load `?archived=1`); **Alben** (`/albums` CRUD +
@@ -188,7 +192,10 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   (`POST /files/entries/{id}/copy` + per-record move/delete; Selection-Bar), **„Von mir geteilt"**
   (`SharedByMeScreen`: Public-Links-Index `GET /files/rel-shares` mit Copy/Revoke + **Inbound-Upload-Links**
   `GET/POST/DELETE /files/upload-links`, Public-Seite `{base}/u/{token}`). `data/files/FilesRepository`
-  (online-only Snapshot + per-Record-CRUD, `NetworkFactory.createFiles` + `FilesApi`); Download →
+  (**cache-first** Snapshot: Plaintext-Disk-Cache `files_data.json` in `filesDir`, sofort publiziert +
+  bei Erfolg überschrieben → Ordner/Datei-Browser funktioniert cold-offline [Bytes/Thumbs brauchen
+  weiter Netz]; `clear()`/Wipe löscht den Cache; per-Record-CRUD patcht Snapshot+Cache,
+  `NetworkFactory.createFiles` + `FilesApi`); Download →
   `DocOpener.openFile` (FileProvider). **Info-Panel** (`GET /files/entries/{id}/info`): Metadaten
   (EXIF/PDF/STL/Text via `FileInfoMetadata`), SHA-256, Pfad, Versionszahl, Inhalts-Snippet,
   Share-Status, Duplikate + Aktivität als Dialog im Detail-Screen. **Aktivitäts-Feed**
