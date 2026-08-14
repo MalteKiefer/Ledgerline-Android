@@ -1566,4 +1566,6 @@
     <string name="gallery_person_merge_none">No named people to merge into.</string>
     <string name="gallery_contact_search_hint">Type a contact name…</string>
     <string name="gallery_contact_none">No matching contacts.</string>
+    <string name="gallery_person_name_link">Name / link contact</string>
+    <string name="gallery_contact_suggestions">Contacts</string>
 </resources>

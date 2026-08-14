@@ -61,7 +61,6 @@ fun GalleryPeopleScreen(vm: GalleryViewModel, onBack: () -> Unit) {
     var opened by remember { mutableStateOf<GalleryPerson?>(null) }
     var renaming by remember { mutableStateOf<GalleryPerson?>(null) }
     var merging by remember { mutableStateOf<GalleryPerson?>(null) }
-    var linking by remember { mutableStateOf<GalleryPerson?>(null) }
     fun reload() { scope.launch { people = vm.people() } }
     LaunchedEffect(Unit) { reload() }
 
@@ -87,22 +86,20 @@ fun GalleryPeopleScreen(vm: GalleryViewModel, onBack: () -> Unit) {
                         onRename = { renaming = person },
                         onDelete = { vm.deletePerson(person.id) { reload() } },
                         onMerge = { merging = person },
-                        onLink = { linking = person },
                     )
                 }
             }
         }
     }
 
-    renaming?.let { p -> RenamePersonDialog(vm, p, onDone = { reload() }, onDismiss = { renaming = null }) }
-    linking?.let { p -> LinkContactDialog(vm, p, onDone = { reload() }, onDismiss = { linking = null }) }
+    renaming?.let { p -> NamePersonDialog(vm, p, onDone = { reload() }, onDismiss = { renaming = null }) }
     merging?.let { from ->
         MergePersonDialog(vm, from, others = (people ?: emptyList()).filter { it.id != from.id }, onMerged = { reload() }, onDismiss = { merging = null })
     }
 }
 
 @Composable
-private fun PersonCard(vm: GalleryViewModel, person: GalleryPerson, onOpen: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit, onMerge: () -> Unit, onLink: () -> Unit) {
+private fun PersonCard(vm: GalleryViewModel, person: GalleryPerson, onOpen: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit, onMerge: () -> Unit) {
     var face by remember(person.coverFaceId) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     LaunchedEffect(person.coverFaceId) { face = vm.faceCrop(person.coverFaceId) }
     var menu by remember { mutableStateOf(false) }
@@ -121,8 +118,7 @@ private fun PersonCard(vm: GalleryViewModel, person: GalleryPerson, onOpen: () -
                 modifier = Modifier.fillMaxWidth().clickable { menu = true }.padding(top = 4.dp),
             )
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(text = { Text(stringResource(R.string.action_rename)) }, onClick = { menu = false; onRename() })
-                DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_link_contact)) }, onClick = { menu = false; onLink() })
+                DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_name_link)) }, onClick = { menu = false; onRename() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_merge_into)) }, onClick = { menu = false; onMerge() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.action_delete)) }, onClick = { menu = false; onDelete() })
             }
@@ -140,7 +136,6 @@ fun GalleryPersonPhotosScreen(vm: GalleryViewModel, person: GalleryPerson, onBac
     var lightbox by remember { mutableStateOf<GalleryPhoto?>(null) }
     var menu by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf(false) }
-    var linking by remember { mutableStateOf(false) }
     var merging by remember { mutableStateOf(false) }
     var allPeople by remember { mutableStateOf<List<GalleryPerson>>(emptyList()) }
     fun reload() { scope.launch { photos = vm.personPhotos(current.id); allPeople = vm.people() } }
@@ -158,8 +153,7 @@ fun GalleryPersonPhotosScreen(vm: GalleryViewModel, person: GalleryPerson, onBac
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text(stringResource(R.string.action_rename)) }, onClick = { menu = false; renaming = true })
-                        DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_link_contact)) }, onClick = { menu = false; linking = true })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_name_link)) }, onClick = { menu = false; renaming = true })
                         DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_merge_into)) }, onClick = { menu = false; merging = true })
                         DropdownMenuItem(text = { Text(stringResource(R.string.action_delete)) }, onClick = { menu = false; vm.deletePerson(current.id) { onBack() } })
                     }
@@ -188,57 +182,56 @@ fun GalleryPersonPhotosScreen(vm: GalleryViewModel, person: GalleryPerson, onBac
         }
     }
 
-    if (renaming) RenamePersonDialog(vm, current, onDone = { p -> p?.let { goTo(it) } }, onDismiss = { renaming = false })
-    if (linking) LinkContactDialog(vm, current, onDone = { p -> p?.let { goTo(it) } }, onDismiss = { linking = false })
+    if (renaming) NamePersonDialog(vm, current, onDone = { p -> p?.let { goTo(it) } }, onDismiss = { renaming = false })
     if (merging) MergePersonDialog(vm, current, others = allPeople.filter { it.id != current.id }, onMerged = { target -> goTo(target) }, onDismiss = { merging = false })
 }
 
+/**
+ * One dialog to name AND link a person (web parity): type a name — free text saves as the name,
+ * matching contacts are suggested live and tapping one links the person (adopting the contact's name
+ * when the person is still unnamed, keeping the typed/existing name otherwise).
+ */
 @Composable
-private fun RenamePersonDialog(vm: GalleryViewModel, person: GalleryPerson, onDone: (GalleryPerson?) -> Unit, onDismiss: () -> Unit) {
-    var name by remember(person.id) { mutableStateOf(person.name ?: "") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.gallery_person_name)) },
-        text = { TextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.gallery_person_name)) }) },
-        confirmButton = { TextButton(onClick = { onDismiss(); vm.renamePerson(person.id, name.trim().ifBlank { null }) { onDone(it) } }) { Text(stringResource(R.string.action_save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
-    )
-}
-
-@Composable
-private fun LinkContactDialog(vm: GalleryViewModel, person: GalleryPerson, onDone: (GalleryPerson?) -> Unit, onDismiss: () -> Unit) {
-    var q by remember(person.id) { mutableStateOf("") }
+private fun NamePersonDialog(vm: GalleryViewModel, person: GalleryPerson, onDone: (GalleryPerson?) -> Unit, onDismiss: () -> Unit) {
+    var q by remember(person.id) { mutableStateOf(person.name ?: "") }
     var contacts by remember(person.id) { mutableStateOf<List<de.ledgerline.app.data.remote.ContactLite>?>(null) }
     LaunchedEffect(person.id, q) { contacts = vm.searchContacts(q) }
-    // Web parity: keep an existing custom name when linking; adopt the contact's name only if unnamed.
-    val keep = person.name?.takeIf { it.isNotBlank() }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.gallery_person_link_contact)) },
+        title = { Text(stringResource(R.string.gallery_person_name_link)) },
         text = {
             Column(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
                 TextField(q, { q = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.gallery_contact_search_hint)) })
                 if (person.contactId != null) Text(
                     stringResource(R.string.gallery_person_unlink),
-                    Modifier.fillMaxWidth().clickable { onDismiss(); vm.linkPersonContact(person.id, null, null) { onDone(it) } }.padding(vertical = 12.dp),
+                    Modifier.fillMaxWidth().clickable { onDismiss(); vm.linkPersonContact(person.id, null, null) { onDone(it) } }.padding(vertical = 10.dp),
                     color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
                 )
                 when (val list = contacts) {
-                    null -> if (q.trim().length >= 2) Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                    else -> if (list.isEmpty() && q.trim().length >= 2) Text(stringResource(R.string.gallery_contact_none), Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    else LazyColumn {
-                        listItems(list, key = { it.id }) { c ->
-                            Text(
-                                c.display,
-                                Modifier.fillMaxWidth().clickable { onDismiss(); vm.linkPersonContact(person.id, c.id, keep) { onDone(it) } }.padding(vertical = 12.dp),
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
+                    null -> if (q.trim().length >= 2) Box(Modifier.fillMaxWidth().padding(12.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    else -> if (list.isNotEmpty()) {
+                        Text(stringResource(R.string.gallery_contact_suggestions), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        LazyColumn {
+                            listItems(list, key = { it.id }) { c ->
+                                Text(
+                                    c.display,
+                                    Modifier.fillMaxWidth().clickable {
+                                        onDismiss()
+                                        // Keep an existing custom name; else adopt the contact's name.
+                                        vm.linkPersonContact(person.id, c.id, person.name?.takeIf { it.isNotBlank() }) { onDone(it) }
+                                    }.padding(vertical = 10.dp),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
                         }
                     }
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+        // Free-text save = rename (no contact link).
+        confirmButton = { TextButton(enabled = q.isNotBlank(), onClick = { onDismiss(); vm.renamePerson(person.id, q.trim().ifBlank { null }) { onDone(it) } }) { Text(stringResource(R.string.action_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 

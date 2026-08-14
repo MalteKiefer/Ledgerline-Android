@@ -1563,4 +1563,6 @@
     <string name="gallery_person_merge_none">Keine benannten Personen zum Zusammenführen.</string>
     <string name="gallery_contact_search_hint">Kontaktname eingeben…</string>
     <string name="gallery_contact_none">Keine passenden Kontakte.</string>
+    <string name="gallery_person_name_link">Benennen / Kontakt verknüpfen</string>
+    <string name="gallery_contact_suggestions">Kontakte</string>
 </resources>
