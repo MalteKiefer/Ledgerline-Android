@@ -11,20 +11,16 @@ import retrofit2.http.Query
  */
 @Serializable data class ContactLite(
     val id: String = "",
-    val fn: String? = null,
-    val first_name: String? = null,
-    val last_name: String? = null,
-    val org: String? = null,
+    val name: String? = null,
 ) {
-    /** Best display name: formatted name, else first+last, else org, else the id. */
-    val display: String
-        get() = fn?.takeIf { it.isNotBlank() }
-            ?: listOfNotNull(first_name, last_name).joinToString(" ").ifBlank { org ?: id }
+    /** Best display name: the server-formatted name, else the id. */
+    val display: String get() = name?.takeIf { it.isNotBlank() } ?: id
 }
 
-@Serializable data class ContactsDataResponse(val contacts: List<ContactLite> = emptyList())
+@Serializable data class ContactSuggestResponse(val contacts: List<ContactLite> = emptyList())
 
 interface ContactsApi {
-    @GET("api/v1/contacts/data")
-    suspend fun data(@Query("q") q: String? = null): Response<ContactsDataResponse>
+    /** Same suggestion endpoint the web uses when linking a gallery person → `{id, name}`. */
+    @GET("api/v1/contacts/suggest")
+    suspend fun suggest(@Query("q") q: String): Response<ContactSuggestResponse>
 }

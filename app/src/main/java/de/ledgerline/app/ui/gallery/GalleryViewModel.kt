@@ -152,11 +152,13 @@ class GalleryViewModel @Inject constructor(
     // ---- People (face clusters) ----
     suspend fun people() = repo.people()
     suspend fun personPhotos(id: Int): List<GalleryPhoto> = repo.personPhotos(id)
-    fun renamePerson(id: Int, name: String?, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.renamePerson(id, name)) }
+    fun renamePerson(id: Int, name: String?, done: (de.ledgerline.app.domain.model.gallery.GalleryPerson?) -> Unit) =
+        viewModelScope.launch { done(repo.renamePerson(id, name)) }
     fun deletePerson(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deletePerson(id)) }
     fun mergePeople(fromId: Int, intoId: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.mergePeople(fromId, intoId)) }
     suspend fun searchContacts(q: String) = repo.searchContacts(q)
-    fun linkPersonContact(personId: Int, contactId: String?, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.linkPersonContact(personId, contactId)) }
+    fun linkPersonContact(personId: Int, contactId: String?, keepName: String? = null, done: (de.ledgerline.app.domain.model.gallery.GalleryPerson?) -> Unit) =
+        viewModelScope.launch { done(repo.linkPersonContact(personId, contactId, keepName)) }
 
     private val faceCache = mutableMapOf<Int, ImageBitmap?>()
     /** Decoded face crop for a person's cover (or any face id). Cached. */

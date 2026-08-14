@@ -281,12 +281,13 @@ class GalleryRepository @Inject constructor(
     suspend fun personPhotos(id: Int): List<GalleryPhoto> = withContext(Dispatchers.IO) {
         runCatching { api().personPhotos(id).takeIf { it.isSuccessful }?.body()?.photos.orEmpty() }.getOrDefault(emptyList())
     }
-    suspend fun renamePerson(id: Int, name: String?): Boolean = withContext(Dispatchers.IO) {
+    /** Rename → returns the updated person from the `{ok, person}` response (null on failure). */
+    suspend fun renamePerson(id: Int, name: String?): de.ledgerline.app.domain.model.gallery.GalleryPerson? = withContext(Dispatchers.IO) {
         runCatching {
             api().updatePerson(id, buildJsonObject {
                 if (name.isNullOrBlank()) put("name", kotlinx.serialization.json.JsonNull) else put("name", name)
-            }).isSuccessful
-        }.getOrDefault(false)
+            }).takeIf { it.isSuccessful }?.body()?.person
+        }.getOrNull()
     }
     suspend fun deletePerson(id: Int): Boolean = withContext(Dispatchers.IO) {
         runCatching { api().deletePerson(id).isSuccessful }.getOrDefault(false)
@@ -302,17 +303,22 @@ class GalleryRepository @Inject constructor(
         val s = sessionHolder.get() ?: error("no session")
         return NetworkFactory.createContacts(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin)
     }
-    /** Read-only contact search for linking a person (empty when the contacts module is off). */
+    /** Contact suggestions for linking (empty when contacts are off). Min 2 chars server-side. */
     suspend fun searchContacts(q: String): List<de.ledgerline.app.data.remote.ContactLite> = withContext(Dispatchers.IO) {
-        runCatching { contactsApi().data(q.ifBlank { null }).takeIf { it.isSuccessful }?.body()?.contacts.orEmpty() }.getOrDefault(emptyList())
+        if (q.trim().length < 2) return@withContext emptyList()
+        runCatching { contactsApi().suggest(q.trim()).takeIf { it.isSuccessful }?.body()?.contacts.orEmpty() }.getOrDefault(emptyList())
     }
-    /** Link a person to an address-book contact (server sets the name from the contact). null unlinks. */
-    suspend fun linkPersonContact(personId: Int, contactId: String?): Boolean = withContext(Dispatchers.IO) {
+    /**
+     * Link a person to a contact → returns the resulting person (the server sets the name from the
+     * contact). [keepName] preserves an existing custom name (web parity); null contactId unlinks.
+     */
+    suspend fun linkPersonContact(personId: Int, contactId: String?, keepName: String? = null): de.ledgerline.app.domain.model.gallery.GalleryPerson? = withContext(Dispatchers.IO) {
         runCatching {
             api().updatePerson(personId, buildJsonObject {
                 if (contactId.isNullOrBlank()) put("contact_id", kotlinx.serialization.json.JsonNull) else put("contact_id", contactId)
-            }).isSuccessful
-        }.getOrDefault(false)
+                if (!keepName.isNullOrBlank()) put("name", keepName)
+            }).takeIf { it.isSuccessful }?.body()?.person
+        }.getOrNull()
     }
 
     private fun copyBody(body: ResponseBody, out: OutputStream) { body.byteStream().use { it.copyTo(out) } }

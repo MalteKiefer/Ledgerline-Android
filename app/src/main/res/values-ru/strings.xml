@@ -1564,4 +1564,6 @@
     <string name="gallery_person_link_contact">Связать с контактом</string>
     <string name="gallery_person_unlink">Удалить связь с контактом</string>
     <string name="gallery_person_merge_none">Нет именованных людей для объединения.</string>
+    <string name="gallery_contact_search_hint">Введите имя контакта…</string>
+    <string name="gallery_contact_none">Нет подходящих контактов.</string>
 </resources>

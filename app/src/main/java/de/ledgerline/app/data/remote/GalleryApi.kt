@@ -28,6 +28,10 @@ import retrofit2.http.Streaming
 @Serializable data class GalleryAlbumsResponse(val albums: List<GalleryAlbum> = emptyList())
 @Serializable data class GalleryAlbumResponse(val album: GalleryAlbum)
 @Serializable data class GalleryPeopleResponse(val people: List<de.ledgerline.app.domain.model.gallery.GalleryPerson> = emptyList())
+@Serializable data class GalleryPersonUpdateResponse(
+    val ok: Boolean = false,
+    val person: de.ledgerline.app.domain.model.gallery.GalleryPerson? = null,
+)
 @Serializable data class GalleryPersonPhotosResponse(
     val person: de.ledgerline.app.domain.model.gallery.GalleryPerson = de.ledgerline.app.domain.model.gallery.GalleryPerson(),
     val photos: List<GalleryPhoto> = emptyList(),
@@ -164,7 +168,7 @@ interface GalleryApi {
     suspend fun personPhotos(@Path("id") id: Int, @Query("sort") sort: String? = null): Response<GalleryPersonPhotosResponse>
 
     @retrofit2.http.PUT("api/v1/gallery/people/{id}")
-    suspend fun updatePerson(@Path("id") id: Int, @Body body: JsonObject): Response<de.ledgerline.app.domain.model.gallery.GalleryPerson>
+    suspend fun updatePerson(@Path("id") id: Int, @Body body: JsonObject): Response<GalleryPersonUpdateResponse>
 
     @DELETE("api/v1/gallery/people/{id}")
     suspend fun deletePerson(@Path("id") id: Int): Response<OkBody>
