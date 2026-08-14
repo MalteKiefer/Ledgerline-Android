@@ -1,7 +1,11 @@
 package de.ledgerline.app.ui.shell
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.EventNote
@@ -9,12 +13,19 @@ import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,15 +55,19 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Top-level module sections. [moduleKey] gates visibility against `/me.user.modules` (null = always). */
-private enum class Section(val labelRes: Int, val icon: ImageVector, val moduleKey: String?) {
-    FILES(R.string.tab_files, Icons.Outlined.Folder, "files"),
-    GALLERY(R.string.tab_gallery, Icons.Outlined.PhotoLibrary, "gallery"),
-    FINANCE(R.string.tab_finance, Icons.AutoMirrored.Outlined.ReceiptLong, "finance"),
-    TODOS(R.string.tab_todos, Icons.Outlined.CheckCircle, "calendar"),
-    NOTES(R.string.tab_notes, Icons.AutoMirrored.Outlined.EventNote, "notes"),
-    SEARCH(R.string.tab_search, Icons.Outlined.Search, null),
-    ACCOUNT(R.string.tab_account, Icons.Outlined.AccountCircle, null),
+/**
+ * Top-level module sections. [moduleKey] gates visibility against `/me.user.modules` (null = always).
+ * [primary] sections get their own bottom-nav slot; the rest live behind the "More" menu so the bar
+ * never overflows (Material caps a bottom bar at ~5 destinations).
+ */
+private enum class Section(val labelRes: Int, val icon: ImageVector, val moduleKey: String?, val primary: Boolean) {
+    FILES(R.string.tab_files, Icons.Outlined.Folder, "files", true),
+    GALLERY(R.string.tab_gallery, Icons.Outlined.PhotoLibrary, "gallery", true),
+    FINANCE(R.string.tab_finance, Icons.AutoMirrored.Outlined.ReceiptLong, "finance", true),
+    NOTES(R.string.tab_notes, Icons.AutoMirrored.Outlined.EventNote, "notes", true),
+    TODOS(R.string.tab_todos, Icons.Outlined.CheckCircle, "calendar", false),
+    SEARCH(R.string.tab_search, Icons.Outlined.Search, null, false),
+    ACCOUNT(R.string.tab_account, Icons.Outlined.AccountCircle, null, false),
 }
 
 @HiltViewModel
@@ -80,8 +95,11 @@ fun AppShell(
 ) {
     val allowed by shellVm.allowed.collectAsStateWithLifecycle()
     val visible = Section.entries.filter { it.moduleKey == null || allowed == null || it.moduleKey in allowed!! }
+    val primaryTabs = visible.filter { it.primary }
+    val moreTabs = visible.filter { !it.primary }
 
     var section by rememberSaveable { mutableStateOf(Section.FILES) }
+    var showMore by remember { mutableStateOf(false) }
     LaunchedEffect(visible) { if (section !in visible) section = visible.first() }
 
     // A tapped push notification routes here: jump to the Account tab and open the centre.
@@ -116,7 +134,7 @@ fun AppShell(
     AppScaffold(
         bottomBar = {
             NavigationBar {
-                visible.forEach { s ->
+                primaryTabs.forEach { s ->
                     NavigationBarItem(
                         selected = section == s,
                         onClick = { section = s },
@@ -124,6 +142,12 @@ fun AppShell(
                         label = { Text(stringResource(s.labelRes)) },
                     )
                 }
+                if (moreTabs.isNotEmpty()) NavigationBarItem(
+                    selected = section in moreTabs,
+                    onClick = { showMore = true },
+                    icon = { Icon(Icons.Outlined.MoreHoriz, contentDescription = null) },
+                    label = { Text(stringResource(R.string.tab_more)) },
+                )
             }
         },
     ) { pad ->
@@ -161,5 +185,24 @@ fun AppShell(
         }
         // Content shared into the app (ACTION_SEND) surfaces here as an upload sheet (self-hides when empty).
         de.ledgerline.app.ui.share.ShareUploadSheet()
+    }
+
+    if (showMore) MoreSheet(moreTabs, current = section, onPick = { section = it; showMore = false }, onDismiss = { showMore = false })
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun MoreSheet(tabs: List<Section>, current: Section, onPick: (Section) -> Unit, onDismiss: () -> Unit) {
+    val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp)) {
+            tabs.forEach { s ->
+                ListItem(
+                    headlineContent = { Text(stringResource(s.labelRes)) },
+                    leadingContent = { Icon(s.icon, contentDescription = null, tint = if (s == current) MaterialTheme.colorScheme.primary else LocalContentColor.current) },
+                    modifier = Modifier.clickable { onPick(s) },
+                )
+            }
+        }
     }
 }
