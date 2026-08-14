@@ -274,6 +274,30 @@ class GalleryRepository @Inject constructor(
         runCatching { api().detachFromAlbum(albumId, buildJsonObject { put("ids", JsonArray(ids.map { JsonPrimitive(it) })) }).isSuccessful }.getOrDefault(false)
     }
 
+    // ---- People (face clusters) ----
+    suspend fun people(): List<de.ledgerline.app.domain.model.gallery.GalleryPerson> = withContext(Dispatchers.IO) {
+        runCatching { api().people().takeIf { it.isSuccessful }?.body()?.people.orEmpty() }.getOrDefault(emptyList())
+    }
+    suspend fun personPhotos(id: Int): List<GalleryPhoto> = withContext(Dispatchers.IO) {
+        runCatching { api().personPhotos(id).takeIf { it.isSuccessful }?.body()?.photos.orEmpty() }.getOrDefault(emptyList())
+    }
+    suspend fun renamePerson(id: Int, name: String?): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            api().updatePerson(id, buildJsonObject {
+                if (name.isNullOrBlank()) put("name", kotlinx.serialization.json.JsonNull) else put("name", name)
+            }).isSuccessful
+        }.getOrDefault(false)
+    }
+    suspend fun deletePerson(id: Int): Boolean = withContext(Dispatchers.IO) {
+        runCatching { api().deletePerson(id).isSuccessful }.getOrDefault(false)
+    }
+    suspend fun mergePeople(fromId: Int, intoId: Int): Boolean = withContext(Dispatchers.IO) {
+        runCatching { api().mergePeople(buildJsonObject { put("from_id", fromId); put("into_id", intoId) }).isSuccessful }.getOrDefault(false)
+    }
+    suspend fun faceCropBytes(faceId: Int): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { api().faceCrop(faceId).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
+
     private fun copyBody(body: ResponseBody, out: OutputStream) { body.byteStream().use { it.copyTo(out) } }
     private fun String.textPart() = toRequestBody("text/plain".toMediaTypeOrNull())
 

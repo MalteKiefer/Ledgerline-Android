@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.PlaylistAdd
@@ -76,6 +77,7 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
     var showTrash by remember { mutableStateOf(false) }
     var showArchive by remember { mutableStateOf(false) }
     var showAlbums by remember { mutableStateOf(false) }
+    var showPeople by remember { mutableStateOf(false) }
     var addToAlbum by remember { mutableStateOf(false) }
     val selection = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
     var msg by remember { mutableStateOf<String?>(null) }
@@ -113,6 +115,7 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
     if (showTrash) { GalleryTrashScreen(vm) { showTrash = false }; return }
     if (showArchive) { GalleryArchiveScreen(vm) { showArchive = false; vm.refresh() }; return }
     if (showAlbums) { GalleryAlbumsScreen(vm) { showAlbums = false }; return }
+    if (showPeople) { GalleryPeopleScreen(vm) { showPeople = false }; return }
     lightboxId?.let { id ->
         val photo = data?.photos?.firstOrNull { it.id == id }
         if (photo != null) { GalleryLightbox(vm, photo, onClose = { lightboxId = null }); return }
@@ -144,6 +147,9 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
                         }
                         IconButton(onClick = { showAlbums = true }) {
                             Icon(Icons.Outlined.PhotoAlbum, contentDescription = stringResource(R.string.gallery_albums))
+                        }
+                        IconButton(onClick = { showPeople = true }) {
+                            Icon(Icons.Outlined.People, contentDescription = stringResource(R.string.gallery_people))
                         }
                         IconButton(onClick = { showArchive = true }) {
                             Icon(Icons.Outlined.Archive, contentDescription = stringResource(R.string.gallery_archived))

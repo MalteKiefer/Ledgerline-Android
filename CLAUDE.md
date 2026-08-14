@@ -179,9 +179,13 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   `/albums/{id}/photos` attach/detach; `GalleryAlbumsScreen`/`GalleryAlbumGridScreen`, „zu Album
   hinzufügen" aus Multi-Select); **Datum-Navigation** (Monats-Section-Header im Grid) +
   **Capture-Date-Edit** (`PUT /{id}` taken_at via DatePicker im EXIF-Sheet).
-  **Offen (Phasen 3–5):** P3 Sharing (public/internal/upload-links/Kommentare/Reaktionen); P4 ML
-  (CLIP-Suche/Duplikate/People+Faces [ohne Kontakt-Link — kein Contacts-Modul]/Memories/reprocess;
-  ML-Sidecar serverseitig vorhanden); P5 Geräte-Kamera-Roll-Backup.
+  **Phase 4 People (2026-08-14, ML-gated):** `GalleryPeopleScreen`/`GalleryPersonPhotosScreen` +
+  `GalleryPerson`-Modell — Personen-Cluster (`GET /gallery/people`) als Cover-Face-Avatare
+  (`/gallery/faces/{id}/crop`), Umbenennen (`PUT /gallery/people/{id}` name), Löschen, **Merge**
+  (`/gallery/people/merge`), Personen-Fotos (`GET /gallery/people/{id}`) + Lightbox. Top-Bar-Aktion in
+  `GallerySection`. **Ohne Kontakt-Link** (kein Contacts-Modul). Leer wenn ML-Sidecar/Face aus.
+  **Offen (Rest P4/P3/P5):** CLIP-Suche/Duplikate/Memories/reprocess + per-Photo-Face-Tagging
+  (assign/hide); P3 Sharing (public/internal/upload-links/Kommentare/Reaktionen); P5 Geräte-Backup.
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte
   Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
   Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung, **Favoriten-Filter, Label-

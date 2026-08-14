@@ -27,6 +27,11 @@ import retrofit2.http.Streaming
 @Serializable data class GalleryChunkPart(val ok: Boolean = false, val index: Int = 0)
 @Serializable data class GalleryAlbumsResponse(val albums: List<GalleryAlbum> = emptyList())
 @Serializable data class GalleryAlbumResponse(val album: GalleryAlbum)
+@Serializable data class GalleryPeopleResponse(val people: List<de.ledgerline.app.domain.model.gallery.GalleryPerson> = emptyList())
+@Serializable data class GalleryPersonPhotosResponse(
+    val person: de.ledgerline.app.domain.model.gallery.GalleryPerson = de.ledgerline.app.domain.model.gallery.GalleryPerson(),
+    val photos: List<GalleryPhoto> = emptyList(),
+)
 
 /**
  * The Gallery module REST surface — Phase 1 (MVP viewing): timeline read, sandboxed bytes
@@ -150,4 +155,24 @@ interface GalleryApi {
 
     @HTTP(method = "DELETE", path = "api/v1/gallery/albums/{id}/photos", hasBody = true)
     suspend fun detachFromAlbum(@Path("id") id: Int, @Body body: JsonObject): Response<OkBody>
+
+    // ---- People (face clusters; ML-gated) ----
+    @GET("api/v1/gallery/people")
+    suspend fun people(): Response<GalleryPeopleResponse>
+
+    @GET("api/v1/gallery/people/{id}")
+    suspend fun personPhotos(@Path("id") id: Int, @Query("sort") sort: String? = null): Response<GalleryPersonPhotosResponse>
+
+    @retrofit2.http.PUT("api/v1/gallery/people/{id}")
+    suspend fun updatePerson(@Path("id") id: Int, @Body body: JsonObject): Response<de.ledgerline.app.domain.model.gallery.GalleryPerson>
+
+    @DELETE("api/v1/gallery/people/{id}")
+    suspend fun deletePerson(@Path("id") id: Int): Response<OkBody>
+
+    @POST("api/v1/gallery/people/merge")
+    suspend fun mergePeople(@Body body: JsonObject): Response<OkBody>
+
+    @GET("api/v1/gallery/faces/{id}/crop")
+    @Streaming
+    suspend fun faceCrop(@Path("id") id: Int): Response<ResponseBody>
 }

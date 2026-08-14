@@ -149,6 +149,24 @@ class GalleryViewModel @Inject constructor(
     fun addToAlbum(albumId: Int, ids: List<Int>, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.addToAlbum(albumId, ids)) }
     fun removeFromAlbum(albumId: Int, ids: List<Int>, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.removeFromAlbum(albumId, ids)) }
 
+    // ---- People (face clusters) ----
+    suspend fun people() = repo.people()
+    suspend fun personPhotos(id: Int): List<GalleryPhoto> = repo.personPhotos(id)
+    fun renamePerson(id: Int, name: String?, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.renamePerson(id, name)) }
+    fun deletePerson(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deletePerson(id)) }
+    fun mergePeople(fromId: Int, intoId: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.mergePeople(fromId, intoId)) }
+
+    private val faceCache = mutableMapOf<Int, ImageBitmap?>()
+    /** Decoded face crop for a person's cover (or any face id). Cached. */
+    suspend fun faceCrop(faceId: Int?): ImageBitmap? {
+        if (faceId == null) return null
+        faceCache[faceId]?.let { return it }
+        if (faceCache.containsKey(faceId)) return null
+        val bmp = repo.faceCropBytes(faceId)?.let { decode(it) }
+        faceCache[faceId] = bmp
+        return bmp
+    }
+
     // ---- Trash ----
     suspend fun loadTrash(): List<GalleryPhoto> = repo.trash()
     fun restore(id: Int, done: () -> Unit) = viewModelScope.launch { if (repo.restore(id)) done() }

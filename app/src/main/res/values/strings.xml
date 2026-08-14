@@ -1555,4 +1555,10 @@
     <string name="admin_unblock_user">Unblock user</string>
     <string name="security_step_up_pw">Login password (to manage 2FA)</string>
     <string name="login_verify_email">Please verify your email address, then sign in again.</string>
+    <string name="gallery_people">People</string>
+    <string name="gallery_people_empty">No people yet. Face grouping runs on the server.</string>
+    <string name="gallery_person_unnamed">Unnamed</string>
+    <string name="gallery_person_name">Name</string>
+    <string name="gallery_person_count">%1$d photos</string>
+    <string name="gallery_person_merge_into">Merge into…</string>
 </resources>

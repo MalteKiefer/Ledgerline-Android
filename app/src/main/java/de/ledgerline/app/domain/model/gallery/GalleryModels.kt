@@ -69,6 +69,20 @@ data class GalleryAlbum(
     val version: Int = 0,
 )
 
+/**
+ * A face-recognition person: an auto-grouped cluster of detected faces (biometric, opt-in). [name] is
+ * null until the owner names it; [coverFaceId] points at the crop shown as the person's avatar; [count]
+ * is the visible-face count. Contact linking is server-only (this app has no Contacts module).
+ */
+@Serializable
+data class GalleryPerson(
+    val id: Int = 0,
+    val name: String? = null,
+    @SerialName("contact_id") val contactId: String? = null,
+    val count: Int = 0,
+    @SerialName("cover_face_id") val coverFaceId: Int? = null,
+)
+
 /** `GET /gallery/{photo}/exif` — photo overview + section-grouped EXIF for the lightbox sidebar. */
 @Serializable
 data class GalleryExif(
