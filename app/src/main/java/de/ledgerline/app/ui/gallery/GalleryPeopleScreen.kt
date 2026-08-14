@@ -239,18 +239,30 @@ private fun LinkContactDialog(vm: GalleryViewModel, person: GalleryPerson, onDon
 
 @Composable
 private fun MergePersonDialog(vm: GalleryViewModel, person: GalleryPerson, others: List<GalleryPerson>, onDone: () -> Unit, onDismiss: () -> Unit) {
+    var q by remember { mutableStateOf("") }
+    // Only NAMED people are valid merge targets; filter by the typed query (autocomplete).
+    val named = remember(others) { others.filter { !it.name.isNullOrBlank() } }
+    val matches = remember(named, q) {
+        if (q.isBlank()) named else named.filter { it.name!!.contains(q, ignoreCase = true) }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.gallery_person_merge_into)) },
         text = {
-            Column {
-                if (others.isEmpty()) Text(stringResource(R.string.gallery_people_empty))
-                others.forEach { target ->
-                    Text(
-                        target.name ?: stringResource(R.string.gallery_person_unnamed),
-                        Modifier.fillMaxWidth().clickable { onDismiss(); vm.mergePeople(person.id, target.id) { onDone() } }.padding(vertical = 12.dp),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+            Column(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                TextField(q, { q = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.gallery_person_name)) })
+                when {
+                    named.isEmpty() -> Text(stringResource(R.string.gallery_person_merge_none), Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    matches.isEmpty() -> Text(stringResource(R.string.gallery_people_empty), Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    else -> LazyColumn {
+                        listItems(matches, key = { it.id }) { target ->
+                            Text(
+                                target.name!!,
+                                Modifier.fillMaxWidth().clickable { onDismiss(); vm.mergePeople(person.id, target.id) { onDone() } }.padding(vertical = 12.dp),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
                 }
             }
         },

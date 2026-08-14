@@ -1560,4 +1560,5 @@
     <string name="gallery_person_merge_into">Zusammenführen mit…</string>
     <string name="gallery_person_link_contact">Mit Kontakt verknüpfen</string>
     <string name="gallery_person_unlink">Kontakt-Verknüpfung entfernen</string>
+    <string name="gallery_person_merge_none">Keine benannten Personen zum Zusammenführen.</string>
 </resources>

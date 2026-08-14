@@ -1563,4 +1563,5 @@
     <string name="gallery_person_merge_into">Объединить с…</string>
     <string name="gallery_person_link_contact">Связать с контактом</string>
     <string name="gallery_person_unlink">Удалить связь с контактом</string>
+    <string name="gallery_person_merge_none">Нет именованных людей для объединения.</string>
 </resources>

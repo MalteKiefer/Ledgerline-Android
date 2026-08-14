@@ -1563,4 +1563,5 @@
     <string name="gallery_person_merge_into">Merge into…</string>
     <string name="gallery_person_link_contact">Link to contact</string>
     <string name="gallery_person_unlink">Remove contact link</string>
+    <string name="gallery_person_merge_none">No named people to merge into.</string>
 </resources>
