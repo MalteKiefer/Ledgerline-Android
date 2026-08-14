@@ -42,6 +42,9 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val galBackupDeleteAfterKey = booleanPreferencesKey("gallery_backup_delete_after")
     private val galBackupBackgroundKey = booleanPreferencesKey("gallery_backup_background")
     private val galBackupAlbumIdKey = androidx.datastore.preferences.core.intPreferencesKey("gallery_backup_album_id")
+    private val galBackupChargingKey = booleanPreferencesKey("gallery_backup_charging")
+    private val galBackupBatteryOkKey = booleanPreferencesKey("gallery_backup_battery_ok")
+    private val galBackupIdleKey = booleanPreferencesKey("gallery_backup_idle")
     // ── Push notifications (UnifiedPush) ──
     private val pushEnabledKey = booleanPreferencesKey("push_enabled")
     private val pushLockscreenContentKey = booleanPreferencesKey("push_lockscreen_content")
@@ -135,6 +138,15 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     suspend fun setGalleryBackupDeleteAfter(on: Boolean) { context.settingsDataStore.edit { it[galBackupDeleteAfterKey] = on } }
     suspend fun setGalleryBackupBackground(on: Boolean) { context.settingsDataStore.edit { it[galBackupBackgroundKey] = on } }
     suspend fun setGalleryBackupAlbumId(id: Int) { context.settingsDataStore.edit { it[galBackupAlbumIdKey] = id } }
+    /** Only run backup while charging. */
+    val galleryBackupCharging: Flow<Boolean> = context.settingsDataStore.data.map { it[galBackupChargingKey] ?: false }
+    /** Skip backup when the battery is low. */
+    val galleryBackupBatteryOk: Flow<Boolean> = context.settingsDataStore.data.map { it[galBackupBatteryOkKey] ?: true }
+    /** Background runs only while the device is idle. */
+    val galleryBackupIdle: Flow<Boolean> = context.settingsDataStore.data.map { it[galBackupIdleKey] ?: false }
+    suspend fun setGalleryBackupCharging(on: Boolean) { context.settingsDataStore.edit { it[galBackupChargingKey] = on } }
+    suspend fun setGalleryBackupBatteryOk(on: Boolean) { context.settingsDataStore.edit { it[galBackupBatteryOkKey] = on } }
+    suspend fun setGalleryBackupIdle(on: Boolean) { context.settingsDataStore.edit { it[galBackupIdleKey] = on } }
 
     // ── Push notifications (UnifiedPush) ──────────────────────────────────────────
     // Delivery does not use the biometric-sealed bearer token: the server sends a

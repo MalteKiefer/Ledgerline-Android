@@ -201,6 +201,12 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   WorkManager periodic 1h, Netz/Unmetered-Constraint) setzt den Token transient in `SessionHolder`,
   läuft `runHeadless`, restauriert Locked-Zustand. `LedgerlineApp : Configuration.Provider`
   (HiltWorkerFactory); `ForceLogout`/Wipe löscht bgCred + cancelt Worker.
+  **Bedingungen:** WLAN-only, **nur beim Laden** (`BatteryManager.isCharging` + Worker
+  `setRequiresCharging`), **Akku-nicht-niedrig** (`setRequiresBatteryNotLow`), **nur im Ruhezustand**
+  (`setRequiresDeviceIdle`, Hintergrund). Constraint-Toggle rescheduled den Worker.
+  **Ganze Backup-UI liegt in den App-Einstellungen** (`SettingsSub.GalleryBackup` →
+  `ui/gallery/GalleryBackupScreen` + leichtes `GalleryBackupViewModel`, kein Timeline-Load); die
+  Gallery-Cloud-Aktion öffnet denselben Screen.
   **Offen (Rest P4/P3):** CLIP-Suche/Duplikate/Memories/reprocess + per-Photo-Face-Tagging
   (assign/hide); P3 Sharing (public/internal/upload-links/Kommentare/Reaktionen).
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte

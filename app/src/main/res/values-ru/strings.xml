@@ -1581,4 +1581,9 @@
     <string name="gallery_backup_background">Резервное копирование при блокировке</string>
     <string name="gallery_backup_background_warn">Сохраняет токен входа, чтобы копирование шло в фоне. Менее безопасно, чем биометрическая блокировка.</string>
     <string name="gallery_backup_all">Скопировать всё</string>
+    <string name="gallery_backup_conditions">Условия</string>
+    <string name="gallery_backup_what">Что копировать</string>
+    <string name="gallery_backup_charging">Только при зарядке</string>
+    <string name="gallery_backup_battery_ok">Пропускать при низком заряде</string>
+    <string name="gallery_backup_idle">В фоне только в простое</string>
 </resources>

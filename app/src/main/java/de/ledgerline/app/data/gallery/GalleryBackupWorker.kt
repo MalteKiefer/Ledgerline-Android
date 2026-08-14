@@ -47,13 +47,15 @@ class GalleryBackupWorker @AssistedInject constructor(
     companion object {
         private const val NAME = "gallery-backup"
 
-        fun schedule(context: Context, wifiOnly: Boolean) {
+        fun schedule(context: Context, wifiOnly: Boolean, charging: Boolean, batteryOk: Boolean, idle: Boolean) {
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
+                .setRequiresCharging(charging)
+                .setRequiresBatteryNotLow(batteryOk)
+                .apply { if (idle) setRequiresDeviceIdle(true) }
+                .build()
             val req = PeriodicWorkRequestBuilder<GalleryBackupWorker>(1, TimeUnit.HOURS)
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(if (wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED)
-                        .build(),
-                )
+                .setConstraints(constraints)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(NAME, ExistingPeriodicWorkPolicy.UPDATE, req)
         }

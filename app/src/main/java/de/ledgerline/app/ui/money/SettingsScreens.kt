@@ -34,6 +34,7 @@ import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
@@ -90,6 +91,7 @@ private sealed interface SettingsSub {
     data object About : SettingsSub
     data object Admin : SettingsSub
     data object Paperless : SettingsSub
+    data object GalleryBackup : SettingsSub
 }
 
 /** Settings hub with internal sub-navigation (devices / notifications / about). [onBack] is null when
@@ -113,6 +115,7 @@ fun MoneySettingsScreen(
         SettingsSub.About -> AboutScreen(vm) { sub = SettingsSub.Hub }
         SettingsSub.Admin -> de.ledgerline.app.ui.admin.AdminScreen(onBack = { sub = SettingsSub.Hub })
         SettingsSub.Paperless -> PaperlessScreen(vm) { sub = SettingsSub.Hub }
+        SettingsSub.GalleryBackup -> de.ledgerline.app.ui.gallery.GalleryBackupScreen(onBack = { sub = SettingsSub.Hub })
         SettingsSub.Hub -> SettingsHub(vm, onBack, onLoggedOut, open = { sub = it })
     }
 }
@@ -167,6 +170,8 @@ private fun SettingsHub(vm: AccountViewModel, onBack: (() -> Unit)?, onLoggedOut
                 SettingRow(stringResource(R.string.security_title), null, Icons.Outlined.Shield, Brand.tintGreen) { open(SettingsSub.Security) }
                 RowDivider()
                 SettingRow(stringResource(R.string.settings_paperless), null, Icons.Outlined.Description, Brand.tintTeal) { open(SettingsSub.Paperless) }
+                RowDivider()
+                SettingRow(stringResource(R.string.gallery_backup), null, Icons.Outlined.CloudUpload, Brand.tintBlue) { open(SettingsSub.GalleryBackup) }
                 RowDivider()
                 SettingRow(stringResource(R.string.settings_about), null, Icons.Outlined.Info, Brand.tintGray) { open(SettingsSub.About) }
             }

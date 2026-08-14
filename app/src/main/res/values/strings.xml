@@ -1581,4 +1581,9 @@
     <string name="gallery_backup_background">Back up while locked</string>
     <string name="gallery_backup_background_warn">Stores your login token so backup can run in the background. Less secure than the biometric lock.</string>
     <string name="gallery_backup_all">Back up everything</string>
+    <string name="gallery_backup_conditions">Conditions</string>
+    <string name="gallery_backup_what">What to back up</string>
+    <string name="gallery_backup_charging">Only while charging</string>
+    <string name="gallery_backup_battery_ok">Skip when battery is low</string>
+    <string name="gallery_backup_idle">Background only when idle</string>
 </resources>

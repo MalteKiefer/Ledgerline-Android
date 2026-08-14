@@ -1578,4 +1578,9 @@
     <string name="gallery_backup_background">Bei gesperrtem Gerät sichern</string>
     <string name="gallery_backup_background_warn">Speichert dein Login-Token, damit das Backup im Hintergrund läuft. Weniger sicher als die biometrische Sperre.</string>
     <string name="gallery_backup_all">Alles sichern</string>
+    <string name="gallery_backup_conditions">Bedingungen</string>
+    <string name="gallery_backup_what">Was gesichert wird</string>
+    <string name="gallery_backup_charging">Nur beim Laden</string>
+    <string name="gallery_backup_battery_ok">Bei niedrigem Akku aussetzen</string>
+    <string name="gallery_backup_idle">Hintergrund nur im Ruhezustand</string>
 </resources>

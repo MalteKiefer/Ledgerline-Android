@@ -84,6 +84,8 @@ class GalleryBackup @Inject constructor(
         if (!hasPermission()) { _status.value = BackupStatus(lastError = "permission"); return@withLock 0 }
         if (!connectivity.isOnline()) return@withLock 0
         if (settings.galleryBackupWifiOnly.first() && !connectivity.isUnmetered()) return@withLock 0
+        if (settings.galleryBackupCharging.first() && !isCharging()) return@withLock 0
+        if (settings.galleryBackupBatteryOk.first() && isBatteryLow()) return@withLock 0
 
         val since = if (includeExisting) 0L else settings.galleryBackupSince.first()
         val includeVideos = settings.galleryBackupVideos.first()
@@ -166,4 +168,14 @@ class GalleryBackup @Inject constructor(
     }
 
     private fun nowSeconds() = System.currentTimeMillis() / 1000
+
+    private fun isCharging(): Boolean {
+        val bm = context.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager ?: return true
+        return bm.isCharging
+    }
+    private fun isBatteryLow(): Boolean {
+        val bm = context.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager ?: return false
+        val level = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        return level in 1..19 // treat <20% as low (WorkManager's BatteryNotLow is similar)
+    }
 }
