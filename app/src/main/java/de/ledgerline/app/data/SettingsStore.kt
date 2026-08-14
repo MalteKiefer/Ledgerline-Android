@@ -45,6 +45,7 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val galBackupChargingKey = booleanPreferencesKey("gallery_backup_charging")
     private val galBackupBatteryOkKey = booleanPreferencesKey("gallery_backup_battery_ok")
     private val galBackupIdleKey = booleanPreferencesKey("gallery_backup_idle")
+    private val galBackupExcludedBucketsKey = stringSetPreferencesKey("gallery_backup_excluded_buckets")
     // ── Push notifications (UnifiedPush) ──
     private val pushEnabledKey = booleanPreferencesKey("push_enabled")
     private val pushLockscreenContentKey = booleanPreferencesKey("push_lockscreen_content")
@@ -147,6 +148,15 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     suspend fun setGalleryBackupCharging(on: Boolean) { context.settingsDataStore.edit { it[galBackupChargingKey] = on } }
     suspend fun setGalleryBackupBatteryOk(on: Boolean) { context.settingsDataStore.edit { it[galBackupBatteryOkKey] = on } }
     suspend fun setGalleryBackupIdle(on: Boolean) { context.settingsDataStore.edit { it[galBackupIdleKey] = on } }
+    /** Device media folders (bucket ids) EXCLUDED from backup. */
+    val galleryBackupExcludedBuckets: Flow<Set<String>> = context.settingsDataStore.data.map { it[galBackupExcludedBucketsKey] ?: emptySet() }
+    suspend fun setGalleryBackupBucketExcluded(bucketId: String, excluded: Boolean) {
+        context.settingsDataStore.edit { p ->
+            val cur = p[galBackupExcludedBucketsKey]?.toMutableSet() ?: mutableSetOf()
+            if (excluded) cur.add(bucketId) else cur.remove(bucketId)
+            p[galBackupExcludedBucketsKey] = cur
+        }
+    }
 
     // ── Push notifications (UnifiedPush) ──────────────────────────────────────────
     // Delivery does not use the biometric-sealed bearer token: the server sends a

@@ -77,6 +77,7 @@ class GalleryBackupViewModel @Inject constructor(
     val deleteAfter = flag(settings.galleryBackupDeleteAfter, false)
     val background = flag(settings.galleryBackupBackground, false)
     val albumId = flag(settings.galleryBackupAlbumId, 0)
+    val excludedBuckets = flag(settings.galleryBackupExcludedBuckets, emptySet())
     val status = backup.status
     val pendingDeletes = backup.pendingDeletes
 
@@ -112,6 +113,8 @@ class GalleryBackupViewModel @Inject constructor(
     }
 
     suspend fun albums() = repo.albums()
+    suspend fun buckets() = backup.deviceBuckets(settings.galleryBackupVideos.first())
+    fun setBucketExcluded(id: String, excluded: Boolean) = viewModelScope.launch { settings.setGalleryBackupBucketExcluded(id, excluded) }
 }
 
 /** Full-screen camera-roll backup settings (from the account settings or the gallery cloud action). */
@@ -130,8 +133,11 @@ fun GalleryBackupScreen(onBack: () -> Unit, vm: GalleryBackupViewModel = hiltVie
     val status by vm.status.collectAsStateWithLifecycle()
     val pendingDeletes by vm.pendingDeletes.collectAsStateWithLifecycle()
 
+    val excludedBuckets by vm.excludedBuckets.collectAsStateWithLifecycle()
     var albums by remember { mutableStateOf<List<GalleryAlbum>?>(null) }
+    var buckets by remember { mutableStateOf<List<de.ledgerline.app.data.gallery.GalleryBackup.Bucket>>(emptyList()) }
     LaunchedEffect(Unit) { albums = vm.albums() }
+    LaunchedEffect(enabled) { if (vm.hasPermission()) buckets = vm.buckets() }
     var albumMenu by remember { mutableStateOf(false) }
 
     val perms = arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
@@ -175,6 +181,15 @@ fun GalleryBackupScreen(onBack: () -> Unit, vm: GalleryBackupViewModel = hiltVie
                 }
             }
             ToggleRow(stringResource(R.string.gallery_backup_delete_after), deleteAfter, vm::setDeleteAfter)
+
+            // Device folders — on = included; switch off to exclude a folder from backup.
+            if (buckets.isNotEmpty()) {
+                SectionLabel(stringResource(R.string.gallery_backup_folders))
+                Text(stringResource(R.string.gallery_backup_folders_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                buckets.forEach { b ->
+                    ToggleRow("${b.name} (${b.count})", checked = b.id !in excludedBuckets) { on -> vm.setBucketExcluded(b.id, !on) }
+                }
+            }
 
             SectionLabel(stringResource(R.string.gallery_backup_background))
             ToggleRow(stringResource(R.string.gallery_backup_background), background, vm::setBackground)

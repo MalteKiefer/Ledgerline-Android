@@ -1584,4 +1584,6 @@
     <string name="gallery_backup_battery_ok">Bei niedrigem Akku aussetzen</string>
     <string name="gallery_backup_idle">Hintergrund nur im Ruhezustand</string>
     <string name="gallery_open_map">Auf Karte anzeigen</string>
+    <string name="gallery_backup_folders">Geräteordner</string>
+    <string name="gallery_backup_folders_desc">Ordner ausschalten, um ihn vom Backup auszuschließen.</string>
 </resources>

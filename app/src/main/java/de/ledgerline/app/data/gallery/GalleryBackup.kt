@@ -91,7 +91,8 @@ class GalleryBackup @Inject constructor(
         val includeVideos = settings.galleryBackupVideos.first()
         val albumId = settings.galleryBackupAlbumId.first()
         val deleteAfter = settings.galleryBackupDeleteAfter.first()
-        val items = queryNewMedia(since, includeVideos)
+        val excluded = settings.galleryBackupExcludedBuckets.first()
+        val items = queryNewMedia(since, includeVideos, excluded)
         if (items.isEmpty()) {
             if (since == 0L) settings.setGalleryBackupSince(nowSeconds())
             return@withLock 0
@@ -122,21 +123,30 @@ class GalleryBackup @Inject constructor(
 
     private data class Media(val id: Long, val name: String, val mime: String?, val dateAdded: Long, val isVideo: Boolean)
 
-    private fun queryNewMedia(sinceSeconds: Long, includeVideos: Boolean): List<Media> {
+    /** One device media folder (MediaStore bucket) the user can include/exclude. */
+    data class Bucket(val id: String, val name: String, val count: Int)
+
+    private fun queryNewMedia(sinceSeconds: Long, includeVideos: Boolean, excludedBuckets: Set<String>): List<Media> {
         val out = ArrayList<Media>()
         val projection = arrayOf(
             MediaStore.MediaColumns._ID,
             MediaStore.MediaColumns.DISPLAY_NAME,
             MediaStore.MediaColumns.MIME_TYPE,
             MediaStore.MediaColumns.DATE_ADDED,
+            MediaStore.MediaColumns.BUCKET_ID,
         )
-        val selection = "${MediaStore.MediaColumns.DATE_ADDED} > ?"
-        val args = arrayOf(sinceSeconds.toString())
         val order = "${MediaStore.MediaColumns.DATE_ADDED} ASC"
 
         fun scan(collection: android.net.Uri, isVideo: Boolean) {
+            // Exclude opted-out folders directly in SQL when possible.
+            val sel = StringBuilder("${MediaStore.MediaColumns.DATE_ADDED} > ?")
+            val args = ArrayList<String>().apply { add(sinceSeconds.toString()) }
+            if (excludedBuckets.isNotEmpty()) {
+                sel.append(" AND ${MediaStore.MediaColumns.BUCKET_ID} NOT IN (${excludedBuckets.joinToString(",") { "?" }})")
+                args.addAll(excludedBuckets)
+            }
             runCatching {
-                context.contentResolver.query(collection, projection, selection, args, order)?.use { c ->
+                context.contentResolver.query(collection, projection, sel.toString(), args.toTypedArray(), order)?.use { c ->
                     val idc = c.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                     val namec = c.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
                     val mimec = c.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
@@ -150,6 +160,29 @@ class GalleryBackup @Inject constructor(
         scan(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, false)
         if (includeVideos) scan(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true)
         return out.sortedBy { it.dateAdded }
+    }
+
+    /** Distinct device media folders (buckets) with a photo count — for the include/exclude picker. */
+    fun deviceBuckets(includeVideos: Boolean): List<Bucket> {
+        val map = LinkedHashMap<String, Bucket>()
+        val projection = arrayOf(MediaStore.MediaColumns.BUCKET_ID, MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
+        fun scan(collection: android.net.Uri) {
+            runCatching {
+                context.contentResolver.query(collection, projection, null, null, null)?.use { c ->
+                    val idc = c.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_ID)
+                    val namec = c.getColumnIndexOrThrow(MediaStore.MediaColumns.BUCKET_DISPLAY_NAME)
+                    while (c.moveToNext()) {
+                        val id = c.getString(idc) ?: continue
+                        val name = c.getString(namec) ?: id
+                        val prev = map[id]
+                        map[id] = Bucket(id, name, (prev?.count ?: 0) + 1)
+                    }
+                }
+            }
+        }
+        scan(MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        if (includeVideos) scan(MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+        return map.values.sortedByDescending { it.count }
     }
 
     private fun uriFor(item: Media): android.net.Uri {
