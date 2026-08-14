@@ -65,22 +65,24 @@ class GalleryViewModel @Inject constructor(
     private val previewCache = mutableMapOf<String, ImageBitmap?>()
 
     suspend fun thumbnail(p: GalleryPhoto): ImageBitmap? {
-        if (!p.thumb) return null // worker still generating; caller shows a spinner + reloads
         val key = "${p.id}:${p.version}"
         thumbCache[key]?.let { return it }
-        if (thumbCache.containsKey(key)) return null
+        // Fetch the thumbnail unconditionally: the server serves the cached webp whenever it exists and
+        // 404s only when it is genuinely not generated yet. We do NOT trust the `thumb` readiness flag
+        // (a large migrated library can have the bytes on disk while the DB flag is still false/unbackfilled).
+        // Only cache a SUCCESSFUL decode, so a 404 retries on the next bind once the worker catches up.
         val bmp = repo.thumbBytes(p.id)?.let { decode(it) }
-        thumbCache[key] = bmp
+        if (bmp != null) thumbCache[key] = bmp
         return bmp
     }
 
     suspend fun preview(p: GalleryPhoto): ImageBitmap? {
         val key = "${p.id}:${p.version}"
         previewCache[key]?.let { return it }
-        if (previewCache.containsKey(key)) return null
-        // The lightbox WebP; on a cache miss the server 404s and re-queues generation.
-        val bmp = repo.previewBytes(p.id)?.let { decode(it) }
-        previewCache[key] = bmp
+        // Lightbox WebP; fetch regardless of the `preview` flag (server 404s only if truly not ready).
+        // Fall back to the raw original bytes so an image without a generated preview still shows.
+        val bmp = (repo.previewBytes(p.id) ?: repo.rawBytes(p.id))?.let { decode(it) }
+        if (bmp != null) previewCache[key] = bmp
         return bmp
     }
 

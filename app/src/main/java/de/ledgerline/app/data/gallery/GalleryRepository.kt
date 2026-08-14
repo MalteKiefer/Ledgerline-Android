@@ -230,6 +230,10 @@ class GalleryRepository @Inject constructor(
     suspend fun previewBytes(id: Int): ByteArray? = withContext(Dispatchers.IO) {
         runCatching { api().preview(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
     }
+    /** Original bytes (lightbox fallback when no WebP preview was generated; HEIF decodes on API 28+). */
+    suspend fun rawBytes(id: Int): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { api().raw(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    }
     /** Stream a photo's original (or edited) bytes into [dest] for saving/opening. */
     suspend fun downloadToFile(id: Int, dest: File, variant: String? = null): Boolean = withContext(Dispatchers.IO) {
         runCatching {

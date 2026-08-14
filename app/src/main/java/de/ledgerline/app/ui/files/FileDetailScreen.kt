@@ -176,7 +176,10 @@ fun FileDetailScreen(vm: FilesViewModel, fileId: Int, onBack: () -> Unit) {
             Column(Modifier.fillMaxWidth().cardSurface(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 MetaRow(stringResource(R.string.files_type), file.mime ?: "—")
                 MetaRow(stringResource(R.string.files_size), formatBytes(file.size))
+                file.createdAt?.let { MetaRow(stringResource(R.string.files_created), it.take(19).replace('T', ' ')) }
                 file.updatedAt?.let { MetaRow(stringResource(R.string.files_modified), it.take(19).replace('T', ' ')) }
+                MetaRow(stringResource(R.string.files_versions), file.version.toString())
+                file.sha256?.takeIf { it.isNotBlank() }?.let { MetaRow("SHA-256", it) }
                 MetaRow(stringResource(R.string.files_tags), file.tags.joinToString(", ").ifBlank { "—" })
                 MetaRow(stringResource(R.string.files_note), file.note?.takeIf { it.isNotBlank() } ?: "—")
             }
