@@ -35,11 +35,29 @@ import javax.inject.Singleton
  */
 @Singleton
 class GalleryRepository @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
     private val sessionHolder: SessionHolder,
     private val connectivity: Connectivity,
 ) {
     private val _data = MutableStateFlow<GalleryData?>(null)
     val data: StateFlow<GalleryData?> = _data.asStateFlow()
+
+    // Plaintext offline cache of the first timeline page (app-private, no backup) for instant
+    // cold-offline browse; mirrors FilesRepository/finance_data.json.
+    private val cacheFile = File(context.filesDir, "gallery_data.json")
+    private val cacheJson = kotlinx.serialization.json.Json {
+        ignoreUnknownKeys = true; encodeDefaults = true; explicitNulls = false; coerceInputValues = true
+    }
+    private fun readCache(): GalleryData? =
+        runCatching { if (cacheFile.exists()) cacheJson.decodeFromString(GalleryData.serializer(), cacheFile.readText()) else null }.getOrNull()
+    private fun writeCache(d: GalleryData) = runCatching {
+        val tmp = File(cacheFile.parentFile, cacheFile.name + ".tmp")
+        tmp.writeText(cacheJson.encodeToString(GalleryData.serializer(), d))
+        tmp.renameTo(cacheFile)
+    }
+    // On-disk thumbnail byte cache so the grid survives process death + works offline (keyed id+version).
+    private val thumbDir = File(context.cacheDir, "gallery_thumbs").apply { mkdirs() }
+    private fun thumbCacheFile(id: Int, version: Int) = File(thumbDir, "$id-$version.webp")
 
     // Keyset-pagination state for the main (non-archived) timeline.
     private var cursor: String? = null
@@ -51,7 +69,11 @@ class GalleryRepository @Inject constructor(
         return NetworkFactory.createGallery(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin)
     }
 
-    fun clear() { _data.value = null }
+    fun clear() {
+        _data.value = null
+        runCatching { cacheFile.delete() }
+        runCatching { thumbDir.listFiles()?.forEach { it.delete() } }
+    }
 
     private fun cur() = _data.value ?: GalleryData()
     private fun upsert(p: GalleryPhoto) = _data.let {
@@ -62,9 +84,13 @@ class GalleryRepository @Inject constructor(
     private fun remove(id: Int) { _data.value = GalleryData(cur().photos.filterNot { it.id == id }) }
     private fun removeAll(ids: Set<Int>) { _data.value = GalleryData(cur().photos.filterNot { it.id in ids }) }
 
-    /** Load (or reload) the FIRST page of the timeline. Resets the keyset cursor. */
+    /**
+     * Cache-first load of the FIRST timeline page: publish the disk snapshot immediately (instant
+     * cold-offline browse), then refresh from the network and overwrite the cache. Resets the cursor.
+     */
     suspend fun load(): Outcome<GalleryData> = withContext(Dispatchers.IO) {
         sessionHolder.get() ?: return@withContext Outcome.Err(ErrorKind.HTTP)
+        if (_data.value == null) readCache()?.let { _data.value = it }
         try {
             val res = api().data(limit = PAGE)
             when {
@@ -74,12 +100,14 @@ class GalleryRepository @Inject constructor(
                     val body = res.body()!!
                     cursor = body.nextCursor
                     endReached = body.nextCursor == null
-                    _data.value = GalleryData(body.photos)
-                    Outcome.Ok(_data.value!!)
+                    val page = GalleryData(body.photos)
+                    _data.value = page
+                    writeCache(page)
+                    Outcome.Ok(page)
                 }
             }
         } catch (e: Exception) {
-            _data.value?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK, e)
+            (_data.value ?: readCache()?.also { _data.value = it })?.let { Outcome.Ok(it) } ?: Outcome.Err(ErrorKind.NETWORK, e)
         }
     }
 
@@ -224,8 +252,20 @@ class GalleryRepository @Inject constructor(
     }
 
     // ---- Bytes ----
-    suspend fun thumbBytes(id: Int): ByteArray? = withContext(Dispatchers.IO) {
-        runCatching { api().thumb(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+    /**
+     * Thumbnail bytes, disk-cached by id+version: a cache hit avoids the network entirely (fast scroll,
+     * works offline); a miss fetches, persists, and returns. [version] 0 = uncached fetch (covers).
+     */
+    suspend fun thumbBytes(id: Int, version: Int = 0): ByteArray? = withContext(Dispatchers.IO) {
+        if (version > 0) {
+            val f = thumbCacheFile(id, version)
+            if (f.exists()) return@withContext runCatching { f.readBytes() }.getOrNull()
+            val bytes = runCatching { api().thumb(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+            if (bytes != null) runCatching { f.writeBytes(bytes) }
+            bytes
+        } else {
+            runCatching { api().thumb(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
+        }
     }
     suspend fun previewBytes(id: Int): ByteArray? = withContext(Dispatchers.IO) {
         runCatching { api().preview(id).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()

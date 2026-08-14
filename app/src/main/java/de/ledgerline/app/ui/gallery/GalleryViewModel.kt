@@ -71,7 +71,7 @@ class GalleryViewModel @Inject constructor(
         // 404s only when it is genuinely not generated yet. We do NOT trust the `thumb` readiness flag
         // (a large migrated library can have the bytes on disk while the DB flag is still false/unbackfilled).
         // Only cache a SUCCESSFUL decode, so a 404 retries on the next bind once the worker catches up.
-        val bmp = repo.thumbBytes(p.id)?.let { decode(it) }
+        val bmp = repo.thumbBytes(p.id, p.version)?.let { decode(it) }
         if (bmp != null) thumbCache[key] = bmp
         return bmp
     }

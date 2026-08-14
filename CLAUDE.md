@@ -172,7 +172,11 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   2026-08-14): `/gallery/data?limit&cursor&cursor_ym` liefert Seiten à 200 + `next_cursor`; `load()`
   holt Seite 1, `loadMore()` (Grid-Scroll-`snapshotFlow`) hängt an; Album/Archiv-Sub-Listen laufen alle
   Seiten via `fetchAllPages`; `/gallery/dates` Monats-Histogramm (Scrubber, Datenschicht). Server macht
-  readiness (thumb/preview) jetzt DB-basiert (kein per-Row-Disk-Stat mehr).
+  readiness (thumb/preview) jetzt DB-basiert (kein per-Row-Disk-Stat mehr). **Cache** (2026-08-14):
+  cache-first Metadaten (`gallery_data.json` = erste Seite, sofort für cold-offline-Browse) +
+  **Thumbnail-Disk-Cache** (`cacheDir/gallery_thumbs/{id}-{version}.webp` → schnelles Scrollen + offline
+  Thumbs); `clear()`/Wipe löscht beides. Thumb/Preview-Fetch bewusst **flag-unabhängig** (Server-404
+  = wirklich nicht bereit; `thumb_ready`-Backfill egal).
   **Phase 2 (fertig 2026-08-13):** Video-Playback (`/{id}/play` web-MP4 → pinned-Download → inline
   `VideoView`, kein Media3) + Live-Photo (`/{id}/motion`); **Archiv** (`/{id}/archive` PATCH,
   `/bulk-archive`, `GalleryArchiveScreen` + load `?archived=1`); **Alben** (`/albums` CRUD +
