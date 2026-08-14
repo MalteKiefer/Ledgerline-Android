@@ -161,6 +161,7 @@ dependencies {
 
     implementation(libs.unifiedpush.connector)
     implementation(libs.markdown.renderer.m3)
+    implementation(libs.markdown.renderer.code)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

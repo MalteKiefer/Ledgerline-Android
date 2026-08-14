@@ -125,6 +125,8 @@ mapsforge-themes = { module = "org.mapsforge:mapsforge-themes", version.ref = "m
 mapsforge-core = { module = "org.mapsforge:mapsforge-core", version.ref = "mapsforge" }
 unifiedpush-connector = { module = "org.unifiedpush.android:connector", version.ref = "unifiedpush" }
 markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
+# Code-block syntax highlighting for the Markdown preview (uses dev.snipme:highlights under the hood).
+markdown-renderer-code = { module = "com.mikepenz:multiplatform-markdown-renderer-code", version.ref = "markdownRenderer" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

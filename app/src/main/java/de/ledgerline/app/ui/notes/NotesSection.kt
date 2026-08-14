@@ -319,7 +319,8 @@ private fun NoteEditorSheet(
     var attachments by remember { mutableStateOf<List<de.ledgerline.app.domain.model.notes.NoteAttachment>>(emptyList()) }
     var showFilePicker by remember { mutableStateOf(false) }
     var pickable by remember { mutableStateOf<List<de.ledgerline.app.domain.model.files.FileEntry>>(emptyList()) }
-    var preview by remember { mutableStateOf(false) }
+    // Open an existing note in the rendered preview (read-first); a brand-new note starts in edit.
+    var preview by remember(existingId) { mutableStateOf(existingId != null) }
     var tagInput by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
 
@@ -416,8 +417,15 @@ private fun NoteEditorSheet(
                 // Rewrite [[Title]] into a tappable internal link before rendering; the wikiHandler
                 // resolves the title to a note id and re-targets the editor.
                 val rendered = remember(body) { rewriteWikilinks(body) }.ifBlank { stringResource(R.string.notes_empty_body) }
+                // GitHub-flavored Markdown (tables/strikethrough/task-lists render natively) plus
+                // per-language syntax highlighting for code fences, with a header showing the language
+                // and a copy button.
+                val mdComponents = com.mikepenz.markdown.compose.components.markdownComponents(
+                    codeBlock = com.mikepenz.markdown.compose.elements.highlightedCodeBlock,
+                    codeFence = com.mikepenz.markdown.compose.elements.highlightedCodeFence,
+                )
                 androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalUriHandler provides wikiHandler) {
-                    Box(Modifier.fillMaxWidth().cardSurface()) { Markdown(content = rendered) }
+                    Box(Modifier.fillMaxWidth().cardSurface()) { Markdown(content = rendered, components = mdComponents) }
                 }
             } else {
                 OutlinedTextField(value = body, onValueChange = { body = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.notes_body_md)) }, minLines = 6)
