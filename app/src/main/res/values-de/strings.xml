@@ -158,6 +158,11 @@
     <string name="gallery_added_to_album">Zum Album hinzugefügt</string>
     <string name="gallery_album_remove">Aus Album entfernen</string>
     <string name="gallery_edit_date">Datum setzen</string>
+    <string name="share_upload_title">Geteilte Inhalte hochladen</string>
+    <string name="share_upload_count">%1$d Element(e) geteilt</string>
+    <string name="share_uploaded_n">%1$d hochgeladen</string>
+    <string name="share_to_files">In Dateien</string>
+    <string name="share_to_gallery">In Galerie</string>
     <string name="ws_empty_notes">Noch keine Notizen.</string>
     <string name="ws_empty_bookmarks">Noch keine Lesezeichen.</string>
     <string name="ws_empty_todos">Noch keine Todos.</string>

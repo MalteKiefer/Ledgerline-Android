@@ -159,6 +159,11 @@
     <string name="gallery_added_to_album">Добавлено в альбом</string>
     <string name="gallery_album_remove">Убрать из альбома</string>
     <string name="gallery_edit_date">Задать дату</string>
+    <string name="share_upload_title">Загрузить полученное</string>
+    <string name="share_upload_count">Получено элементов: %1$d</string>
+    <string name="share_uploaded_n">Загружено: %1$d</string>
+    <string name="share_to_files">В Файлы</string>
+    <string name="share_to_gallery">В Галерею</string>
     <string name="ws_empty_notes">Пока нет заметок.</string>
     <string name="ws_empty_bookmarks">Пока нет закладок.</string>
     <string name="ws_empty_todos">Пока нет задач.</string>

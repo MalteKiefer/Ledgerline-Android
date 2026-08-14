@@ -40,6 +40,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var settingsStore: SettingsStore
     @Inject lateinit var deepLinkBus: de.ledgerline.app.core.DeepLinkBus
     @Inject lateinit var pushRegistrar: de.ledgerline.app.push.PushRegistrar
+    @Inject lateinit var shareInbox: de.ledgerline.app.core.ShareInbox
 
     private var idleTimeoutMs = 5 * 60_000L
     @Volatile private var lastInteraction = SystemClock.elapsedRealtime()
@@ -76,7 +77,48 @@ class MainActivity : FragmentActivity() {
         if (intent?.getStringExtra(EXTRA_OPEN) == OPEN_NOTIFICATIONS) {
             deepLinkBus.emit(de.ledgerline.app.core.DeepLink.NOTIFICATIONS)
         }
+        handleShare(intent)
     }
+
+    /**
+     * ACTION_SEND(_MULTIPLE): copy the shared URIs into cache NOW (the read grant is only valid while
+     * this activity holds the intent), then publish them to [shareInbox]; the unlocked shell offers the
+     * upload. Copying runs off the main thread but within the live grant.
+     */
+    private fun handleShare(intent: Intent?) {
+        intent ?: return
+        val uris: List<android.net.Uri> = when (intent.action) {
+            Intent.ACTION_SEND -> listOfNotNull(
+                if (android.os.Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                else @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM),
+            )
+            Intent.ACTION_SEND_MULTIPLE ->
+                (if (android.os.Build.VERSION.SDK_INT >= 33) intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+                else @Suppress("DEPRECATION") intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)).orEmpty()
+            else -> return
+        }
+        if (uris.isEmpty()) return
+        lifecycleScope.launch {
+            val items = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val dir = java.io.File(cacheDir, "shared").apply { mkdirs() }
+                uris.mapNotNull { uri ->
+                    runCatching {
+                        val name = queryDisplayName(uri) ?: "shared_${System.nanoTime()}"
+                        val dest = java.io.File(dir, "${System.nanoTime()}_$name")
+                        contentResolver.openInputStream(uri)?.use { i -> dest.outputStream().use { i.copyTo(it) } }
+                        de.ledgerline.app.core.ShareInbox.Item(dest, name, contentResolver.getType(uri))
+                    }.getOrNull()
+                }
+            }
+            if (items.isNotEmpty()) shareInbox.set(items)
+        }
+    }
+
+    private fun queryDisplayName(uri: android.net.Uri): String? = runCatching {
+        contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0) else null
+        }
+    }.getOrNull()
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

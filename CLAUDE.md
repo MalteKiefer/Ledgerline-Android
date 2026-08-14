@@ -193,7 +193,7 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   (EXIF/PDF/STL/Text via `FileInfoMetadata`), SHA-256, Pfad, Versionszahl, Inhalts-Snippet,
   Share-Status, Duplikate + Aktivität als Dialog im Detail-Screen. **Aktivitäts-Feed**
   (`GET /files/activity` + `/entries/{id}/activity`, `FileActivity`) in der Datenschicht/VM.
-  **Offen (Rest):** Share-Target (`ACTION_SEND`); Aktivitäts-Feed-Screen; externe Mounts (`/mounts/*`
+  **Offen (Rest):** Aktivitäts-Feed-Screen; externe Mounts (`/mounts/*`
   S3+SFTP, bewusst verschoben).
 - **`ui/money/FinanceSection`** — Top-Tab-Row (Dashboard/Rechnungen/Umsätze/Mehr) über geteiltes
   **`FinanceViewModel`**; „Mehr" → Partner/Zahlungsmittel/Projekte/Belege(Fremdbelege)/Insights/
@@ -290,7 +290,13 @@ Auswahl + Als gesendet/bezahlt, tx↔Rechnung-Link, Beleg-Metadaten-Edit, Firmen
 Kontaktpersonen, Partner-Kontaktpersonen, Rechnungssuche, Projekt-Nesting, Quartals-USt, Konto-USt).
 Datenmodell-Fixes: `company_contacts`, `InvoiceAging.buckets`, `FinanceTrash.standaloneReceipts`.
 **Bewusst weggelassen (User):** client-seitige Rechnungs-PDF-Erzeugung (bleibt web-seitig).
-**Offen (Rest):** Share-Target (`ACTION_SEND`), MT940/CAMT-Import, mehr Tests. **On-device-Verifikation
+**Share-Target (2026-08-14):** `ACTION_SEND`/`SEND_MULTIPLE`-Intent-Filter an `MainActivity`; die
+geteilten URIs werden sofort (unter dem lebenden Read-Grant) in `cacheDir/shared` kopiert und im
+`core/ShareInbox`-Singleton veröffentlicht; die entsperrte `AppShell` blendet ein `ui/share/
+ShareUploadSheet` ein (Ziel **Dateien** [root] oder **Galerie** [nur Bild/Video, wenn Modul aktiv]) →
+`FilesRepository`/`GalleryRepository`-Upload, danach Inbox geleert. Kein separater Biometrie-Unlock —
+läuft über den bestehenden Lock-Flow.
+**Offen (Rest):** MT940/CAMT-Import, mehr Tests. **On-device-Verifikation
 offen** (FLAG_SECURE → visuell am Gerät prüfen).
 
 **Push-Notifications (2026-08-10) — Android fertig, Server offen:** UnifiedPush-Client komplett

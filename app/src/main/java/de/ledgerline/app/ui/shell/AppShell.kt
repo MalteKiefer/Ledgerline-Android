@@ -159,5 +159,7 @@ fun AppShell(
                 )
             }
         }
+        // Content shared into the app (ACTION_SEND) surfaces here as an upload sheet (self-hides when empty).
+        de.ledgerline.app.ui.share.ShareUploadSheet()
     }
 }
