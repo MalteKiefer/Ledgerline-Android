@@ -23,4 +23,6 @@
     <string name="notes_attachments">Вложения</string>
     <string name="notes_attach_add">Добавить</string>
     <string name="notes_export">Экспорт в Markdown</string>
+    <string name="notes_none_match">Нет подходящих заметок.</string>
+    <string name="notes_empty_hint">Нажмите кнопку, чтобы создать первую заметку.</string>
 </resources>

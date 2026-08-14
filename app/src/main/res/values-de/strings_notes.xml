@@ -23,4 +23,6 @@
     <string name="notes_attachments">Anhänge</string>
     <string name="notes_attach_add">Hinzufügen</string>
     <string name="notes_export">Als Markdown exportieren</string>
+    <string name="notes_none_match">Keine passenden Notizen.</string>
+    <string name="notes_empty_hint">Tippe auf den Button für deine erste Notiz.</string>
 </resources>

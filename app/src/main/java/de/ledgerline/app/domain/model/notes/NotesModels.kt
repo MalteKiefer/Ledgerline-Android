@@ -20,6 +20,8 @@ data class NoteRow(
     val id: Int = 0,
     @SerialName("note_folder_id") val folderId: Int? = null,
     val title: String = "",
+    /** Short plain-text preview of the Markdown body (list cards). */
+    val excerpt: String = "",
     val tags: List<String> = emptyList(),
     val pinned: Boolean = false,
     val favorite: Boolean = false,

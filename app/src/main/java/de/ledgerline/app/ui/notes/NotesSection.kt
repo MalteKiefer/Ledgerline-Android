@@ -2,6 +2,8 @@
 
 package de.ledgerline.app.ui.notes
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -57,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -162,12 +166,21 @@ fun NotesSection(
 
             Box(Modifier.fillMaxSize()) {
                 if (shown.isEmpty()) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.notes_empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    NotesEmptyState(searching || selectedFolder != null)
                 } else {
-                    LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(shown, key = { it.id }) { n ->
+                    // Pinned notes float to the top; the rest by recency. A staggered grid gives each
+                    // note a card sized to its own preview (Keep-style), so the page reads as content.
+                    val ordered = remember(shown) {
+                        shown.sortedWith(compareByDescending<NoteRow> { it.pinned }.thenByDescending { it.updatedAt ?: "" })
+                    }
+                    androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid(
+                        columns = androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells.Adaptive(180.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 96.dp),
+                        verticalItemSpacing = 10.dp,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        staggeredItems(ordered, key = { it.id }) { n ->
                             NoteCard(n, onOpen = { editId = n.id; editorOpen = true }, onFav = { vm.setFavorite(n.id, !n.favorite) }, onPin = { vm.setPinned(n.id, !n.pinned) })
                         }
                     }
@@ -176,6 +189,8 @@ fun NotesSection(
                     onClick = { editId = null; editorOpen = true },
                     icon = { Icon(Icons.Outlined.Add, contentDescription = null) },
                     text = { Text(stringResource(R.string.notes_new)) },
+                    containerColor = Brand.accent,
+                    contentColor = Color.White,
                     modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
                 )
             }
@@ -195,18 +210,89 @@ fun NotesSection(
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun NoteCard(n: NoteRow, onOpen: () -> Unit, onFav: () -> Unit, onPin: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable { onOpen() }.cardSurface(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(n.title.ifBlank { stringResource(R.string.notes_untitled) }, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-            IconButton(onClick = onPin) { Icon(Icons.Outlined.PushPin, contentDescription = stringResource(R.string.notes_pin), tint = if (n.pinned) Brand.accent else MaterialTheme.colorScheme.onSurfaceVariant) }
-            IconButton(onClick = onFav) { Icon(Icons.Outlined.Star, contentDescription = stringResource(R.string.notes_favorite), tint = if (n.favorite) Brand.tintOrange else MaterialTheme.colorScheme.onSurfaceVariant) }
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    val hasTitle = n.title.isNotBlank()
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .then(
+                if (n.pinned) Modifier.border(1.5.dp, Brand.accent.copy(alpha = 0.55f), shape) else Modifier,
+            )
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable { onOpen() }
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                n.title.ifBlank { stringResource(R.string.notes_untitled) },
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.titleSmall,
+                color = if (hasTitle) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+            if (n.pinned) Icon(Icons.Outlined.PushPin, contentDescription = null, tint = Brand.accent, modifier = Modifier.padding(start = 4.dp).heightIn(max = 16.dp))
+        }
+        if (n.excerpt.isNotBlank()) {
+            Text(
+                n.excerpt,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 8,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
         }
         if (n.tags.isNotEmpty()) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                n.tags.forEach { t -> Text("#$t", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                n.tags.take(4).forEach { t ->
+                    Text(
+                        "#$t",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Brand.accent,
+                        modifier = Modifier
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                            .background(Brand.accent.copy(alpha = 0.10f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
             }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            CompactIcon(Icons.Outlined.PushPin, active = n.pinned, activeTint = Brand.accent, cd = stringResource(R.string.notes_pin), onClick = onPin)
+            CompactIcon(Icons.Outlined.Star, active = n.favorite, activeTint = Brand.tintOrange, cd = stringResource(R.string.notes_favorite), onClick = onFav)
+        }
+    }
+}
+
+@Composable
+private fun CompactIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, active: Boolean, activeTint: Color, cd: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick, modifier = Modifier.heightIn(max = 32.dp).width(32.dp)) {
+        Icon(icon, contentDescription = cd, tint = if (active) activeTint else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.heightIn(max = 18.dp))
+    }
+}
+
+@Composable
+private fun NotesEmptyState(filtered: Boolean) {
+    Column(
+        Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        de.ledgerline.app.ui.theme.HeroIcon(Icons.Outlined.Edit)
+        Spacer(Modifier.heightIn(min = 16.dp))
+        Text(
+            stringResource(if (filtered) R.string.notes_none_match else R.string.notes_empty),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (!filtered) {
+            Spacer(Modifier.heightIn(min = 6.dp))
+            Text(stringResource(R.string.notes_empty_hint), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

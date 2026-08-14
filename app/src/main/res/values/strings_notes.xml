@@ -23,4 +23,6 @@
     <string name="notes_attachments">Attachments</string>
     <string name="notes_attach_add">Add</string>
     <string name="notes_export">Export as Markdown</string>
+    <string name="notes_none_match">No notes match.</string>
+    <string name="notes_empty_hint">Tap the button to write your first note.</string>
 </resources>
