@@ -62,6 +62,11 @@ object NetworkFactory {
         retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
             .create(GalleryApi::class.java)
 
+    /** Read-only contacts slice (used only to link a gallery person to an address-book contact). */
+    fun createContacts(baseUrl: String, tokenProvider: () -> String?, pin: String?): ContactsApi =
+        retrofitFor(baseUrl, tokenProvider, pin, listOf(ConnectionSpec.RESTRICTED_TLS))
+            .create(ContactsApi::class.java)
+
     /**
      * A minimal HTTPS client (RESTRICTED_TLS + SPKI pinning, short timeouts, no auth) for the
      * server-reachability health ping (`GET {baseUrl}/up`). Same fail-closed transport as the API,

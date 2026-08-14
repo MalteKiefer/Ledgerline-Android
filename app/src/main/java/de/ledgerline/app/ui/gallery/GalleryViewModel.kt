@@ -155,6 +155,8 @@ class GalleryViewModel @Inject constructor(
     fun renamePerson(id: Int, name: String?, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.renamePerson(id, name)) }
     fun deletePerson(id: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.deletePerson(id)) }
     fun mergePeople(fromId: Int, intoId: Int, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.mergePeople(fromId, intoId)) }
+    suspend fun searchContacts(q: String) = repo.searchContacts(q)
+    fun linkPersonContact(personId: Int, contactId: String?, done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.linkPersonContact(personId, contactId)) }
 
     private val faceCache = mutableMapOf<Int, ImageBitmap?>()
     /** Decoded face crop for a person's cover (or any face id). Cached. */

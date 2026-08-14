@@ -298,6 +298,23 @@ class GalleryRepository @Inject constructor(
         runCatching { api().faceCrop(faceId).takeIf { it.isSuccessful }?.body()?.bytes() }.getOrNull()
     }
 
+    private fun contactsApi(): de.ledgerline.app.data.remote.ContactsApi {
+        val s = sessionHolder.get() ?: error("no session")
+        return NetworkFactory.createContacts(s.baseUrl, tokenProvider = { s.token }, pin = s.spkiPin)
+    }
+    /** Read-only contact search for linking a person (empty when the contacts module is off). */
+    suspend fun searchContacts(q: String): List<de.ledgerline.app.data.remote.ContactLite> = withContext(Dispatchers.IO) {
+        runCatching { contactsApi().data(q.ifBlank { null }).takeIf { it.isSuccessful }?.body()?.contacts.orEmpty() }.getOrDefault(emptyList())
+    }
+    /** Link a person to an address-book contact (server sets the name from the contact). null unlinks. */
+    suspend fun linkPersonContact(personId: Int, contactId: String?): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            api().updatePerson(personId, buildJsonObject {
+                if (contactId.isNullOrBlank()) put("contact_id", kotlinx.serialization.json.JsonNull) else put("contact_id", contactId)
+            }).isSuccessful
+        }.getOrDefault(false)
+    }
+
     private fun copyBody(body: ResponseBody, out: OutputStream) { body.byteStream().use { it.copyTo(out) } }
     private fun String.textPart() = toRequestBody("text/plain".toMediaTypeOrNull())
 

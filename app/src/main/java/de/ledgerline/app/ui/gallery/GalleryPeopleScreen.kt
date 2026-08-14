@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items as listItems
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MoreVert
@@ -58,6 +61,7 @@ fun GalleryPeopleScreen(vm: GalleryViewModel, onBack: () -> Unit) {
     var opened by remember { mutableStateOf<GalleryPerson?>(null) }
     var renaming by remember { mutableStateOf<GalleryPerson?>(null) }
     var merging by remember { mutableStateOf<GalleryPerson?>(null) }
+    var linking by remember { mutableStateOf<GalleryPerson?>(null) }
     fun reload() { scope.launch { people = vm.people() } }
     LaunchedEffect(Unit) { reload() }
 
@@ -83,6 +87,7 @@ fun GalleryPeopleScreen(vm: GalleryViewModel, onBack: () -> Unit) {
                         onRename = { renaming = person },
                         onDelete = { vm.deletePerson(person.id) { reload() } },
                         onMerge = { merging = person },
+                        onLink = { linking = person },
                     )
                 }
             }
@@ -97,6 +102,42 @@ fun GalleryPeopleScreen(vm: GalleryViewModel, onBack: () -> Unit) {
             text = { TextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.gallery_person_name)) }) },
             confirmButton = { TextButton(onClick = { renaming = null; vm.renamePerson(p.id, name.trim().ifBlank { null }) { reload() } }) { Text(stringResource(R.string.action_save)) } },
             dismissButton = { TextButton(onClick = { renaming = null }) { Text(stringResource(R.string.action_cancel)) } },
+        )
+    }
+
+    linking?.let { p ->
+        var q by remember(p.id) { mutableStateOf("") }
+        var contacts by remember(p.id) { mutableStateOf<List<de.ledgerline.app.data.remote.ContactLite>?>(null) }
+        LaunchedEffect(p.id, q) { contacts = vm.searchContacts(q) }
+        AlertDialog(
+            onDismissRequest = { linking = null },
+            title = { Text(stringResource(R.string.gallery_person_link_contact)) },
+            text = {
+                Column(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                    TextField(q, { q = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.action_search)) })
+                    if (p.contactId != null) Text(
+                        stringResource(R.string.gallery_person_unlink),
+                        Modifier.fillMaxWidth().clickable { linking = null; vm.linkPersonContact(p.id, null) { reload() } }.padding(vertical = 12.dp),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    when (val list = contacts) {
+                        null -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                        else -> LazyColumn {
+                            listItems(list, key = { it.id }) { c ->
+                                Text(
+                                    c.display,
+                                    Modifier.fillMaxWidth().clickable {
+                                        linking = null
+                                        vm.linkPersonContact(p.id, c.id) { reload() }
+                                    }.padding(vertical = 12.dp),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { linking = null }) { Text(stringResource(R.string.action_close)) } },
         )
     }
 
@@ -126,7 +167,7 @@ fun GalleryPeopleScreen(vm: GalleryViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun PersonCard(vm: GalleryViewModel, person: GalleryPerson, onOpen: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit, onMerge: () -> Unit) {
+private fun PersonCard(vm: GalleryViewModel, person: GalleryPerson, onOpen: () -> Unit, onRename: () -> Unit, onDelete: () -> Unit, onMerge: () -> Unit, onLink: () -> Unit) {
     var face by remember(person.coverFaceId) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     LaunchedEffect(person.coverFaceId) { face = vm.faceCrop(person.coverFaceId) }
     var menu by remember { mutableStateOf(false) }
@@ -146,6 +187,7 @@ private fun PersonCard(vm: GalleryViewModel, person: GalleryPerson, onOpen: () -
             )
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.action_rename)) }, onClick = { menu = false; onRename() })
+                DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_link_contact)) }, onClick = { menu = false; onLink() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_merge_into)) }, onClick = { menu = false; onMerge() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.action_delete)) }, onClick = { menu = false; onDelete() })
             }

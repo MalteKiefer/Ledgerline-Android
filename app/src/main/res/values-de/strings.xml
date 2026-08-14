@@ -1558,4 +1558,6 @@
     <string name="gallery_person_name">Name</string>
     <string name="gallery_person_count">%1$d Fotos</string>
     <string name="gallery_person_merge_into">Zusammenführen mit…</string>
+    <string name="gallery_person_link_contact">Mit Kontakt verknüpfen</string>
+    <string name="gallery_person_unlink">Kontakt-Verknüpfung entfernen</string>
 </resources>
