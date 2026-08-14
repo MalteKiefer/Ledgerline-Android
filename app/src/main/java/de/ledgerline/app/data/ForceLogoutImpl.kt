@@ -27,15 +27,22 @@ class ForceLogoutImpl @Inject constructor(
     private val avatarCache: AvatarCache,
     private val snapshotCache: AccountSnapshotCache,
     private val moduleAccess: ModuleAccess,
+    private val galleryRepository: de.ledgerline.app.data.gallery.GalleryRepository,
+    private val bgCred: de.ledgerline.app.data.gallery.BackgroundCredStore,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
 ) : ForceLogout {
     override suspend fun invoke() {
         appLockState.lock()
         sessionHolder.clear()
         financeRepository.clear()
+        galleryRepository.clear()
         avatarCache.put(null)
         snapshotCache.put(null)
         moduleAccess.clear()
         sessionStore.clear()
         keystoreSealer.clear()
+        // Kill the opt-in background-backup token + its worker on wipe.
+        bgCred.clear()
+        de.ledgerline.app.data.gallery.GalleryBackupWorker.cancel(context)
     }
 }

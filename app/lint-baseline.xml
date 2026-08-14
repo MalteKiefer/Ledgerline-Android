@@ -19,7 +19,7 @@
         errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="64"
+            line="67"
             column="27"/>
     </issue>
 
@@ -57,8 +57,41 @@
         errorLine2="                                                                                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/de/ledgerline/app/ui/gallery/GallerySection.kt"
-            line="269"
+            line="385"
             column="90"/>
+    </issue>
+
+    <issue
+        id="RemoveWorkManagerInitializer"
+        message="Remove androidx.work.WorkManagerInitializer from your AndroidManifest.xml when using on-demand initialization."
+        errorLine1="    &lt;application"
+        errorLine2="    ^">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="26"
+            column="5"/>
+    </issue>
+
+    <issue
+        id="SelectedPhotoAccess"
+        message="Your app is currently not handling Selected Photos Access introduced in Android 14+"
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.READ_MEDIA_IMAGES&quot; />"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="13"
+            column="36"/>
+    </issue>
+
+    <issue
+        id="SelectedPhotoAccess"
+        message="Your app is currently not handling Selected Photos Access introduced in Android 14+"
+        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.READ_MEDIA_VIDEO&quot; />"
+        errorLine2="                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/AndroidManifest.xml"
+            line="14"
+            column="36"/>
     </issue>
 
     <issue
@@ -169,6 +202,17 @@
             file="$HOME/Entwicklung/ledgerline-android/gradle/libs.versions.toml"
             line="33"
             column="10"/>
+    </issue>
+
+    <issue
+        id="GradleDependency"
+        message="A newer version of androidx.work:work-runtime-ktx than 2.10.0 is available: 2.11.2"
+        errorLine1="work-runtime = { module = &quot;androidx.work:work-runtime-ktx&quot;, version = &quot;2.10.0&quot; }"
+        errorLine2="                                                                      ~~~~~~~~">
+        <location
+            file="$HOME/Entwicklung/ledgerline-android/gradle/libs.versions.toml"
+            line="131"
+            column="71"/>
     </issue>
 
     <issue
@@ -442,7 +486,7 @@
         errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/de/ledgerline/app/ui/gallery/GallerySection.kt"
-            line="87"
+            line="98"
             column="19"/>
     </issue>
 
@@ -453,7 +497,7 @@
         errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/de/ledgerline/app/ui/gallery/GallerySection.kt"
-            line="102"
+            line="113"
             column="19"/>
     </issue>
 
@@ -464,7 +508,7 @@
         errorLine2="                                                                                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/de/ledgerline/app/ui/gallery/GallerySection.kt"
-            line="133"
+            line="146"
             column="107"/>
     </issue>
 
@@ -475,7 +519,7 @@
         errorLine2="                                                                                              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/de/ledgerline/app/ui/gallery/GallerySection.kt"
-            line="206"
+            line="226"
             column="95"/>
     </issue>
 
@@ -1096,6 +1140,17 @@
     </issue>
 
     <issue
+        id="PluralsCandidate"
+        message="Formatting %d followed by words (&quot;photos&quot;): This should probably be a plural rather than a string"
+        errorLine1="    &lt;string name=&quot;gallery_person_count&quot;>%1$d photos&lt;/string>"
+        errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="1562"
+            column="5"/>
+    </issue>
+
+    <issue
         id="ChromeOsAbiSupport"
         message="Missing x86_64 ABI support for ChromeOS"
         errorLine1="        ndk { abiFilters += listOf(&quot;arm64-v8a&quot;) } // 64-bit only"
@@ -1113,7 +1168,7 @@
         errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/de/ledgerline/app/MainActivity.kt"
-            line="92"
+            line="93"
             column="21"/>
     </issue>
 
@@ -1124,7 +1179,7 @@
         errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/de/ledgerline/app/MainActivity.kt"
-            line="96"
+            line="97"
             column="22"/>
     </issue>
 
@@ -11774,17 +11829,6 @@
 
     <issue
         id="UnusedResources"
-        message="The resource `R.string.tab_more` appears to be unused"
-        errorLine1="    &lt;string name=&quot;tab_more&quot;>More&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="1136"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
         message="The resource `R.string.action_refresh` appears to be unused"
         errorLine1="    &lt;string name=&quot;action_refresh&quot;>Refresh&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~">
@@ -11901,6 +11945,28 @@
         <location
             file="src/main/res/values/strings.xml"
             line="1510"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.gallery_person_link_contact` appears to be unused"
+        errorLine1="    &lt;string name=&quot;gallery_person_link_contact&quot;>Link to contact&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="1564"
+            column="13"/>
+    </issue>
+
+    <issue
+        id="UnusedResources"
+        message="The resource `R.string.gallery_contact_none` appears to be unused"
+        errorLine1="    &lt;string name=&quot;gallery_contact_none&quot;>No matching contacts.&lt;/string>"
+        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location
+            file="src/main/res/values/strings.xml"
+            line="1568"
             column="13"/>
     </issue>
 

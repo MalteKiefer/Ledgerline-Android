@@ -193,7 +193,14 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   Background-Sync): getriggert bei Unlock (`MainActivity`) + manuell „Jetzt sichern". MediaStore-Scan
   `DATE_ADDED > since` (Cursor `galleryBackupSince`, Server dedupt sha256), WLAN-only + Videos-Toggles,
   Fortschritt-`StateFlow`. Perms `READ_MEDIA_IMAGES`/`_VIDEO`, UI `GalleryBackupSheet` (Cloud-Icon).
-  Erst-Aktivierung setzt `since=now` (kein Bulk-Upload der bestehenden Fotos).
+  Erst-Aktivierung setzt `since=now`; **„Alles sichern"** = `includeExisting` (Bulk). **Ziel-Album**
+  (`galleryBackupAlbumId` → `addToAlbum` nach Upload). **Nach-Upload-Löschen** (opt-in, consent-gated via
+  `MediaStore.createDeleteRequest`, nur Vordergrund; `pendingDeletes`-StateFlow). **Hintergrund/Locked-
+  Upload** (opt-in, **Sicherheits-Downgrade**): `BackgroundCredStore` versiegelt den Token per
+  `KeystoreSealer(requireAuth=false)` (nicht-biometrisch) → `GalleryBackupWorker` (@HiltWorker,
+  WorkManager periodic 1h, Netz/Unmetered-Constraint) setzt den Token transient in `SessionHolder`,
+  läuft `runHeadless`, restauriert Locked-Zustand. `LedgerlineApp : Configuration.Provider`
+  (HiltWorkerFactory); `ForceLogout`/Wipe löscht bgCred + cancelt Worker.
   **Offen (Rest P4/P3):** CLIP-Suche/Duplikate/Memories/reprocess + per-Photo-Face-Tagging
   (assign/hide); P3 Sharing (public/internal/upload-links/Kommentare/Reaktionen).
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte

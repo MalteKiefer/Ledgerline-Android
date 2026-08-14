@@ -31,6 +31,8 @@ class GalleryViewModel @Inject constructor(
     private val repo: GalleryRepository,
     private val settings: de.ledgerline.app.data.SettingsStore,
     private val backup: de.ledgerline.app.data.gallery.GalleryBackup,
+    private val sessionHolder: de.ledgerline.app.core.SessionHolder,
+    private val bgCred: de.ledgerline.app.data.gallery.BackgroundCredStore,
 ) : ViewModel() {
 
     val data: StateFlow<GalleryData?> = repo.data
@@ -187,11 +189,30 @@ class GalleryViewModel @Inject constructor(
     val backupEnabled = flag(settings.galleryBackupEnabled, false)
     val backupWifiOnly = flag(settings.galleryBackupWifiOnly, true)
     val backupVideos = flag(settings.galleryBackupVideos, true)
+    val backupDeleteAfter = flag(settings.galleryBackupDeleteAfter, false)
+    val backupBackground = flag(settings.galleryBackupBackground, false)
+    val backupAlbumId = flag(settings.galleryBackupAlbumId, 0)
+    val pendingDeletes = backup.pendingDeletes
     fun hasMediaPermission() = backup.hasPermission()
     fun setBackupEnabled(on: Boolean) = viewModelScope.launch { settings.setGalleryBackupEnabled(on); if (on) backup.runNow(includeExisting = false) }
     fun setBackupWifiOnly(on: Boolean) = viewModelScope.launch { settings.setGalleryBackupWifiOnly(on) }
     fun setBackupVideos(on: Boolean) = viewModelScope.launch { settings.setGalleryBackupVideos(on) }
+    fun setBackupDeleteAfter(on: Boolean) = viewModelScope.launch { settings.setGalleryBackupDeleteAfter(on) }
+    fun setBackupAlbum(id: Int) = viewModelScope.launch { settings.setGalleryBackupAlbumId(id) }
     fun backupNow(includeExisting: Boolean) = backup.runNow(includeExisting)
+    fun clearPendingDeletes() = backup.clearPendingDeletes()
+
+    /** Background/locked backup: opt-in security downgrade (persists the token non-biometrically). */
+    fun setBackgroundBackup(on: Boolean) = viewModelScope.launch {
+        settings.setGalleryBackupBackground(on)
+        if (on) {
+            sessionHolder.get()?.let { bgCred.save(it) }
+            de.ledgerline.app.data.gallery.GalleryBackupWorker.schedule(context, backupWifiOnly.value)
+        } else {
+            bgCred.clear()
+            de.ledgerline.app.data.gallery.GalleryBackupWorker.cancel(context)
+        }
+    }
 
     fun clear() = repo.clear()
 }

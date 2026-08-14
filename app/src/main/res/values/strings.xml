@@ -1575,4 +1575,10 @@
     <string name="gallery_backup_videos">Include videos</string>
     <string name="gallery_backup_now">Back up now</string>
     <string name="gallery_backup_progress">Backing up %1$d / %2$d…</string>
+    <string name="gallery_backup_delete_after">Delete from device after upload</string>
+    <string name="gallery_backup_album">Add to album</string>
+    <string name="gallery_backup_album_none">None</string>
+    <string name="gallery_backup_background">Back up while locked</string>
+    <string name="gallery_backup_background_warn">Stores your login token so backup can run in the background. Less secure than the biometric lock.</string>
+    <string name="gallery_backup_all">Back up everything</string>
 </resources>

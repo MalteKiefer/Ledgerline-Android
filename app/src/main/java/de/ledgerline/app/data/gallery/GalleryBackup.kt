@@ -52,6 +52,12 @@ class GalleryBackup @Inject constructor(
     private val _status = MutableStateFlow(BackupStatus())
     val status: StateFlow<BackupStatus> = _status.asStateFlow()
 
+    // Successfully-uploaded content URIs awaiting the user's delete confirmation (foreground only —
+    // MediaStore.createDeleteRequest needs UI, so a background/worker run leaves them for next time).
+    private val _pendingDeletes = MutableStateFlow<List<android.net.Uri>>(emptyList())
+    val pendingDeletes: StateFlow<List<android.net.Uri>> = _pendingDeletes.asStateFlow()
+    fun clearPendingDeletes() { _pendingDeletes.value = emptyList() }
+
     /** True if we can read the camera roll (READ_MEDIA_IMAGES). */
     fun hasPermission(): Boolean =
         context.checkSelfPermission(android.Manifest.permission.READ_MEDIA_IMAGES) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -69,37 +75,47 @@ class GalleryBackup @Inject constructor(
         scope.launch { runInternal(includeExisting) }
     }
 
-    private suspend fun runInternal(includeExisting: Boolean) = mutex.withLock {
-        if (_status.value.running) return@withLock
-        if (sessionHolder.get() == null) return@withLock          // locked → no token
-        if (!hasPermission()) { _status.value = BackupStatus(lastError = "permission"); return@withLock }
-        if (!connectivity.isOnline()) return@withLock
-        if (settings.galleryBackupWifiOnly.first() && !connectivity.isUnmetered()) return@withLock
+    /** Blocking run for a background Worker (session must already be in [sessionHolder]). */
+    suspend fun runHeadless(): Int = runInternal(includeExisting = false)
+
+    private suspend fun runInternal(includeExisting: Boolean): Int = mutex.withLock {
+        if (_status.value.running) return@withLock 0
+        if (sessionHolder.get() == null) return@withLock 0        // locked → no token
+        if (!hasPermission()) { _status.value = BackupStatus(lastError = "permission"); return@withLock 0 }
+        if (!connectivity.isOnline()) return@withLock 0
+        if (settings.galleryBackupWifiOnly.first() && !connectivity.isUnmetered()) return@withLock 0
 
         val since = if (includeExisting) 0L else settings.galleryBackupSince.first()
         val includeVideos = settings.galleryBackupVideos.first()
+        val albumId = settings.galleryBackupAlbumId.first()
+        val deleteAfter = settings.galleryBackupDeleteAfter.first()
         val items = queryNewMedia(since, includeVideos)
         if (items.isEmpty()) {
             if (since == 0L) settings.setGalleryBackupSince(nowSeconds())
-            return@withLock
+            return@withLock 0
         }
 
         _status.value = BackupStatus(running = true, done = 0, total = items.size)
         var maxSeen = since
         var done = 0
+        val uploadedUris = ArrayList<android.net.Uri>()
         for (item in items) {
             if (sessionHolder.get() == null) break // locked mid-run
             val tmp = copyToCache(item) ?: continue
-            val ok = repo.upload(tmp, item.name, item.mime) is Outcome.Ok
+            val res = repo.upload(tmp, item.name, item.mime)
             runCatching { tmp.delete() }
-            if (ok) {
+            if (res is Outcome.Ok) {
                 done++
+                if (albumId > 0) runCatching { repo.addToAlbum(albumId, listOf(res.value.id)) }
+                if (deleteAfter) uploadedUris += uriFor(item)
                 if (item.dateAdded > maxSeen) maxSeen = item.dateAdded
                 settings.setGalleryBackupSince(maxSeen) // durable cursor after each success
                 _status.value = _status.value.copy(done = done)
             }
         }
+        if (uploadedUris.isNotEmpty()) _pendingDeletes.value = _pendingDeletes.value + uploadedUris
         _status.value = BackupStatus(running = false, done = done, total = items.size)
+        done
     }
 
     private data class Media(val id: Long, val name: String, val mime: String?, val dateAdded: Long, val isVideo: Boolean)
@@ -134,9 +150,13 @@ class GalleryBackup @Inject constructor(
         return out.sortedBy { it.dateAdded }
     }
 
-    private suspend fun copyToCache(item: Media): File? = withContext(Dispatchers.IO) {
+    private fun uriFor(item: Media): android.net.Uri {
         val collection = if (item.isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val uri = ContentUris.withAppendedId(collection, item.id)
+        return ContentUris.withAppendedId(collection, item.id)
+    }
+
+    private suspend fun copyToCache(item: Media): File? = withContext(Dispatchers.IO) {
+        val uri = uriFor(item)
         val dir = File(context.cacheDir, "backup").apply { mkdirs() }
         val dest = File(dir, "${item.id}_${item.name}")
         runCatching {

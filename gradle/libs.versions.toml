@@ -127,6 +127,10 @@ unifiedpush-connector = { module = "org.unifiedpush.android:connector", version.
 markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
 # Code-block syntax highlighting for the Markdown preview (uses dev.snipme:highlights under the hood).
 markdown-renderer-code = { module = "com.mikepenz:multiplatform-markdown-renderer-code", version.ref = "markdownRenderer" }
+# Background camera-roll backup (runs while the app/device is locked).
+work-runtime = { module = "androidx.work:work-runtime-ktx", version = "2.10.0" }
+hilt-work = { module = "androidx.hilt:hilt-work", version = "1.4.0" }
+hilt-work-compiler = { module = "androidx.hilt:hilt-compiler", version = "1.4.0" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

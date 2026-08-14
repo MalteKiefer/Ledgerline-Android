@@ -39,6 +39,9 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val galBackupVideosKey = booleanPreferencesKey("gallery_backup_videos")
     private val galBackupWifiOnlyKey = booleanPreferencesKey("gallery_backup_wifi_only")
     private val galBackupSinceKey = androidx.datastore.preferences.core.longPreferencesKey("gallery_backup_since")
+    private val galBackupDeleteAfterKey = booleanPreferencesKey("gallery_backup_delete_after")
+    private val galBackupBackgroundKey = booleanPreferencesKey("gallery_backup_background")
+    private val galBackupAlbumIdKey = androidx.datastore.preferences.core.intPreferencesKey("gallery_backup_album_id")
     // ── Push notifications (UnifiedPush) ──
     private val pushEnabledKey = booleanPreferencesKey("push_enabled")
     private val pushLockscreenContentKey = booleanPreferencesKey("push_lockscreen_content")
@@ -125,6 +128,13 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     suspend fun setGalleryBackupVideos(on: Boolean) { context.settingsDataStore.edit { it[galBackupVideosKey] = on } }
     suspend fun setGalleryBackupWifiOnly(on: Boolean) { context.settingsDataStore.edit { it[galBackupWifiOnlyKey] = on } }
     suspend fun setGalleryBackupSince(epochSeconds: Long) { context.settingsDataStore.edit { it[galBackupSinceKey] = epochSeconds } }
+    val galleryBackupDeleteAfter: Flow<Boolean> = context.settingsDataStore.data.map { it[galBackupDeleteAfterKey] ?: false }
+    val galleryBackupBackground: Flow<Boolean> = context.settingsDataStore.data.map { it[galBackupBackgroundKey] ?: false }
+    /** Target album id for backed-up photos, or 0 = none. */
+    val galleryBackupAlbumId: Flow<Int> = context.settingsDataStore.data.map { it[galBackupAlbumIdKey] ?: 0 }
+    suspend fun setGalleryBackupDeleteAfter(on: Boolean) { context.settingsDataStore.edit { it[galBackupDeleteAfterKey] = on } }
+    suspend fun setGalleryBackupBackground(on: Boolean) { context.settingsDataStore.edit { it[galBackupBackgroundKey] = on } }
+    suspend fun setGalleryBackupAlbumId(id: Int) { context.settingsDataStore.edit { it[galBackupAlbumIdKey] = id } }
 
     // ── Push notifications (UnifiedPush) ──────────────────────────────────────────
     // Delivery does not use the biometric-sealed bearer token: the server sends a

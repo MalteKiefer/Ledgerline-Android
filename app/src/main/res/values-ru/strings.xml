@@ -1575,4 +1575,10 @@
     <string name="gallery_backup_videos">Включая видео</string>
     <string name="gallery_backup_now">Загрузить сейчас</string>
     <string name="gallery_backup_progress">Загрузка %1$d / %2$d…</string>
+    <string name="gallery_backup_delete_after">Удалять с устройства после загрузки</string>
+    <string name="gallery_backup_album">Добавить в альбом</string>
+    <string name="gallery_backup_album_none">Нет</string>
+    <string name="gallery_backup_background">Резервное копирование при блокировке</string>
+    <string name="gallery_backup_background_warn">Сохраняет токен входа, чтобы копирование шло в фоне. Менее безопасно, чем биометрическая блокировка.</string>
+    <string name="gallery_backup_all">Скопировать всё</string>
 </resources>

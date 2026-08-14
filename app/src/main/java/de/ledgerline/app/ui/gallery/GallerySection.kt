@@ -298,14 +298,53 @@ private fun GalleryBackupSheet(vm: GalleryViewModel, onDismiss: () -> Unit) {
         else permLauncher.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO))
     }
 
+    val deleteAfter by vm.backupDeleteAfter.collectAsStateWithLifecycle()
+    val background by vm.backupBackground.collectAsStateWithLifecycle()
+    val albumId by vm.backupAlbumId.collectAsStateWithLifecycle()
+    val pendingDeletes by vm.pendingDeletes.collectAsStateWithLifecycle()
+    var albums by remember { mutableStateOf<List<de.ledgerline.app.domain.model.gallery.GalleryAlbum>?>(null) }
+    LaunchedEffect(Unit) { albums = vm.albums() }
+    var albumMenu by remember { mutableStateOf(false) }
+
+    // Delete-after-backup needs the user's consent per batch (MediaStore.createDeleteRequest).
+    val deleteLauncher = rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()) {
+        vm.clearPendingDeletes()
+    }
+    LaunchedEffect(pendingDeletes) {
+        if (pendingDeletes.isNotEmpty()) {
+            val pi = android.provider.MediaStore.createDeleteRequest(ctx.contentResolver, pendingDeletes)
+            runCatching { deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(pi.intentSender).build()) }
+                .onFailure { vm.clearPendingDeletes() }
+        }
+    }
+
     androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(stringResource(R.string.gallery_backup), style = MaterialTheme.typography.titleMedium)
             Text(stringResource(R.string.gallery_backup_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             BackupRow(stringResource(R.string.gallery_backup_enable), enabled) { on -> if (on) enableWithPermission() else vm.setBackupEnabled(false) }
             BackupRow(stringResource(R.string.gallery_backup_wifi), wifiOnly) { vm.setBackupWifiOnly(it) }
             BackupRow(stringResource(R.string.gallery_backup_videos), videos) { vm.setBackupVideos(it) }
+            BackupRow(stringResource(R.string.gallery_backup_delete_after), deleteAfter) { vm.setBackupDeleteAfter(it) }
+
+            // Target album.
+            androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().clickable { albumMenu = true }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.gallery_backup_album), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                Text(albums?.firstOrNull { it.id == albumId }?.name ?: stringResource(R.string.gallery_backup_album_none), color = MaterialTheme.colorScheme.primary)
+                Box {
+                    androidx.compose.material3.DropdownMenu(expanded = albumMenu, onDismissRequest = { albumMenu = false }) {
+                        androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.gallery_backup_album_none)) }, onClick = { albumMenu = false; vm.setBackupAlbum(0) })
+                        albums.orEmpty().forEach { a ->
+                            androidx.compose.material3.DropdownMenuItem(text = { Text(a.name) }, onClick = { albumMenu = false; vm.setBackupAlbum(a.id) })
+                        }
+                    }
+                }
+            }
+
+            // Background/locked backup — security-sensitive opt-in.
+            BackupRow(stringResource(R.string.gallery_backup_background), background) { vm.setBackgroundBackup(it) }
+            if (background) Text(stringResource(R.string.gallery_backup_background_warn), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
 
             if (status.running) {
                 androidx.compose.material3.LinearProgressIndicator(
@@ -314,10 +353,16 @@ private fun GalleryBackupSheet(vm: GalleryViewModel, onDismiss: () -> Unit) {
                 )
                 Text(stringResource(R.string.gallery_backup_progress, status.done, status.total), style = MaterialTheme.typography.bodySmall)
             }
-            androidx.compose.material3.TextButton(onClick = {
-                if (!vm.hasMediaPermission()) permLauncher.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO))
-                else vm.backupNow(includeExisting = false)
-            }) { Text(stringResource(R.string.gallery_backup_now)) }
+            androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                androidx.compose.material3.TextButton(onClick = {
+                    if (!vm.hasMediaPermission()) permLauncher.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO))
+                    else vm.backupNow(includeExisting = false)
+                }) { Text(stringResource(R.string.gallery_backup_now)) }
+                androidx.compose.material3.TextButton(onClick = {
+                    if (!vm.hasMediaPermission()) permLauncher.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO))
+                    else vm.backupNow(includeExisting = true)
+                }) { Text(stringResource(R.string.gallery_backup_all)) }
+            }
         }
     }
 }

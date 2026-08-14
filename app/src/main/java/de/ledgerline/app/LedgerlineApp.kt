@@ -8,7 +8,12 @@ import dagger.hilt.android.HiltAndroidApp
 import dagger.hilt.components.SingletonComponent
 
 @HiltAndroidApp
-class LedgerlineApp : Application() {
+class LedgerlineApp : Application(), androidx.work.Configuration.Provider {
+
+    // Lets WorkManager construct @HiltWorker workers (the background gallery backup).
+    @javax.inject.Inject lateinit var workerFactory: androidx.hilt.work.HiltWorkerFactory
+    override val workManagerConfiguration: androidx.work.Configuration
+        get() = androidx.work.Configuration.Builder().setWorkerFactory(workerFactory).build()
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
