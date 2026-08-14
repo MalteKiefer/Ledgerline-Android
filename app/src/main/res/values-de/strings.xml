@@ -1583,4 +1583,5 @@
     <string name="gallery_backup_charging">Nur beim Laden</string>
     <string name="gallery_backup_battery_ok">Bei niedrigem Akku aussetzen</string>
     <string name="gallery_backup_idle">Hintergrund nur im Ruhezustand</string>
+    <string name="gallery_open_map">Auf Karte anzeigen</string>
 </resources>

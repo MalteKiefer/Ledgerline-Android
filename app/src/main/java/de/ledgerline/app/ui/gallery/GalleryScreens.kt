@@ -29,7 +29,9 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.MotionPhotosOn
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.PlayCircleFilled
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Star
@@ -76,6 +78,8 @@ fun GalleryLightbox(vm: GalleryViewModel, photo: GalleryPhoto, onClose: () -> Un
     var showExif by remember { mutableStateOf(false) }
     var exif by remember(photo.id) { mutableStateOf<GalleryExif?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+    var addAlbum by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
     var videoFile by remember(photo.id) { mutableStateOf<File?>(null) }
     var preparing by remember(photo.id) { mutableStateOf(false) }
@@ -109,20 +113,18 @@ fun GalleryLightbox(vm: GalleryViewModel, photo: GalleryPhoto, onClose: () -> Un
             IconButton(onClick = { vm.setFavorite(photo.id, !photo.favorite) }) {
                 Icon(if (photo.favorite) Icons.Outlined.Star else Icons.Outlined.StarBorder, contentDescription = stringResource(R.string.action_favorite))
             }
-            IconButton(onClick = { vm.rotate(photo.id, photo.rotation) }) {
-                Icon(Icons.AutoMirrored.Outlined.RotateRight, contentDescription = stringResource(R.string.gallery_rotate))
-            }
             IconButton(onClick = { showExif = true; scope.launch { exif = vm.exif(photo.id) } }) {
                 Icon(Icons.Outlined.Info, contentDescription = stringResource(R.string.files_info))
             }
-            IconButton(onClick = { saveLauncher.launch(photo.name) }) {
-                Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.files_save_device))
-            }
-            IconButton(onClick = { vm.archive(photo.id, true) { onClose() } }) {
-                Icon(Icons.Outlined.Archive, contentDescription = stringResource(R.string.gallery_archive))
-            }
-            IconButton(onClick = { confirmDelete = true }) {
-                Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.action_delete))
+            Box {
+                IconButton(onClick = { showMenu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
+                androidx.compose.material3.DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.gallery_add_to_album)) }, onClick = { showMenu = false; addAlbum = true })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.gallery_rotate)) }, onClick = { showMenu = false; vm.rotate(photo.id, photo.rotation) })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.files_save_device)) }, onClick = { showMenu = false; saveLauncher.launch(photo.name) })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.gallery_archive)) }, onClick = { showMenu = false; vm.archive(photo.id, true) { onClose() } })
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.action_delete)) }, onClick = { showMenu = false; confirmDelete = true })
+                }
             }
         })
     }) { pad ->
@@ -163,13 +165,50 @@ fun GalleryLightbox(vm: GalleryViewModel, photo: GalleryPhoto, onClose: () -> Un
         confirmButton = { TextButton(onClick = { confirmDelete = false; vm.delete(photo.id) { onClose() } }) { Text(stringResource(R.string.action_delete)) } },
         dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.action_cancel)) } },
     )
+
+    if (addAlbum) {
+        var albums by remember { mutableStateOf<List<de.ledgerline.app.domain.model.gallery.GalleryAlbum>?>(null) }
+        LaunchedEffect(Unit) { albums = vm.albums() }
+        AlertDialog(
+            onDismissRequest = { addAlbum = false },
+            title = { Text(stringResource(R.string.gallery_add_to_album)) },
+            text = {
+                when (val list = albums) {
+                    null -> CircularProgressIndicator()
+                    else -> if (list.isEmpty()) Text(stringResource(R.string.gallery_albums_empty))
+                    else Column(Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                        list.forEach { a ->
+                            Text(
+                                a.name,
+                                Modifier.fillMaxWidth().clickable {
+                                    addAlbum = false
+                                    vm.addToAlbum(a.id, listOf(photo.id)) { ok -> msg = ctx.getString(if (ok) R.string.gallery_added_to_album else R.string.files_save_failed) }
+                                }.padding(vertical = 12.dp),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { addAlbum = false }) { Text(stringResource(R.string.action_close)) } },
+        )
+    }
 }
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun ExifSheet(photo: GalleryPhoto, exif: GalleryExif?, onEditDate: (String) -> Unit, onDismiss: () -> Unit) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     var editDate by remember { mutableStateOf(false) }
+    val lat = exif?.lat ?: photo.lat?.toDouble()
+    val lng = exif?.lng ?: photo.lng?.toDouble()
+    // Server-provided place, else reverse-geocode the GPS with the on-device Geocoder (no network dep).
+    var geoPlace by remember(photo.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(lat, lng, exif?.place, photo.place) {
+        if ((exif?.place ?: photo.place) == null && lat != null && lng != null) geoPlace = reverseGeocode(ctx, lat, lng)
+    }
+    val place = exif?.place ?: photo.place ?: geoPlace
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
         Column(Modifier.fillMaxWidth().heightIn(max = 480.dp).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(photo.name, style = MaterialTheme.typography.titleMedium)
@@ -182,7 +221,20 @@ private fun ExifSheet(photo: GalleryPhoto, exif: GalleryExif?, onEditDate: (Stri
                 }
             }
             (exif?.camera ?: photo.camera)?.let { InfoLine(stringResource(R.string.gallery_camera), it) }
-            (exif?.place ?: photo.place)?.let { InfoLine(stringResource(R.string.gallery_place), it) }
+            // Location: place name + a tappable row that opens the coordinates in a maps app.
+            if (place != null || (lat != null && lng != null)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 4.dp)
+                        .then(if (lat != null && lng != null) Modifier.clickable { openInMaps(ctx, lat, lng, place) } else Modifier),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Outlined.Place, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Column(Modifier.padding(start = 8.dp)) {
+                        Text(place ?: stringResource(R.string.gallery_place), style = MaterialTheme.typography.bodyMedium)
+                        if (lat != null && lng != null) Text(stringResource(R.string.gallery_open_map), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
             exif?.exif?.forEach { (section, tags) ->
                 Text(section, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
                 tags.forEach { (k, v) -> InfoLine(k, v) }
@@ -305,6 +357,31 @@ private fun VideoPlayer(file: File, modifier: Modifier = Modifier) {
             }
         },
     )
+}
+
+/** On-device reverse geocode (no network dependency of ours) → a short place label, or null. */
+private suspend fun reverseGeocode(ctx: android.content.Context, lat: Double, lng: Double): String? =
+    withContext(Dispatchers.IO) {
+        runCatching {
+            val gc = android.location.Geocoder(ctx)
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                val def = kotlinx.coroutines.CompletableDeferred<String?>()
+                gc.getFromLocation(lat, lng, 1) { addrs -> def.complete(addrs.firstOrNull()?.let(::addrLabel)) }
+                kotlinx.coroutines.withTimeoutOrNull(4000) { def.await() }
+            } else {
+                @Suppress("DEPRECATION") gc.getFromLocation(lat, lng, 1)?.firstOrNull()?.let(::addrLabel)
+            }
+        }.getOrNull()
+    }
+
+private fun addrLabel(a: android.location.Address): String =
+    listOfNotNull(a.locality ?: a.subAdminArea, a.countryName).joinToString(", ").ifBlank { a.getAddressLine(0) ?: "" }
+
+/** Open the coordinates in a maps app (geo: URI with an optional label). */
+private fun openInMaps(ctx: android.content.Context, lat: Double, lng: Double, label: String?) {
+    val q = if (label != null) "$lat,$lng(${android.net.Uri.encode(label)})" else "$lat,$lng"
+    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("geo:$lat,$lng?q=$q"))
+    runCatching { ctx.startActivity(intent) }
 }
 
 /** Human-readable byte size (1 KB = 1024). */

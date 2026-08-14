@@ -1586,4 +1586,5 @@
     <string name="gallery_backup_charging">Только при зарядке</string>
     <string name="gallery_backup_battery_ok">Пропускать при низком заряде</string>
     <string name="gallery_backup_idle">В фоне только в простое</string>
+    <string name="gallery_open_map">Показать на карте</string>
 </resources>

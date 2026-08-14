@@ -1586,4 +1586,5 @@
     <string name="gallery_backup_charging">Only while charging</string>
     <string name="gallery_backup_battery_ok">Skip when battery is low</string>
     <string name="gallery_backup_idle">Background only when idle</string>
+    <string name="gallery_open_map">View on map</string>
 </resources>
