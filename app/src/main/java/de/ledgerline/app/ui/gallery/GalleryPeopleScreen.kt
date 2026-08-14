@@ -94,75 +94,10 @@ fun GalleryPeopleScreen(vm: GalleryViewModel, onBack: () -> Unit) {
         }
     }
 
-    renaming?.let { p ->
-        var name by remember(p.id) { mutableStateOf(p.name ?: "") }
-        AlertDialog(
-            onDismissRequest = { renaming = null },
-            title = { Text(stringResource(R.string.gallery_person_name)) },
-            text = { TextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.gallery_person_name)) }) },
-            confirmButton = { TextButton(onClick = { renaming = null; vm.renamePerson(p.id, name.trim().ifBlank { null }) { reload() } }) { Text(stringResource(R.string.action_save)) } },
-            dismissButton = { TextButton(onClick = { renaming = null }) { Text(stringResource(R.string.action_cancel)) } },
-        )
-    }
-
-    linking?.let { p ->
-        var q by remember(p.id) { mutableStateOf("") }
-        var contacts by remember(p.id) { mutableStateOf<List<de.ledgerline.app.data.remote.ContactLite>?>(null) }
-        LaunchedEffect(p.id, q) { contacts = vm.searchContacts(q) }
-        AlertDialog(
-            onDismissRequest = { linking = null },
-            title = { Text(stringResource(R.string.gallery_person_link_contact)) },
-            text = {
-                Column(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
-                    TextField(q, { q = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.action_search)) })
-                    if (p.contactId != null) Text(
-                        stringResource(R.string.gallery_person_unlink),
-                        Modifier.fillMaxWidth().clickable { linking = null; vm.linkPersonContact(p.id, null) { reload() } }.padding(vertical = 12.dp),
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    when (val list = contacts) {
-                        null -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                        else -> LazyColumn {
-                            listItems(list, key = { it.id }) { c ->
-                                Text(
-                                    c.display,
-                                    Modifier.fillMaxWidth().clickable {
-                                        linking = null
-                                        vm.linkPersonContact(p.id, c.id) { reload() }
-                                    }.padding(vertical = 12.dp),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { linking = null }) { Text(stringResource(R.string.action_close)) } },
-        )
-    }
-
+    renaming?.let { p -> RenamePersonDialog(vm, p, onDone = { reload() }, onDismiss = { renaming = null }) }
+    linking?.let { p -> LinkContactDialog(vm, p, onDone = { reload() }, onDismiss = { linking = null }) }
     merging?.let { from ->
-        val others = (people ?: emptyList()).filter { it.id != from.id }
-        AlertDialog(
-            onDismissRequest = { merging = null },
-            title = { Text(stringResource(R.string.gallery_person_merge_into)) },
-            text = {
-                Column {
-                    if (others.isEmpty()) Text(stringResource(R.string.gallery_people_empty))
-                    others.forEach { target ->
-                        Text(
-                            target.name ?: stringResource(R.string.gallery_person_unnamed),
-                            Modifier.fillMaxWidth().clickable {
-                                merging = null
-                                vm.mergePeople(from.id, target.id) { reload() }
-                            }.padding(vertical = 12.dp),
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { merging = null }) { Text(stringResource(R.string.action_close)) } },
-        )
+        MergePersonDialog(vm, from, others = (people ?: emptyList()).filter { it.id != from.id }, onDone = { reload() }, onDismiss = { merging = null })
     }
 }
 
@@ -200,14 +135,36 @@ private fun PersonCard(vm: GalleryViewModel, person: GalleryPerson, onOpen: () -
 @Composable
 fun GalleryPersonPhotosScreen(vm: GalleryViewModel, person: GalleryPerson, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+    var current by remember(person.id) { mutableStateOf(person) } // updates after rename/link
     var photos by remember(person.id) { mutableStateOf<List<GalleryPhoto>?>(null) }
     var lightbox by remember { mutableStateOf<GalleryPhoto?>(null) }
-    fun reload() { scope.launch { photos = vm.personPhotos(person.id) } }
+    var menu by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    var linking by remember { mutableStateOf(false) }
+    var merging by remember { mutableStateOf(false) }
+    var allPeople by remember { mutableStateOf<List<GalleryPerson>>(emptyList()) }
+    fun reload() { scope.launch { photos = vm.personPhotos(current.id); vm.people().firstOrNull { it.id == current.id }?.let { current = it }; allPeople = vm.people() } }
     LaunchedEffect(person.id) { reload() }
 
     lightbox?.let { p -> GalleryLightbox(vm, p, onClose = { lightbox = null }); return }
 
-    AppScaffold(topBar = { AppTopBar(title = person.name ?: stringResource(R.string.gallery_person_unnamed), onBack = onBack) }) { pad ->
+    AppScaffold(topBar = {
+        AppTopBar(
+            title = current.name ?: stringResource(R.string.gallery_person_unnamed),
+            onBack = onBack,
+            actions = {
+                Box {
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.MoreVert, contentDescription = stringResource(R.string.action_more)) }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text(stringResource(R.string.action_rename)) }, onClick = { menu = false; renaming = true })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_link_contact)) }, onClick = { menu = false; linking = true })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.gallery_person_merge_into)) }, onClick = { menu = false; merging = true })
+                        DropdownMenuItem(text = { Text(stringResource(R.string.action_delete)) }, onClick = { menu = false; vm.deletePerson(current.id) { onBack() } })
+                    }
+                }
+            },
+        )
+    }) { pad ->
         val list = photos
         when {
             list == null -> Box(Modifier.fillMaxSize().padding(pad), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -228,4 +185,75 @@ fun GalleryPersonPhotosScreen(vm: GalleryViewModel, person: GalleryPerson, onBac
             }
         }
     }
+
+    if (renaming) RenamePersonDialog(vm, current, onDone = { reload() }, onDismiss = { renaming = false })
+    if (linking) LinkContactDialog(vm, current, onDone = { reload() }, onDismiss = { linking = false })
+    if (merging) MergePersonDialog(vm, current, others = allPeople.filter { it.id != current.id }, onDone = { onBack() }, onDismiss = { merging = false })
+}
+
+@Composable
+private fun RenamePersonDialog(vm: GalleryViewModel, person: GalleryPerson, onDone: () -> Unit, onDismiss: () -> Unit) {
+    var name by remember(person.id) { mutableStateOf(person.name ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.gallery_person_name)) },
+        text = { TextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.gallery_person_name)) }) },
+        confirmButton = { TextButton(onClick = { onDismiss(); vm.renamePerson(person.id, name.trim().ifBlank { null }) { onDone() } }) { Text(stringResource(R.string.action_save)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}
+
+@Composable
+private fun LinkContactDialog(vm: GalleryViewModel, person: GalleryPerson, onDone: () -> Unit, onDismiss: () -> Unit) {
+    var q by remember(person.id) { mutableStateOf("") }
+    var contacts by remember(person.id) { mutableStateOf<List<de.ledgerline.app.data.remote.ContactLite>?>(null) }
+    LaunchedEffect(person.id, q) { contacts = vm.searchContacts(q) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.gallery_person_link_contact)) },
+        text = {
+            Column(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                TextField(q, { q = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text(stringResource(R.string.action_search)) })
+                if (person.contactId != null) Text(
+                    stringResource(R.string.gallery_person_unlink),
+                    Modifier.fillMaxWidth().clickable { onDismiss(); vm.linkPersonContact(person.id, null) { onDone() } }.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.error,
+                )
+                when (val list = contacts) {
+                    null -> Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                    else -> LazyColumn {
+                        listItems(list, key = { it.id }) { c ->
+                            Text(
+                                c.display,
+                                Modifier.fillMaxWidth().clickable { onDismiss(); vm.linkPersonContact(person.id, c.id) { onDone() } }.padding(vertical = 12.dp),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+    )
+}
+
+@Composable
+private fun MergePersonDialog(vm: GalleryViewModel, person: GalleryPerson, others: List<GalleryPerson>, onDone: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.gallery_person_merge_into)) },
+        text = {
+            Column {
+                if (others.isEmpty()) Text(stringResource(R.string.gallery_people_empty))
+                others.forEach { target ->
+                    Text(
+                        target.name ?: stringResource(R.string.gallery_person_unnamed),
+                        Modifier.fillMaxWidth().clickable { onDismiss(); vm.mergePeople(person.id, target.id) { onDone() } }.padding(vertical = 12.dp),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_close)) } },
+    )
 }
