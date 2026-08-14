@@ -165,6 +165,7 @@ dependencies {
     implementation(libs.unifiedpush.connector)
     implementation(libs.markdown.renderer.m3)
     implementation(libs.markdown.renderer.code)
+    implementation(libs.osmdroid)
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

@@ -54,6 +54,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
@@ -221,7 +222,8 @@ private fun ExifSheet(photo: GalleryPhoto, exif: GalleryExif?, onEditDate: (Stri
                 }
             }
             (exif?.camera ?: photo.camera)?.let { InfoLine(stringResource(R.string.gallery_camera), it) }
-            // Location: place name + a tappable row that opens the coordinates in a maps app.
+            // Location: an embedded OSM mini-map (osmdroid) + place name.
+            if (lat != null && lng != null) GalleryMiniMap(lat, lng, onOpen = { openInMaps(ctx, lat, lng, place) })
             if (place != null || (lat != null && lng != null)) {
                 Row(
                     Modifier.fillMaxWidth().padding(top = 4.dp)
@@ -356,6 +358,42 @@ private fun VideoPlayer(file: File, modifier: Modifier = Modifier) {
                 setOnPreparedListener { it.isLooping = false; start() }
             }
         },
+    )
+}
+
+private var osmConfigured = false
+private fun ensureOsm(ctx: android.content.Context) {
+    if (osmConfigured) return
+    org.osmdroid.config.Configuration.getInstance().apply {
+        userAgentValue = ctx.packageName // OSM tile policy requires a UA
+        osmdroidBasePath = java.io.File(ctx.filesDir, "osmdroid")
+        osmdroidTileCache = java.io.File(ctx.cacheDir, "osmdroid-tiles")
+    }
+    osmConfigured = true
+}
+
+/** A small embedded OpenStreetMap centred on the photo's GPS, with a marker; tapping opens a maps app. */
+@Composable
+private fun GalleryMiniMap(lat: Double, lng: Double, onOpen: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    ensureOsm(ctx)
+    androidx.compose.ui.viewinterop.AndroidView(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 160.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).clickable { onOpen() },
+        factory = { c ->
+            org.osmdroid.views.MapView(c).apply {
+                setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+                setMultiTouchControls(false)
+                setOnTouchListener { _, _ -> onOpen(); true } // tap-through to a full maps app
+                controller.setZoom(15.0)
+                val p = org.osmdroid.util.GeoPoint(lat, lng)
+                controller.setCenter(p)
+                overlays.add(org.osmdroid.views.overlay.Marker(this).apply {
+                    position = p
+                    setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
+                })
+            }
+        },
+        onRelease = { it.onDetach() },
     )
 }
 

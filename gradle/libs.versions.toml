@@ -131,6 +131,8 @@ markdown-renderer-code = { module = "com.mikepenz:multiplatform-markdown-rendere
 work-runtime = { module = "androidx.work:work-runtime-ktx", version = "2.10.0" }
 hilt-work = { module = "androidx.hilt:hilt-work", version = "1.4.0" }
 hilt-work-compiler = { module = "androidx.hilt:hilt-compiler", version = "1.4.0" }
+# Embedded OpenStreetMap mini-map for the photo location (OSS, F-Droid-friendly, OSM tiles).
+osmdroid = { module = "org.osmdroid:osmdroid-android", version = "6.1.20" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
