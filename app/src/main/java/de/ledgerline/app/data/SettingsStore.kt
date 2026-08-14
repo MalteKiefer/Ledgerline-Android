@@ -34,6 +34,11 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
     private val prefTimeFormatKey = stringPreferencesKey("pref_time_format")
     private val prefDateFormatKey = stringPreferencesKey("pref_date_format")
     private val prefTimezoneKey = stringPreferencesKey("pref_timezone")
+    // ── Gallery camera-roll auto-backup (opt-in) ──
+    private val galBackupEnabledKey = booleanPreferencesKey("gallery_backup_enabled")
+    private val galBackupVideosKey = booleanPreferencesKey("gallery_backup_videos")
+    private val galBackupWifiOnlyKey = booleanPreferencesKey("gallery_backup_wifi_only")
+    private val galBackupSinceKey = androidx.datastore.preferences.core.longPreferencesKey("gallery_backup_since")
     // ── Push notifications (UnifiedPush) ──
     private val pushEnabledKey = booleanPreferencesKey("push_enabled")
     private val pushLockscreenContentKey = booleanPreferencesKey("push_lockscreen_content")
@@ -110,6 +115,16 @@ class SettingsStore(private val context: Context) : de.ledgerline.app.core.prefs
             it[prefTimezoneKey] = prefs.timezone
         }
     }
+
+    // ── Gallery camera-roll auto-backup ──────────────────────────────────────────
+    val galleryBackupEnabled: Flow<Boolean> = context.settingsDataStore.data.map { it[galBackupEnabledKey] ?: false }
+    val galleryBackupVideos: Flow<Boolean> = context.settingsDataStore.data.map { it[galBackupVideosKey] ?: true }
+    val galleryBackupWifiOnly: Flow<Boolean> = context.settingsDataStore.data.map { it[galBackupWifiOnlyKey] ?: true }
+    val galleryBackupSince: Flow<Long> = context.settingsDataStore.data.map { it[galBackupSinceKey] ?: 0L }
+    suspend fun setGalleryBackupEnabled(on: Boolean) { context.settingsDataStore.edit { it[galBackupEnabledKey] = on } }
+    suspend fun setGalleryBackupVideos(on: Boolean) { context.settingsDataStore.edit { it[galBackupVideosKey] = on } }
+    suspend fun setGalleryBackupWifiOnly(on: Boolean) { context.settingsDataStore.edit { it[galBackupWifiOnlyKey] = on } }
+    suspend fun setGalleryBackupSince(epochSeconds: Long) { context.settingsDataStore.edit { it[galBackupSinceKey] = epochSeconds } }
 
     // ── Push notifications (UnifiedPush) ──────────────────────────────────────────
     // Delivery does not use the biometric-sealed bearer token: the server sends a

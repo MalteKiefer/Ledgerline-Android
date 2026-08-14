@@ -41,6 +41,7 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var deepLinkBus: de.ledgerline.app.core.DeepLinkBus
     @Inject lateinit var pushRegistrar: de.ledgerline.app.push.PushRegistrar
     @Inject lateinit var shareInbox: de.ledgerline.app.core.ShareInbox
+    @Inject lateinit var galleryBackup: de.ledgerline.app.data.gallery.GalleryBackup
 
     private var idleTimeoutMs = 5 * 60_000L
     @Volatile private var lastInteraction = SystemClock.elapsedRealtime()
@@ -132,7 +133,9 @@ class MainActivity : FragmentActivity() {
         de.ledgerline.app.push.PushNotifier.ensureChannels(this)
         // Deliver any push endpoint that arrived while locked, once we're unlocked again.
         lifecycleScope.launch {
-            appLockState.unlocked.collect { unlocked -> if (unlocked) pushRegistrar.flushPending() }
+            appLockState.unlocked.collect { unlocked ->
+                if (unlocked) { pushRegistrar.flushPending(); galleryBackup.runIfEnabled() }
+            }
         }
         if (!de.ledgerline.app.BuildConfig.DEBUG) {
             window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)

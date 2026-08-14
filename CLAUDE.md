@@ -188,8 +188,14 @@ libs.versions.toml`), material3 1.5.0-alphaXX bewusst adoptiert.
   (`/gallery/faces/{id}/crop`), Umbenennen (`PUT /gallery/people/{id}` name), Löschen, **Merge**
   (`/gallery/people/merge`), Personen-Fotos (`GET /gallery/people/{id}`) + Lightbox. Top-Bar-Aktion in
   `GallerySection`. **Ohne Kontakt-Link** (kein Contacts-Modul). Leer wenn ML-Sidecar/Face aus.
-  **Offen (Rest P4/P3/P5):** CLIP-Suche/Duplikate/Memories/reprocess + per-Photo-Face-Tagging
-  (assign/hide); P3 Sharing (public/internal/upload-links/Kommentare/Reaktionen); P5 Geräte-Backup.
+  **Phase 5 Kamera-Roll-Backup (2026-08-14):** `data/gallery/GalleryBackup` (Singleton) — opt-in
+  Auto-Upload neuer Gerätefotos/-videos, **nur bei entsperrter App** (Token in-memory, kein
+  Background-Sync): getriggert bei Unlock (`MainActivity`) + manuell „Jetzt sichern". MediaStore-Scan
+  `DATE_ADDED > since` (Cursor `galleryBackupSince`, Server dedupt sha256), WLAN-only + Videos-Toggles,
+  Fortschritt-`StateFlow`. Perms `READ_MEDIA_IMAGES`/`_VIDEO`, UI `GalleryBackupSheet` (Cloud-Icon).
+  Erst-Aktivierung setzt `since=now` (kein Bulk-Upload der bestehenden Fotos).
+  **Offen (Rest P4/P3):** CLIP-Suche/Duplikate/Memories/reprocess + per-Photo-Face-Tagging
+  (assign/hide); P3 Sharing (public/internal/upload-links/Kommentare/Reaktionen).
 - **Files (`ui/files/`):** `FilesSection`/`FilesViewModel` — Ordner-Browser (Breadcrumb, gruppierte
   Listen), Upload (SAF, single+chunked), Datei-Detail mit Inline-Vorschau (Bild/Text) + Metadaten +
   Label-Zuweisung + Versionen, Trash, Suche, Statistik, Label-Verwaltung, **Favoriten-Filter, Label-

@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.buildJsonObject
@@ -28,6 +29,8 @@ import javax.inject.Inject
 class GalleryViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repo: GalleryRepository,
+    private val settings: de.ledgerline.app.data.SettingsStore,
+    private val backup: de.ledgerline.app.data.gallery.GalleryBackup,
 ) : ViewModel() {
 
     val data: StateFlow<GalleryData?> = repo.data
@@ -176,6 +179,19 @@ class GalleryViewModel @Inject constructor(
     fun restore(id: Int, done: () -> Unit) = viewModelScope.launch { if (repo.restore(id)) done() }
     fun force(id: Int, done: () -> Unit) = viewModelScope.launch { if (repo.forceDelete(id)) done() }
     fun emptyTrash(done: (Boolean) -> Unit) = viewModelScope.launch { done(repo.emptyTrash()) }
+
+    // ---- Camera-roll backup ----
+    val backupStatus = backup.status
+    private fun <T> flag(f: kotlinx.coroutines.flow.Flow<T>, initial: T) =
+        f.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, initial)
+    val backupEnabled = flag(settings.galleryBackupEnabled, false)
+    val backupWifiOnly = flag(settings.galleryBackupWifiOnly, true)
+    val backupVideos = flag(settings.galleryBackupVideos, true)
+    fun hasMediaPermission() = backup.hasPermission()
+    fun setBackupEnabled(on: Boolean) = viewModelScope.launch { settings.setGalleryBackupEnabled(on); if (on) backup.runNow(includeExisting = false) }
+    fun setBackupWifiOnly(on: Boolean) = viewModelScope.launch { settings.setGalleryBackupWifiOnly(on) }
+    fun setBackupVideos(on: Boolean) = viewModelScope.launch { settings.setGalleryBackupVideos(on) }
+    fun backupNow(includeExisting: Boolean) = backup.runNow(includeExisting)
 
     fun clear() = repo.clear()
 }

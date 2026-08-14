@@ -1568,4 +1568,11 @@
     <string name="gallery_contact_none">Нет подходящих контактов.</string>
     <string name="gallery_person_name_link">Имя / связать с контактом</string>
     <string name="gallery_contact_suggestions">Контакты</string>
+    <string name="gallery_backup">Резервная копия</string>
+    <string name="gallery_backup_desc">Автоматически загружать новые фото устройства в галерею, пока приложение разблокировано.</string>
+    <string name="gallery_backup_enable">Автозагрузка</string>
+    <string name="gallery_backup_wifi">Только Wi-Fi</string>
+    <string name="gallery_backup_videos">Включая видео</string>
+    <string name="gallery_backup_now">Загрузить сейчас</string>
+    <string name="gallery_backup_progress">Загрузка %1$d / %2$d…</string>
 </resources>

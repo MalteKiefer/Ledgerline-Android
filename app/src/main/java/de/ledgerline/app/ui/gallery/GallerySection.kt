@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -23,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Archive
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.People
 import androidx.compose.material.icons.outlined.PhotoAlbum
@@ -78,6 +80,7 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
     var showArchive by remember { mutableStateOf(false) }
     var showAlbums by remember { mutableStateOf(false) }
     var showPeople by remember { mutableStateOf(false) }
+    var showBackup by remember { mutableStateOf(false) }
     var addToAlbum by remember { mutableStateOf(false) }
     val selection = remember { androidx.compose.runtime.mutableStateListOf<Int>() }
     var msg by remember { mutableStateOf<String?>(null) }
@@ -116,6 +119,7 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
     if (showArchive) { GalleryArchiveScreen(vm) { showArchive = false; vm.refresh() }; return }
     if (showAlbums) { GalleryAlbumsScreen(vm) { showAlbums = false }; return }
     if (showPeople) { GalleryPeopleScreen(vm) { showPeople = false }; return }
+    if (showBackup) GalleryBackupSheet(vm, onDismiss = { showBackup = false })
     lightboxId?.let { id ->
         val photo = data?.photos?.firstOrNull { it.id == id }
         if (photo != null) { GalleryLightbox(vm, photo, onClose = { lightboxId = null }); return }
@@ -150,6 +154,9 @@ fun GallerySection(modifier: Modifier = Modifier, vm: GalleryViewModel = hiltVie
                         }
                         IconButton(onClick = { showPeople = true }) {
                             Icon(Icons.Outlined.People, contentDescription = stringResource(R.string.gallery_people))
+                        }
+                        IconButton(onClick = { showBackup = true }) {
+                            Icon(Icons.Outlined.CloudUpload, contentDescription = stringResource(R.string.gallery_backup))
                         }
                         IconButton(onClick = { showArchive = true }) {
                             Icon(Icons.Outlined.Archive, contentDescription = stringResource(R.string.gallery_archived))
@@ -269,6 +276,57 @@ private fun GalleryCell(
                 .background(if (selected) MaterialTheme.colorScheme.primary else Color(0x66000000)),
             contentAlignment = Alignment.Center,
         ) { if (selected) Text("✓", color = Color.White, style = MaterialTheme.typography.labelSmall) }
+    }
+}
+
+/** Camera-roll auto-backup settings: enable (+ permission), Wi-Fi-only, videos, and "back up now". */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun GalleryBackupSheet(vm: GalleryViewModel, onDismiss: () -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val enabled by vm.backupEnabled.collectAsStateWithLifecycle()
+    val wifiOnly by vm.backupWifiOnly.collectAsStateWithLifecycle()
+    val videos by vm.backupVideos.collectAsStateWithLifecycle()
+    val status by vm.backupStatus.collectAsStateWithLifecycle()
+    val sheet = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        if (grants.values.any { it }) vm.setBackupEnabled(true)
+    }
+    fun enableWithPermission() {
+        if (vm.hasMediaPermission()) vm.setBackupEnabled(true)
+        else permLauncher.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO))
+    }
+
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
+        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(stringResource(R.string.gallery_backup), style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.gallery_backup_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+            BackupRow(stringResource(R.string.gallery_backup_enable), enabled) { on -> if (on) enableWithPermission() else vm.setBackupEnabled(false) }
+            BackupRow(stringResource(R.string.gallery_backup_wifi), wifiOnly) { vm.setBackupWifiOnly(it) }
+            BackupRow(stringResource(R.string.gallery_backup_videos), videos) { vm.setBackupVideos(it) }
+
+            if (status.running) {
+                androidx.compose.material3.LinearProgressIndicator(
+                    progress = { if (status.total > 0) status.done.toFloat() / status.total else 0f },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                )
+                Text(stringResource(R.string.gallery_backup_progress, status.done, status.total), style = MaterialTheme.typography.bodySmall)
+            }
+            androidx.compose.material3.TextButton(onClick = {
+                if (!vm.hasMediaPermission()) permLauncher.launch(arrayOf(android.Manifest.permission.READ_MEDIA_IMAGES, android.Manifest.permission.READ_MEDIA_VIDEO))
+                else vm.backupNow(includeExisting = false)
+            }) { Text(stringResource(R.string.gallery_backup_now)) }
+        }
+    }
+}
+
+@Composable
+private fun BackupRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChange)
     }
 }
 
