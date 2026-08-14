@@ -424,8 +424,21 @@ private fun NoteEditorSheet(
                     codeBlock = com.mikepenz.markdown.compose.elements.highlightedCodeBlock,
                     codeFence = com.mikepenz.markdown.compose.elements.highlightedCodeFence,
                 )
+                // Compact heading scale — the renderer's defaults are display-sized (huge on a phone).
+                val mdTypography = com.mikepenz.markdown.m3.markdownTypography(
+                    h1 = MaterialTheme.typography.titleLarge,
+                    h2 = MaterialTheme.typography.titleMedium,
+                    h3 = MaterialTheme.typography.titleSmall,
+                    h4 = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                    h5 = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                    h6 = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+                    text = MaterialTheme.typography.bodyMedium,
+                    table = MaterialTheme.typography.bodySmall,
+                )
                 androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalUriHandler provides wikiHandler) {
-                    Box(Modifier.fillMaxWidth().cardSurface()) { Markdown(content = rendered, components = mdComponents) }
+                    Box(Modifier.fillMaxWidth().cardSurface()) {
+                        Markdown(content = rendered, components = mdComponents, typography = mdTypography)
+                    }
                 }
             } else {
                 OutlinedTextField(value = body, onValueChange = { body = it }, modifier = Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.notes_body_md)) }, minLines = 6)
